@@ -76,7 +76,7 @@ async function listCasesMemory(): Promise<CaseSummary[]> {
     .filter((c) => !c.deletedAt)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 50)
-    .map(({ deletedAt, ...rest }) => rest);
+    .map(({ ...rest }) => rest);
 }
 
 async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
