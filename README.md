@@ -86,6 +86,8 @@ See `.env.example`. Create a local `.env` (not committed).
 - Copy buttons on assistant messages: plain + "system" format
 - Tests: Vitest
 
+---
+
 ### Storage Policy
 - Text-only chat history
 - No storage of images / files / audio
