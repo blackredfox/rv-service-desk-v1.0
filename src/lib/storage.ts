@@ -355,7 +355,9 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput): Promise<Cas
 }
 
 async function softDeleteCaseDb(caseId: string): Promise<void> {
-  await prisma!.case.update({
+  const prisma = await getPrisma();
+  if (!prisma) return softDeleteCaseMemory(caseId);
+  await prisma.case.update({
     where: { id: caseId },
     data: { deletedAt: new Date() },
   });
