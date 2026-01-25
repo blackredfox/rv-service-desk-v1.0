@@ -2,7 +2,6 @@ import type { CaseSummary, ChatMessage } from "@/lib/storage";
 
 export type LanguageMode = "AUTO" | "EN" | "RU" | "ES";
 
-type ApiError = { error: string };
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   const data = (await res.json().catch(() => null)) as T | null;
