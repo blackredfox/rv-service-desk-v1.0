@@ -517,22 +517,20 @@ async function hasDb() {
 export const storage = {
   hasDb,
 
-  listCases: () => (hasDb() ? listCasesDb() : listCasesMemory()),
-  createCase: (input: CreateCaseInput) => (hasDb() ? createCaseDb(input) : createCaseMemory(input)),
-  getCase: (caseId: string) => (hasDb() ? getCaseDb(caseId) : getCaseMemory(caseId)),
-  updateCase: (caseId: string, input: UpdateCaseInput) =>
-    (hasDb() ? updateCaseDb(caseId, input) : updateCaseMemory(caseId, input)),
-  softDeleteCase: (caseId: string) => (hasDb() ? softDeleteCaseDb(caseId) : softDeleteCaseMemory(caseId)),
-  searchCases: (q: string) => (hasDb() ? searchCasesDb(q) : searchCasesMemory(q)),
+  listCases: () => listCasesDb(),
+  createCase: (input: CreateCaseInput) => createCaseDb(input),
+  getCase: (caseId: string) => getCaseDb(caseId),
+  updateCase: (caseId: string, input: UpdateCaseInput) => updateCaseDb(caseId, input),
+  softDeleteCase: (caseId: string) => softDeleteCaseDb(caseId),
+  searchCases: (q: string) => searchCasesDb(q),
   appendMessage: (args: {
     caseId: string;
     role: "user" | "assistant";
     content: string;
     language: Language;
-  }) => (hasDb() ? appendMessageDb(args) : appendMessageMemory(args)),
-  ensureCase: (input: EnsureCaseInput) => (hasDb() ? ensureCaseDb(input) : ensureCaseMemory(input)),
-  listMessagesForContext: (caseId: string, take = 30) =>
-    (hasDb() ? listMessagesForContextDb(caseId, take) : listMessagesForContextMemory(caseId, take)),
+  }) => appendMessageDb(args),
+  ensureCase: (input: EnsureCaseInput) => ensureCaseDb(input),
+  listMessagesForContext: (caseId: string, take = 30) => listMessagesForContextDb(caseId, take),
 
   inferLanguageForMessage: (message: string, mode: "AUTO" | Language) => {
     const detected = detectLanguage(message);
