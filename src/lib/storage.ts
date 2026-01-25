@@ -423,7 +423,7 @@ async function appendMessageDb(args: {
   });
 
   // touch case updatedAt
-  await prisma!.case.update({ where: { id: args.caseId }, data: { updatedAt: new Date() } });
+  await prisma.case.update({ where: { id: args.caseId }, data: { updatedAt: new Date() } });
 
   return {
     id: created.id,
