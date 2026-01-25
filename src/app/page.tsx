@@ -140,6 +140,17 @@ export default function Home() {
         }}
       />
 
+      {termsLoading ? (
+        <div
+          data-testid="terms-loading-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]"
+        >
+          <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
+            Loading Terms...
+          </div>
+        </div>
+      ) : null}
+
       <TermsModal
         open={showTermsModal}
         title="Terms of Use & Privacy Notice"
