@@ -122,7 +122,7 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
     updatedAt: nowIso(),
   };
   store.cases.set(caseId, updated);
-  const { deletedAt, ...summary } = updated;
+  const { ...summary } = updated;
   return summary;
 }
 
@@ -199,7 +199,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
       updatedAt: nowIso(),
     };
     store.cases.set(existing.id, updated);
-    const { deletedAt, ...summary } = updated;
+    const { ...summary } = updated;
     return summary;
   }
 
