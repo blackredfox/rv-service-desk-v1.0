@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 // Mock fs to make the test deterministic (and not depend on build output)
-vi.mock("node:fs/promises", () => ({
-  readFile: vi.fn(async () => "# Terms\n\nHello"),
-}));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import("node:fs/promises");
+  return {
+    ...actual,
+    readFile: vi.fn(async () => "# Terms\n\nHello"),
+  };
+});
 
 import { GET } from "../src/app/api/terms/route";
 
