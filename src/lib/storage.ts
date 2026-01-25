@@ -229,7 +229,9 @@ async function listMessagesForContextMemory(caseId: string, take = 30) {
 }
 
 async function listCasesDb(): Promise<CaseSummary[]> {
-  const rows = await prisma!.case.findMany({
+  const prisma = await getPrisma();
+  if (!prisma) return listCasesMemory();
+  const rows = await prisma.case.findMany({
     where: { deletedAt: null },
     orderBy: { updatedAt: "desc" },
     take: 50,
