@@ -142,13 +142,11 @@ export async function POST(req: Request) {
 
         // Save assistant message
         if (full.trim()) {
-          await prisma.message.create({
-            data: {
-              caseId: ensuredCase.id,
-              role: "assistant",
-              content: full,
-              language: effectiveLanguage,
-            },
+          await storage.appendMessage({
+            caseId: ensuredCase.id,
+            role: "assistant",
+            content: full,
+            language: effectiveLanguage,
           });
         }
 
