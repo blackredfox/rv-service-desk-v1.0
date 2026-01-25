@@ -102,9 +102,14 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
     try {
       const body = await apiChatStream({ caseId: caseId ?? undefined, message: text, languageMode });
-      await readSseStream(body, (ev) => {
+
+      let serverCaseId: string | null = null;
+
+      const onEvent = (ev: ChatSseEvent) => {
         if (ev.type === "case") {
+          serverCaseId = ev.caseId;
           onCaseId(ev.caseId);
+          return;
         }
 
         if (ev.type === "token") {
@@ -113,27 +118,33 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               m.id === `${localId}_assistant` ? { ...m, content: m.content + ev.token } : m
             )
           );
+          return;
         }
 
         if (ev.type === "error") {
           setError(ev.message);
+          return;
         }
 
         if (ev.type === "done") {
           setLoading(false);
-          const effectiveCaseId = caseId ?? null;
-          // refresh persisted messages (works for brand new cases too)
+          setStreaming(false);
+
+          const effectiveCaseId = serverCaseId ?? caseId;
           if (effectiveCaseId) {
             void apiGetCase(effectiveCaseId)
               .then((res) => setMessages(res.messages))
               .catch(() => {});
           }
         }
-      });
+      };
+
+      await readSseStream(body, onEvent);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to send";
       setError(msg);
       setLoading(false);
+      setStreaming(false);
     }
   }
 
