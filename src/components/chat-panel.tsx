@@ -65,6 +65,9 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     [input, loading, disabled]
   );
 
+  const isTyping = streaming && messages.length > 0;
+
+
   async function send() {
     const text = input.trim();
     if (!text) return;
