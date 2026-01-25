@@ -38,7 +38,10 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as ChatBody | null;
   const message = (body?.message ?? "").trim();
   if (!message) {
-    return new Response("Missing message", { status: 400 });
+    return new Response(
+      JSON.stringify({ error: "Missing message" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const languageMode = normalizeLanguageMode(body?.languageMode);
