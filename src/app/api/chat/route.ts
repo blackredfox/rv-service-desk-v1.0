@@ -39,71 +39,28 @@ export async function POST(req: Request) {
   }
 
   const languageMode = normalizeLanguageMode(body?.languageMode);
-  const detected = detectLanguage(message);
-  const effectiveLanguage = languageMode === "AUTO" ? detected.language : languageMode;
-  const languageSource = languageMode === "AUTO" ? "AUTO" : "MANUAL";
+  const { language: effectiveLanguage, languageSource } = storage.inferLanguageForMessage(
+    message,
+    languageMode
+  );
 
   // Ensure a case exists
-  const caseId = body?.caseId;
-  const chatCase = caseId
-    ? await prisma.case.findFirst({ where: { id: caseId, deletedAt: null } })
-    : null;
-
-  const ensuredCase = chatCase
-    ? await prisma.case.update({
-        where: { id: chatCase.id },
-        data: {
-          // If language is manually set, persist it.
-          inputLanguage: effectiveLanguage,
-          languageSource,
-          // Set a title if still default.
-          title:
-            chatCase.title === "New Case"
-              ? message.slice(0, 60)
-              : chatCase.title,
-        },
-      })
-    : await prisma.case.create({
-        data: {
-          title: message.slice(0, 60) || "New Case",
-          inputLanguage: effectiveLanguage,
-          languageSource,
-        },
-      });
+  const ensuredCase = await storage.ensureCase({
+    caseId: body?.caseId,
+    titleSeed: message,
+    inputLanguage: effectiveLanguage,
+    languageSource,
+  });
 
   // Load last 30 messages for context
-  const historyMessages = await prisma.message.findMany({
-    where: { caseId: ensuredCase.id },
-    orderBy: { createdAt: "asc" },
-    take: 30,
-    select: { role: true, content: true },
-  });
-
-  const history = historyMessages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+  const history = await storage.listMessagesForContext(ensuredCase.id, 30);
 
   // Persist user message
-  const userMsg = await prisma.message.create({
-    data: {
-      caseId: ensuredCase.id,
-      role: "user",
-      content: message,
-      language: effectiveLanguage,
-    },
-  });
-
-  await prisma.languageMeta.create({
-    data: {
-      caseId: ensuredCase.id,
-      messageId: userMsg.id,
-      detectedLanguage: effectiveLanguage,
-      confidence: languageMode === "AUTO" ? detected.confidence : 1,
-      source: languageSource,
-    },
+  await storage.appendMessage({
+    caseId: ensuredCase.id,
+    role: "user",
+    content: message,
+    language: effectiveLanguage,
   });
 
   const openAiBody = {
