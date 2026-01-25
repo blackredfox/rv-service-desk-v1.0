@@ -436,8 +436,11 @@ async function appendMessageDb(args: {
 }
 
 async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
+  const prisma = await getPrisma();
+  if (!prisma) return ensureCaseMemory(input);
+
   if (input.caseId) {
-    const existing = await prisma!.case.findFirst({
+    const existing = await prisma.case.findFirst({
       where: { id: input.caseId, deletedAt: null },
       select: { id: true, title: true },
     });
