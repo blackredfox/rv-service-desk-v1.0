@@ -86,12 +86,6 @@ See `.env.example`. Create a local `.env` (not committed).
 - Copy buttons on assistant messages: plain + "system" format
 - Tests: Vitest
 
-See `.env.example`. Create a local `.env` (not committed).
-
-- `OPENAI_API_KEY` (required for chat)
-- `TERMS_VERSION` (required; terms gate versioning)
-- `DATABASE_URL` (optional; enables Prisma/Postgres persistence in Phase 2)
-
 ### Storage Policy
 - Text-only chat history
 - No storage of:
