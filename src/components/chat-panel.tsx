@@ -53,7 +53,10 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading]);
+  const canSend = useMemo(
+    () => input.trim().length > 0 && !loading && !disabled,
+    [input, loading, disabled]
+  );
 
   async function send() {
     const text = input.trim();
