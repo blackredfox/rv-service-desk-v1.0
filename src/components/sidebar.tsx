@@ -6,7 +6,7 @@ import { apiCreateCase, apiDeleteCase, apiListCases, apiSearch } from "@/lib/api
 
 type Props = {
   activeCaseId: string | null;
-  onSelectCase: (caseId: string) => void;
+  onSelectCase: (caseId: string | null) => void;
 };
 
 export function Sidebar({ activeCaseId, onSelectCase }: Props) {
@@ -21,32 +21,33 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
     return cases.filter((c) => c.title.toLowerCase().includes(q));
   }, [cases, query]);
 
-  async function refresh() {
+  async function refresh(): Promise<CaseSummary[]> {
     setLoading(true);
     setError(null);
     try {
-      if (query.trim()) {
-        const res = await apiSearch(query.trim());
-        setCases(res.cases);
-      } else {
-        const res = await apiListCases();
-        setCases(res.cases);
-      }
+      const res = query.trim() ? await apiSearch(query.trim()) : await apiListCases();
+      setCases(res.cases);
+      return res.cases;
     } catch (e: any) {
       setError(e?.message ?? "Failed to load cases");
+      return [];
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    void refresh();
+    void refresh().then((cs) => {
+      if (!activeCaseId && cs.length > 0) onSelectCase(cs[0].id);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      void refresh();
+      void refresh().then((cs) => {
+        if (!activeCaseId && cs.length > 0) onSelectCase(cs[0].id);
+      });
     }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,10 +73,10 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
     setError(null);
     try {
       await apiDeleteCase(caseId);
-      await refresh();
+      const updated = await refresh();
       if (activeCaseId === caseId) {
-        const next = cases.find((c) => c.id !== caseId);
-        if (next) onSelectCase(next.id);
+        const next = updated.find((c) => c.id !== caseId);
+        onSelectCase(next ? next.id : null);
       }
     } catch (e: any) {
       setError(e?.message ?? "Failed to delete case");
