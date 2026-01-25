@@ -76,7 +76,7 @@ async function listCasesMemory(): Promise<CaseSummary[]> {
     .filter((c) => !c.deletedAt)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 50)
-    .map(({ deletedAt: _d, ...rest }) => rest);
+    .map(({ deletedAt: _ignoredDeletedAt, ...rest }) => rest);
 }
 
 async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
@@ -93,7 +93,7 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     deletedAt: null,
   };
   store.cases.set(id, c);
-  const { deletedAt: _d, ...summary } = c;
+  const { deletedAt: _ignoredDeletedAt, ...summary } = c;
   return summary;
 }
 
@@ -106,7 +106,7 @@ async function getCaseMemory(caseId: string): Promise<{ case: CaseSummary | null
     .filter((m) => m.caseId === caseId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const { deletedAt: _d, ...summary } = c;
+  const { deletedAt: _ignoredDeletedAt, ...summary } = c;
   return { case: summary, messages };
 }
 
@@ -122,7 +122,7 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
     updatedAt: nowIso(),
   };
   store.cases.set(caseId, updated);
-  const { deletedAt: _d, ...summary } = updated;
+  const { deletedAt: _ignoredDeletedAt, ...summary } = updated;
   return summary;
 }
 
@@ -157,7 +157,7 @@ async function searchCasesMemory(q: string): Promise<CaseSummary[]> {
   return results
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 25)
-    .map(({ deletedAt: _d, ...summary }) => summary);
+    .map(({ deletedAt: _ignoredDeletedAt, ...summary }) => summary);
 }
 
 async function appendMessageMemory(args: {
@@ -199,7 +199,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
       updatedAt: nowIso(),
     };
     store.cases.set(existing.id, updated);
-    const { deletedAt: _d, ...summary } = updated;
+    const { deletedAt: _ignoredDeletedAt, ...summary } = updated;
     return summary;
   }
 
@@ -215,7 +215,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     deletedAt: null,
   };
   store.cases.set(id, created);
-  const { deletedAt: _d, ...summary } = created;
+  const { deletedAt: _ignoredDeletedAt, ...summary } = created;
   return summary;
 }
 
