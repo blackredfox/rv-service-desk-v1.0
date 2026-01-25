@@ -119,6 +119,7 @@ export async function POST(req: Request) {
             encoder.encode(
               sseEncode({
                 type: "error",
+                code: "UPSTREAM_ERROR",
                 message: `Upstream error (${upstream.status}) ${text}`.slice(0, 500),
               })
             )
