@@ -89,7 +89,13 @@ export default function Home() {
 
   return (
     <div data-testid="app-shell" className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
-      <Sidebar activeCaseId={activeCaseId} onSelectCase={setActiveCaseId} />
+      <Sidebar
+        activeCaseId={activeCaseId}
+        onSelectCase={setActiveCaseId}
+        disabled={appDisabled}
+        onOpenTerms={() => setShowTermsModal(true)}
+        onOpenPrivacy={() => setShowTermsModal(true)}
+      />
 
       <div className="flex h-full flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white/70 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
@@ -98,15 +104,50 @@ export default function Home() {
             <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">
               Diagnostic & authorization agent
             </div>
+            {termsError ? (
+              <div data-testid="terms-load-error" className="ml-3 text-xs text-red-600 dark:text-red-400">
+                {termsError}
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center gap-3">
             <LanguageSelector value={languageMode} onChange={setLanguageMode} />
+            <button
+              type="button"
+              data-testid="header-terms-link"
+              onClick={() => setShowTermsModal(true)}
+              className="hidden rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900 md:inline-flex"
+            >
+              Terms
+            </button>
             <ThemeToggle />
           </div>
         </header>
 
-        <ChatPanel caseId={activeCaseId} languageMode={languageMode} onCaseId={setActiveCaseId} />
+        <ChatPanel
+          caseId={activeCaseId}
+          languageMode={languageMode}
+          onCaseId={setActiveCaseId}
+          disabled={appDisabled}
+        />
       </div>
+
+      <TermsGate
+        open={termsGateOpen}
+        termsVersion={termsVersion}
+        onOpenTerms={() => setShowTermsModal(true)}
+        onAccept={() => {
+          storeTermsAcceptance(termsVersion);
+          setTermsAccepted(true);
+        }}
+      />
+
+      <TermsModal
+        open={showTermsModal}
+        title="Terms of Use & Privacy Notice"
+        markdown={termsMarkdown}
+        onClose={() => setShowTermsModal(false)}
+      />
     </div>
   );
 }
