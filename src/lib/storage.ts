@@ -403,7 +403,9 @@ async function appendMessageDb(args: {
   content: string;
   language: Language;
 }): Promise<ChatMessage> {
-  const created = await prisma!.message.create({
+  const prisma = await getPrisma();
+  if (!prisma) return appendMessageMemory(args);
+  const created = await prisma.message.create({
     data: {
       caseId: args.caseId,
       role: args.role,
