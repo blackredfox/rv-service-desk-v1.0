@@ -1,14 +1,30 @@
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient as PrismaClientType } from "@prisma/client";
 
 declare global {
-  var prisma: PrismaClient | undefined;
+  // Cached instance for dev hot-reload. Can be null when DB is not configured.
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClientType | null | undefined;
 }
 
-export const prisma =
-  process.env.DATABASE_URL
-    ? global.prisma ?? new PrismaClient()
-    : null;
+/**
+ * Returns a PrismaClient instance when DATABASE_URL is set and Prisma client is generated.
+ * In early bootstrap (no DATABASE_URL), returns null and callers should fall back to in-memory storage.
+ */
+export async function getPrisma(): Promise<PrismaClientType | null> {
+  if (!process.env.DATABASE_URL) return null;
 
-if (process.env.NODE_ENV !== "production" && prisma) {
-  global.prisma = prisma;
+  if (global.__prisma !== undefined) {
+    return global.__prisma;
+  }
+
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const client = new PrismaClient();
+    global.__prisma = client;
+    return client;
+  } catch {
+    // If prisma client hasn't been generated yet, this import will fail.
+    global.__prisma = null;
+    return null;
+  }
 }
