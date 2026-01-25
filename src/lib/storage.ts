@@ -215,7 +215,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     deletedAt: null,
   };
   store.cases.set(id, created);
-  const { deletedAt, ...summary } = created;
+  const { ...summary } = created;
   return summary;
 }
 
