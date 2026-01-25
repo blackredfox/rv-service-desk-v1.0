@@ -36,14 +36,17 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 
 **Goal:** Functional ChatGPT-like experience.
 
-- [ ] Chat UI with streaming responses (SSE)
-- [ ] Left sidebar with case list
-- [ ] Create / rename / delete cases
-- [ ] Search cases (title + message text)
-- [ ] Light / Dark mode toggle
-- [ ] Local history support
-- [ ] Cloud text history (basic, optional)
-- [ ] Terms & Privacy acceptance gate
+- [x] Chat UI with streaming responses (SSE)
+- [x] SSE client-abort handling (stop upstream request on disconnect)
+- [x] Left sidebar with case list
+- [x] Create / delete cases (rename deferred)
+- [x] Search cases (title + message text)
+- [x] Light / Dark mode toggle
+- [x] Terms & Privacy acceptance gate + versioning (TERMS_VERSION)
+- [x] Persistent Terms/Privacy links + read-only modal
+- [x] Copy buttons for assistant responses (plain + system)
+- [x] Minimal tests (Vitest)
+- [ ] Cloud text history sync (explicitly deferred)
 
 **Outcome:** Technicians can create and revisit multiple cases.
 
