@@ -5,6 +5,8 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = (await importOriginal()) as typeof import("node:fs/promises");
   return {
     ...actual,
+    // Some ESM environments expect a default export to exist on the mock.
+    default: actual,
     readFile: vi.fn(async () => "# Terms\n\nHello"),
   };
 });

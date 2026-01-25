@@ -92,27 +92,40 @@ export async function readSseStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let doneReceived = false;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split("\n\n");
-    buffer = frames.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
 
-    for (const frame of frames) {
-      const line = frame
-        .split("\n")
-        .map((l) => l.trim())
-        .find((l) => l.startsWith("data:"));
-      if (!line) continue;
-      const payload = line.replace(/^data:\s*/, "");
-      try {
-        onEvent(JSON.parse(payload));
-      } catch {
-        // ignore
+      for (const frame of frames) {
+        const line = frame
+          .split("\n")
+          .map((l) => l.trim())
+          .find((l) => l.startsWith("data:"));
+        if (!line) continue;
+        const payload = line.replace(/^data:\s*/, "");
+        try {
+          const ev = JSON.parse(payload) as ChatSseEvent;
+          if (ev.type === "done") doneReceived = true;
+          onEvent(ev);
+        } catch {
+          // ignore
+        }
       }
+    }
+  } finally {
+    // If the connection ends without an explicit done frame, finalize client state.
+    if (!doneReceived) onEvent({ type: "done" });
+    try {
+      await reader.cancel();
+    } catch {
+      // ignore
     }
   }
 }
