@@ -98,7 +98,8 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
           type="button"
           data-testid="new-case-button"
           onClick={() => void onNewCase()}
-          className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
+          disabled={Boolean(disabled)}
+          className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
         >
           New case
         </button>
