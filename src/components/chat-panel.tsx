@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@/lib/storage";
-import { apiChatStream, apiGetCase, readSseStream, type LanguageMode } from "@/lib/api";
+import {
+  apiChatStream,
+  apiGetCase,
+  readSseStream,
+  type LanguageMode,
+  type ChatSseEvent,
+} from "@/lib/api";
 
 type Props = {
   caseId: string | null;
