@@ -24,6 +24,42 @@ export default function Home() {
   useEffect(() => {
     // restore last session
     try {
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTerms() {
+      setTermsLoading(true);
+      setTermsError(null);
+      try {
+        const t = await fetchTerms();
+        if (cancelled) return;
+
+        setTermsVersion(t.version);
+        setTermsMarkdown(t.markdown);
+
+        const acc = loadTermsAcceptance();
+        const ok = Boolean(acc?.accepted) && acc?.version === t.version;
+        setTermsAccepted(ok);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "Failed to load Terms";
+        setTermsError(msg);
+        setTermsAccepted(false);
+      } finally {
+        if (!cancelled) setTermsLoading(false);
+      }
+    }
+
+    void loadTerms();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const termsGateOpen = !termsLoading && !termsAccepted;
+  const appDisabled = termsGateOpen || termsLoading;
+
       const storedCaseId = localStorage.getItem("rv:lastCaseId");
       const storedLang = localStorage.getItem("rv:languageMode") as LanguageMode | null;
       if (storedCaseId) queueMicrotask(() => setActiveCaseId(storedCaseId));
