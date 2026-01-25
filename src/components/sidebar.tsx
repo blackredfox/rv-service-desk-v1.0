@@ -178,6 +178,26 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
           })}
         </ul>
 
+      <div className="border-t border-zinc-200 p-3 text-sm dark:border-zinc-800">
+        <button
+          type="button"
+          data-testid="sidebar-terms-link"
+          onClick={() => onOpenTerms?.()}
+          className="block w-full rounded-md px-2 py-1 text-left text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        >
+          Terms
+        </button>
+        <button
+          type="button"
+          data-testid="sidebar-privacy-link"
+          onClick={() => onOpenPrivacy?.()}
+          className="mt-1 block w-full rounded-md px-2 py-1 text-left text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        >
+          Privacy
+        </button>
+      </div>
+
+
         {!loading && filtered.length === 0 ? (
           <div data-testid="cases-sidebar-empty" className="px-2 py-2 text-sm text-zinc-500">
             No cases
