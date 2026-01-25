@@ -471,7 +471,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
     }
   }
 
-  const created = await prisma!.case.create({
+  const created = await prisma.case.create({
     data: {
       title: clampTitleSeed(input.titleSeed),
       inputLanguage: input.inputLanguage,
