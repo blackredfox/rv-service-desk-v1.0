@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 
 export type CaseSummary = {
