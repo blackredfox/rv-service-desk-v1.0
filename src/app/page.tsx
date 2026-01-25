@@ -69,17 +69,6 @@ export default function Home() {
   const termsGateOpen = !termsLoading && !termsAccepted;
   const appDisabled = termsGateOpen || termsLoading;
 
-      const storedCaseId = localStorage.getItem("rv:lastCaseId");
-      const storedLang = localStorage.getItem("rv:languageMode") as LanguageMode | null;
-      if (storedCaseId) queueMicrotask(() => setActiveCaseId(storedCaseId));
-      if (storedLang === "AUTO" || storedLang === "EN" || storedLang === "RU" || storedLang === "ES") {
-        queueMicrotask(() => setLanguageMode(storedLang));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   useEffect(() => {
     try {
       if (activeCaseId) localStorage.setItem("rv:lastCaseId", activeCaseId);
