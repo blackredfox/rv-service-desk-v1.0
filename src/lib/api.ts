@@ -74,7 +74,12 @@ export async function apiChatStream(args: { caseId?: string; message: string; la
 
   if (!res.ok || !res.body) {
     const txt = await res.text().catch(() => "");
-    throw new Error(txt || `Chat request failed (${res.status})`);
+    try {
+      const parsed = JSON.parse(txt) as { error?: string };
+      throw new Error(parsed?.error || `Chat request failed (${res.status})`);
+    } catch {
+      throw new Error(txt || `Chat request failed (${res.status})`);
+    }
   }
 
   return res.body;
