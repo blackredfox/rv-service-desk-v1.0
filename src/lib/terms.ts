@@ -36,8 +36,9 @@ export function storeTermsAcceptance(version: string) {
 export async function fetchTerms(): Promise<TermsPayload> {
   const res = await fetch("/api/terms", { cache: "no-store" });
   const data = (await res.json().catch(() => null)) as TermsPayload | { error?: string } | null;
-  if (!res.ok || !data || "error" in (data as any)) {
-    throw new Error((data as any)?.error || `Failed to load terms (${res.status})`);
+  const maybeError = data as unknown as { error?: string } | null;
+  if (!res.ok || !data || typeof maybeError?.error === "string") {
+    throw new Error(maybeError?.error || `Failed to load terms (${res.status})`);
   }
   return data as TermsPayload;
 }
