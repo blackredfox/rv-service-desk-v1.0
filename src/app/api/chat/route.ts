@@ -186,7 +186,9 @@ export async function POST(req: Request) {
 
         const msg = e instanceof Error ? e.message : "Unknown error";
         controller.enqueue(
-          encoder.encode(sseEncode({ type: "error", message: msg.slice(0, 300) }))
+          encoder.encode(
+            sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) })
+          )
         );
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
