@@ -8,9 +8,10 @@ type Props = {
   caseId: string | null;
   languageMode: LanguageMode;
   onCaseId: (caseId: string) => void;
+  disabled?: boolean;
 };
 
-export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
+export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
