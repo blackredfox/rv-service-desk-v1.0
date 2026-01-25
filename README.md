@@ -60,6 +60,13 @@ Commands:
 
 ## Configuration / Env Vars
 
+See `.env.example`. Create a local `.env` (not committed).
+
+- `OPENAI_API_KEY` (required for chat)
+- `TERMS_VERSION` (required; terms gate versioning)
+- `DATABASE_URL` (optional; enables Prisma/Postgres persistence in Phase 2)
+
+---
 
 ## Database / Storage
 
