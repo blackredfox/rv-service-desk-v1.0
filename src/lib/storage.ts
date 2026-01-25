@@ -93,7 +93,7 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     deletedAt: null,
   };
   store.cases.set(id, c);
-  const { deletedAt: _ignoredDeletedAt, ...summary } = c;
+  const { deletedAt, ...summary } = c;
   return summary;
 }
 
@@ -106,7 +106,7 @@ async function getCaseMemory(caseId: string): Promise<{ case: CaseSummary | null
     .filter((m) => m.caseId === caseId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const { deletedAt: _ignoredDeletedAt, ...summary } = c;
+  const { deletedAt, ...summary } = c;
   return { case: summary, messages };
 }
 
