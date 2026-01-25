@@ -323,8 +323,11 @@ async function getCaseDb(caseId: string): Promise<{ case: CaseSummary | null; me
 }
 
 async function updateCaseDb(caseId: string, input: UpdateCaseInput): Promise<CaseSummary | null> {
+  const prisma = await getPrisma();
+  if (!prisma) return updateCaseMemory(caseId, input);
+
   try {
-    const updated = await prisma!.case.update({
+    const updated = await prisma.case.update({
       where: { id: caseId },
       data: {
         ...(input.title ? { title: clampTitle(input.title) } : {}),
