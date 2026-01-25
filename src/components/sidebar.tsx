@@ -9,7 +9,7 @@ type Props = {
   onSelectCase: (caseId: string | null) => void;
 };
 
-export function Sidebar({ activeCaseId, onSelectCase }: Props) {
+export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onOpenPrivacy }: Props & { disabled?: boolean; onOpenTerms?: () => void; onOpenPrivacy?: () => void }) {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
