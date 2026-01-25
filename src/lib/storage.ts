@@ -489,7 +489,7 @@ async function listMessagesForContextDb(caseId: string, take = 30) {
 }
 
 function hasDb() {
-  return Boolean(process.env.DATABASE_URL) && Boolean(prisma);
+  return Boolean(process.env.DATABASE_URL) && prisma !== null;
 }
 
 export const storage = {
