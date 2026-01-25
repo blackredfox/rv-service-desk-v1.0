@@ -178,8 +178,41 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                   : "border-zinc-200 bg-zinc-50 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-50")
               }
             >
-              <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                {m.role === "user" ? "Technician" : "Assistant"}
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {m.role === "user" ? "Technician" : "Assistant"}
+                </div>
+
+                {m.role === "assistant" ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      data-testid={`copy-assistant-plain-${m.id}`}
+                      onClick={() => {
+                        void navigator.clipboard
+                          .writeText(m.content)
+                          .catch(() => setError("Copy failed"));
+                      }}
+                      className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    >
+                      Copy
+                    </button>
+
+                    <button
+                      type="button"
+                      data-testid={`copy-assistant-system-${m.id}`}
+                      onClick={() => {
+                        const formatted = `=== RV SERVICE DESK REPORT ===\n\n${m.content}\n`;
+                        void navigator.clipboard
+                          .writeText(formatted)
+                          .catch(() => setError("Copy failed"));
+                      }}
+                      className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    >
+                      Copy (system)
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <div className="whitespace-pre-wrap">{m.content}</div>
             </div>
