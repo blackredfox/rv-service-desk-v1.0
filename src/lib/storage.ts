@@ -273,7 +273,9 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
 }
 
 async function getCaseDb(caseId: string): Promise<{ case: CaseSummary | null; messages: ChatMessage[] }> {
-  const c = await prisma!.case.findFirst({
+  const prisma = await getPrisma();
+  if (!prisma) return getCaseMemory(caseId);
+  const c = await prisma.case.findFirst({
     where: { id: caseId, deletedAt: null },
     select: {
       id: true,
