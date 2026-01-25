@@ -7,17 +7,26 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 
 ---
 
+## State of MVP (Current Capabilities)
+
+- Chat UI with SSE streaming and client-abort handling
+- Cases: create / list / delete (rename planned)
+- Search (case title + message text)
+- Terms gate + versioning via TERMS_VERSION + localStorage acceptance
+- Copy buttons on assistant messages: plain + system format
+- Tests: Vitest
+
+---
+
 ## Phase 0 — Foundation (Planning & Setup)
 
 **Goal:** Lock product behavior and technical base.
 
-- [ ] Finalize system prompt & policy rules
-- [ ] Define banned / risky language filters
-- [ ] Define authorization-safe report templates
-- [ ] Confirm legal Terms & Privacy (v1.0)
-- [ ] Create repository structure
-- [ ] Configure environment variables and secrets
-- [ ] Set up Postgres schema (cases, messages, terms_acceptance)
+- [x] Finalize system prompt & policy rules
+- [x] Confirm legal Terms & Privacy (v1.0)
+- [x] Create repository structure
+- [x] Configure environment variables and secrets
+- [ ] Postgres schema + migrations (deferred to Phase 2; MVP runs without DB)
 
 **Outcome:** Stable foundation, no feature drift.
 
