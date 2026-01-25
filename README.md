@@ -88,11 +88,8 @@ See `.env.example`. Create a local `.env` (not committed).
 
 ### Storage Policy
 - Text-only chat history
-- No storage of:
-  - images
-  - files
-  - screenshots
-  - audio
+- No storage of images / files / audio
+- No third-party system integrations (copy/paste only)
 - Optional cloud text sync (future)
 
 ---
