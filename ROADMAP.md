@@ -52,10 +52,13 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 
 ---
 
-## Phase 2 — Agent Intelligence
+## Phase 2 — Persistence + Agent Intelligence
 
-**Goal:** Deliver real diagnostic value.
+**Goal:** Enable persistence and deliver real diagnostic value.
 
+- [ ] Enable Prisma/Postgres persistence when DATABASE_URL is provided
+- [ ] Migrations + deployable DB schema (cases, messages, terms_acceptance)
+- [ ] Terms acceptance sync to DB (when DB enabled)
 - [ ] Mode auto-detection (authorization vs customer-pay)
 - [ ] Guided diagnostics flow
 - [ ] Report-from-findings flow
@@ -63,7 +66,7 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 - [ ] Structured report rendering
 - [ ] Copy full report / copy by section
 
-**Outcome:** Authorization-ready output with minimal rework.
+**Outcome:** Authorization-ready output with persistence and minimal rework.
 
 ---
 
