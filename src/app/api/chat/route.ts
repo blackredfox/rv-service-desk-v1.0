@@ -1,6 +1,6 @@
 import { SYSTEM_PROMPT_V1 } from "@/lib/prompts/system-prompt-v1";
-import { prisma } from "@/lib/db";
-import { detectLanguage, normalizeLanguageMode, type LanguageMode } from "@/lib/lang";
+import { normalizeLanguageMode, type LanguageMode } from "@/lib/lang";
+import { storage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
