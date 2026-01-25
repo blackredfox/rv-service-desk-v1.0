@@ -156,7 +156,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
 
           {loading && messages.length === 0 ? (
             <div data-testid="chat-loading" className="text-sm text-zinc-500">
-              Loading0
+              Loading...
             </div>
           ) : null}
 
@@ -191,7 +191,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
           </button>
         </div>
         <div className="mx-auto mt-2 max-w-2xl text-xs text-zinc-500 dark:text-zinc-400">
-          Enter to send  Shift+Enter for newline.
+          Enter to send. Shift+Enter for newline.
         </div>
       </div>
     </section>

@@ -122,7 +122,7 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         {loading && cases.length === 0 ? (
           <div data-testid="cases-sidebar-loading" className="px-2 py-2 text-sm text-zinc-500">
-            Loading0
+            Loading...
           </div>
         ) : null}
 
