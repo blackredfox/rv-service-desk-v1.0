@@ -128,7 +128,9 @@ export async function POST(req: Request) {
             }
 
             try {
-              const json = JSON.parse(payload) as any;
+              const json = JSON.parse(payload) as unknown as {
+                choices?: { delta?: { content?: string } }[];
+              };
               const token: string | undefined = json?.choices?.[0]?.delta?.content;
               if (token) {
                 full += token;
@@ -152,11 +154,10 @@ export async function POST(req: Request) {
 
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Unknown error";
         controller.enqueue(
-          encoder.encode(
-            sseEncode({ type: "error", message: (e?.message ?? "Unknown error").slice(0, 300) })
-          )
+          encoder.encode(sseEncode({ type: "error", message: msg.slice(0, 300) }))
         );
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();

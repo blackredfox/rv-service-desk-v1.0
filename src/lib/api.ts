@@ -6,7 +6,8 @@ export type LanguageMode = "AUTO" | "EN" | "RU" | "ES";
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   const data = (await res.json().catch(() => null)) as T | null;
   if (!res.ok) {
-    const msg = (data as any)?.error || `Request failed (${res.status})`;
+    const maybe = data as unknown as { error?: string } | null;
+    const msg = maybe?.error || `Request failed (${res.status})`;
     throw new Error(msg);
   }
   if (!data) throw new Error("Empty response");

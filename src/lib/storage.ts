@@ -60,14 +60,14 @@ type MemoryStore = {
 };
 
 function getMemoryStore(): MemoryStore {
-  const g = globalThis as any;
+  const g = globalThis as unknown as { __rvServiceDeskMemoryStore?: MemoryStore };
   if (!g.__rvServiceDeskMemoryStore) {
     g.__rvServiceDeskMemoryStore = {
       cases: new Map(),
       messages: new Map(),
-    } satisfies MemoryStore;
+    };
   }
-  return g.__rvServiceDeskMemoryStore as MemoryStore;
+  return g.__rvServiceDeskMemoryStore;
 }
 
 async function listCasesMemory(): Promise<CaseSummary[]> {
@@ -299,7 +299,7 @@ async function getCaseDb(caseId: string): Promise<{ case: CaseSummary | null; me
       id: c.id,
       title: c.title,
       inputLanguage: c.inputLanguage as Language,
-      languageSource: c.languageSource as any,
+      languageSource: c.languageSource as "AUTO" | "MANUAL", 
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     },

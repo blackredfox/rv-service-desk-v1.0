@@ -28,8 +28,9 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
       const res = query.trim() ? await apiSearch(query.trim()) : await apiListCases();
       setCases(res.cases);
       return res.cases;
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load cases");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to load cases";
+      setError(msg);
       return [];
     } finally {
       setLoading(false);
@@ -60,8 +61,9 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
       const res = await apiCreateCase();
       await refresh();
       onSelectCase(res.case.id);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to create case");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to create case";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -78,8 +80,9 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
         const next = updated.find((c) => c.id !== caseId);
         onSelectCase(next ? next.id : null);
       }
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to delete case");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to delete case";
+      setError(msg);
     } finally {
       setLoading(false);
     }

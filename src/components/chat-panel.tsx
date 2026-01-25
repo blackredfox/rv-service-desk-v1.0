@@ -33,9 +33,10 @@ export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
         const res = await apiGetCase(caseId);
         if (cancelled) return;
         setMessages(res.messages);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
-        setError(e?.message ?? "Failed to load messages");
+        const msg = e instanceof Error ? e.message : "Failed to load messages";
+        setError(msg);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -105,7 +106,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
 
         if (ev.type === "done") {
           setLoading(false);
-          const effectiveCaseId = caseId ?? ("caseId" in (ev as any) ? (ev as any).caseId : null);
+          const effectiveCaseId = caseId ?? null;
           // refresh persisted messages (works for brand new cases too)
           if (effectiveCaseId) {
             void apiGetCase(effectiveCaseId)
