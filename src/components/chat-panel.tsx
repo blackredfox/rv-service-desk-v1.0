@@ -105,9 +105,12 @@ export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
 
         if (ev.type === "done") {
           setLoading(false);
-          if (caseId) {
-            // refresh persisted messages
-            void apiGetCase(caseId).then((res) => setMessages(res.messages)).catch(() => {});
+          const effectiveCaseId = caseId ?? ("caseId" in (ev as any) ? (ev as any).caseId : null);
+          // refresh persisted messages (works for brand new cases too)
+          if (effectiveCaseId) {
+            void apiGetCase(effectiveCaseId)
+              .then((res) => setMessages(res.messages))
+              .catch(() => {});
           }
         }
       });
