@@ -115,8 +115,9 @@ export function ChatPanel({ caseId, languageMode, onCaseId }: Props) {
           }
         }
       });
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to send");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to send";
+      setError(msg);
       setLoading(false);
     }
   }
