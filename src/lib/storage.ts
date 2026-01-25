@@ -488,7 +488,8 @@ async function listMessagesForContextDb(caseId: string, take = 30) {
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 }
 
-function hasDb() {
+async function hasDb() {
+  const prisma = await getPrisma();
   return Boolean(process.env.DATABASE_URL) && prisma !== null;
 }
 
