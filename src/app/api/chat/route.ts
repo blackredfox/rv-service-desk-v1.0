@@ -79,12 +79,27 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let full = "";
+      let aborted = false;
+
+      const ac = new AbortController();
+      const onAbort = () => {
+        aborted = true;
+        try {
+          ac.abort();
+        } catch {
+          // ignore
+        }
+      };
+
+      // Abort upstream request if client disconnects
+      req.signal.addEventListener("abort", onAbort, { once: true });
 
       try {
         controller.enqueue(encoder.encode(sseEncode({ type: "case", caseId: ensuredCase.id })));
 
         const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
+          signal: ac.signal,
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
@@ -112,6 +127,7 @@ export async function POST(req: Request) {
         let buffer = "";
 
         while (true) {
+          if (aborted) break;
           const { value, done } = await reader.read();
           if (done) break;
 
@@ -142,8 +158,8 @@ export async function POST(req: Request) {
           }
         }
 
-        // Save assistant message
-        if (full.trim()) {
+        // Save assistant message (skip persistence if client aborted)
+        if (!aborted && full.trim()) {
           await storage.appendMessage({
             caseId: ensuredCase.id,
             role: "assistant",
@@ -155,12 +171,28 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } catch (e: unknown) {
+        // If the client disconnected, just stop.
+        if (aborted) {
+          controller.close();
+          return;
+        }
+
         const msg = e instanceof Error ? e.message : "Unknown error";
         controller.enqueue(
           encoder.encode(sseEncode({ type: "error", message: msg.slice(0, 300) }))
         );
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
+      } finally {
+        req.signal.removeEventListener("abort", onAbort);
+      }
+    },
+    cancel() {
+      // Called if the consumer cancels the stream
+      try {
+        ac.abort();
+      } catch {
+        // ignore
       }
     },
   });
