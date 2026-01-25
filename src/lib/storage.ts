@@ -446,7 +446,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
     });
 
     if (existing) {
-      const updated = await prisma!.case.update({
+      const updated = await prisma.case.update({
         where: { id: existing.id },
         data: {
           inputLanguage: input.inputLanguage,
