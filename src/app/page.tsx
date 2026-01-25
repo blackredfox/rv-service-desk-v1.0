@@ -11,10 +11,7 @@ export default function Home() {
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [languageMode, setLanguageMode] = useState<LanguageMode>("AUTO");
 
-  const [hydrated, setHydrated] = useState(false);
-
   useEffect(() => {
-    setHydrated(true);
     // restore last session
     try {
       const storedCaseId = localStorage.getItem("rv:lastCaseId");
