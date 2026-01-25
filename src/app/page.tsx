@@ -10,6 +10,13 @@ import { TermsModal } from "@/components/terms-modal";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
 import type { LanguageMode } from "@/lib/api";
 
+  const [termsVersion, setTermsVersion] = useState<string>("v1.0");
+  const [termsMarkdown, setTermsMarkdown] = useState<string>("");
+  const [termsLoading, setTermsLoading] = useState(true);
+  const [termsError, setTermsError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+
 export default function Home() {
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [languageMode, setLanguageMode] = useState<LanguageMode>("AUTO");
