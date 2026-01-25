@@ -80,7 +80,7 @@ See `.env.example`. Create a local `.env` (not committed).
 ## State of MVP (Current Capabilities)
 
 - Chat UI with SSE streaming and **client-abort handling**
-- Cases: create / list / rename (planned) / delete
+- Cases: create / list / delete (rename planned)
 - Search (case title + message text)
 - Terms gate + versioning via `TERMS_VERSION` + localStorage acceptance
 - Copy buttons on assistant messages: plain + "system" format
