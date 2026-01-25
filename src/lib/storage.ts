@@ -252,7 +252,9 @@ async function listCasesDb(): Promise<CaseSummary[]> {
 }
 
 async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
-  const created = await prisma!.case.create({
+  const prisma = await getPrisma();
+  if (!prisma) return createCaseMemory(input);
+  const created = await prisma.case.create({
     data: { title: clampTitle(input.title ?? "New Case") },
     select: {
       id: true,
