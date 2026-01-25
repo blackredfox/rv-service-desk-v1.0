@@ -367,7 +367,10 @@ async function searchCasesDb(q: string): Promise<CaseSummary[]> {
   const query = q.trim();
   if (!query) return [];
 
-  const rows = await prisma!.case.findMany({
+  const prisma = await getPrisma();
+  if (!prisma) return searchCasesMemory(query);
+
+  const rows = await prisma.case.findMany({
     where: {
       deletedAt: null,
       OR: [
