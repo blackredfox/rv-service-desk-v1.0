@@ -75,6 +75,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     setInput("");
     setError(null);
     setLoading(true);
+    setStreaming(true);
 
     const localId = `local_${Date.now()}`;
     const now = new Date().toISOString();
