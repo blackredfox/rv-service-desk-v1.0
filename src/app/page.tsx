@@ -23,6 +23,16 @@ export default function Home() {
   useEffect(() => {
     // restore last session
     try {
+      const storedCaseId = localStorage.getItem("rv:lastCaseId");
+      const storedLang = localStorage.getItem("rv:languageMode") as LanguageMode | null;
+      if (storedCaseId) queueMicrotask(() => setActiveCaseId(storedCaseId));
+      if (storedLang === "AUTO" || storedLang === "EN" || storedLang === "RU" || storedLang === "ES") {
+        queueMicrotask(() => setLanguageMode(storedLang));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
