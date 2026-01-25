@@ -73,13 +73,14 @@ export async function apiChatStream(args: { caseId?: string; message: string; la
   });
 
   if (!res.ok || !res.body) {
-    const txt = await res.text().catch(() => "");
-    try {
-      const parsed = JSON.parse(txt) as { error?: string };
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const parsed = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(parsed?.error || `Chat request failed (${res.status})`);
-    } catch {
-      throw new Error(txt || `Chat request failed (${res.status})`);
     }
+
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || `Chat request failed (${res.status})`);
   }
 
   return res.body;
