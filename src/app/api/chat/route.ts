@@ -29,7 +29,10 @@ function buildOpenAiMessages(args: {
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return new Response("Missing OPENAI_API_KEY", { status: 500 });
+    return new Response(
+      JSON.stringify({ error: "Missing OPENAI_API_KEY" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const body = (await req.json().catch(() => null)) as ChatBody | null;
