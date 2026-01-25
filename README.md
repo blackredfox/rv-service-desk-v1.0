@@ -60,6 +60,25 @@ Commands:
 
 ## Configuration / Env Vars
 
+
+## Database / Storage
+
+- The MVP runs with **in-memory storage by default** (no DB required to run locally).
+- When `DATABASE_URL` is provided (Phase 2), Prisma/Postgres persistence will be enabled.
+- **Text-only** storage: case title + message text.
+- No files/images/audio are stored in the MVP.
+
+---
+
+## State of MVP (Current Capabilities)
+
+- Chat UI with SSE streaming and **client-abort handling**
+- Cases: create / list / rename (planned) / delete
+- Search (case title + message text)
+- Terms gate + versioning via `TERMS_VERSION` + localStorage acceptance
+- Copy buttons on assistant messages: plain + "system" format
+- Tests: Vitest
+
 See `.env.example`. Create a local `.env` (not committed).
 
 - `OPENAI_API_KEY` (required for chat)
