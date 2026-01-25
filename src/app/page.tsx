@@ -5,6 +5,9 @@ import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSelector } from "@/components/language-selector";
+import { TermsGate } from "@/components/terms-gate";
+import { TermsModal } from "@/components/terms-modal";
+import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
 import type { LanguageMode } from "@/lib/api";
 
 export default function Home() {
