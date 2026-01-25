@@ -20,7 +20,7 @@ describe("/api/terms route", () => {
     const res = await GET();
     expect(res.status).toBe(200);
 
-    const json = (await res.json()) as any;
+    const json = (await res.json()) as unknown as { version: string; markdown: string };
     expect(json.version).toBe("v1.2");
     expect(typeof json.markdown).toBe("string");
     expect(json.markdown).toContain("Terms");
