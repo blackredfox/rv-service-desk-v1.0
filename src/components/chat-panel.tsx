@@ -191,6 +191,15 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
             </div>
           ) : null}
 
+          {isTyping ? (
+            <div
+              data-testid="assistant-typing-indicator"
+              className="text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              Assistant is typing…
+            </div>
+          ) : null}
+
           <div ref={bottomRef} />
         </div>
       </div>
