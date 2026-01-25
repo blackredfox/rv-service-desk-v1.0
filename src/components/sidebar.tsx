@@ -158,7 +158,7 @@ export function Sidebar({ activeCaseId, onSelectCase }: Props) {
                       role="button"
                       aria-label="Delete case"
                     >
-                      ×
+                      
                     </span>
                   </span>
                 </button>
