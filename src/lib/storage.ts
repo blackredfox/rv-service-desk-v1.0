@@ -157,7 +157,7 @@ async function searchCasesMemory(q: string): Promise<CaseSummary[]> {
   return results
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 25)
-    .map(({ deletedAt, ...summary }) => summary);
+    .map(({ ...summary }) => summary);
 }
 
 async function appendMessageMemory(args: {
