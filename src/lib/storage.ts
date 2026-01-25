@@ -495,7 +495,9 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
 }
 
 async function listMessagesForContextDb(caseId: string, take = 30) {
-  const rows = await prisma!.message.findMany({
+  const prisma = await getPrisma();
+  if (!prisma) return listMessagesForContextMemory(caseId, take);
+  const rows = await prisma.message.findMany({
     where: { caseId },
     orderBy: { createdAt: "asc" },
     take,
