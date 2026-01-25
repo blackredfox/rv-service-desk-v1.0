@@ -2,7 +2,6 @@ import type { PrismaClient as PrismaClientType } from "@prisma/client";
 
 declare global {
   // Cached instance for dev hot-reload. Can be null when DB is not configured.
-  // eslint-disable-next-line no-var
   var __prisma: PrismaClientType | null | undefined;
 }
 
