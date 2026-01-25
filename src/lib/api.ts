@@ -62,7 +62,7 @@ export async function apiSearch(q: string) {
 export type ChatSseEvent =
   | { type: "case"; caseId: string }
   | { type: "token"; token: string }
-  | { type: "error"; message: string }
+  | { type: "error"; message: string; code?: string }
   | { type: "done" };
 
 export async function apiChatStream(args: { caseId?: string; message: string; languageMode: LanguageMode }) {
