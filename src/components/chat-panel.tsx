@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ChatMessage } from "@/lib/storage";
 import {
   apiChatStream,
@@ -25,6 +26,13 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Show Copy (system) only when ?debug=true (or ?debug=1)
+  const searchParams = useSearchParams();
+  const showSystemCopy = useMemo(() => {
+    const v = (searchParams?.get("debug") ?? "").toLowerCase();
+    return v === "true" || v === "1";
+  }, [searchParams]);
 
   useEffect(() => {
     if (!caseId) {
@@ -67,7 +75,6 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
   const isTyping = streaming && messages.length > 0;
 
-
   async function send() {
     const text = input.trim();
     if (!text) return;
@@ -101,7 +108,11 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     ]);
 
     try {
-      const body = await apiChatStream({ caseId: caseId ?? undefined, message: text, languageMode });
+      const body = await apiChatStream({
+        caseId: caseId ?? undefined,
+        message: text,
+        languageMode,
+      });
 
       let serverCaseId: string | null = null;
 
@@ -152,16 +163,25 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     <section data-testid="chat-panel" className="flex h-full flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-6">
         {!caseId && messages.length === 0 ? (
-          <div data-testid="chat-empty-state" className="mx-auto max-w-2xl pt-12 text-zinc-600 dark:text-zinc-300">
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">RV Service Desk</h1>
+          <div
+            data-testid="chat-empty-state"
+            className="mx-auto max-w-2xl pt-12 text-zinc-600 dark:text-zinc-300"
+          >
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+              RV Service Desk
+            </h1>
             <p className="mt-2 text-sm">
-              Start a new case from the left or send a message. The assistant will produce an English report plus a translated copy.
+              Start a new case from the left or send a message. The assistant will produce an English
+              report plus a translated copy.
             </p>
           </div>
         ) : null}
 
         {error ? (
-          <div data-testid="chat-error" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+          <div
+            data-testid="chat-error"
+            className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+          >
             {error}
           </div>
         ) : null}
@@ -198,19 +218,21 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                       Copy
                     </button>
 
-                    <button
-                      type="button"
-                      data-testid={`copy-assistant-system-${m.id}`}
-                      onClick={() => {
-                        const formatted = `=== RV SERVICE DESK REPORT ===\n\n${m.content}\n`;
-                        void navigator.clipboard
-                          .writeText(formatted)
-                          .catch(() => setError("Copy failed"));
-                      }}
-                      className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                    >
-                      Copy (system)
-                    </button>
+                    {showSystemCopy ? (
+                      <button
+                        type="button"
+                        data-testid={`copy-assistant-system-${m.id}`}
+                        onClick={() => {
+                          const formatted = `=== RV SERVICE DESK REPORT ===\n\n${m.content}\n`;
+                          void navigator.clipboard
+                            .writeText(formatted)
+                            .catch(() => setError("Copy failed"));
+                        }}
+                        className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                      >
+                        Copy (system)
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

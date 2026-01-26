@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
-import { ThemeToggle } from "@/components/theme-toggle";
+import dynamic from "next/dynamic";
+const ThemeToggle = dynamic(
+  () => import("@/components/theme-toggle").then((m) => m.ThemeToggle),
+  { ssr: false }
+);
 import { LanguageSelector } from "@/components/language-selector";
 import { TermsGate } from "@/components/terms-gate";
 import { TermsModal } from "@/components/terms-modal";
@@ -86,8 +90,6 @@ export default function Home() {
         activeCaseId={activeCaseId}
         onSelectCase={setActiveCaseId}
         disabled={appDisabled}
-        onOpenTerms={() => setShowTermsModal(true)}
-        onOpenPrivacy={() => setShowTermsModal(true)}
       />
 
       <div className="flex h-full flex-1 flex-col">
@@ -119,18 +121,18 @@ export default function Home() {
 
       {/* Bottom-right Terms & Privacy link */}
       <button
-  type="button"
-  onClick={() => setShowTermsModal(true)}
-  className="
-    fixed bottom-2 right-3 z-40
-    text-[9px] italic uppercase
-    tracking-wider
-    text-red-600 hover:underline
-    dark:text-red-400
-  "
->
-  TERMS AND PRIVACY
-</button>
+        type="button"
+        onClick={() => setShowTermsModal(true)}
+        className="
+          fixed bottom-2 right-3 z-40
+          text-[9px] italic uppercase
+          tracking-wider
+          text-red-600 hover:underline
+          dark:text-red-400
+        "
+      >
+        TERMS AND PRIVACY
+      </button>
 
       <TermsGate
         open={termsGateOpen}

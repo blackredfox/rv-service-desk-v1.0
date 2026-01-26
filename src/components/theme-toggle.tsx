@@ -1,10 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTheme } from "next-themes";
 
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const current = theme === "system" ? resolvedTheme : theme;
+
+  const current = useMemo(() => {
+    const t = theme === "system" ? resolvedTheme : theme;
+    return t === "dark" ? "dark" : "light";
+  }, [theme, resolvedTheme]);
 
   return (
     <button
