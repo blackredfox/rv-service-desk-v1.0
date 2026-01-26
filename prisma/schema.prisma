@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Language {
+  EN
+  RU
+  ES
+}
+
+enum LanguageSource {
+  AUTO
+  MANUAL
+}
+
+enum MessageRole {
+  system
+  user
+  assistant
+}
+
+model Case {
+  id             String         @id @default(uuid())
+  title          String
+  inputLanguage  Language       @default(EN)
+  languageSource LanguageSource @default(AUTO)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  messages       Message[]
+  languageMetas  LanguageMeta[]
+
+  @@index([updatedAt])
+  @@index([deletedAt])
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  caseId    String
+  role      MessageRole
+  content   String
+  language  Language?
+
+  createdAt DateTime @default(now())
+
+  case         Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  languageMeta LanguageMeta?
+
+  @@index([caseId, createdAt])
+}
+
+model LanguageMeta {
+  id              String         @id @default(uuid())
+  caseId          String
+  messageId       String?        @unique
+  detectedLanguage Language
+  confidence      Float?
+  source          LanguageSource @default(AUTO)
+
+  createdAt DateTime @default(now())
+
+  case    Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  message Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+}

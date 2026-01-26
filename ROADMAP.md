@@ -7,17 +7,26 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 
 ---
 
+## State of MVP (Current Capabilities)
+
+- Chat UI with SSE streaming and client-abort handling
+- Cases: create / list / delete (rename planned)
+- Search (case title + message text)
+- Terms gate + versioning via TERMS_VERSION + localStorage acceptance
+- Copy buttons on assistant messages: plain + system format
+- Tests: Vitest
+
+---
+
 ## Phase 0 — Foundation (Planning & Setup)
 
 **Goal:** Lock product behavior and technical base.
 
-- [ ] Finalize system prompt & policy rules
-- [ ] Define banned / risky language filters
-- [ ] Define authorization-safe report templates
-- [ ] Confirm legal Terms & Privacy (v1.0)
-- [ ] Create repository structure
-- [ ] Configure environment variables and secrets
-- [ ] Set up Postgres schema (cases, messages, terms_acceptance)
+- [x] Finalize system prompt & policy rules
+- [x] Confirm legal Terms & Privacy (v1.0)
+- [x] Create repository structure
+- [x] Configure environment variables and secrets
+- [ ] Postgres schema + migrations (deferred to Phase 2; MVP runs without DB)
 
 **Outcome:** Stable foundation, no feature drift.
 
@@ -27,23 +36,29 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 
 **Goal:** Functional ChatGPT-like experience.
 
-- [ ] Chat UI with streaming responses (SSE)
-- [ ] Left sidebar with case list
-- [ ] Create / rename / delete cases
-- [ ] Search cases (title + message text)
-- [ ] Light / Dark mode toggle
-- [ ] Local history support
-- [ ] Cloud text history (basic, optional)
-- [ ] Terms & Privacy acceptance gate
+- [x] Chat UI with streaming responses (SSE)
+- [x] SSE client-abort handling (stop upstream request on disconnect)
+- [x] Left sidebar with case list
+- [x] Create / delete cases (rename deferred)
+- [x] Search cases (title + message text)
+- [x] Light / Dark mode toggle
+- [x] Terms & Privacy acceptance gate + versioning (TERMS_VERSION)
+- [x] Persistent Terms/Privacy links + read-only modal
+- [x] Copy buttons for assistant responses (plain + system)
+- [x] Minimal tests (Vitest)
+- [ ] Cloud text history sync (explicitly deferred)
 
 **Outcome:** Technicians can create and revisit multiple cases.
 
 ---
 
-## Phase 2 — Agent Intelligence
+## Phase 2 — Persistence + Agent Intelligence
 
-**Goal:** Deliver real diagnostic value.
+**Goal:** Enable persistence and deliver real diagnostic value.
 
+- [ ] Enable Prisma/Postgres persistence when DATABASE_URL is provided
+- [ ] Migrations + deployable DB schema (cases, messages, terms_acceptance)
+- [ ] Terms acceptance sync to DB (when DB enabled)
 - [ ] Mode auto-detection (authorization vs customer-pay)
 - [ ] Guided diagnostics flow
 - [ ] Report-from-findings flow
@@ -51,7 +66,7 @@ This roadmap reflects the **agreed MVP scope** and prioritizes:
 - [ ] Structured report rendering
 - [ ] Copy full report / copy by section
 
-**Outcome:** Authorization-ready output with minimal rework.
+**Outcome:** Authorization-ready output with persistence and minimal rework.
 
 ---
 

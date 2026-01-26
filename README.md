@@ -32,32 +32,66 @@ The agent **assists and formats documentation**, but **does not make technical d
 
 ---
 
-## Tech Stack (Selected Option)
+## Tech Stack (Current MVP)
 
-### Frontend
-- **Next.js 14+ (App Router)**
-- TypeScript
+- **Next.js (App Router) + TypeScript**
 - Tailwind CSS
-- shadcn/ui
-- Chat streaming via Server-Sent Events (SSE)
+- API routes (server-only)
+- OpenAI via HTTP + SSE streaming
 - Light / Dark mode
+- Tests: Vitest
 
-### Backend
-- Next.js API routes (server-only)
-- OpenAI (or compatible LLM provider) via server gateway
-- Prompt & policy enforcement layer
+---
 
-### Database
-- **PostgreSQL** (Neon / Render / Supabase DB-only)
-- ORM: Prisma or Drizzle
+## Package Manager (Required)
+
+We officially use **Yarn**.
+
+- `yarn.lock` is the source of truth
+- `package-lock.json` must **not** be used or committed
+
+Commands:
+- `yarn install`
+- `yarn dev`
+- `yarn test`
+- `yarn lint`
+
+---
+
+## Configuration / Env Vars
+
+See `.env.example`. Create a local `.env` (not committed).
+
+- `OPENAI_API_KEY` (required for chat)
+- `TERMS_VERSION` (required; terms gate versioning)
+- `DATABASE_URL` (optional; enables Prisma/Postgres persistence in Phase 2)
+
+---
+
+## Database / Storage
+
+- The MVP runs with **in-memory storage by default** (no DB required to run locally).
+- When `DATABASE_URL` is provided (Phase 2), Prisma/Postgres persistence will be enabled.
+- **Text-only** storage: case title + message text.
+- No files/images/audio are stored in the MVP.
+
+---
+
+## State of MVP (Current Capabilities)
+
+- Chat UI with SSE streaming and **client-abort handling**
+- Cases: create / list / delete (rename planned)
+- Search (case title + message text)
+- Terms gate + versioning via `TERMS_VERSION` + localStorage acceptance
+- Copy buttons on assistant messages: plain + "system" format
+- Tests: Vitest
+
+---
 
 ### Storage Policy
 - Text-only chat history
-- No storage of:
-  - images
-  - files
-  - screenshots
-  - audio
+- No storage of images / files / audio
+- No third-party system integrations (copy/paste only)
 - Optional cloud text sync (future)
 
 ---
