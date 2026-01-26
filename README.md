@@ -1,182 +1,123 @@
+# README.md
+
 # RV Service Desk
 
-**RV Service Desk** is a diagnostic and authorization AI agent for RV service operations in the United States.
+**RV Service Desk** is a diagnostic and authorization assistant for RV technicians.
+It helps technicians structure troubleshooting conversations and generate clear, professional service reports suitable for warranty claims and internal service systems.
 
-The product assists RV technicians during diagnostics and generates authorization-ready technical reports for:
-- warranty claims,
-- insurance claims,
-- customer-pay repairs.
-
-The agent **assists and formats documentation**, but **does not make technical decisions** and **does not guarantee approvals**.
+The product is designed for **speed, clarity, and real‑world shop workflows** — no exports, no clutter, just copy‑ready results.
 
 ---
 
-## Product Principles
+## What the App Does
 
-- ChatGPT-like interface (chat + left sidebar with case history)
-- Minimal, distraction-free UI
-- Text-only data storage (no images, no files, no audio stored)
-- English final reports (with copy in technician’s input language)
-- Technician remains fully responsible for all decisions
+* Guides technicians through structured diagnostics via chat
+* Asks the *right follow‑up questions* automatically
+* Produces a **ready‑to‑copy service report** inside the chat
+* Supports multiple languages (Auto / EN / RU / ES)
+* Works on desktop and mobile
 
----
-
-## Platform (MVP)
-
-**Web Application (PWA-ready)**
-
-- Desktop / Tablet / Mobile browser
-- No messengers
-- No third-party system integrations
-- Copy / Paste workflow only
+Technicians copy the final assistant response and paste it into their existing company system.
 
 ---
 
-## Tech Stack (Current MVP)
+## Core UX Flow
 
-- **Next.js (App Router) + TypeScript**
-- Tailwind CSS
-- API routes (server-only)
-- OpenAI via HTTP + SSE streaming
-- Light / Dark mode
-- Tests: Vitest
-
----
-
-## Package Manager (Required)
-
-We officially use **Yarn**.
-
-- `yarn.lock` is the source of truth
-- `package-lock.json` must **not** be used or committed
-
-Commands:
-- `yarn install`
-- `yarn dev`
-- `yarn test`
-- `yarn lint`
+1. User opens the app
+2. **Welcome screen** explains the purpose of the tool
+3. User accepts **Terms & Privacy**
+4. Main Service Desk UI opens
+5. Technician starts a **New Case**
+6. Chat-based diagnostics
+7. Assistant produces final report
+8. Technician clicks **Copy**
 
 ---
 
-## Configuration / Env Vars
+## Release 1 Scope (MVP)
 
-See `.env.example`. Create a local `.env` (not committed).
+### Frontend
 
-- `OPENAI_API_KEY` (required for chat)
-- `TERMS_VERSION` (required; terms gate versioning)
-- `DATABASE_URL` (optional; enables Prisma/Postgres persistence in Phase 2)
+* Welcome screen with Terms acceptance
+* Sidebar with case list (session + short-term backend storage)
+* Chat interface (technician ↔ assistant)
+* Copy button on assistant response
+* Language selector (Auto / EN / RU / ES)
+* Light / Dark theme
+* Mobile‑friendly layout
 
----
+### Chat Features
 
-## Database / Storage
+* Text input
+* **Voice‑to‑Text** input
+* **Attach photo (session-only)**
 
-- The MVP runs with **in-memory storage by default** (no DB required to run locally).
-- When `DATABASE_URL` is provided (Phase 2), Prisma/Postgres persistence will be enabled.
-- **Text-only** storage: case title + message text.
-- No files/images/audio are stored in the MVP.
+  * Photo is used during the active session only
+  * No persistent storage in Release 1
 
----
+### Auth & Payments
 
-## State of MVP (Current Capabilities)
+* **User authentication required**
+* Authentication handled via **Stripe (paid access)**
+* Logged-in state required to use the app
+* Login / Logout supported
 
-- Chat UI with SSE streaming and **client-abort handling**
-- Cases: create / list / delete (rename planned)
-- Search (case title + message text)
-- Terms gate + versioning via `TERMS_VERSION` + localStorage acceptance
-- Copy buttons on assistant messages: plain + "system" format
-- Tests: Vitest
+### Backend
 
----
+* Backend **is required**
+* Responsibilities:
 
-### Storage Policy
-- Text-only chat history
-- No storage of images / files / audio
-- No third-party system integrations (copy/paste only)
-- Optional cloud text sync (future)
+  * Authentication & access control
+  * Case storage (≈ 30 days noted retention)
+  * Chat message persistence per case
+  * OpenAI request proxy
 
----
+### Infrastructure
 
-## Core Concepts
-
-### Case = Chat
-- Each case is a standalone chat thread
-- Cases are listed in the left sidebar
-- Cases can be renamed or deleted
-- No workflow statuses (by design)
-
-### Operating Modes (Automatic)
-The agent automatically switches modes based on context:
-- **Service Authorization Mode**  
-  (warranty / insurance / third-party payer)
-- **Customer Authorization Mode**  
-  (customer-pay repairs)
-
-Modes are invisible to the user but affect language and output rules.
+* Frontend: **Vercel**
+* Backend: **Render**
+* Database: **Prisma + DB (Postgres or equivalent)**
+* AI: **OpenAI API**
+* Payments: **Stripe**
 
 ---
 
-## Supported Languages
+## What Is NOT in Release 1
 
-### Input
-- English
-- Russian
-- Spanish
-
-### Output
-- Final authorization report: **English only**
-- Additional copy: technician’s input language
+* No file downloads / exports
+* No sharing links
+* No long-term media storage
+* No report history beyond short retention window
+* No advanced analytics UI
 
 ---
 
-## Agent Scenarios
+## Environment Variables (Planned)
 
-### Guided Diagnostics
-- Step-by-step questioning
-- One question at a time
-- Technician-provided answers only
-
-### Report From Findings
-- Technician provides completed diagnostics
-- Agent formats without adding assumptions
-
----
-
-## Output Format
-
-### Authorization-Ready Report (English)
-- Complaint
-- Diagnostic Procedure
-- Verified Condition
-- Recommended Corrective Action
-- Estimated Labor (breakdown + total)
-- Required Parts
-
-No numbering.  
-Shop-style language.  
-Approval-safe wording.
+```env
+OPENAI_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+DATABASE_URL=
+NEXT_PUBLIC_APP_URL=
+```
 
 ---
 
-## Legal & Compliance
+## Target Users
 
-- Mandatory acceptance of Terms & Privacy on first launch
-- Inline disclaimer: agent assists only
-- No liability for approvals, repairs, or outcomes
-- Technician retains full responsibility
-
----
-
-## Non-Goals (MVP)
-
-- No automatic report submission
-- No DMS / insurance integrations
-- No media storage
-- No approval guarantees
+* RV technicians
+* Service departments
+* Warranty processing teams
 
 ---
 
-## Status
+## Product Philosophy
 
-🚧 **In active development (MVP phase)**
+* **Fast > Fancy**
+* **Copy-ready output > PDFs**
+* **Guided thinking > free-form chat**
+* **Real shop workflows > theoretical UX**
 
-See `ROADMAP.md` for details.
+---
+

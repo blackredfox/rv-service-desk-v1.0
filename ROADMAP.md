@@ -1,128 +1,66 @@
-# RV Service Desk — Product Roadmap
+# ROADMAP.md
 
-This roadmap reflects the **agreed MVP scope** and prioritizes:
-- speed to first customer,
-- minimal operational cost,
-- legal and technical safety.
+## Release 1 — MVP (Current Priority)
 
----
+**Goal:** Launch a paid, authenticated Service Desk with core diagnostic value.
 
-## State of MVP (Current Capabilities)
+### Must‑Have
 
-- Chat UI with SSE streaming and client-abort handling
-- Cases: create / list / delete (rename planned)
-- Search (case title + message text)
-- Terms gate + versioning via TERMS_VERSION + localStorage acceptance
-- Copy buttons on assistant messages: plain + system format
-- Tests: Vitest
+* Welcome screen + Terms acceptance
+* Authentication (Stripe‑based)
+* Backend + database
+* Case persistence (~30 days)
+* Chat diagnostics
+* Copy report button
+* Voice‑to‑Text
+* Attach photo (session‑only)
+* Multi‑language support
+* Mobile usability
 
----
+### Nice‑to‑Have (if time permits)
 
-## Phase 0 — Foundation (Planning & Setup)
-
-**Goal:** Lock product behavior and technical base.
-
-- [x] Finalize system prompt & policy rules
-- [x] Confirm legal Terms & Privacy (v1.0)
-- [x] Create repository structure
-- [x] Configure environment variables and secrets
-- [ ] Postgres schema + migrations (deferred to Phase 2; MVP runs without DB)
-
-**Outcome:** Stable foundation, no feature drift.
+* Reset / Clear current case
+* Minor UI polish (colors, spacing)
 
 ---
 
-## Phase 1 — Core Chat MVP
+## Release 2 — Productivity & Retention
 
-**Goal:** Functional ChatGPT-like experience.
+**Goal:** Improve daily usage and reduce friction.
 
-- [x] Chat UI with streaming responses (SSE)
-- [x] SSE client-abort handling (stop upstream request on disconnect)
-- [x] Left sidebar with case list
-- [x] Create / delete cases (rename deferred)
-- [x] Search cases (title + message text)
-- [x] Light / Dark mode toggle
-- [x] Terms & Privacy acceptance gate + versioning (TERMS_VERSION)
-- [x] Persistent Terms/Privacy links + read-only modal
-- [x] Copy buttons for assistant responses (plain + system)
-- [x] Minimal tests (Vitest)
-- [ ] Cloud text history sync (explicitly deferred)
-
-**Outcome:** Technicians can create and revisit multiple cases.
+* Optional photo storage
+* Case history management
+* Clear history button
+* Improved onboarding text
+* UI theming polish
+* Usage analytics
+* Admin dashboard (internal)
 
 ---
 
-## Phase 2 — Persistence + Agent Intelligence
+## Release 3 — Advanced Workflow
 
-**Goal:** Enable persistence and deliver real diagnostic value.
+**Goal:** Deeper integration with service operations.
 
-- [ ] Enable Prisma/Postgres persistence when DATABASE_URL is provided
-- [ ] Migrations + deployable DB schema (cases, messages, terms_acceptance)
-- [ ] Terms acceptance sync to DB (when DB enabled)
-- [ ] Mode auto-detection (authorization vs customer-pay)
-- [ ] Guided diagnostics flow
-- [ ] Report-from-findings flow
-- [ ] Policy enforcement (no forbidden wording)
-- [ ] Structured report rendering
-- [ ] Copy full report / copy by section
-
-**Outcome:** Authorization-ready output with persistence and minimal rework.
+* Structured report templates
+* Diagnostic modes (HVAC, Electrical, Plumbing, etc.)
+* Fleet / shop accounts
+* Role-based access
+* Advanced analytics
 
 ---
 
-## Phase 3 — Field Usability
+## Parking Lot / Ideas
 
-**Goal:** Reduce friction for real-world technicians.
+* Emergency safety guidance (contextual)
+* Offline-first mode
+* Technician presets
+* Company branding
 
-- [ ] Voice input (speech-to-text)
-- [ ] Session-only image upload (no storage)
-- [ ] Session-only file upload (no storage)
-- [ ] Auto-generated case titles
-- [ ] Manual case title editing
-
-**Outcome:** Usable in shop and field environments.
-
----
-
-## Phase 4 — Cost & Safety Controls
-
-**Goal:** Protect margins and prevent abuse.
-
-- [ ] Rate limiting per user
-- [ ] Token usage tracking
-- [ ] Retention policy enforcement
-- [ ] Auto-cleanup of old cases
-- [ ] Error monitoring & alerts
-
-**Outcome:** Predictable cost-to-serve.
-
----
-
-## Phase 5 — First Customer Readiness
-
-**Goal:** Ship to first paying client.
-
-- [ ] UX polish
-- [ ] Performance optimization
-- [ ] Dealer onboarding checklist
-- [ ] Basic pricing plans
-- [ ] Support & feedback loop
-
-**Outcome:** Sellable MVP.
-
----
-
-## Future (Post-MVP, Not Committed)
-
-- Team / organization accounts
-- Cloud history sync by plan
-- API / embedded agent
-- Advanced analytics
-- Insurance-specific templates
-- Enterprise audit logs
+(Items here are intentionally **not committed** to a release.)
 
 ---
 
 ## Guiding Rule
 
-> **If a feature increases complexity without directly reducing claim denials or technician time — it does not belong in MVP.**
+If a feature does not **directly help a technician finish a diagnostic faster**, it does not belong in Release 1.
