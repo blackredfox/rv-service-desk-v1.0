@@ -328,34 +328,66 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       </div>
 
       <div className="border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
-        <div className="mx-auto flex max-w-2xl items-end gap-3">
-          <textarea
-            data-testid="chat-composer-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={disabled ? "Accept Terms to begin" : "Message"}
-            rows={2}
-            disabled={Boolean(disabled)}
-            className="max-h-40 flex-1 resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (canSend) void send();
-              }
-            }}
-          />
-          <button
-            type="button"
-            data-testid="chat-send-button"
-            disabled={!canSend}
-            onClick={() => void send()}
-            className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
-          >
-            Send
-          </button>
-        </div>
-        <div className="mx-auto mt-2 max-w-2xl text-xs text-zinc-500 dark:text-zinc-400">
-          Enter to send. Shift+Enter for newline.
+        <div className="mx-auto max-w-2xl">
+          {/* Photo preview row */}
+          {photoAttachment && (
+            <div className="mb-3">
+              <PhotoAttachButton
+                attachment={photoAttachment}
+                onAttach={setPhotoAttachment}
+                onRemove={() => setPhotoAttachment(null)}
+                disabled={loading || disabled}
+                caseId={caseId}
+              />
+            </div>
+          )}
+          
+          <div className="flex items-end gap-3">
+            {/* Photo attach button (hidden when attachment exists) */}
+            {!photoAttachment && (
+              <PhotoAttachButton
+                attachment={null}
+                onAttach={setPhotoAttachment}
+                onRemove={() => setPhotoAttachment(null)}
+                disabled={loading || disabled}
+                caseId={caseId}
+              />
+            )}
+            
+            {/* Voice button */}
+            <VoiceButton
+              onTranscript={handleVoiceTranscript}
+              disabled={loading || disabled}
+            />
+            
+            <textarea
+              data-testid="chat-composer-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={disabled ? "Accept Terms to begin" : "Message"}
+              rows={2}
+              disabled={Boolean(disabled)}
+              className="max-h-40 flex-1 resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canSend) void send();
+                }
+              }}
+            />
+            <button
+              type="button"
+              data-testid="chat-send-button"
+              disabled={!canSend}
+              onClick={() => void send()}
+              className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
+            >
+              Send
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Enter to send. Shift+Enter for newline.
+          </div>
         </div>
       </div>
     </section>
