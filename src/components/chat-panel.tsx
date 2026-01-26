@@ -100,6 +100,10 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const localId = `local_${Date.now()}`;
     const now = new Date().toISOString();
 
+    // Capture and clear attachment before sending
+    const currentAttachment = photoAttachment;
+    setPhotoAttachment(null);
+
     setMessages((prev) => [
       ...prev,
       {
@@ -121,11 +125,28 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     ]);
 
     try {
-      const body = await apiChatStream({
+      // Build request body with optional attachment
+      const requestBody: {
+        caseId?: string;
+        message: string;
+        languageMode: LanguageMode;
+        attachments?: Array<{ type: "image"; dataUrl: string }>;
+      } = {
         caseId: caseId ?? undefined,
         message: text,
         languageMode,
-      });
+      };
+
+      if (currentAttachment) {
+        requestBody.attachments = [
+          { type: "image", dataUrl: currentAttachment.dataUrl },
+        ];
+      }
+
+      const body = await apiChatStreamWithAttachments(requestBody);
+
+      // Track chat sent
+      void analytics.chatSent(caseId ?? undefined);
 
       let serverCaseId: string | null = null;
 
@@ -151,6 +172,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
         if (ev.type === "error") {
           setError(ev.message);
+          void analytics.chatError();
           return;
         }
 
@@ -173,7 +195,35 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       setError(msg);
       setLoading(false);
       setStreaming(false);
+      void analytics.chatError();
     }
+  }
+
+  // Extended chat stream function that supports attachments
+  async function apiChatStreamWithAttachments(args: {
+    caseId?: string;
+    message: string;
+    languageMode: LanguageMode;
+    attachments?: Array<{ type: "image"; dataUrl: string }>;
+  }) {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    });
+
+    if (!res.ok || !res.body) {
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const parsed = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(parsed?.error || `Chat request failed (${res.status})`);
+      }
+
+      const txt = await res.text().catch(() => "");
+      throw new Error(txt || `Chat request failed (${res.status})`);
+    }
+
+    return res.body;
   }
 
   return (
