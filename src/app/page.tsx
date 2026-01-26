@@ -85,6 +85,8 @@ function WelcomeScreen(props: {
 }
 
 export default function Home() {
+  const { user, loading: authLoading, logout } = useAuth();
+  
   const [termsVersion, setTermsVersion] = useState<string>("v1.0");
   const [termsMarkdown, setTermsMarkdown] = useState<string>("");
   const [termsLoading, setTermsLoading] = useState(true);
@@ -154,7 +156,23 @@ export default function Home() {
     } catch {}
   }, [languageMode]);
 
-  // 1) Loading state (blocking)
+  // 1) Auth loading state
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
+        <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // 2) Not authenticated - show login screen
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  // 3) Terms loading state
   if (termsLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
@@ -165,7 +183,7 @@ export default function Home() {
     );
   }
 
-  // 2) Welcome gate (replaces the old "Accept terms" blank page)
+  // 4) Welcome gate (replaces the old "Accept terms" blank page)
   if (!termsAccepted) {
     return (
       <>
@@ -188,7 +206,7 @@ export default function Home() {
     );
   }
 
-  // 3) Main app
+  // 5) Main app
   return (
     <div className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
      <Sidebar
@@ -210,6 +228,23 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* User info + logout */}
+            <div className="flex items-center gap-2">
+              <span
+                data-testid="user-email-display"
+                className="hidden text-xs text-zinc-600 dark:text-zinc-400 sm:inline"
+              >
+                {user.email}
+              </span>
+              <button
+                type="button"
+                data-testid="logout-button"
+                onClick={() => void logout()}
+                className="rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                Logout
+              </button>
+            </div>
             <LanguageSelector value={languageMode} onChange={setLanguageMode} />
             <ThemeToggle />
           </div>
