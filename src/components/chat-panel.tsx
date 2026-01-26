@@ -27,6 +27,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoAttachment, setPhotoAttachment] = useState<PhotoAttachment | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -36,6 +37,11 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const v = (searchParams?.get("debug") ?? "").toLowerCase();
     return v === "true" || v === "1";
   }, [searchParams]);
+
+  // Voice transcript handler
+  const handleVoiceTranscript = useCallback((text: string) => {
+    setInput((prev) => (prev ? `${prev} ${text}` : text));
+  }, []);
 
   useEffect(() => {
     if (!caseId) {
