@@ -214,9 +214,11 @@ class RVServiceDeskAPITester:
             return True
         return False
 
+    # === CASES API TESTS ===
+
     def test_cases_list_empty(self):
         """Test GET /api/cases (should be empty initially)"""
-        success, response = self.run_test(
+        success, response, cookies = self.run_test(
             "List Cases (Empty)",
             "GET",
             "api/cases",
@@ -229,7 +231,7 @@ class RVServiceDeskAPITester:
 
     def test_create_case(self):
         """Test POST /api/cases"""
-        success, response = self.run_test(
+        success, response, cookies = self.run_test(
             "Create Case",
             "POST",
             "api/cases",
@@ -248,7 +250,7 @@ class RVServiceDeskAPITester:
             print("❌ No case ID available for testing")
             return False
             
-        success, response = self.run_test(
+        success, response, cookies = self.run_test(
             "Get Case by ID",
             "GET",
             f"api/cases/{self.case_id}",
@@ -260,18 +262,37 @@ class RVServiceDeskAPITester:
             return True
         return False
 
-    def test_search_cases(self):
-        """Test GET /api/search"""
-        success, response = self.run_test(
-            "Search Cases",
-            "GET",
-            "api/search?q=Test",
-            200
+    def test_update_case(self):
+        """Test PATCH /api/cases/[id]"""
+        if not self.case_id:
+            print("❌ No case ID available for testing")
+            return False
+            
+        success, response, cookies = self.run_test(
+            "Update Case",
+            "PATCH",
+            f"api/cases/{self.case_id}",
+            200,
+            data={"title": "Updated Test Case", "languageMode": "EN"}
         )
-        if success and 'cases' in response:
-            print(f"   Search results: {len(response['cases'])} cases")
+        if success and 'case' in response:
+            print(f"   Updated case title: {response['case'].get('title')}")
             return True
         return False
+
+    def test_delete_case(self):
+        """Test DELETE /api/cases/[id]"""
+        if not self.case_id:
+            print("❌ No case ID available for testing")
+            return False
+            
+        success, response, cookies = self.run_test(
+            "Delete Case",
+            "DELETE",
+            f"api/cases/{self.case_id}",
+            200
+        )
+        return success
 
     def test_chat_without_openai_key(self):
         """Test POST /api/chat without OPENAI_API_KEY"""
