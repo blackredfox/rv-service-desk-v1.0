@@ -11,8 +11,11 @@ class RVServiceDeskAPITester:
         self.tests_run = 0
         self.tests_passed = 0
         self.case_id = None
+        self.session_cookies = None
+        self.test_user_email = f"test_{datetime.now().strftime('%H%M%S')}@example.com"
+        self.test_user_password = "TestPassword123!"
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None):
+    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, cookies=None):
         """Run a single API test"""
         url = f"{self.base_url}/{endpoint}"
         default_headers = {'Content-Type': 'application/json'}
@@ -24,12 +27,20 @@ class RVServiceDeskAPITester:
         print(f"   URL: {method} {url}")
         
         try:
+            kwargs = {'headers': default_headers}
+            if cookies:
+                kwargs['cookies'] = cookies
+            elif self.session_cookies:
+                kwargs['cookies'] = self.session_cookies
+                
             if method == 'GET':
-                response = requests.get(url, headers=default_headers)
+                response = requests.get(url, **kwargs)
             elif method == 'POST':
-                response = requests.post(url, json=data, headers=default_headers)
+                response = requests.post(url, json=data, **kwargs)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=default_headers)
+                response = requests.delete(url, **kwargs)
+            elif method == 'PATCH':
+                response = requests.patch(url, json=data, **kwargs)
 
             success = response.status_code == expected_status
             if success:
@@ -38,9 +49,9 @@ class RVServiceDeskAPITester:
                 try:
                     response_data = response.json()
                     print(f"   Response: {json.dumps(response_data, indent=2)[:200]}...")
-                    return True, response_data
+                    return True, response_data, response.cookies
                 except:
-                    return True, {}
+                    return True, {}, response.cookies
             else:
                 print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
                 try:
@@ -48,11 +59,11 @@ class RVServiceDeskAPITester:
                     print(f"   Error: {error_data}")
                 except:
                     print(f"   Error text: {response.text[:200]}")
-                return False, {}
+                return False, {}, None
 
         except Exception as e:
             print(f"❌ Failed - Error: {str(e)}")
-            return False, {}
+            return False, {}, None
 
     def test_terms_api(self):
         """Test /api/terms endpoint"""
