@@ -67,6 +67,8 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled }: Props) {
       const res = await apiCreateCase();
       await refresh();
       onSelectCase(res.case.id);
+      // Track case created
+      void analytics.caseCreated(res.case.id);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to create case";
       setError(msg);
