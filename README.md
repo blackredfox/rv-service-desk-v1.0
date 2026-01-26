@@ -82,46 +82,17 @@ APP_URL="http://localhost:3000"
 ### Prerequisites
 - Node.js 18+
 - Yarn
-- PostgreSQL (local or hosted)
+- PostgreSQL (Supabase recommended)
 
-### Option 1: Local PostgreSQL with Docker
+### Database Setup (Supabase)
 
-```bash
-# Start PostgreSQL container
-docker run --name rv-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=rv_service_desk \
-  -p 5432:5432 \
-  -d postgres:16
-
-# Set DATABASE_URL in .env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/rv_service_desk?schema=public"
-```
-
-### Option 2: Docker Compose
-
-Create `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-services:
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: rv_service_desk
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
-```
-
-Run: `docker compose up -d`
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Go to **Settings → Database → Connection String**
+3. Copy the **Transaction Pooler** URL (recommended for serverless)
+4. Set in `.env`:
+   ```
+   DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true"
+   ```
 
 ### Installation
 
@@ -132,8 +103,8 @@ yarn install
 # Generate Prisma client
 yarn prisma:generate
 
-# Run database migrations
-yarn prisma:migrate
+# Push schema to database (run locally, not in CI)
+npx prisma db push
 
 # Start development server
 yarn dev
