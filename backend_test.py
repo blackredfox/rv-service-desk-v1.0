@@ -460,19 +460,54 @@ class RVServiceDeskAPITester:
         print("🚀 Starting RV Service Desk API Tests")
         print("=" * 50)
 
-        # Test terms API
+        # Test terms API (no auth required)
         self.test_terms_api()
         
-        # Test cases API
+        # Test auth registration flow
+        print("\n" + "=" * 30 + " AUTH TESTS " + "=" * 30)
+        self.test_auth_register_invalid_data()
+        self.test_auth_register_valid()
+        self.test_auth_register_duplicate()
+        self.test_auth_me_authenticated()
+        
+        # Test logout and unauthenticated access
+        self.test_auth_logout()
+        self.test_auth_me_unauthenticated()
+        
+        # Test login flow
+        self.test_auth_login_invalid()
+        self.test_auth_login_valid()
+        
+        # Test cases API (some endpoints work without auth for backward compatibility)
+        print("\n" + "=" * 30 + " CASES TESTS " + "=" * 30)
         self.test_cases_list_empty()
         self.test_create_case()
         self.test_get_case()
-        self.test_search_cases()
+        self.test_update_case()
         
         # Test chat API (should fail without OpenAI key)
+        print("\n" + "=" * 30 + " CHAT TESTS " + "=" * 30)
         self.test_chat_without_openai_key()
+        self.test_chat_missing_message()
         
-        # Test delete case
+        # Test billing API (requires auth and Stripe config)
+        print("\n" + "=" * 30 + " BILLING TESTS " + "=" * 30)
+        self.test_billing_checkout_unauthenticated()
+        self.test_billing_checkout_authenticated()
+        self.test_billing_checkout_invalid_plan()
+        self.test_billing_webhook_no_signature()
+        self.test_billing_webhook_invalid_signature()
+        
+        # Test analytics API (requires auth)
+        print("\n" + "=" * 30 + " ANALYTICS TESTS " + "=" * 30)
+        self.test_analytics_unauthenticated()
+        self.test_analytics_authenticated_valid()
+        self.test_analytics_invalid_event()
+        self.test_analytics_missing_event_name()
+        self.test_analytics_large_payload()
+        
+        # Clean up - delete test case
+        print("\n" + "=" * 30 + " CLEANUP " + "=" * 30)
         self.test_delete_case()
 
         # Print results
