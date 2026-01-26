@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeLanguageMode } from "@/lib/lang";
+import { getCurrentUser } from "@/lib/auth";
 import { storage } from "@/lib/storage";
 
 type PatchBody = {
@@ -12,8 +13,9 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser();
     const { id } = await ctx.params;
-    const data = await storage.getCase(id);
+    const data = await storage.getCase(id, user?.id);
 
     if (!data.case) {
       return NextResponse.json({ error: "Case not found" }, { status: 404 });
@@ -27,16 +29,21 @@ export async function GET(
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
+    const user = await getCurrentUser();
     const { id } = await ctx.params;
     const body = (await req.json().catch(() => null)) as PatchBody | null;
 
     const languageMode = normalizeLanguageMode(body?.languageMode);
-    const updated = await storage.updateCase(id, {
-      title: body?.title,
-      ...(languageMode !== "AUTO"
-        ? { inputLanguage: languageMode, languageSource: "MANUAL" }
-        : { languageSource: "AUTO" }),
-    });
+    const updated = await storage.updateCase(
+      id,
+      {
+        title: body?.title,
+        ...(languageMode !== "AUTO"
+          ? { inputLanguage: languageMode, languageSource: "MANUAL" }
+          : { languageSource: "AUTO" }),
+      },
+      user?.id
+    );
 
     if (!updated) {
       return NextResponse.json({ error: "Case not found" }, { status: 404 });
@@ -53,8 +60,9 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser();
     const { id } = await ctx.params;
-    await storage.softDeleteCase(id);
+    await storage.softDeleteCase(id, user?.id);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Failed to delete case" }, { status: 500 });
