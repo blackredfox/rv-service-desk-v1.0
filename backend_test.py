@@ -65,19 +65,153 @@ class RVServiceDeskAPITester:
             print(f"❌ Failed - Error: {str(e)}")
             return False, {}, None
 
-    def test_terms_api(self):
-        """Test /api/terms endpoint"""
-        success, response = self.run_test(
-            "Terms API",
+    # === AUTH TESTS ===
+    
+    def test_auth_register_invalid_data(self):
+        """Test POST /api/auth/register with invalid data"""
+        # Test missing email
+        success, response, cookies = self.run_test(
+            "Auth Register - Missing Email",
+            "POST",
+            "api/auth/register",
+            400,
+            data={"password": self.test_user_password}
+        )
+        
+        # Test missing password
+        success, response, cookies = self.run_test(
+            "Auth Register - Missing Password",
+            "POST",
+            "api/auth/register",
+            400,
+            data={"email": self.test_user_email}
+        )
+        
+        # Test invalid email format
+        success, response, cookies = self.run_test(
+            "Auth Register - Invalid Email",
+            "POST",
+            "api/auth/register",
+            400,
+            data={"email": "invalid-email", "password": self.test_user_password}
+        )
+        
+        # Test weak password
+        success, response, cookies = self.run_test(
+            "Auth Register - Weak Password",
+            "POST",
+            "api/auth/register",
+            400,
+            data={"email": self.test_user_email, "password": "123"}
+        )
+        
+        return True
+
+    def test_auth_register_valid(self):
+        """Test POST /api/auth/register with valid data"""
+        success, response, cookies = self.run_test(
+            "Auth Register - Valid Data",
+            "POST",
+            "api/auth/register",
+            201,
+            data={"email": self.test_user_email, "password": self.test_user_password}
+        )
+        
+        if success and cookies:
+            self.session_cookies = cookies
+            print(f"   Registered user: {response.get('user', {}).get('email')}")
+            return True
+        return False
+
+    def test_auth_register_duplicate(self):
+        """Test POST /api/auth/register with duplicate email"""
+        success, response, cookies = self.run_test(
+            "Auth Register - Duplicate Email",
+            "POST",
+            "api/auth/register",
+            409,
+            data={"email": self.test_user_email, "password": self.test_user_password}
+        )
+        return success
+
+    def test_auth_me_authenticated(self):
+        """Test GET /api/auth/me when authenticated"""
+        success, response, cookies = self.run_test(
+            "Auth Me - Authenticated",
             "GET",
-            "api/terms",
+            "api/auth/me",
             200
         )
+        
         if success:
-            if 'version' in response and 'markdown' in response:
-                print(f"   Terms version: {response.get('version')}")
-                print(f"   Markdown length: {len(response.get('markdown', ''))}")
-                return True
+            print(f"   User info: {response}")
+            return True
+        return False
+
+    def test_auth_logout(self):
+        """Test POST /api/auth/logout"""
+        success, response, cookies = self.run_test(
+            "Auth Logout",
+            "POST",
+            "api/auth/logout",
+            200
+        )
+        
+        if success:
+            self.session_cookies = None  # Clear session
+            return True
+        return False
+
+    def test_auth_me_unauthenticated(self):
+        """Test GET /api/auth/me when not authenticated"""
+        success, response, cookies = self.run_test(
+            "Auth Me - Unauthenticated",
+            "GET",
+            "api/auth/me",
+            401,
+            cookies={}  # No cookies
+        )
+        return success
+
+    def test_auth_login_invalid(self):
+        """Test POST /api/auth/login with invalid credentials"""
+        # Test wrong password
+        success, response, cookies = self.run_test(
+            "Auth Login - Wrong Password",
+            "POST",
+            "api/auth/login",
+            401,
+            data={"email": self.test_user_email, "password": "wrongpassword"},
+            cookies={}
+        )
+        
+        # Test non-existent user
+        success, response, cookies = self.run_test(
+            "Auth Login - Non-existent User",
+            "POST",
+            "api/auth/login",
+            401,
+            data={"email": "nonexistent@example.com", "password": self.test_user_password},
+            cookies={}
+        )
+        
+        return True
+
+    def test_auth_login_valid(self):
+        """Test POST /api/auth/login with valid credentials"""
+        success, response, cookies = self.run_test(
+            "Auth Login - Valid Credentials",
+            "POST",
+            "api/auth/login",
+            200,
+            data={"email": self.test_user_email, "password": self.test_user_password},
+            cookies={}
+        )
+        
+        if success and cookies:
+            self.session_cookies = cookies
+            print(f"   Logged in user: {response.get('user', {}).get('email')}")
+            return True
         return False
 
     def test_cases_list_empty(self):
