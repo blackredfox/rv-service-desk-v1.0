@@ -11,7 +11,7 @@ function getStripe(): Stripe {
       throw new Error("Missing STRIPE_SECRET_KEY");
     }
     stripeInstance = new Stripe(secretKey, {
-      apiVersion: "2025-05-28.basil",
+      apiVersion: "2025-12-15.clover",
     });
   }
   return stripeInstance;
