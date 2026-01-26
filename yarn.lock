@@ -1667,6 +1667,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bcryptjs@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "@types/bcryptjs@npm:3.0.0"
+  dependencies:
+    bcryptjs: "npm:*"
+  checksum: 10c0/5d61ce381736f8252627cf32f2bbc17003c0361c6cf63ac23034a651b9c1edfdbf8f786730816e0b5257a927ffa369658562183a68495eb07ca2ddc77fbb171c
+  languageName: node
+  linkType: hard
+
 "@types/chai@npm:^5.2.2":
   version: 5.2.3
   resolution: "@types/chai@npm:5.2.3"
@@ -1729,6 +1738,15 @@ __metadata:
   dependencies:
     csstype: "npm:^3.2.2"
   checksum: 10c0/91c6839edd10ebdab4cd686d2a744e6ae078ed5831a36d48284ae92df0463c89bda1084ffdd2e6445f0716236c2c6ae0828b82f70720727632331695f4581d2a
+  languageName: node
+  linkType: hard
+
+"@types/uuid@npm:^11.0.0":
+  version: 11.0.0
+  resolution: "@types/uuid@npm:11.0.0"
+  dependencies:
+    uuid: "npm:*"
+  checksum: 10c0/6ebf1448d8fdc78d348a8a84389b74083f2f58bed75a5a6cf3be8419d33dcf757735c8b2de746b066ff8ef07f4384d02549774dc84195ffa46b24745471e9d8e
   languageName: node
   linkType: hard
 
@@ -2337,6 +2355,15 @@ __metadata:
   bin:
     baseline-browser-mapping: dist/cli.js
   checksum: 10c0/869bdbb2784f8b1bc49b52d54ea48bf9ea6da8309195e3a0b3f4625197b8187a9b557b1d02f1b6b6dd51f163840a87db259e2b791eed35f0c5fddf3110c4cf28
+  languageName: node
+  linkType: hard
+
+"bcryptjs@npm:*, bcryptjs@npm:^3.0.3":
+  version: 3.0.3
+  resolution: "bcryptjs@npm:3.0.3"
+  bin:
+    bcrypt: bin/bcrypt
+  checksum: 10c0/127c94699f07eab5fbbb89d600c3f0e36ae6fd001e028139740b41fffb62a23a2743523fb88f442ae3308a27d4843b97ccb9e436d78f5c5899be187d0972c6d5
   languageName: node
   linkType: hard
 
@@ -5379,6 +5406,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"qs@npm:^6.14.1":
+  version: 6.14.1
+  resolution: "qs@npm:6.14.1"
+  dependencies:
+    side-channel: "npm:^1.1.0"
+  checksum: 10c0/0e3b22dc451f48ce5940cbbc7c7d9068d895074f8c969c0801ac15c1313d1859c4d738e46dc4da2f498f41a9ffd8c201bd9fb12df67799b827db94cc373d2613
+  languageName: node
+  linkType: hard
+
 "queue-microtask@npm:^1.2.2":
   version: 1.2.3
   resolution: "queue-microtask@npm:1.2.3"
@@ -5664,10 +5700,13 @@ __metadata:
   dependencies:
     "@prisma/client": "npm:^7.3.0"
     "@tailwindcss/postcss": "npm:^4"
+    "@types/bcryptjs": "npm:^3.0.0"
     "@types/node": "npm:^20"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"
+    "@types/uuid": "npm:^11.0.0"
     "@vitest/ui": "npm:^4.0.18"
+    bcryptjs: "npm:^3.0.3"
     clsx: "npm:^2.1.1"
     eslint: "npm:^9"
     eslint-config-next: "npm:16.1.4"
@@ -5677,8 +5716,10 @@ __metadata:
     prisma: "npm:^7.3.0"
     react: "npm:19.2.3"
     react-dom: "npm:19.2.3"
+    stripe: "npm:^20.2.0"
     tailwindcss: "npm:^4"
     typescript: "npm:^5"
+    uuid: "npm:^13.0.0"
     vitest: "npm:^4.0.18"
   languageName: unknown
   linkType: soft
@@ -6158,6 +6199,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"stripe@npm:^20.2.0":
+  version: 20.2.0
+  resolution: "stripe@npm:20.2.0"
+  dependencies:
+    qs: "npm:^6.14.1"
+  peerDependencies:
+    "@types/node": ">=16"
+  peerDependenciesMeta:
+    "@types/node":
+      optional: true
+  checksum: 10c0/f91726e64fe91dfc9c40b0b305bc8d47d1d2765104e1844ee97364d742126fe95f375b7f5b1dbd17e7c3d288ae124c25dcc441c5cebdc23efc1d9b5bc7623fa6
+  languageName: node
+  linkType: hard
+
 "styled-jsx@npm:5.1.6":
   version: 5.1.6
   resolution: "styled-jsx@npm:5.1.6"
@@ -6556,6 +6611,15 @@ __metadata:
   dependencies:
     punycode: "npm:^2.1.0"
   checksum: 10c0/4ef57b45aa820d7ac6496e9208559986c665e49447cb072744c13b66925a362d96dd5a46c4530a6b8e203e5db5fe849369444440cb22ecfc26c679359e5dfa3c
+  languageName: node
+  linkType: hard
+
+"uuid@npm:*, uuid@npm:^13.0.0":
+  version: 13.0.0
+  resolution: "uuid@npm:13.0.0"
+  bin:
+    uuid: dist-node/bin/uuid
+  checksum: 10c0/950e4c18d57fef6c69675344f5700a08af21e26b9eff2bf2180427564297368c538ea11ac9fb2e6528b17fc3966a9fd2c5049361b0b63c7d654f3c550c9b3d67
   languageName: node
   linkType: hard
 

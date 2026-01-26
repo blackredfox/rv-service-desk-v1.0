@@ -42,10 +42,15 @@ model User {
   password  String
   createdAt DateTime @default(now())
 
-  sessions      Session[]
-  subscription  Subscription?
-  cases         Case[]
+  sessions        Session[]
+  subscription    Subscription?
+  cases           Case[]
   analyticsEvents AnalyticsEvent[]
+
+  // ✅ Added opposite relation fields (fixes prisma validate errors)
+  termsAcceptances TermsAcceptance[]
+  auditLogs        AuditLog[]
+  apiKeys          ApiKey[]
 
   @@index([email])
 }
@@ -77,57 +82,112 @@ model Subscription {
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+  @@index([status])
 }
 
 model Case {
-  id             String         @id @default(uuid())
-  userId         String?
-  title          String
-  inputLanguage  Language       @default(EN)
-  languageSource LanguageSource @default(AUTO)
-
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  language  Language
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  messages      Message[]
-  languageMetas LanguageMeta[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
 
-  @@index([userId])
-  @@index([updatedAt])
+  // ✅ Added opposite relation fields (fixes prisma validate errors)
+  reports     Report[]
+  attachments Attachment[]
+
+  @@index([userId, createdAt])
   @@index([deletedAt])
 }
 
 model Message {
-  id       String      @id @default(uuid())
-  caseId   String
-  role     MessageRole
-  content  String
-  language Language?
+  id        String      @id @default(cuid())
+  caseId    String
+  role      MessageRole
+  content   String
+  createdAt DateTime    @default(now())
 
-  createdAt DateTime @default(now())
-
-  case         Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  languageMeta LanguageMeta?
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([caseId, createdAt])
 }
 
-model LanguageMeta {
-  id               String         @id @default(uuid())
-  caseId           String
-  messageId        String?        @unique
-  detectedLanguage Language
-  confidence       Float?
-  source           LanguageSource @default(AUTO)
+model TermsAcceptance {
+  id         String   @id @default(cuid())
+  userId     String
+  version    String
+  acceptedAt DateTime @default(now())
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, version])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  caseId    String
+  language  Language
+  title     String
+  content   String
   createdAt DateTime @default(now())
 
-  case    Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  message Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([caseId, createdAt])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  caseId    String
+  fileName  String
+  mimeType  String
+  url       String
+  createdAt DateTime @default(now())
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  hashedKey String
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([revokedAt])
+}
+
+model RateLimitCounter {
+  id        String   @id @default(cuid())
+  key       String
+  count     Int      @default(0)
+  windowEnd DateTime
+
+  @@unique([key])
+  @@index([windowEnd])
 }
 
 model AnalyticsEvent {
