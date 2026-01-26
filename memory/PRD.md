@@ -8,6 +8,13 @@ Build Release 1 backend foundation for RV Service Desk:
 - Analytics events (minimal, privacy-safe)
 - Secure OpenAI proxy (no client-side keys)
 
+## User Choices (Jan 2026)
+- **Database**: Supabase PostgreSQL (Transaction Pooler URL for serverless)
+- **Auth**: Email + Password with bcrypt, 30-day session cookies
+- **OpenAI**: User's own OPENAI_API_KEY (server-only)
+- **Stripe**: Test keys, Price ID: `price_1StuJhLmSEa773AhxEhZC1UK`
+- **Framework**: Existing Next.js App Router repo
+
 ## User Personas
 1. **RV Technicians** - Primary users who diagnose RV issues and generate service reports
 2. **Service Managers** - Oversee technician workflows and warranty processing
@@ -16,7 +23,7 @@ Build Release 1 backend foundation for RV Service Desk:
 ## Core Requirements (Static)
 - Email + password authentication with bcrypt
 - Session-based auth with httpOnly cookies (30-day expiry)
-- Stripe subscription billing (PREMIUM, PRO plans)
+- Stripe subscription billing (PREMIUM plan configured)
 - Case & message persistence with user ownership
 - OpenAI proxy (server-side API key only)
 - Privacy-safe analytics events
@@ -24,7 +31,7 @@ Build Release 1 backend foundation for RV Service Desk:
 
 ## Architecture
 - **Framework**: Next.js 16 App Router
-- **Database**: PostgreSQL + Prisma ORM
+- **Database**: Supabase PostgreSQL + Prisma ORM (Transaction Pooler)
 - **Auth**: Session cookies with bcrypt passwords
 - **Payments**: Stripe Checkout + Webhooks
 - **AI**: OpenAI API (server-only)
@@ -72,9 +79,18 @@ Build Release 1 backend foundation for RV Service Desk:
 - Cases CRUD tests
 - Chat route tests
 
+## Deployment Checklist
+1. [ ] Set DATABASE_URL (Supabase Transaction Pooler)
+2. [ ] Run `npx prisma db push` locally
+3. [ ] Set OPENAI_API_KEY
+4. [ ] Set STRIPE_SECRET_KEY
+5. [ ] Set STRIPE_WEBHOOK_SECRET
+6. [ ] Configure Stripe webhook endpoint: `/api/billing/webhook`
+7. [ ] Deploy to Vercel
+
 ## Prioritized Backlog
 
-### P0 (Critical)
+### P0 (Critical) - DONE ✅
 - ✅ Auth system (email + password)
 - ✅ Stripe checkout + webhook
 - ✅ Cases with user ownership
@@ -94,9 +110,9 @@ Build Release 1 backend foundation for RV Service Desk:
 - [ ] Export functionality
 
 ## Next Tasks List
-1. Configure DATABASE_URL with production PostgreSQL
-2. Set up Stripe products and price IDs
-3. Add OPENAI_API_KEY for chat functionality
-4. Integrate auth UI in frontend
+1. Run `npx prisma db push` locally with DATABASE_URL
+2. Add OPENAI_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET to .env
+3. Configure Stripe webhook in dashboard → `/api/billing/webhook`
+4. Integrate auth UI in frontend (login/register forms)
 5. Add billing/subscription page
 6. Deploy to Vercel with environment variables
