@@ -14,7 +14,7 @@ import {
 type Props = {
   caseId: string | null;
   languageMode: LanguageMode;
-  onCaseId: (caseId: string) => void;
+  onCaseId: (caseId: string | null) => void;
   disabled?: boolean;
 };
 
@@ -40,13 +40,17 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       return;
     }
 
+    // IMPORTANT: Capture the narrowed caseId in a local const so TS keeps it as `string`
+    // inside the async function below (avoids `string | null` issues).
+    const id = caseId;
+
     let cancelled = false;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiGetCase(caseId);
+        const res = await apiGetCase(id);
         if (cancelled) return;
         setMessages(res.messages);
       } catch (e: unknown) {
@@ -118,15 +122,19 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
       const onEvent = (ev: ChatSseEvent) => {
         if (ev.type === "case") {
-          serverCaseId = ev.caseId;
-          onCaseId(ev.caseId);
+          // Be defensive: allow null if backend ever emits it.
+          const newId = ev.caseId ?? null;
+          serverCaseId = newId;
+          onCaseId(newId);
           return;
         }
 
         if (ev.type === "token") {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === `${localId}_assistant` ? { ...m, content: m.content + ev.token } : m
+              m.id === `${localId}_assistant`
+                ? { ...m, content: m.content + ev.token }
+                : m
             )
           );
           return;
@@ -171,8 +179,8 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               RV Service Desk
             </h1>
             <p className="mt-2 text-sm">
-              Start a new case from the left or send a message. The assistant will produce an English
-              report plus a translated copy.
+              Start a new case from the left or send a message. The assistant
+              will produce an English report plus a translated copy.
             </p>
           </div>
         ) : null}
@@ -236,6 +244,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                   </div>
                 ) : null}
               </div>
+
               <div className="whitespace-pre-wrap">{m.content}</div>
             </div>
           ))}
