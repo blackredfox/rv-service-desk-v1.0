@@ -8,13 +8,24 @@ type Props = {
   disabled?: boolean;
 };
 
+// Extend window type for Web Speech API
+interface WindowWithSpeechRecognition extends Window {
+  SpeechRecognition?: typeof SpeechRecognition;
+  webkitSpeechRecognition?: typeof SpeechRecognition;
+}
+
 // Check if Web Speech API is supported
 function isSpeechRecognitionSupported(): boolean {
   if (typeof window === "undefined") return false;
-  return !!(
-    window.SpeechRecognition ||
-    (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition
-  );
+  const win = window as WindowWithSpeechRecognition;
+  return !!(win.SpeechRecognition || win.webkitSpeechRecognition);
+}
+
+// Get Speech Recognition constructor
+function getSpeechRecognitionClass(): typeof SpeechRecognition | null {
+  if (typeof window === "undefined") return null;
+  const win = window as WindowWithSpeechRecognition;
+  return win.SpeechRecognition || win.webkitSpeechRecognition || null;
 }
 
 export function VoiceButton({ onTranscript, disabled }: Props) {
@@ -29,9 +40,8 @@ export function VoiceButton({ onTranscript, disabled }: Props) {
   const startListening = useCallback(() => {
     if (!supported || listening) return;
 
-    const SpeechRecognitionClass =
-      window.SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition;
+    const SpeechRecognitionClass = getSpeechRecognitionClass();
+    if (!SpeechRecognitionClass) return;
 
     const recognition = new SpeechRecognitionClass();
     recognition.continuous = false;
@@ -42,7 +52,7 @@ export function VoiceButton({ onTranscript, disabled }: Props) {
       setListening(true);
     };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event) => {
       const transcript = event.results[0]?.[0]?.transcript;
       if (transcript) {
         onTranscript(transcript);
