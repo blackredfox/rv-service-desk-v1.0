@@ -21,7 +21,6 @@ export default function Home() {
   const [languageMode, setLanguageMode] = useState<LanguageMode>("AUTO");
 
   useEffect(() => {
-    // restore last session
     try {
       const storedCaseId = localStorage.getItem("rv:lastCaseId");
       const storedLang = localStorage.getItem("rv:languageMode") as LanguageMode | null;
@@ -72,21 +71,17 @@ export default function Home() {
   useEffect(() => {
     try {
       if (activeCaseId) localStorage.setItem("rv:lastCaseId", activeCaseId);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [activeCaseId]);
 
   useEffect(() => {
     try {
       localStorage.setItem("rv:languageMode", languageMode);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [languageMode]);
 
   return (
-    <div data-testid="app-shell" className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
+    <div className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
       <Sidebar
         activeCaseId={activeCaseId}
         onSelectCase={setActiveCaseId}
@@ -102,22 +97,14 @@ export default function Home() {
             <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">
               Diagnostic & authorization agent
             </div>
-            {termsError ? (
-              <div data-testid="terms-load-error" className="ml-3 text-xs text-red-600 dark:text-red-400">
+            {termsError && (
+              <div className="ml-3 text-xs text-red-600 dark:text-red-400">
                 {termsError}
               </div>
-            ) : null}
+            )}
           </div>
           <div className="flex items-center gap-3">
             <LanguageSelector value={languageMode} onChange={setLanguageMode} />
-            <button
-              type="button"
-              data-testid="header-terms-link"
-              onClick={() => setShowTermsModal(true)}
-              className="hidden rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900 md:inline-flex"
-            >
-              Terms
-            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -130,6 +117,21 @@ export default function Home() {
         />
       </div>
 
+      {/* Bottom-right Terms & Privacy link */}
+      <button
+  type="button"
+  onClick={() => setShowTermsModal(true)}
+  className="
+    fixed bottom-2 right-3 z-40
+    text-[9px] italic uppercase
+    tracking-wider
+    text-red-600 hover:underline
+    dark:text-red-400
+  "
+>
+  TERMS AND PRIVACY
+</button>
+
       <TermsGate
         open={termsGateOpen}
         termsVersion={termsVersion}
@@ -140,16 +142,13 @@ export default function Home() {
         }}
       />
 
-      {termsLoading ? (
-        <div
-          data-testid="terms-loading-overlay"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]"
-        >
+      {termsLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)]">
           <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
             Loading Terms...
           </div>
         </div>
-      ) : null}
+      )}
 
       <TermsModal
         open={showTermsModal}

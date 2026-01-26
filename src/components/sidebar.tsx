@@ -7,9 +7,10 @@ import { apiCreateCase, apiDeleteCase, apiListCases, apiSearch } from "@/lib/api
 type Props = {
   activeCaseId: string | null;
   onSelectCase: (caseId: string | null) => void;
+  disabled?: boolean;
 };
 
-export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onOpenPrivacy }: Props & { disabled?: boolean; onOpenTerms?: () => void; onOpenPrivacy?: () => void }) {
+export function Sidebar({ activeCaseId, onSelectCase, disabled }: Props) {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,7 +40,9 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
 
   useEffect(() => {
     void refresh().then((cs) => {
-      if (!activeCaseId && cs.length > 0) onSelectCase(cs[0].id);
+      if (!activeCaseId && cs.length > 0) {
+        onSelectCase(cs[0].id);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -47,7 +50,9 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
   useEffect(() => {
     const t = setTimeout(() => {
       void refresh().then((cs) => {
-        if (!activeCaseId && cs.length > 0) onSelectCase(cs[0].id);
+        if (!activeCaseId && cs.length > 0) {
+          onSelectCase(cs[0].id);
+        }
       });
     }, 250);
     return () => clearTimeout(t);
@@ -91,8 +96,15 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
   return (
     <aside
       data-testid="cases-sidebar"
-      className="flex h-full w-[320px] flex-col border-r border-zinc-200 bg-white/70 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50"
+      className="
+        flex h-full w-[320px] flex-col
+        border-r border-zinc-200
+        bg-white/70 backdrop-blur
+        dark:border-zinc-800 dark:bg-zinc-950/50
+        pb-24
+      "
     >
+      {/* top */}
       <div className="p-3">
         <button
           type="button"
@@ -116,26 +128,14 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
         />
       </div>
 
-      {error ? (
-        <div
-          data-testid="cases-sidebar-error"
-          className="px-3 pb-3 text-sm text-red-600 dark:text-red-400"
-        >
-          {error}
-        </div>
-      ) : null}
+      {error && <div className="px-3 pb-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {disabled ? (
-          <div data-testid="sidebar-disabled-hint" className="px-2 py-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Accept Terms to begin.
-          </div>
-        ) : null}
-        {loading && cases.length === 0 ? (
-          <div data-testid="cases-sidebar-loading" className="px-2 py-2 text-sm text-zinc-500">
-            Loading...
-          </div>
-        ) : null}
+        {disabled && (
+          <div className="px-2 py-2 text-xs text-zinc-500 dark:text-zinc-400">Accept Terms to begin.</div>
+        )}
+
+        {loading && cases.length === 0 && <div className="px-2 py-2 text-sm text-zinc-500">Loading...</div>}
 
         <ul className="space-y-1">
           {filtered.map((c) => {
@@ -144,7 +144,6 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
               <li key={c.id}>
                 <button
                   type="button"
-                  data-testid={`case-item-${c.id}`}
                   onClick={() => onSelectCase(c.id)}
                   className={
                     "group flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm " +
@@ -159,15 +158,12 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
                       {c.inputLanguage}
                     </span>
                     <span
-                      data-testid={`case-delete-${c.id}`}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         void onDelete(c.id);
                       }}
                       className="hidden cursor-pointer rounded px-1 text-zinc-500 hover:text-zinc-900 group-hover:inline dark:text-zinc-400 dark:hover:text-zinc-50"
-                      role="button"
-                      aria-label="Delete case"
                     >
                       ×
                     </span>
@@ -178,30 +174,7 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled, onOpenTerms, onO
           })}
         </ul>
 
-        {!loading && filtered.length === 0 ? (
-          <div data-testid="cases-sidebar-empty" className="px-2 py-2 text-sm text-zinc-500">
-            No cases
-          </div>
-        ) : null}
-      </div>
-
-      <div className="border-t border-zinc-200 p-3 text-sm dark:border-zinc-800">
-        <button
-          type="button"
-          data-testid="sidebar-terms-link"
-          onClick={() => onOpenTerms?.()}
-          className="block w-full rounded-md px-2 py-1 text-left text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-        >
-          Terms
-        </button>
-        <button
-          type="button"
-          data-testid="sidebar-privacy-link"
-          onClick={() => onOpenPrivacy?.()}
-          className="mt-1 block w-full rounded-md px-2 py-1 text-left text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-        >
-          Privacy
-        </button>
+        {!loading && filtered.length === 0 && <div className="px-2 py-2 text-sm text-zinc-500">No cases</div>}
       </div>
     </aside>
   );
