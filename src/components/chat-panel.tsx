@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ChatMessage } from "@/lib/storage";
 import {
@@ -10,6 +10,9 @@ import {
   type LanguageMode,
   type ChatSseEvent,
 } from "@/lib/api";
+import { VoiceButton } from "@/components/voice-button";
+import { PhotoAttachButton, type PhotoAttachment } from "@/components/photo-attach";
+import { analytics } from "@/lib/client-analytics";
 
 type Props = {
   caseId: string | null;
