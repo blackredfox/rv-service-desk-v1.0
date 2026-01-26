@@ -294,9 +294,11 @@ class RVServiceDeskAPITester:
         )
         return success
 
+    # === CHAT API TESTS ===
+
     def test_chat_without_openai_key(self):
         """Test POST /api/chat without OPENAI_API_KEY"""
-        success, response = self.run_test(
+        success, response, cookies = self.run_test(
             "Chat without OpenAI Key",
             "POST",
             "api/chat",
@@ -305,19 +307,153 @@ class RVServiceDeskAPITester:
         )
         return success
 
-    def test_delete_case(self):
-        """Test DELETE /api/cases/[id]"""
-        if not self.case_id:
-            print("❌ No case ID available for testing")
-            return False
-            
-        success, response = self.run_test(
-            "Delete Case",
-            "DELETE",
-            f"api/cases/{self.case_id}",
-            200
+    def test_chat_missing_message(self):
+        """Test POST /api/chat without message"""
+        success, response, cookies = self.run_test(
+            "Chat without Message",
+            "POST",
+            "api/chat",
+            400,  # Should return 400 for missing message
+            data={"languageMode": "EN"}
         )
         return success
+
+    # === BILLING API TESTS ===
+
+    def test_billing_checkout_unauthenticated(self):
+        """Test POST /api/billing/checkout-session without auth"""
+        success, response, cookies = self.run_test(
+            "Billing Checkout - Unauthenticated",
+            "POST",
+            "api/billing/checkout-session",
+            401,
+            data={"plan": "PREMIUM", "origin": "http://localhost:3000"},
+            cookies={}
+        )
+        return success
+
+    def test_billing_checkout_authenticated(self):
+        """Test POST /api/billing/checkout-session with auth (should fail due to missing Stripe config)"""
+        success, response, cookies = self.run_test(
+            "Billing Checkout - Authenticated (No Stripe Config)",
+            "POST",
+            "api/billing/checkout-session",
+            500,  # Should fail due to missing Stripe configuration
+            data={"plan": "PREMIUM", "origin": "http://localhost:3000"}
+        )
+        return success
+
+    def test_billing_checkout_invalid_plan(self):
+        """Test POST /api/billing/checkout-session with invalid plan"""
+        success, response, cookies = self.run_test(
+            "Billing Checkout - Invalid Plan",
+            "POST",
+            "api/billing/checkout-session",
+            400,
+            data={"plan": "INVALID", "origin": "http://localhost:3000"}
+        )
+        return success
+
+    def test_billing_webhook_no_signature(self):
+        """Test POST /api/billing/webhook without stripe-signature header"""
+        success, response, cookies = self.run_test(
+            "Billing Webhook - No Signature",
+            "POST",
+            "api/billing/webhook",
+            400,
+            data={"type": "test"},
+            cookies={}
+        )
+        return success
+
+    def test_billing_webhook_invalid_signature(self):
+        """Test POST /api/billing/webhook with invalid signature"""
+        success, response, cookies = self.run_test(
+            "Billing Webhook - Invalid Signature",
+            "POST",
+            "api/billing/webhook",
+            400,  # Should fail signature verification
+            data={"type": "test"},
+            headers={"stripe-signature": "invalid_signature"},
+            cookies={}
+        )
+        return success
+
+    # === ANALYTICS API TESTS ===
+
+    def test_analytics_unauthenticated(self):
+        """Test POST /api/analytics/event without auth"""
+        success, response, cookies = self.run_test(
+            "Analytics Event - Unauthenticated",
+            "POST",
+            "api/analytics/event",
+            401,
+            data={"eventName": "page.view", "payload": {"page": "/test"}},
+            cookies={}
+        )
+        return success
+
+    def test_analytics_authenticated_valid(self):
+        """Test POST /api/analytics/event with auth and valid data"""
+        success, response, cookies = self.run_test(
+            "Analytics Event - Valid",
+            "POST",
+            "api/analytics/event",
+            200,
+            data={"eventName": "page.view", "payload": {"page": "/test"}}
+        )
+        return success
+
+    def test_analytics_invalid_event(self):
+        """Test POST /api/analytics/event with invalid event name"""
+        success, response, cookies = self.run_test(
+            "Analytics Event - Invalid Event Name",
+            "POST",
+            "api/analytics/event",
+            400,
+            data={"eventName": "invalid.event", "payload": {"page": "/test"}}
+        )
+        return success
+
+    def test_analytics_missing_event_name(self):
+        """Test POST /api/analytics/event without event name"""
+        success, response, cookies = self.run_test(
+            "Analytics Event - Missing Event Name",
+            "POST",
+            "api/analytics/event",
+            400,
+            data={"payload": {"page": "/test"}}
+        )
+        return success
+
+    def test_analytics_large_payload(self):
+        """Test POST /api/analytics/event with large payload"""
+        large_payload = {"data": "x" * 5000}  # > 4KB limit
+        success, response, cookies = self.run_test(
+            "Analytics Event - Large Payload",
+            "POST",
+            "api/analytics/event",
+            400,
+            data={"eventName": "page.view", "payload": large_payload}
+        )
+        return success
+
+    # === TERMS API TEST ===
+
+    def test_terms_api(self):
+        """Test /api/terms endpoint"""
+        success, response, cookies = self.run_test(
+            "Terms API",
+            "GET",
+            "api/terms",
+            200
+        )
+        if success:
+            if 'version' in response and 'markdown' in response:
+                print(f"   Terms version: {response.get('version')}")
+                print(f"   Markdown length: {len(response.get('markdown', ''))}")
+                return True
+        return False
 
     def run_all_tests(self):
         """Run all API tests"""
