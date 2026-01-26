@@ -261,20 +261,23 @@ async function handleSubscriptionUpdated(
       status = "INACTIVE";
   }
 
+  // Get period end from subscription (may be named differently in newer API versions)
+  const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
+
   await prisma.subscription.upsert({
     where: { userId },
     update: {
       plan: plan ?? undefined,
       status,
       stripeSubscriptionId: subscription.id,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
     },
     create: {
       userId,
       plan: plan ?? "FREE",
       status,
       stripeSubscriptionId: subscription.id,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
     },
   });
 
