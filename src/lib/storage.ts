@@ -1,9 +1,11 @@
 import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
+import { trackEvent } from "@/lib/analytics";
 
 export type CaseSummary = {
   id: string;
   title: string;
+  userId?: string | null;
   inputLanguage: Language;
   languageSource: "AUTO" | "MANUAL";
   createdAt: string;
@@ -19,13 +21,14 @@ export type ChatMessage = {
   createdAt: string;
 };
 
-type CreateCaseInput = { title?: string };
+type CreateCaseInput = { title?: string; userId?: string };
 
 type EnsureCaseInput = {
   caseId?: string;
   titleSeed: string;
   inputLanguage: Language;
   languageSource: "AUTO" | "MANUAL";
+  userId?: string;
 };
 
 type UpdateCaseInput = {
@@ -228,16 +231,20 @@ async function listMessagesForContextMemory(caseId: string, take = 30) {
     .map((m) => ({ role: m.role, content: m.content }));
 }
 
-async function listCasesDb(): Promise<CaseSummary[]> {
+async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
   const prisma = await getPrisma();
   if (!prisma) return listCasesMemory();
   const rows = await prisma.case.findMany({
-    where: { deletedAt: null },
+    where: { 
+      deletedAt: null,
+      ...(userId ? { userId } : {}),
+    },
     orderBy: { updatedAt: "desc" },
     take: 50,
     select: {
       id: true,
       title: true,
+      userId: true,
       inputLanguage: true,
       languageSource: true,
       createdAt: true,
@@ -255,16 +262,26 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
   const prisma = await getPrisma();
   if (!prisma) return createCaseMemory(input);
   const created = await prisma.case.create({
-    data: { title: clampTitle(input.title ?? "New Case") },
+    data: { 
+      title: clampTitle(input.title ?? "New Case"),
+      userId: input.userId,
+    },
     select: {
       id: true,
       title: true,
+      userId: true,
       inputLanguage: true,
       languageSource: true,
       createdAt: true,
       updatedAt: true,
     },
   });
+
+  // Track case creation
+  if (input.userId) {
+    await trackEvent("case.created", input.userId, { caseId: created.id });
+  }
+
   return {
     ...created,
     createdAt: created.createdAt.toISOString(),
@@ -272,14 +289,19 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
   };
 }
 
-async function getCaseDb(caseId: string): Promise<{ case: CaseSummary | null; messages: ChatMessage[] }> {
+async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseSummary | null; messages: ChatMessage[] }> {
   const prisma = await getPrisma();
   if (!prisma) return getCaseMemory(caseId);
   const c = await prisma.case.findFirst({
-    where: { id: caseId, deletedAt: null },
+    where: { 
+      id: caseId, 
+      deletedAt: null,
+      ...(userId ? { userId } : {}),
+    },
     select: {
       id: true,
       title: true,
+      userId: true,
       inputLanguage: true,
       languageSource: true,
       createdAt: true,
@@ -304,6 +326,7 @@ async function getCaseDb(caseId: string): Promise<{ case: CaseSummary | null; me
     case: {
       id: c.id,
       title: c.title,
+      userId: c.userId,
       inputLanguage: c.inputLanguage as Language,
       languageSource: c.languageSource as "AUTO" | "MANUAL", 
       createdAt: c.createdAt.toISOString(),
@@ -322,11 +345,19 @@ async function getCaseDb(caseId: string): Promise<{ case: CaseSummary | null; me
   };
 }
 
-async function updateCaseDb(caseId: string, input: UpdateCaseInput): Promise<CaseSummary | null> {
+async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: string): Promise<CaseSummary | null> {
   const prisma = await getPrisma();
   if (!prisma) return updateCaseMemory(caseId, input);
 
   try {
+    // First verify ownership if userId is provided
+    if (userId) {
+      const existing = await prisma.case.findFirst({
+        where: { id: caseId, userId, deletedAt: null },
+      });
+      if (!existing) return null;
+    }
+
     const updated = await prisma.case.update({
       where: { id: caseId },
       data: {
@@ -337,6 +368,7 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput): Promise<Cas
       select: {
         id: true,
         title: true,
+        userId: true,
         inputLanguage: true,
         languageSource: true,
         createdAt: true,
@@ -354,16 +386,25 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput): Promise<Cas
   }
 }
 
-async function softDeleteCaseDb(caseId: string): Promise<void> {
+async function softDeleteCaseDb(caseId: string, userId?: string): Promise<void> {
   const prisma = await getPrisma();
   if (!prisma) return softDeleteCaseMemory(caseId);
+  
+  // Verify ownership if userId is provided
+  if (userId) {
+    const existing = await prisma.case.findFirst({
+      where: { id: caseId, userId, deletedAt: null },
+    });
+    if (!existing) return;
+  }
+
   await prisma.case.update({
     where: { id: caseId },
     data: { deletedAt: new Date() },
   });
 }
 
-async function searchCasesDb(q: string): Promise<CaseSummary[]> {
+async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]> {
   const query = q.trim();
   if (!query) return [];
 
@@ -373,6 +414,7 @@ async function searchCasesDb(q: string): Promise<CaseSummary[]> {
   const rows = await prisma.case.findMany({
     where: {
       deletedAt: null,
+      ...(userId ? { userId } : {}),
       OR: [
         { title: { contains: query, mode: "insensitive" } },
         { messages: { some: { content: { contains: query, mode: "insensitive" } } } },
@@ -383,6 +425,7 @@ async function searchCasesDb(q: string): Promise<CaseSummary[]> {
     select: {
       id: true,
       title: true,
+      userId: true,
       inputLanguage: true,
       languageSource: true,
       createdAt: true,
@@ -402,6 +445,7 @@ async function appendMessageDb(args: {
   role: "user" | "assistant";
   content: string;
   language: Language;
+  userId?: string;
 }): Promise<ChatMessage> {
   const prisma = await getPrisma();
   if (!prisma) return appendMessageMemory(args);
@@ -425,6 +469,11 @@ async function appendMessageDb(args: {
   // touch case updatedAt
   await prisma.case.update({ where: { id: args.caseId }, data: { updatedAt: new Date() } });
 
+  // Track message sent (only for user messages)
+  if (args.role === "user" && args.userId) {
+    await trackEvent("message.sent", args.userId, { caseId: args.caseId });
+  }
+
   return {
     id: created.id,
     caseId: created.caseId,
@@ -441,8 +490,12 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
 
   if (input.caseId) {
     const existing = await prisma.case.findFirst({
-      where: { id: input.caseId, deletedAt: null },
-      select: { id: true, title: true },
+      where: { 
+        id: input.caseId, 
+        deletedAt: null,
+        ...(input.userId ? { userId: input.userId } : {}),
+      },
+      select: { id: true, title: true, userId: true },
     });
 
     if (existing) {
@@ -456,6 +509,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
         select: {
           id: true,
           title: true,
+          userId: true,
           inputLanguage: true,
           languageSource: true,
           createdAt: true,
@@ -476,16 +530,23 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
       title: clampTitleSeed(input.titleSeed),
       inputLanguage: input.inputLanguage,
       languageSource: input.languageSource,
+      userId: input.userId,
     },
     select: {
       id: true,
       title: true,
+      userId: true,
       inputLanguage: true,
       languageSource: true,
       createdAt: true,
       updatedAt: true,
     },
   });
+
+  // Track case creation
+  if (input.userId) {
+    await trackEvent("case.created", input.userId, { caseId: created.id });
+  }
 
   return {
     ...created,
@@ -517,17 +578,18 @@ async function hasDb() {
 export const storage = {
   hasDb,
 
-  listCases: () => listCasesDb(),
+  listCases: (userId?: string) => listCasesDb(userId),
   createCase: (input: CreateCaseInput) => createCaseDb(input),
-  getCase: (caseId: string) => getCaseDb(caseId),
-  updateCase: (caseId: string, input: UpdateCaseInput) => updateCaseDb(caseId, input),
-  softDeleteCase: (caseId: string) => softDeleteCaseDb(caseId),
-  searchCases: (q: string) => searchCasesDb(q),
+  getCase: (caseId: string, userId?: string) => getCaseDb(caseId, userId),
+  updateCase: (caseId: string, input: UpdateCaseInput, userId?: string) => updateCaseDb(caseId, input, userId),
+  softDeleteCase: (caseId: string, userId?: string) => softDeleteCaseDb(caseId, userId),
+  searchCases: (q: string, userId?: string) => searchCasesDb(q, userId),
   appendMessage: (args: {
     caseId: string;
     role: "user" | "assistant";
     content: string;
     language: Language;
+    userId?: string;
   }) => appendMessageDb(args),
   ensureCase: (input: EnsureCaseInput) => ensureCaseDb(input),
   listMessagesForContext: (caseId: string, take = 30) => listMessagesForContextDb(caseId, take),

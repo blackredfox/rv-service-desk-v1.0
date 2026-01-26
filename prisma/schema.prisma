@@ -23,8 +23,65 @@ enum MessageRole {
   assistant
 }
 
+enum Plan {
+  FREE
+  PREMIUM
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  sessions      Session[]
+  subscription  Subscription?
+  cases         Case[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  plan                 Plan               @default(FREE)
+  status               SubscriptionStatus @default(INACTIVE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  updatedAt            DateTime           @updatedAt
+  createdAt            DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+}
+
 model Case {
   id             String         @id @default(uuid())
+  userId         String?
   title          String
   inputLanguage  Language       @default(EN)
   languageSource LanguageSource @default(AUTO)
@@ -33,19 +90,21 @@ model Case {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  messages       Message[]
-  languageMetas  LanguageMeta[]
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  languageMetas LanguageMeta[]
 
+  @@index([userId])
   @@index([updatedAt])
   @@index([deletedAt])
 }
 
 model Message {
-  id        String      @id @default(uuid())
-  caseId    String
-  role      MessageRole
-  content   String
-  language  Language?
+  id       String      @id @default(uuid())
+  caseId   String
+  role     MessageRole
+  content  String
+  language Language?
 
   createdAt DateTime @default(now())
 
@@ -56,12 +115,12 @@ model Message {
 }
 
 model LanguageMeta {
-  id              String         @id @default(uuid())
-  caseId          String
-  messageId       String?        @unique
+  id               String         @id @default(uuid())
+  caseId           String
+  messageId        String?        @unique
   detectedLanguage Language
-  confidence      Float?
-  source          LanguageSource @default(AUTO)
+  confidence       Float?
+  source           LanguageSource @default(AUTO)
 
   createdAt DateTime @default(now())
 
@@ -69,4 +128,36 @@ model LanguageMeta {
   message Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([caseId, createdAt])
+}
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  eventName   String
+  payloadJson String?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventName])
+  @@index([createdAt])
+}
+
+model PaymentTransaction {
+  id            String   @id @default(cuid())
+  userId        String?
+  email         String?
+  sessionId     String   @unique
+  paymentId     String?
+  amount        Float?
+  currency      String?
+  paymentStatus String   @default("PENDING")
+  metadata      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([paymentStatus])
 }

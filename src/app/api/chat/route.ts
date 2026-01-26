@@ -1,29 +1,62 @@
 import { SYSTEM_PROMPT_V1 } from "@/lib/prompts/system-prompt-v1";
 import { normalizeLanguageMode, type LanguageMode } from "@/lib/lang";
 import { storage } from "@/lib/storage";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
+
+type Attachment = {
+  type: "image";
+  dataUrl: string; // base64 data URL, e.g., "data:image/jpeg;base64,..."
+};
 
 type ChatBody = {
   caseId?: string;
   message: string;
-  languageMode?: LanguageMode; // "AUTO" | "EN" | "RU" | "ES"
+  languageMode?: LanguageMode;
+  attachments?: Attachment[];
 };
 
 function sseEncode(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
+type OpenAiMessageContent =
+  | string
+  | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
+
 function buildOpenAiMessages(args: {
   system: string;
   history: { role: "user" | "assistant"; content: string }[];
   userMessage: string;
-}) {
-  return [
+  attachments?: Attachment[];
+}): Array<{ role: string; content: OpenAiMessageContent }> {
+  const messages: Array<{ role: string; content: OpenAiMessageContent }> = [
     { role: "system", content: args.system },
     ...args.history.map((m) => ({ role: m.role, content: m.content })),
-    { role: "user", content: args.userMessage },
   ];
+
+  // Build user message with optional image attachments
+  if (args.attachments && args.attachments.length > 0) {
+    const contentParts: Array<
+      { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }
+    > = [{ type: "text", text: args.userMessage }];
+
+    for (const attachment of args.attachments) {
+      if (attachment.type === "image" && attachment.dataUrl) {
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: attachment.dataUrl },
+        });
+      }
+    }
+
+    messages.push({ role: "user", content: contentParts });
+  } else {
+    messages.push({ role: "user", content: args.userMessage });
+  }
+
+  return messages;
 }
 
 export async function POST(req: Request) {
@@ -34,6 +67,9 @@ export async function POST(req: Request) {
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  // Get current user (optional for backward compatibility)
+  const user = await getCurrentUser();
 
   const body = (await req.json().catch(() => null)) as ChatBody | null;
   const message = (body?.message ?? "").trim();
@@ -50,23 +86,30 @@ export async function POST(req: Request) {
     languageMode
   );
 
+  // Session-only attachments (images are used for this request only, not stored)
+  const attachments = body?.attachments?.filter(
+    (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
+  );
+
   // Ensure a case exists
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
     inputLanguage: effectiveLanguage,
     languageSource,
+    userId: user?.id,
   });
 
   // Load last 30 messages for context
   const history = await storage.listMessagesForContext(ensuredCase.id, 30);
 
-  // Persist user message
+  // Persist user message (without attachments - session only)
   await storage.appendMessage({
     caseId: ensuredCase.id,
     role: "user",
     content: message,
     language: effectiveLanguage,
+    userId: user?.id,
   });
 
   const openAiBody = {
@@ -77,17 +120,18 @@ export async function POST(req: Request) {
       system: SYSTEM_PROMPT_V1,
       history,
       userMessage: message,
+      attachments,
     }),
   };
 
   const encoder = new TextEncoder();
+  const ac = new AbortController();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let full = "";
       let aborted = false;
 
-      const ac = new AbortController();
       const onAbort = () => {
         aborted = true;
         try {
@@ -172,6 +216,7 @@ export async function POST(req: Request) {
             role: "assistant",
             content: full,
             language: effectiveLanguage,
+            userId: user?.id,
           });
         }
 

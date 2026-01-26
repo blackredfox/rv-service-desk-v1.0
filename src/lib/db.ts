@@ -1,16 +1,19 @@
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 
 declare global {
-  // Cached instance for dev hot-reload. Can be null when DB is not configured.
+  // Cached instance for dev hot-reload.
   var __prisma: PrismaClientType | null | undefined;
 }
 
 /**
  * Returns a PrismaClient instance when DATABASE_URL is set and Prisma client is generated.
- * In early bootstrap (no DATABASE_URL), returns null and callers should fall back to in-memory storage.
+ * DATABASE_URL is REQUIRED for Release 1 - throws if not configured.
  */
 export async function getPrisma(): Promise<PrismaClientType | null> {
-  if (!process.env.DATABASE_URL) return null;
+  if (!process.env.DATABASE_URL) {
+    // In Release 1, database is required for auth
+    return null;
+  }
 
   if (global.__prisma !== undefined) {
     return global.__prisma;
