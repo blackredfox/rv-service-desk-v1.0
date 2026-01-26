@@ -212,7 +212,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   const prisma = await getPrisma();
   if (!prisma) return;
 
-  const subscriptionId = invoice.subscription as string | undefined;
+  // Get subscription ID from invoice parent
+  const subscriptionId = (invoice as unknown as { subscription?: string }).subscription;
   if (!subscriptionId) return;
 
   const subscription = await prisma.subscription.findFirst({
