@@ -33,7 +33,7 @@ describe("Cases API Routes", () => {
 
   describe("GET /api/cases", () => {
     it("should list cases for authenticated user", async () => {
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
       const mockCases = [
         { id: "case_1", title: "Test Case 1", userId: "user_123" },
         { id: "case_2", title: "Test Case 2", userId: "user_123" },
