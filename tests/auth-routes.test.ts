@@ -200,29 +200,51 @@ describe("Auth API Routes", () => {
   });
 
   describe("GET /api/auth/me", () => {
-    it("should return current user", async () => {
-      const mockUser: AuthUser = {
-        id: "user_123",
-        email: "test@example.com",
-        plan: "PREMIUM",
-        status: "ACTIVE",
-      };
+    it("should return 401 when not authenticated (no cookie)", async () => {
+      vi.resetModules();
 
-      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.doMock("next/headers", () => ({
+        headers: vi.fn(() => Promise.resolve({
+          get: vi.fn(() => "127.0.0.1"),
+        })),
+        cookies: vi.fn(() => Promise.resolve({
+          get: vi.fn(() => undefined), // No session cookie
+          set: vi.fn(),
+          delete: vi.fn(),
+        })),
+      }));
 
       const { GET } = await import("@/app/api/auth/me/route");
 
       const response = await GET();
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.id).toBe("user_123");
-      expect(data.email).toBe("test@example.com");
-      expect(data.plan).toBe("PREMIUM");
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Not authenticated");
     });
 
-    it("should return 401 when not authenticated", async () => {
-      vi.mocked(getCurrentUser).mockResolvedValue(null);
+    it("should return 401 when session cookie is invalid", async () => {
+      vi.resetModules();
+
+      vi.doMock("next/headers", () => ({
+        headers: vi.fn(() => Promise.resolve({
+          get: vi.fn(() => "127.0.0.1"),
+        })),
+        cookies: vi.fn(() => Promise.resolve({
+          get: vi.fn((name: string) => {
+            if (name === "rv_session") return { value: "invalid_session" };
+            return undefined;
+          }),
+          set: vi.fn(),
+          delete: vi.fn(),
+        })),
+      }));
+
+      vi.doMock("@/lib/firebase-admin", () => ({
+        getFirebaseAuth: vi.fn(() => ({
+          verifySessionCookie: vi.fn(() => Promise.reject(new Error("Invalid session"))),
+        })),
+      }));
 
       const { GET } = await import("@/app/api/auth/me/route");
 
