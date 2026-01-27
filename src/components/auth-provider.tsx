@@ -14,7 +14,7 @@ export function AuthProvider({ children }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me", { cache: "no-store" });
+      const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "same-origin" });
       if (res.ok) {
         const data = (await res.json()) as AuthUser;
         setUser(data);
@@ -37,6 +37,7 @@ export function AuthProvider({ children }: Props) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
+      credentials: "same-origin",
     });
 
     if (!res.ok) {
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: Props) {
 
   const logout = useCallback(async () => {
     void analytics.logout();
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
     setUser(null);
   }, []);
 

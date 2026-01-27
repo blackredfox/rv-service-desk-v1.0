@@ -46,10 +46,9 @@ export async function POST(req: Request) {
     } catch {
       // Analytics failure should not break login
     }
-
     return NextResponse.json({
       user: { id: user.id, email: user.email, plan: user.plan, status: user.status },
-    });
+    }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Login failed";
 

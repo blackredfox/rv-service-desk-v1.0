@@ -150,7 +150,16 @@ export async function upsertPrismaUser(
   firebaseUid: string
 ): Promise<AuthUser> {
   const prisma = await getPrisma();
-  if (!prisma) throw new Error("Database not configured");
+  if (!prisma) {
+    // When no database is configured (eg. local dev without DATABASE_URL),
+    // return a minimal AuthUser so registration/login still works for auth flows.
+    return {
+      id: firebaseUid,
+      email,
+      plan: "FREE",
+      status: "INACTIVE",
+    };
+  }
 
   // Upsert user
   const user = await prisma.user.upsert({

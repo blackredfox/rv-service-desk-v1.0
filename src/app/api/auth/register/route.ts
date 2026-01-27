@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { registerUser, checkRateLimit } from "@/lib/auth";
+import {
+  registerUser,
+  checkRateLimit,
+  verifyFirebasePassword,
+  createFirebaseSessionCookie,
+  setSessionCookie,
+} from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 
 type RegisterBody = {
@@ -55,6 +61,23 @@ export async function POST(req: Request) {
 
     const user = await registerUser(email, password);
 
+    // Try to create a session cookie by signing in the new user via REST
+    // If this fails we still return 201 but include a helpful warning.
+    let sessionWarning: string | null = null;
+    let cookieSet = false;
+    try {
+      const idToken = await verifyFirebasePassword(email, password);
+      const sessionCookie = await createFirebaseSessionCookie(idToken);
+      await setSessionCookie(sessionCookie);
+      cookieSet = true;
+    } catch (err) {
+      // Do not log sensitive tokens; log a short message for server diagnostics
+      console.error("Failed to create session cookie after registration:",
+        err instanceof Error ? err.message : String(err)
+      );
+      sessionWarning = "Account created but session could not be established. Please sign in.";
+    }
+
     // Track signup (safe - won't break if event name unknown)
     try {
       await trackEvent("user.signup", user.id, { email: user.email });
@@ -62,10 +85,10 @@ export async function POST(req: Request) {
       // Analytics failure should not break registration
     }
 
-    return NextResponse.json(
-      { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } },
-      { status: 201 }
-    );
+    const payload: any = { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } };
+    if (sessionWarning) payload.warning = sessionWarning;
+
+    return NextResponse.json(payload, { status: 201 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Registration failed";
 
