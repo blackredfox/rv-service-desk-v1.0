@@ -1,14 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
-export function LoginScreen() {
-  const { login } = useAuth();
+type Props = {
+  onAuthed?: () => void;
+};
+
+type Mode = "signin" | "signup";
+
+export function LoginScreen(props: Props) {
+  const { onAuthed } = props;
+  const { login, refresh } = useAuth();
+
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // optional fields for signup could be added later (name, company, etc.)
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const title = useMemo(() => (mode === "signin" ? "Sign in" : "Create account"), [mode]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -16,9 +29,32 @@ export function LoginScreen() {
     setLoading(true);
 
     try {
-      await login(email.trim(), password);
+      const cleanEmail = email.trim();
+
+      if (mode === "signup") {
+        // Release-1 onboarding fix: allow first user to create account.
+        // Backend route exists per Neo discovery: POST /api/auth/register
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail, password }),
+        });
+
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Registration failed");
+        }
+      }
+
+      // After signup (or directly on signin) -> login
+      await login(cleanEmail, password);
+
+      // Ensure context is in sync (cookie/session)
+      await refresh();
+
+      onAuthed?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
+      const msg = err instanceof Error ? err.message : "Authentication failed";
       setError(msg);
     } finally {
       setLoading(false);
@@ -29,12 +65,33 @@ export function LoginScreen() {
     <div className="flex min-h-dvh w-full items-center justify-center bg-[var(--background)] p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-            RV Service Desk
-          </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Sign in to continue
-          </p>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">RV Service Desk</h1>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{title} to continue</p>
+        </div>
+
+        <div className="mb-3 flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("signin")}
+            className={`rounded-full px-3 py-1 text-xs font-medium border ${
+              mode === "signin"
+                ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                : "border-zinc-200 bg-white text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+            }`}
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("signup")}
+            className={`rounded-full px-3 py-1 text-xs font-medium border ${
+              mode === "signup"
+                ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                : "border-zinc-200 bg-white text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+            }`}
+          >
+            Sign up
+          </button>
         </div>
 
         <form
@@ -52,10 +109,7 @@ export function LoginScreen() {
 
           <div className="space-y-4">
             <div>
-              <label
-                htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Email
               </label>
               <input
@@ -73,23 +127,20 @@ export function LoginScreen() {
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Password
               </label>
               <input
                 id="password"
                 data-testid="login-password-input"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
-                placeholder="Enter your password"
+                placeholder={mode === "signup" ? "Create a password" : "Enter your password"}
               />
             </div>
           </div>
@@ -100,8 +151,14 @@ export function LoginScreen() {
             disabled={loading || !email.trim() || !password}
             className="mt-6 w-full rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Working..." : mode === "signup" ? "Create account" : "Sign in"}
           </button>
+
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+            {mode === "signup"
+              ? "You will be able to sign in after creating your account."
+              : "If you don't have an account yet, switch to Sign up."}
+          </p>
         </form>
       </div>
     </div>
