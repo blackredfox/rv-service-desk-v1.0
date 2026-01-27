@@ -7,17 +7,28 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSelector } from "@/components/language-selector";
 import { TermsModal } from "@/components/terms-modal";
 import { LoginScreen } from "@/components/login-screen";
+import { OrgSetupScreen } from "@/components/org-setup-screen";
+import { BillingPaywall } from "@/components/billing-paywall";
+import { AccessBlockedScreen } from "@/components/access-blocked";
 import { useAuth } from "@/hooks/use-auth";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
 import type { LanguageMode } from "@/lib/api";
 
-type OnboardingStep = "welcome" | "auth" | "terms" | "start" | "app";
+type OnboardingStep = 
+  | "welcome" 
+  | "auth" 
+  | "terms" 
+  | "org_setup"   // Create organization (if no org)
+  | "billing"     // Subscribe (if org exists but no subscription)
+  | "blocked"     // Access blocked (member issues)
+  | "start" 
+  | "app";
 
 /**
  * NOTE (maintainability):
  * - We keep onboarding steps as a small state-machine in one place.
  * - No setState calls inside render branches (avoids React warnings + future debugging pain).
- * - Later (Release 1.1) we can move Welcome/Terms/Start into /components/onboarding/* without logic changes.
+ * - B2B flow: welcome -> auth -> terms -> org_setup/billing -> start -> app
  */
 
 function WelcomeScreen(props: { onContinue: () => void }) {
@@ -33,13 +44,14 @@ function WelcomeScreen(props: { onContinue: () => void }) {
         </p>
 
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
-          Next: sign in, accept Terms &amp; Privacy, then start a case chat.
+          Next: sign in with your corporate email, accept Terms &amp; Privacy, then start a case chat.
         </p>
 
         <div className="mt-6 flex items-center justify-end">
           <button
             type="button"
             onClick={onContinue}
+            data-testid="welcome-continue-btn"
             className="
               rounded-xl px-5 py-2 text-sm font-semibold
               text-white
@@ -113,6 +125,7 @@ function TermsAcceptanceScreen(props: {
             type="button"
             onClick={onAccept}
             disabled={!checked}
+            data-testid="terms-accept-btn"
             className="
               rounded-xl px-5 py-2 text-sm font-semibold
               text-white
@@ -145,6 +158,7 @@ function StartScreen(props: { onStart: () => void }) {
           <button
             type="button"
             onClick={onStart}
+            data-testid="start-btn"
             className="
               rounded-xl px-5 py-2 text-sm font-semibold
               text-white
@@ -161,7 +175,7 @@ function StartScreen(props: { onStart: () => void }) {
 }
 
 export default function Home() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, refresh } = useAuth();
 
   const [step, setStep] = useState<OnboardingStep>("welcome");
 
@@ -178,6 +192,22 @@ export default function Home() {
   // User menu (header)
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Check for billing callback params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billingStatus = params.get("billing");
+    
+    if (billingStatus === "success") {
+      // Refresh user data to get updated subscription
+      void refresh();
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (billingStatus === "cancel") {
+      // Just clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [refresh]);
 
   // Load local preferences (case + language)
   useEffect(() => {
@@ -272,16 +302,38 @@ export default function Home() {
   }, []);
 
   /**
-   * Step machine guard:
-   * Keeps step consistent when auth/terms state changes.
-   * Example: user logs out -> force step to "auth" (unless still at welcome).
+   * Compute the expected step based on current state
    */
   const expectedStepAfterWelcome = useMemo<OnboardingStep>(() => {
+    // Not authenticated
     if (!user) return "auth";
+    
+    // Terms not accepted
     if (!termsAccepted) return "terms";
+    
+    // Check access status
+    if (!user.access.allowed) {
+      const reason = user.access.reason || "";
+      
+      // No organization - need to set one up (for corporate users)
+      if (reason === "no_organization") {
+        return "org_setup";
+      }
+      
+      // Subscription required - admin sees paywall
+      if (reason === "subscription_required" && user.access.isAdmin) {
+        return "billing";
+      }
+      
+      // Other blocked states
+      return "blocked";
+    }
+    
+    // All good - ready to start
     return "start";
   }, [user, termsAccepted]);
 
+  // Sync step with state
   useEffect(() => {
     // Do not auto-advance from welcome: user must click Continue.
     if (step === "welcome") return;
@@ -297,9 +349,30 @@ export default function Home() {
       if (step !== "terms") setStep("terms");
       return;
     }
+    
+    // Check access and route appropriately
+    if (!user.access.allowed) {
+      const reason = user.access.reason || "";
+      
+      if (reason === "no_organization" && step !== "org_setup") {
+        setStep("org_setup");
+        return;
+      }
+      
+      if (reason === "subscription_required" && user.access.isAdmin) {
+        if (step !== "billing") setStep("billing");
+        return;
+      }
+      
+      if (step !== "blocked") {
+        setStep("blocked");
+        return;
+      }
+      return;
+    }
 
-    // If auth + terms accepted, "start" or "app" are allowed.
-    if (step === "auth" || step === "terms") {
+    // If auth + terms accepted + access allowed, "start" or "app" are allowed.
+    if (step === "auth" || step === "terms" || step === "org_setup" || step === "billing" || step === "blocked") {
       setStep("start");
     }
   }, [step, user, termsAccepted]);
@@ -352,7 +425,7 @@ export default function Home() {
           onAccept={() => {
             storeTermsAcceptance(termsVersion);
             setTermsAccepted(true);
-            setStep("start");
+            setStep(expectedStepAfterWelcome);
           }}
         />
 
@@ -366,12 +439,49 @@ export default function Home() {
     );
   }
 
-  // 4) Start (explicit step before app)
+  // 4) Organization setup (admin creates org)
+  if (step === "org_setup") {
+    return (
+      <OrgSetupScreen
+        onComplete={() => {
+          void refresh().then(() => {
+            setStep(expectedStepAfterWelcome);
+          });
+        }}
+      />
+    );
+  }
+
+  // 5) Billing paywall (admin subscribes)
+  if (step === "billing") {
+    return (
+      <BillingPaywall
+        onRefresh={() => {
+          void refresh();
+        }}
+      />
+    );
+  }
+
+  // 6) Blocked screen (various reasons)
+  if (step === "blocked") {
+    return (
+      <AccessBlockedScreen
+        reason={user?.access.reason || "Access denied"}
+        isAdmin={user?.access.isAdmin}
+        onRefresh={() => {
+          void refresh();
+        }}
+      />
+    );
+  }
+
+  // 7) Start (explicit step before app)
   if (step === "start") {
     return <StartScreen onStart={() => setStep("app")} />;
   }
 
-  // 5) Main app
+  // 8) Main app
   return (
     <div className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
       <Sidebar activeCaseId={activeCaseId} onSelectCase={setActiveCaseId} disabled={false} />
@@ -383,6 +493,11 @@ export default function Home() {
             <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">
               Diagnostic & authorization agent
             </div>
+            {user?.organization && (
+              <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">
+                • {user.organization.name}
+              </div>
+            )}
             {termsError ? (
               <div className="ml-3 text-xs text-red-600 dark:text-red-400">{termsError}</div>
             ) : null}
@@ -423,11 +538,48 @@ export default function Home() {
                       Signed in as
                     </div>
                     <div className="mt-1 truncate">{userEmail || "-"}</div>
+                    {user?.organization && (
+                      <div className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+                        {user.organization.name}
+                      </div>
+                    )}
                   </div>
 
                   <div className="my-1 h-px bg-zinc-200 dark:bg-zinc-800" />
 
-                  {/* Placeholder for future Support link (domain email later) */}
+                  {/* Billing portal (admin only) */}
+                  {user?.access.isAdmin && user?.organization?.subscriptionStatus === "active" && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-testid="billing-portal-button"
+                      onClick={async () => {
+                        setUserMenuOpen(false);
+                        try {
+                          const res = await fetch("/api/billing/portal", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ returnUrl: window.location.href }),
+                            credentials: "same-origin",
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            window.location.href = data.url;
+                          }
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      className="
+                        block w-full px-3 py-2 text-left text-xs
+                        text-zinc-700 hover:bg-zinc-50
+                        dark:text-zinc-200 dark:hover:bg-zinc-900
+                      "
+                    >
+                      Manage Billing
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     role="menuitem"
