@@ -5,8 +5,26 @@ import { createContext, useContext } from "react";
 export type AuthUser = {
   id: string;
   email: string;
-  plan: "FREE" | "PREMIUM" | "PRO";
-  status: "ACTIVE" | "INACTIVE" | "PAST_DUE" | "CANCELED";
+  // Organization info
+  organization: {
+    id: string;
+    name: string;
+    subscriptionStatus: string;
+    seatLimit: number;
+    activeSeatCount: number;
+  } | null;
+  // Membership info
+  membership: {
+    role: "admin" | "member";
+    status: "active" | "inactive" | "pending";
+  } | null;
+  // Access status
+  access: {
+    allowed: boolean;
+    reason?: string;
+    requiresSubscription: boolean;
+    isAdmin: boolean;
+  };
 };
 
 export type AuthContextValue = {
