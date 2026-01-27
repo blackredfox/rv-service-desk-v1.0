@@ -69,7 +69,7 @@ describe("Cases API Routes", () => {
 
   describe("POST /api/cases", () => {
     it("should create case with user ownership", async () => {
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
       const mockCase = {
         id: "case_new",
         title: "New Case",
@@ -105,7 +105,7 @@ describe("Cases API Routes", () => {
 
   describe("GET /api/cases/[id]", () => {
     it("should get case with ownership check", async () => {
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
       const mockCase = {
         id: "case_1",
         title: "Test Case",
@@ -127,7 +127,7 @@ describe("Cases API Routes", () => {
     });
 
     it("should return 404 for non-existent case", async () => {
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
 
       vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
       vi.mocked(storage.getCase).mockResolvedValue({ case: null, messages: [] });
@@ -145,7 +145,7 @@ describe("Cases API Routes", () => {
 
   describe("DELETE /api/cases/[id]", () => {
     it("should delete case with ownership check", async () => {
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
 
       vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
       vi.mocked(storage.softDeleteCase).mockResolvedValue(undefined);
