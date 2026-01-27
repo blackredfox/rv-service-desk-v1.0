@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import {
-  registerUser,
-  setSessionCookie,
-  checkRateLimit,
-} from "@/lib/auth";
+import { registerUser, checkRateLimit } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 
 type RegisterBody = {
@@ -57,12 +53,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const { user, sessionId } = await registerUser(email, password);
+    const user = await registerUser(email, password);
 
-    await setSessionCookie(sessionId);
-
-    // Track signup
-    await trackEvent("user.signup", user.id, { email: user.email });
+    // Track signup (safe - won't break if event name unknown)
+    try {
+      await trackEvent("user.signup", user.id, { email: user.email });
+    } catch {
+      // Analytics failure should not break registration
+    }
 
     return NextResponse.json(
       { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } },
@@ -71,13 +69,23 @@ export async function POST(req: Request) {
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Registration failed";
 
-    if (message === "User already exists") {
-      return NextResponse.json({ error: message }, { status: 409 });
+    // Firebase error: user already exists
+    if (message.includes("already exists") || message.includes("EMAIL_EXISTS")) {
+      return NextResponse.json({ error: "User already exists" }, { status: 409 });
     }
 
     if (message === "Database not configured") {
       return NextResponse.json(
         { error: "Service temporarily unavailable" },
+        { status: 503 }
+      );
+    }
+
+    // Firebase Admin SDK initialization error
+    if (message.includes("firebase") || message.includes("Firebase")) {
+      console.error("Firebase error during registration:", message);
+      return NextResponse.json(
+        { error: "Authentication service unavailable" },
         { status: 503 }
       );
     }

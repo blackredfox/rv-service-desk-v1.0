@@ -17,6 +17,12 @@ export async function GET() {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to get user";
+    
+    // Session cookie invalid/expired
+    if (message.includes("session") || message.includes("token")) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

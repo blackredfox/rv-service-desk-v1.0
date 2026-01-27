@@ -1,26 +1,20 @@
 import { NextResponse } from "next/server";
-import {
-  clearSessionCookie,
-  getSessionFromCookie,
-  invalidateSession,
-  getCurrentUser,
-} from "@/lib/auth";
+import { clearSessionCookie, getCurrentUser } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 
 export async function POST() {
   try {
     const user = await getCurrentUser();
-    const sessionId = await getSessionFromCookie();
-
-    if (sessionId) {
-      await invalidateSession(sessionId);
-    }
 
     await clearSessionCookie();
 
-    // Track logout
+    // Track logout (safe - won't break if event name unknown)
     if (user) {
-      await trackEvent("user.logout", user.id, {});
+      try {
+        await trackEvent("user.logout", user.id, {});
+      } catch {
+        // Analytics failure should not break logout
+      }
     }
 
     return NextResponse.json({ success: true });

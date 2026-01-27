@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
 import { getPrisma } from "@/lib/db";
-import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
+import { getFirebaseAuth } from "@/lib/firebase-admin";
 
 const SESSION_COOKIE_NAME = "rv_session";
-const SESSION_DURATION_DAYS = 30;
+const SESSION_DURATION_DAYS = parseInt(process.env.SESSION_COOKIE_DAYS || "7", 10);
+const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 
 export type AuthUser = {
   id: string;
@@ -41,40 +41,76 @@ export function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
-}
+/**
+ * Verify credentials using Firebase Identity Toolkit REST API
+ */
+export async function verifyFirebasePassword(
+  email: string,
+  password: string
+): Promise<string> {
+  const apiKey = process.env.FIREBASE_WEB_API_KEY;
+  if (!apiKey) {
+    throw new Error("FIREBASE_WEB_API_KEY not configured");
+  }
 
-export async function verifyPassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
-
-export async function createSession(userId: string): Promise<string> {
-  const prisma = await getPrisma();
-  if (!prisma) throw new Error("Database not configured");
-
-  const sessionId = uuidv4();
-  const expiresAt = new Date(
-    Date.now() + SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true,
+      }),
+    }
   );
 
-  await prisma.session.create({
-    data: {
-      id: sessionId,
-      userId,
-      expiresAt,
-    },
-  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorCode = errorData?.error?.message || "UNKNOWN_ERROR";
+    if (
+      errorCode === "EMAIL_NOT_FOUND" ||
+      errorCode === "INVALID_PASSWORD" ||
+      errorCode === "INVALID_LOGIN_CREDENTIALS"
+    ) {
+      throw new Error("Invalid credentials");
+    }
+    throw new Error(`Firebase auth error: ${errorCode}`);
+  }
 
-  return sessionId;
+  const data = await response.json();
+  return data.idToken as string;
 }
 
-export async function setSessionCookie(sessionId: string) {
+/**
+ * Create Firebase session cookie from ID token
+ */
+export async function createFirebaseSessionCookie(idToken: string): Promise<string> {
+  const auth = getFirebaseAuth();
+  return auth.createSessionCookie(idToken, { expiresIn: SESSION_DURATION_MS });
+}
+
+/**
+ * Verify Firebase session cookie
+ */
+export async function verifyFirebaseSessionCookie(
+  sessionCookie: string
+): Promise<{ uid: string; email: string }> {
+  const auth = getFirebaseAuth();
+  const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+  return {
+    uid: decodedClaims.uid,
+    email: decodedClaims.email || "",
+  };
+}
+
+/**
+ * Set session cookie in response
+ */
+export async function setSessionCookie(sessionCookie: string) {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, sessionId, {
+  cookieStore.set(SESSION_COOKIE_NAME, sessionCookie, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -83,46 +119,62 @@ export async function setSessionCookie(sessionId: string) {
   });
 }
 
+/**
+ * Clear session cookie
+ */
 export async function clearSessionCookie() {
   const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
+  cookieStore.set(SESSION_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
 }
 
-export async function getSessionFromCookie(): Promise<string | null> {
+/**
+ * Get session cookie value
+ */
+export async function getSessionCookie(): Promise<string | null> {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
-  return sessionCookie?.value ?? null;
+  return sessionCookie?.value || null;
 }
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  const sessionId = await getSessionFromCookie();
-  if (!sessionId) return null;
-
+/**
+ * Upsert user + subscription in Prisma
+ */
+export async function upsertPrismaUser(
+  email: string,
+  firebaseUid: string
+): Promise<AuthUser> {
   const prisma = await getPrisma();
-  if (!prisma) return null;
+  if (!prisma) throw new Error("Database not configured");
 
-  const session = await prisma.session.findUnique({
-    where: { id: sessionId },
-    include: {
-      user: {
-        include: {
-          subscription: true,
-        },
-      },
+  // Upsert user
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: { firebaseUid },
+    create: {
+      email,
+      firebaseUid,
     },
+    include: { subscription: true },
   });
 
-  if (!session) return null;
-
-  // Check if session expired
-  if (session.expiresAt < new Date()) {
-    await prisma.session.delete({ where: { id: sessionId } });
-    return null;
+  // Ensure subscription exists
+  if (!user.subscription) {
+    await prisma.subscription.create({
+      data: {
+        userId: user.id,
+        plan: "FREE",
+        status: "INACTIVE",
+      },
+    });
   }
 
-  const user = session.user;
   const sub = user.subscription;
-
   return {
     id: user.id,
     email: user.email,
@@ -131,96 +183,62 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   };
 }
 
-export async function invalidateSession(sessionId: string): Promise<void> {
-  const prisma = await getPrisma();
-  if (!prisma) return;
+/**
+ * Get current user from Firebase session cookie
+ */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const sessionCookie = await getSessionCookie();
+  if (!sessionCookie) return null;
 
-  await prisma.session.delete({ where: { id: sessionId } }).catch(() => {
-    // Session might not exist
-  });
+  try {
+    const { email, uid } = await verifyFirebaseSessionCookie(sessionCookie);
+    if (!email) return null;
+
+    return await upsertPrismaUser(email, uid);
+  } catch {
+    // Invalid or expired session
+    return null;
+  }
 }
 
-export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  const prisma = await getPrisma();
-  if (!prisma) return;
-
-  await prisma.session.deleteMany({ where: { userId } });
-}
-
+/**
+ * Create user in Firebase and Prisma
+ */
 export async function registerUser(
   email: string,
   password: string
-): Promise<{ user: AuthUser; sessionId: string }> {
-  const prisma = await getPrisma();
-  if (!prisma) throw new Error("Database not configured");
+): Promise<AuthUser> {
+  const auth = getFirebaseAuth();
 
-  // Check if user exists
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new Error("User already exists");
-  }
-
-  const hashedPassword = await hashPassword(password);
-
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      subscription: {
-        create: {
-          plan: "FREE",
-          status: "ACTIVE",
-        },
-      },
-    },
-    include: {
-      subscription: true,
-    },
+  // Create user in Firebase
+  const firebaseUser = await auth.createUser({
+    email,
+    password,
   });
 
-  const sessionId = await createSession(user.id);
-
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      plan: user.subscription?.plan ?? "FREE",
-      status: user.subscription?.status ?? "ACTIVE",
-    },
-    sessionId,
-  };
+  // Upsert in Prisma
+  return upsertPrismaUser(email, firebaseUser.uid);
 }
 
+/**
+ * Login user via Firebase and create session cookie
+ */
 export async function loginUser(
   email: string,
   password: string
-): Promise<{ user: AuthUser; sessionId: string }> {
-  const prisma = await getPrisma();
-  if (!prisma) throw new Error("Database not configured");
+): Promise<{ user: AuthUser; sessionCookie: string }> {
+  // Verify credentials with Firebase REST API
+  const idToken = await verifyFirebasePassword(email, password);
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { subscription: true },
-  });
+  // Create session cookie
+  const sessionCookie = await createFirebaseSessionCookie(idToken);
 
-  if (!user) {
-    throw new Error("Invalid credentials");
-  }
+  // Decode token to get uid
+  const auth = getFirebaseAuth();
+  const decodedToken = await auth.verifyIdToken(idToken);
 
-  const valid = await verifyPassword(password, user.password);
-  if (!valid) {
-    throw new Error("Invalid credentials");
-  }
+  // Upsert user in Prisma
+  const user = await upsertPrismaUser(email, decodedToken.uid);
 
-  const sessionId = await createSession(user.id);
-
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      plan: user.subscription?.plan ?? "FREE",
-      status: user.subscription?.status ?? "ACTIVE",
-    },
-    sessionId,
-  };
+  return { user, sessionCookie };
 }

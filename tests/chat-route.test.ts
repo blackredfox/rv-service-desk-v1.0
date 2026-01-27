@@ -81,7 +81,7 @@ describe("Chat API Route", () => {
     it("should process chat with mocked OpenAI response", async () => {
       process.env.OPENAI_API_KEY = "sk-test-mock";
 
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
       const mockCase = {
         id: "case_123",
         title: "Test Case",
@@ -143,7 +143,7 @@ describe("Chat API Route", () => {
     it("should handle session-only image attachments", async () => {
       process.env.OPENAI_API_KEY = "sk-test-mock";
 
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE", status: "ACTIVE" };
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
       const mockCase = {
         id: "case_123",
         title: "Test Case",

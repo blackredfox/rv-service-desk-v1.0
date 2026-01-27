@@ -36,12 +36,16 @@ export async function POST(req: Request) {
       );
     }
 
-    const { user, sessionId } = await loginUser(email, password);
+    const { user, sessionCookie } = await loginUser(email, password);
 
-    await setSessionCookie(sessionId);
+    await setSessionCookie(sessionCookie);
 
-    // Track login
-    await trackEvent("user.login", user.id, {});
+    // Track login (safe - won't break if event name unknown)
+    try {
+      await trackEvent("user.login", user.id, {});
+    } catch {
+      // Analytics failure should not break login
+    }
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, plan: user.plan, status: user.status },
@@ -53,9 +57,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: message }, { status: 401 });
     }
 
+    if (message === "FIREBASE_WEB_API_KEY not configured") {
+      return NextResponse.json(
+        { error: "Authentication service not configured" },
+        { status: 503 }
+      );
+    }
+
     if (message === "Database not configured") {
       return NextResponse.json(
         { error: "Service temporarily unavailable" },
+        { status: 503 }
+      );
+    }
+
+    // Firebase errors
+    if (message.includes("Firebase") || message.includes("firebase")) {
+      console.error("Firebase error during login:", message);
+      return NextResponse.json(
+        { error: "Authentication service unavailable" },
         { status: 503 }
       );
     }

@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the auth module
+// Mock the auth module with Firebase-based functions
 vi.mock("@/lib/auth", () => ({
   registerUser: vi.fn(),
   loginUser: vi.fn(),
   getCurrentUser: vi.fn(),
   setSessionCookie: vi.fn(),
   clearSessionCookie: vi.fn(),
-  getSessionFromCookie: vi.fn(),
-  invalidateSession: vi.fn(),
+  getSessionCookie: vi.fn(),
   checkRateLimit: vi.fn(() => true),
 }));
 
@@ -33,10 +32,9 @@ import {
   getCurrentUser,
   setSessionCookie,
   clearSessionCookie,
-  getSessionFromCookie,
-  invalidateSession,
 } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
+import type { AuthUser } from "@/lib/auth";
 
 describe("Auth API Routes", () => {
   beforeEach(() => {
@@ -45,18 +43,15 @@ describe("Auth API Routes", () => {
 
   describe("POST /api/auth/register", () => {
     it("should register a new user successfully", async () => {
-      const mockUser = {
+      const mockUser: AuthUser = {
         id: "user_123",
         email: "test@example.com",
         plan: "FREE",
         status: "ACTIVE",
       };
-      const mockSessionId = "session_123";
 
-      vi.mocked(registerUser).mockResolvedValue({
-        user: mockUser,
-        sessionId: mockSessionId,
-      });
+      // Firebase-based registerUser returns just user (no sessionId - auto-login is optional)
+      vi.mocked(registerUser).mockResolvedValue(mockUser);
 
       // Import dynamically to get mocked version
       const { POST } = await import("@/app/api/auth/register/route");
@@ -75,7 +70,6 @@ describe("Auth API Routes", () => {
 
       expect(response.status).toBe(201);
       expect(data.user.email).toBe("test@example.com");
-      expect(setSessionCookie).toHaveBeenCalledWith(mockSessionId);
       expect(trackEvent).toHaveBeenCalledWith("user.signup", mockUser.id, { email: mockUser.email });
     });
 
@@ -119,17 +113,18 @@ describe("Auth API Routes", () => {
 
   describe("POST /api/auth/login", () => {
     it("should login user successfully", async () => {
-      const mockUser = {
+      const mockUser: AuthUser = {
         id: "user_123",
         email: "test@example.com",
         plan: "FREE",
         status: "ACTIVE",
       };
-      const mockSessionId = "session_123";
+      const mockSessionCookie = "firebase_session_cookie_123";
 
+      // Firebase-based loginUser returns user + sessionCookie
       vi.mocked(loginUser).mockResolvedValue({
         user: mockUser,
-        sessionId: mockSessionId,
+        sessionCookie: mockSessionCookie,
       });
 
       const { POST } = await import("@/app/api/auth/login/route");
@@ -148,7 +143,7 @@ describe("Auth API Routes", () => {
 
       expect(response.status).toBe(200);
       expect(data.user.email).toBe("test@example.com");
-      expect(setSessionCookie).toHaveBeenCalledWith(mockSessionId);
+      expect(setSessionCookie).toHaveBeenCalledWith(mockSessionCookie);
       expect(trackEvent).toHaveBeenCalledWith("user.login", mockUser.id, {});
     });
 
@@ -176,7 +171,7 @@ describe("Auth API Routes", () => {
 
   describe("POST /api/auth/logout", () => {
     it("should logout user successfully", async () => {
-      const mockUser = {
+      const mockUser: AuthUser = {
         id: "user_123",
         email: "test@example.com",
         plan: "FREE",
@@ -184,7 +179,6 @@ describe("Auth API Routes", () => {
       };
 
       vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
-      vi.mocked(getSessionFromCookie).mockResolvedValue("session_123");
 
       const { POST } = await import("@/app/api/auth/logout/route");
 
@@ -193,7 +187,6 @@ describe("Auth API Routes", () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(invalidateSession).toHaveBeenCalledWith("session_123");
       expect(clearSessionCookie).toHaveBeenCalled();
       expect(trackEvent).toHaveBeenCalledWith("user.logout", mockUser.id, {});
     });
@@ -201,7 +194,7 @@ describe("Auth API Routes", () => {
 
   describe("GET /api/auth/me", () => {
     it("should return current user", async () => {
-      const mockUser = {
+      const mockUser: AuthUser = {
         id: "user_123",
         email: "test@example.com",
         plan: "PREMIUM",
