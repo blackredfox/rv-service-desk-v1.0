@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -175,6 +175,10 @@ export default function Home() {
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [languageMode, setLanguageMode] = useState<LanguageMode>("AUTO");
 
+  // User menu (header)
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
   // Load local preferences (case + language)
   useEffect(() => {
     try {
@@ -207,6 +211,31 @@ export default function Home() {
       // ignore
     }
   }, [languageMode]);
+
+  // Close menu on outside click + ESC
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    function onMouseDown(e: MouseEvent) {
+      const root = userMenuRef.current;
+      if (!root) return;
+      if (e.target instanceof Node && !root.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setUserMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [userMenuOpen]);
 
   // Load terms (version + markdown) + acceptance state
   useEffect(() => {
@@ -360,21 +389,79 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              {userEmail ? (
-                <span className="hidden text-xs text-zinc-600 dark:text-zinc-400 sm:inline">
-                  {userEmail}
-                </span>
-              ) : null}
-
+            {/* User menu */}
+            <div className="relative" ref={userMenuRef}>
               <button
                 type="button"
-                data-testid="logout-button"
-                onClick={() => void logout()}
-                className="rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                data-testid="user-menu-button"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="
+                  flex items-center gap-2
+                  rounded-md border border-zinc-200 px-2 py-1
+                  text-xs font-medium text-zinc-700 hover:bg-zinc-50
+                  dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900
+                "
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
               >
-                Logout
+                <span className="block max-w-[160px] truncate">{userEmail || "-"}</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">▾</span>
               </button>
+
+              {userMenuOpen ? (
+                <div
+                  role="menu"
+                  aria-label="User menu"
+                  className="
+                    absolute right-0 mt-2 w-56 overflow-hidden rounded-xl
+                    border border-zinc-200 bg-white shadow-lg
+                    dark:border-zinc-800 dark:bg-zinc-950
+                  "
+                >
+                  <div className="px-3 pb-2 pt-3 text-xs font-medium text-zinc-700 dark:text-zinc-200">
+                    <div className="text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      Signed in as
+                    </div>
+                    <div className="mt-1 truncate">{userEmail || "-"}</div>
+                  </div>
+
+                  <div className="my-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+
+                  {/* Placeholder for future Support link (domain email later) */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      setShowTermsModal(true);
+                    }}
+                    className="
+                      block w-full px-3 py-2 text-left text-xs
+                      text-zinc-700 hover:bg-zinc-50
+                      dark:text-zinc-200 dark:hover:bg-zinc-900
+                    "
+                  >
+                    Terms &amp; Privacy
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="logout-button"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      void logout();
+                    }}
+                    className="
+                      block w-full px-3 py-2 text-left text-xs font-medium
+                      text-red-600 hover:bg-red-50
+                      dark:text-red-400 dark:hover:bg-red-950/30
+                    "
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <LanguageSelector value={languageMode} onChange={setLanguageMode} />
