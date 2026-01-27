@@ -37,10 +37,11 @@ enum SubscriptionStatus {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String?
+  firebaseUid String?  @unique
+  createdAt   DateTime @default(now())
 
   sessions        Session[]
   subscription    Subscription?
@@ -53,6 +54,7 @@ model User {
   apiKeys          ApiKey[]
 
   @@index([email])
+  @@index([firebaseUid])
 }
 
 model Session {
