@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ChatMessage } from "@/lib/storage";
 import {
@@ -10,6 +10,9 @@ import {
   type LanguageMode,
   type ChatSseEvent,
 } from "@/lib/api";
+import { VoiceButton } from "@/components/voice-button";
+import { PhotoAttachButton, type PhotoAttachment } from "@/components/photo-attach";
+import { analytics } from "@/lib/client-analytics";
 
 type Props = {
   caseId: string | null;
@@ -24,6 +27,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoAttachment, setPhotoAttachment] = useState<PhotoAttachment | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -33,6 +37,11 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const v = (searchParams?.get("debug") ?? "").toLowerCase();
     return v === "true" || v === "1";
   }, [searchParams]);
+
+  // Voice transcript handler
+  const handleVoiceTranscript = useCallback((text: string) => {
+    setInput((prev) => (prev ? `${prev} ${text}` : text));
+  }, []);
 
   useEffect(() => {
     if (!caseId) {
@@ -91,6 +100,10 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const localId = `local_${Date.now()}`;
     const now = new Date().toISOString();
 
+    // Capture and clear attachment before sending
+    const currentAttachment = photoAttachment;
+    setPhotoAttachment(null);
+
     setMessages((prev) => [
       ...prev,
       {
@@ -112,11 +125,28 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     ]);
 
     try {
-      const body = await apiChatStream({
+      // Build request body with optional attachment
+      const requestBody: {
+        caseId?: string;
+        message: string;
+        languageMode: LanguageMode;
+        attachments?: Array<{ type: "image"; dataUrl: string }>;
+      } = {
         caseId: caseId ?? undefined,
         message: text,
         languageMode,
-      });
+      };
+
+      if (currentAttachment) {
+        requestBody.attachments = [
+          { type: "image", dataUrl: currentAttachment.dataUrl },
+        ];
+      }
+
+      const body = await apiChatStreamWithAttachments(requestBody);
+
+      // Track chat sent
+      void analytics.chatSent(caseId ?? undefined);
 
       let serverCaseId: string | null = null;
 
@@ -142,6 +172,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
         if (ev.type === "error") {
           setError(ev.message);
+          void analytics.chatError();
           return;
         }
 
@@ -164,7 +195,35 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       setError(msg);
       setLoading(false);
       setStreaming(false);
+      void analytics.chatError();
     }
+  }
+
+  // Extended chat stream function that supports attachments
+  async function apiChatStreamWithAttachments(args: {
+    caseId?: string;
+    message: string;
+    languageMode: LanguageMode;
+    attachments?: Array<{ type: "image"; dataUrl: string }>;
+  }) {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    });
+
+    if (!res.ok || !res.body) {
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const parsed = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(parsed?.error || `Chat request failed (${res.status})`);
+      }
+
+      const txt = await res.text().catch(() => "");
+      throw new Error(txt || `Chat request failed (${res.status})`);
+    }
+
+    return res.body;
   }
 
   return (
@@ -269,34 +328,66 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       </div>
 
       <div className="border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
-        <div className="mx-auto flex max-w-2xl items-end gap-3">
-          <textarea
-            data-testid="chat-composer-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={disabled ? "Accept Terms to begin" : "Message"}
-            rows={2}
-            disabled={Boolean(disabled)}
-            className="max-h-40 flex-1 resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (canSend) void send();
-              }
-            }}
-          />
-          <button
-            type="button"
-            data-testid="chat-send-button"
-            disabled={!canSend}
-            onClick={() => void send()}
-            className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
-          >
-            Send
-          </button>
-        </div>
-        <div className="mx-auto mt-2 max-w-2xl text-xs text-zinc-500 dark:text-zinc-400">
-          Enter to send. Shift+Enter for newline.
+        <div className="mx-auto max-w-2xl">
+          {/* Photo preview row */}
+          {photoAttachment && (
+            <div className="mb-3">
+              <PhotoAttachButton
+                attachment={photoAttachment}
+                onAttach={setPhotoAttachment}
+                onRemove={() => setPhotoAttachment(null)}
+                disabled={loading || disabled}
+                caseId={caseId}
+              />
+            </div>
+          )}
+          
+          <div className="flex items-end gap-3">
+            {/* Photo attach button (hidden when attachment exists) */}
+            {!photoAttachment && (
+              <PhotoAttachButton
+                attachment={null}
+                onAttach={setPhotoAttachment}
+                onRemove={() => setPhotoAttachment(null)}
+                disabled={loading || disabled}
+                caseId={caseId}
+              />
+            )}
+            
+            {/* Voice button */}
+            <VoiceButton
+              onTranscript={handleVoiceTranscript}
+              disabled={loading || disabled}
+            />
+            
+            <textarea
+              data-testid="chat-composer-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={disabled ? "Accept Terms to begin" : "Message"}
+              rows={2}
+              disabled={Boolean(disabled)}
+              className="max-h-40 flex-1 resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canSend) void send();
+                }
+              }}
+            />
+            <button
+              type="button"
+              data-testid="chat-send-button"
+              disabled={!canSend}
+              onClick={() => void send()}
+              className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
+            >
+              Send
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Enter to send. Shift+Enter for newline.
+          </div>
         </div>
       </div>
     </section>
