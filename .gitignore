@@ -53,7 +53,8 @@ package-lock.json
 next-env.d.ts
 
 #farebase
-secrets/-e 
+# secrets
+secrets/
 # Environment files
 *.env
 *.env.*

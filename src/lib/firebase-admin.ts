@@ -1,63 +1,80 @@
-// src/lib/firebase-admin.ts
-// Server-only Firebase Admin initialization for Next.js (App Router).
-// Do NOT import this file from client components.
-
-import admin from "firebase-admin";
 import fs from "node:fs";
 import path from "node:path";
+import admin from "firebase-admin";
 
-type RawServiceAccountJson = {
-  project_id?: string;
-  client_email?: string;
-  private_key?: string;
+/**
+ * Shape of firebase-admin.json (snake_case, as Google provides it)
+ */
+type FirebaseServiceAccountJson = {
+  type: string;
+  project_id: string;
+  private_key_id: string;
+  private_key: string;
+  client_email: string;
+  client_id: string;
+  auth_uri: string;
+  token_uri: string;
+  auth_provider_x509_cert_url: string;
+  client_x509_cert_url: string;
+  universe_domain?: string;
 };
 
-function readServiceAccountFile(): RawServiceAccountJson {
-  const relPath =
-    process.env.FIREBASE_ADMIN_KEY_PATH?.trim() || "secrets/firebase-admin.json";
+function loadServiceAccount(): FirebaseServiceAccountJson {
+  const keyPath = process.env.FIREBASE_ADMIN_KEY_PATH;
 
-  const absPath = path.isAbsolute(relPath)
-    ? relPath
-    : path.join(process.cwd(), relPath);
-
-  const raw = fs.readFileSync(absPath, "utf8");
-  return JSON.parse(raw) as RawServiceAccountJson;
-}
-
-function toServiceAccount(raw: RawServiceAccountJson): admin.ServiceAccount {
-  const clientEmail = raw.client_email;
-  const privateKey = raw.private_key;
-
-  if (!clientEmail || !privateKey) {
-    throw new Error(
-      "Invalid Firebase Admin service account JSON: missing client_email/private_key."
-    );
+  if (!keyPath) {
+    throw new Error("FIREBASE_ADMIN_KEY_PATH is not set");
   }
 
-  // admin.ServiceAccount expects camelCase fields.
-  return {
-    clientEmail,
-    privateKey,
-  };
+  const fullPath = path.isAbsolute(keyPath)
+    ? keyPath
+    : path.join(process.cwd(), keyPath);
+
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`Firebase admin key file not found at: ${fullPath}`);
+  }
+
+  const raw = fs.readFileSync(fullPath, "utf8");
+  const json = JSON.parse(raw) as FirebaseServiceAccountJson;
+
+  if (typeof json.project_id !== "string" || json.project_id.length === 0) {
+    throw new Error("Service account object must contain a string 'project_id' property.");
+  }
+
+  if (typeof json.client_email !== "string" || json.client_email.length === 0) {
+    throw new Error("firebase-admin.json is missing client_email");
+  }
+
+  if (typeof json.private_key !== "string" || json.private_key.length === 0) {
+    throw new Error("firebase-admin.json is missing private_key");
+  }
+
+  return json;
 }
 
-export function getFirebaseAdminApp(): admin.app.App {
-  if (admin.apps.length > 0) return admin.app();
+/**
+ * Singleton Firebase Admin initializer
+ */
+export function getFirebaseAdmin() {
+  if (admin.apps.length > 0) return admin;
 
-  const raw = readServiceAccountFile();
-  const serviceAccount = toServiceAccount(raw);
-
-  const projectId =
-    process.env.FIREBASE_PROJECT_ID?.trim() || raw.project_id || undefined;
+  const serviceAccount = loadServiceAccount();
 
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId,
+    credential: admin.credential.cert({
+      // firebase-admin expects camelCase keys
+      projectId: serviceAccount.project_id,
+      clientEmail: serviceAccount.client_email,
+      privateKey: serviceAccount.private_key.replace(/\\n/g, "\n"),
+    }),
   });
 
-  return admin.app();
+  return admin;
 }
 
-export function getFirebaseAuth(): admin.auth.Auth {
-  return getFirebaseAdminApp().auth();
+/**
+ * Convenience helpers (what routes usually import)
+ */
+export function getFirebaseAuth() {
+  return getFirebaseAdmin().auth();
 }

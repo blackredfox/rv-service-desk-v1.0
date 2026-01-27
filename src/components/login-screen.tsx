@@ -38,6 +38,7 @@ export function LoginScreen(props: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: cleanEmail, password }),
+          credentials: "same-origin",
         });
 
         if (!res.ok) {

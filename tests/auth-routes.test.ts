@@ -8,6 +8,8 @@ vi.mock("@/lib/auth", () => ({
   setSessionCookie: vi.fn(),
   clearSessionCookie: vi.fn(),
   getSessionCookie: vi.fn(),
+  verifyFirebasePassword: vi.fn(),
+  createFirebaseSessionCookie: vi.fn(),
   checkRateLimit: vi.fn(() => true),
 }));
 
@@ -32,6 +34,8 @@ import {
   getCurrentUser,
   setSessionCookie,
   clearSessionCookie,
+  verifyFirebasePassword,
+  createFirebaseSessionCookie,
 } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 import type { AuthUser } from "@/lib/auth";
@@ -52,6 +56,8 @@ describe("Auth API Routes", () => {
 
       // Firebase-based registerUser returns just user (no sessionId - auto-login is optional)
       vi.mocked(registerUser).mockResolvedValue(mockUser);
+      vi.mocked(verifyFirebasePassword).mockResolvedValue("id_token_123");
+      vi.mocked(createFirebaseSessionCookie).mockResolvedValue("session_cookie_123");
 
       // Import dynamically to get mocked version
       const { POST } = await import("@/app/api/auth/register/route");
@@ -71,6 +77,7 @@ describe("Auth API Routes", () => {
       expect(response.status).toBe(201);
       expect(data.user.email).toBe("test@example.com");
       expect(trackEvent).toHaveBeenCalledWith("user.signup", mockUser.id, { email: mockUser.email });
+      expect(setSessionCookie).toHaveBeenCalledWith("session_cookie_123");
     });
 
     it("should reject registration with missing email", async () => {
