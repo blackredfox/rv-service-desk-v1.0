@@ -138,7 +138,7 @@ export async function getMemberByUid(uid: string): Promise<OrgMember | null> {
   const db = getFirestore();
   const snapshot = await db
     .collection("orgMembers")
-    .where("uid", "=", uid)
+    .where("uid", "==", uid)
     .limit(1)
     .get();
   
@@ -155,7 +155,7 @@ export async function getMemberByEmail(email: string): Promise<OrgMember | null>
   const db = getFirestore();
   const snapshot = await db
     .collection("orgMembers")
-    .where("email", "=", email.toLowerCase())
+    .where("email", "==", email.toLowerCase())
     .limit(1)
     .get();
   
@@ -218,7 +218,7 @@ export async function getOrgMembers(orgId: string): Promise<OrgMember[]> {
   const db = getFirestore();
   const snapshot = await db
     .collection("orgMembers")
-    .where("orgId", "=", orgId)
+    .where("orgId", "==", orgId)
     .get();
   
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrgMember));
@@ -231,8 +231,8 @@ export async function getActiveMemberCount(orgId: string): Promise<number> {
   const db = getFirestore();
   const snapshot = await db
     .collection("orgMembers")
-    .where("orgId", "=", orgId)
-    .where("status", "=", "active")
+    .where("orgId", "==", orgId)
+    .where("status", "==", "active")
     .get();
   
   return snapshot.size;
@@ -272,7 +272,7 @@ export async function getOrgByStripeCustomerId(customerId: string): Promise<Orga
   const db = getFirestore();
   const snapshot = await db
     .collection("organizations")
-    .where("stripeCustomerId", "=", customerId)
+    .where("stripeCustomerId", "==", customerId)
     .limit(1)
     .get();
   
