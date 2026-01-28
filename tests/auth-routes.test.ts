@@ -189,7 +189,11 @@ describe("Auth API Routes", () => {
 
       const { POST } = await import("@/app/api/auth/logout/route");
 
-      const response = await POST();
+      const req = new Request("http://localhost/api/auth/logout", {
+        method: "POST",
+      });
+
+      const response = await POST(req);
       const data = await response.json();
 
       expect(response.status).toBe(200);
