@@ -436,7 +436,7 @@ class B2BBillingAPITester:
             return 1
 
 def main():
-    tester = RVServiceDeskAPITester()
+    tester = B2BBillingAPITester()
     return tester.run_all_tests()
 
 if __name__ == "__main__":
