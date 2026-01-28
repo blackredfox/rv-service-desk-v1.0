@@ -5,14 +5,13 @@ import json
 import sys
 from datetime import datetime
 
-class RVServiceDeskAPITester:
+class B2BBillingAPITester:
     def __init__(self, base_url="http://localhost:3000"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
-        self.case_id = None
         self.session_cookies = None
-        self.test_user_email = f"test_{datetime.now().strftime('%H%M%S')}@example.com"
+        self.test_user_email = f"test_{datetime.now().strftime('%H%M%S')}@corporate.com"
         self.test_user_password = "TestPassword123!"
 
     def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, cookies=None):
