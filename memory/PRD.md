@@ -1,66 +1,109 @@
-# RV Service Desk - PRD
+# RV Service Desk - Product Requirements Document
+
+## Overview
+RV Service Desk is a Next.js web application for RV technicians to structure diagnostics and generate service documentation with AI assistance.
 
 ## Original Problem Statement
-Replace /api/auth/* backend implementation with Firebase Auth (Option B / enterprise-ready):
-- POST /api/auth/register and POST /api/auth/login no longer return 503 locally
-- Session managed via Firebase session cookies (httpOnly)
-- GET /api/auth/me works (returns 200 when logged in, 401 when not)
-- DB user record + subscription kept in sync in Prisma
+Implement B2B (corporate) billing and access control for RV Service Desk:
+- Organization-based subscription model ($19.99/seat/month)
+- Seat-based billing via Stripe
+- Corporate email domain restrictions
+- Admin/Member roles within organizations
+- Firestore for organization and membership data
 
 ## Architecture
-- **Framework**: Next.js 16 (App Router)
-- **Database**: Neon Postgres via Prisma
-- **Auth**: Firebase Auth with session cookies
-- **Session**: httpOnly cookie `rv_session` containing Firebase session cookie
 
-## What's Been Implemented (Jan 2026)
+### Tech Stack
+- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS 4
+- **Backend**: Next.js API Routes, Firebase Admin SDK
+- **Database**: Firestore (primary), PostgreSQL/Prisma (optional)
+- **Auth**: Firebase Auth with server-side session cookies
+- **Billing**: Stripe (seat-based subscriptions)
 
-### Prisma Schema Changes
-- `User.password` → nullable (`String?`)
-- Added `User.firebaseUid` (`String? @unique`)
-- Added index on `firebaseUid`
+### Data Model (Firestore)
+- `organizations/{orgId}` - Company info, subscription status, seat limits
+- `orgMembers/{memberId}` - User membership with role (admin/member)
 
-### Auth Backend Routes (Firebase-based)
-1. **POST /api/auth/register**
-   - Validates email + password (>=8 chars)
-   - Creates user in Firebase via Admin SDK
-   - Upserts user + subscription in Prisma
-   - Returns 201 with user data
+## User Personas
 
-2. **POST /api/auth/login**
-   - Verifies credentials via Firebase REST API (Identity Toolkit)
-   - Creates Firebase session cookie via Admin SDK
-   - Sets `rv_session` httpOnly cookie
-   - Upserts user + subscription in Prisma
-   - Returns 200 with user data
+### Organization Admin
+- Creates and manages organization
+- Sets approved email domains
+- Selects seat count and manages billing
+- Invites/removes team members
 
-3. **GET /api/auth/me**
-   - Reads `rv_session` cookie
-   - Verifies via `verifySessionCookie(cookie, true)`
-   - Returns 200 with user data or 401 if not authenticated
-
-4. **POST /api/auth/logout**
-   - Clears `rv_session` cookie (maxAge 0)
-   - Returns `{ success: true }`
-
-### Supporting Files
-- `/app/src/lib/auth.ts` - Firebase auth utilities
-- `/app/src/lib/firebase-admin.ts` - Firebase Admin initialization (unchanged)
-- `/app/.env.example` - Updated with Firebase env vars
-
-## Required Environment Variables
-- `DATABASE_URL` - Neon Postgres connection string
-- `FIREBASE_ADMIN_KEY_PATH` - Path to service account JSON (default: secrets/firebase-admin.json)
-- `FIREBASE_WEB_API_KEY` - Firebase Web API Key for password sign-in
-- `SESSION_COOKIE_DAYS` - Cookie duration (default: 7)
+### Technician (Member)
+- Signs up with corporate email
+- Uses app within seat limits
+- Cannot access billing
 
 ## Core Requirements (Static)
-- No secrets committed to repo
-- Firebase Admin service account at secrets/firebase-admin.json (git-ignored)
-- No UI changes (backend-only task)
+1. ✅ Firebase Auth with session cookies
+2. ✅ Terms acceptance flow
+3. ✅ Organization creation with domain validation
+4. ✅ Seat-based Stripe subscription checkout
+5. ✅ Webhook handler for subscription events
+6. ✅ Access gating based on subscription + seat limits
+7. ✅ Admin/Member role differentiation
 
-## Next Tasks / Backlog
-- P0: Test full flow with real Firebase credentials
-- P1: Add password reset flow (Firebase sendPasswordResetEmail)
-- P2: Add email verification flow
-- P2: Add OAuth providers (Google, etc.)
+## What's Been Implemented (Jan 28, 2026)
+
+### Backend
+- `/api/auth/me` - Returns user, org, membership, access status
+- `/api/org` - Create/get organization
+- `/api/org/members` - Manage organization members
+- `/api/billing/checkout-session` - Stripe seat-based checkout
+- `/api/billing/webhook` - Stripe webhook handler
+- `/api/billing/portal` - Stripe billing portal
+
+### Frontend
+- Welcome screen with corporate email mention
+- Login/Signup with Sign in/Sign up toggle
+- Terms acceptance flow
+- Organization setup screen (create org + select seats)
+- Billing paywall (subscribe with tier options: 5/10/25 seats)
+- Access blocked screen (various states)
+- Billing portal access in user menu (admin only)
+
+### Libraries/Utilities
+- `/lib/firestore.ts` - Firestore CRUD for orgs and members
+- `/lib/b2b-stripe.ts` - Stripe seat-based billing helpers
+
+### Tests
+- 46 tests passing (yarn test)
+- B2B billing tests
+- Auth routes tests
+- Webhook tests
+
+## Prioritized Backlog
+
+### P0 (Critical) - DONE
+- ✅ Organization model and CRUD
+- ✅ Seat-based Stripe checkout
+- ✅ Webhook handling
+- ✅ Access gating
+
+### P1 (Important)
+- [ ] Member invitation emails
+- [ ] Admin dashboard for member management
+- [ ] Seat increase/decrease via portal
+
+### P2 (Nice to Have)
+- [ ] Multi-org support (user in multiple orgs)
+- [ ] Organization settings page
+- [ ] Usage analytics per org
+
+## Next Tasks
+1. Set up real Firebase project and Stripe account for production
+2. Create Stripe Product with seat-based Price
+3. Configure Stripe webhook endpoint
+4. Test full signup → org creation → subscription → access flow
+5. Add member invitation flow with email
+
+## Environment Variables
+See `.env.example` for required configuration:
+- `FIREBASE_ADMIN_KEY_PATH` - Firebase Admin SDK key
+- `STRIPE_SECRET_KEY` - Stripe API key
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signature secret
+- `STRIPE_PRICE_SEAT_MONTHLY` - Price ID for seat subscription
+- `REQUIRE_SUBSCRIPTION` - Feature flag (true/false)
