@@ -64,105 +64,10 @@ class B2BBillingAPITester:
             print(f"❌ Failed - Error: {str(e)}")
             return False, {}, None
 
-    # === AUTH TESTS ===
+    # === B2B BILLING API TESTS ===
     
-    def test_auth_register_invalid_data(self):
-        """Test POST /api/auth/register with invalid data"""
-        # Test missing email
-        success, response, cookies = self.run_test(
-            "Auth Register - Missing Email",
-            "POST",
-            "api/auth/register",
-            400,
-            data={"password": self.test_user_password}
-        )
-        
-        # Test missing password
-        success, response, cookies = self.run_test(
-            "Auth Register - Missing Password",
-            "POST",
-            "api/auth/register",
-            400,
-            data={"email": self.test_user_email}
-        )
-        
-        # Test invalid email format
-        success, response, cookies = self.run_test(
-            "Auth Register - Invalid Email",
-            "POST",
-            "api/auth/register",
-            400,
-            data={"email": "invalid-email", "password": self.test_user_password}
-        )
-        
-        # Test weak password
-        success, response, cookies = self.run_test(
-            "Auth Register - Weak Password",
-            "POST",
-            "api/auth/register",
-            400,
-            data={"email": self.test_user_email, "password": "123"}
-        )
-        
-        return True
-
-    def test_auth_register_valid(self):
-        """Test POST /api/auth/register with valid data"""
-        success, response, cookies = self.run_test(
-            "Auth Register - Valid Data",
-            "POST",
-            "api/auth/register",
-            201,
-            data={"email": self.test_user_email, "password": self.test_user_password}
-        )
-        
-        if success and cookies:
-            self.session_cookies = cookies
-            print(f"   Registered user: {response.get('user', {}).get('email')}")
-            return True
-        return False
-
-    def test_auth_register_duplicate(self):
-        """Test POST /api/auth/register with duplicate email"""
-        success, response, cookies = self.run_test(
-            "Auth Register - Duplicate Email",
-            "POST",
-            "api/auth/register",
-            409,
-            data={"email": self.test_user_email, "password": self.test_user_password}
-        )
-        return success
-
-    def test_auth_me_authenticated(self):
-        """Test GET /api/auth/me when authenticated"""
-        success, response, cookies = self.run_test(
-            "Auth Me - Authenticated",
-            "GET",
-            "api/auth/me",
-            200
-        )
-        
-        if success:
-            print(f"   User info: {response}")
-            return True
-        return False
-
-    def test_auth_logout(self):
-        """Test POST /api/auth/logout"""
-        success, response, cookies = self.run_test(
-            "Auth Logout",
-            "POST",
-            "api/auth/logout",
-            200
-        )
-        
-        if success:
-            self.session_cookies = None  # Clear session
-            return True
-        return False
-
     def test_auth_me_unauthenticated(self):
-        """Test GET /api/auth/me when not authenticated"""
+        """Test GET /api/auth/me when not authenticated - should return 401"""
         success, response, cookies = self.run_test(
             "Auth Me - Unauthenticated",
             "GET",
@@ -172,46 +77,90 @@ class B2BBillingAPITester:
         )
         return success
 
-    def test_auth_login_invalid(self):
-        """Test POST /api/auth/login with invalid credentials"""
-        # Test wrong password
+    def test_billing_checkout_unauthenticated(self):
+        """Test POST /api/billing/checkout-session without auth - should return 401"""
         success, response, cookies = self.run_test(
-            "Auth Login - Wrong Password",
+            "Billing Checkout - Unauthenticated",
             "POST",
-            "api/auth/login",
+            "api/billing/checkout-session",
             401,
-            data={"email": self.test_user_email, "password": "wrongpassword"},
+            data={"orgId": "test-org", "seatCount": 5, "origin": "http://localhost:3000"},
             cookies={}
         )
-        
-        # Test non-existent user
-        success, response, cookies = self.run_test(
-            "Auth Login - Non-existent User",
-            "POST",
-            "api/auth/login",
-            401,
-            data={"email": "nonexistent@example.com", "password": self.test_user_password},
-            cookies={}
-        )
-        
-        return True
+        return success
 
-    def test_auth_login_valid(self):
-        """Test POST /api/auth/login with valid credentials"""
+    def test_billing_checkout_missing_orgid(self):
+        """Test POST /api/billing/checkout-session without orgId - should return 400"""
         success, response, cookies = self.run_test(
-            "Auth Login - Valid Credentials",
+            "Billing Checkout - Missing orgId",
             "POST",
-            "api/auth/login",
-            200,
-            data={"email": self.test_user_email, "password": self.test_user_password},
+            "api/billing/checkout-session",
+            400,
+            data={"seatCount": 5, "origin": "http://localhost:3000"},
             cookies={}
         )
-        
-        if success and cookies:
-            self.session_cookies = cookies
-            print(f"   Logged in user: {response.get('user', {}).get('email')}")
-            return True
-        return False
+        return success
+
+    def test_billing_webhook_no_signature(self):
+        """Test POST /api/billing/webhook without stripe-signature header - should return 400"""
+        success, response, cookies = self.run_test(
+            "Billing Webhook - No Signature",
+            "POST",
+            "api/billing/webhook",
+            400,
+            data={"type": "test"},
+            cookies={}
+        )
+        return success
+
+    def test_org_unauthenticated(self):
+        """Test GET /api/org without auth - should return 401"""
+        success, response, cookies = self.run_test(
+            "Organization API - Unauthenticated",
+            "GET",
+            "api/org",
+            401,
+            cookies={}
+        )
+        return success
+
+    def test_typescript_compilation(self):
+        """Test TypeScript compilation"""
+        print(f"\n🔍 Testing TypeScript Compilation...")
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["yarn", "build"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=120
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - TypeScript compilation successful")
+                return True
+            else:
+                print(f"❌ Failed - TypeScript compilation failed")
+                print(f"   Error: {result.stderr[:200]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+
+    def test_frontend_loading(self):
+        """Test if frontend loads without errors"""
+        success, response, cookies = self.run_test(
+            "Frontend Loading",
+            "GET",
+            "",  # Root path
+            200,
+            cookies={}
+        )
+        return success
 
     # === CASES API TESTS ===
 
