@@ -62,7 +62,7 @@ function isSpeechRecognitionSupported(): boolean {
 }
 
 // Get Speech Recognition constructor
-function getSpeechRecognitionClass(): typeof SpeechRecognition | null {
+function getSpeechRecognitionClass(): SpeechRecognitionConstructor | null {
   if (typeof window === "undefined") return null;
   const win = window as WindowWithSpeechRecognition;
   return win.SpeechRecognition || win.webkitSpeechRecognition || null;
@@ -71,7 +71,7 @@ function getSpeechRecognitionClass(): typeof SpeechRecognition | null {
 export function VoiceButton({ onTranscript, disabled }: Props) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
     setSupported(isSpeechRecognitionSupported());
