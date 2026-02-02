@@ -126,8 +126,10 @@ export async function POST(req: Request) {
     }
     
     // Validate domains
+    const bypassDomainGating = isDevBypassDomainGatingEnabled();
+
     for (const domain of domains) {
-      if (isPersonalDomain(`test@${domain}`)) {
+      if (!bypassDomainGating && isPersonalDomain(`test@${domain}`)) {
         return NextResponse.json(
           { error: `Personal domain "${domain}" is not allowed` },
           { status: 400 }
