@@ -64,12 +64,10 @@ export async function POST(req: Request) {
     // Try to create a session cookie by signing in the new user via REST
     // If this fails we still return 201 but include a helpful warning.
     let sessionWarning: string | null = null;
-    let cookieSet = false;
     try {
       const idToken = await verifyFirebasePassword(email, password);
       const sessionCookie = await createFirebaseSessionCookie(idToken);
       await setSessionCookie(sessionCookie);
-      cookieSet = true;
     } catch (err) {
       // Do not log sensitive tokens; log a short message for server diagnostics
       console.error("Failed to create session cookie after registration:",
