@@ -2,6 +2,7 @@
 
 type Props = {
   reason: string;
+  message?: string;
   isAdmin?: boolean;
   onRefresh?: () => void;
 };
