@@ -47,8 +47,8 @@ export function OrgSetupScreen({ onComplete }: Props) {
     setLoading(true);
 
     try {
-      // Use user's domain if no domains specified
-      const finalDomains = domains.length > 0 ? domains : [userDomain];
+      // Use default domain if no domains specified
+      const finalDomains = domains.length > 0 ? domains : [defaultDomain];
 
       const res = await fetch("/api/org", {
         method: "POST",
