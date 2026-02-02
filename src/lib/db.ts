@@ -1,4 +1,15 @@
-import type { PrismaClient as PrismaClientType } from "@prisma/client";
+// NOTE: Prisma client types are generated ("prisma generate").
+// In local dev, DATABASE_URL may be intentionally unset, so generated client
+// may not exist. To keep typecheck working without generated artifacts,
+// we use a minimal structural type.
+export type PrismaClientType = {
+  case: any;
+  message: any;
+  user: any;
+  subscription: any;
+  event: any;
+  $disconnect: () => Promise<void>;
+};
 
 // NOTE: Prisma client types may be unavailable in local dev if `prisma generate`
 // hasn't been run (e.g., DATABASE_URL missing). We keep runtime imports guarded
