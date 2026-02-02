@@ -19,6 +19,9 @@ export function AuthProvider({ children }: Props) {
       if (res.ok) {
         const data = (await res.json()) as AuthUser;
         setUser(data);
+      } else if (res.status === 401) {
+        // Expected when signed out; do not log as an error.
+        setUser(null);
       } else {
         setUser(null);
       }
