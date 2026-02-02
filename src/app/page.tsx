@@ -469,8 +469,9 @@ export default function Home() {
   if (step === "blocked") {
     return (
       <AccessBlockedScreen
-        reason={user?.access.reason || "Access denied"}
-        isAdmin={user?.access.isAdmin}
+        reason={user?.access?.reason || "unknown"}
+        message={user?.access?.message}
+        isAdmin={user?.access?.isAdmin}
         onRefresh={() => {
           void refresh();
         }}
