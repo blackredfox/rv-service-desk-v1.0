@@ -510,7 +510,7 @@ export default function Home() {
     return <StartScreen onStart={() => setStep("app")} />;
   }
 
-  // 8) Main app
+  // 9) Main app
   return (
     <div className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
       <Sidebar activeCaseId={activeCaseId} onSelectCase={setActiveCaseId} disabled={false} />
