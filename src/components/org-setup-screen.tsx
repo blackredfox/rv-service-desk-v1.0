@@ -16,6 +16,8 @@ const SUGGESTED_TIERS = [
 ];
 
 export function OrgSetupScreen({ onComplete }: Props) {
+  // onComplete is called after successful org creation + refresh in parent.
+  void onComplete; // keep prop stable for future steps
   const { user, refresh } = useAuth();
   
   const [step, setStep] = useState<"create" | "seats">("create");
