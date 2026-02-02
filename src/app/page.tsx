@@ -350,21 +350,22 @@ export default function Home() {
       if (step !== "terms") setStep("terms");
       return;
     }
-    
-    // Check access and route appropriately
-    if (!user.access.allowed) {
-      const reason = user.access.reason || "";
-      
+
+    // Check access and route appropriately (guard against partial user payloads)
+    const accessAllowed = Boolean(user?.access?.allowed);
+    if (!accessAllowed) {
+      const reason = user?.access?.reason || "unknown";
+
       if (reason === "no_organization" && step !== "org_setup") {
         setStep("org_setup");
         return;
       }
-      
-      if (reason === "subscription_required" && user.access.isAdmin) {
+
+      if (reason === "subscription_required" && user?.access?.isAdmin) {
         if (step !== "billing") setStep("billing");
         return;
       }
-      
+
       if (step !== "blocked") {
         setStep("blocked");
         return;
