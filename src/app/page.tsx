@@ -450,7 +450,24 @@ export default function Home() {
     );
   }
 
-  // 4) Organization setup (admin creates org)
+  // 4) No organization (stable screen)
+  if (step === "no_org") {
+    const status = deriveAccessStatus({ authLoading: false, user });
+    const canCreateOrg = status.kind === "no_org" ? status.canCreateOrg : false;
+    const defaultDomain = status.kind === "no_org" ? status.defaultDomain : undefined;
+    const message = status.kind === "no_org" ? status.message : undefined;
+
+    return (
+      <NoOrganizationScreen
+        message={message}
+        canCreateOrg={canCreateOrg}
+        defaultDomain={defaultDomain}
+        onCreateOrg={() => setStep("org_setup")}
+      />
+    );
+  }
+
+  // 5) Organization setup (admin creates org)
   if (step === "org_setup") {
     return (
       <OrgSetupScreen
