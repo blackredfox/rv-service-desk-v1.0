@@ -3,13 +3,13 @@
 // may not exist. To keep typecheck working without generated artifacts,
 // we use a minimal structural type.
 export type PrismaClientType = {
-  case: any;
-  message: any;
-  user: any;
-  subscription: any;
-  event: any;
-  analyticsEvent: any;
-  paymentTransaction: any;
+  case: unknown;
+  message: unknown;
+  user: unknown;
+  subscription: unknown;
+  event: unknown;
+  analyticsEvent: unknown;
+  paymentTransaction: unknown;
   $disconnect: () => Promise<void>;
 };
 
