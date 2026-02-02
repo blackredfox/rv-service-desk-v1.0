@@ -11,7 +11,8 @@ function getStripe(): Stripe {
       throw new Error("Missing STRIPE_SECRET_KEY");
     }
     stripeInstance = new Stripe(secretKey, {
-      apiVersion: "2025-12-15.clover",
+      // Keep aligned with the installed Stripe SDK's supported apiVersion union.
+      apiVersion: "2026-01-28.clover",
     });
   }
   return stripeInstance;
