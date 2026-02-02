@@ -10,10 +10,10 @@ type Props = {
 /**
  * Screen shown when access is blocked for various reasons
  */
-export function AccessBlockedScreen({ reason, isAdmin, onRefresh }: Props) {
+export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onRefresh }: Props) {
   // Determine message based on reason
   let title = "Access Restricted";
-  let message = reason;
+  let message = messageProp || reason;
   let showRefresh = false;
   let showContactAdmin = false;
   let showContactSupport = false;
