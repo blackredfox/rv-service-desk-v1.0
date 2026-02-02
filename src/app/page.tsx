@@ -336,45 +336,53 @@ export default function Home() {
     // Do not auto-advance from welcome: user must click Continue.
     if (step === "welcome") return;
 
-    // If user is not authenticated, only "auth" is allowed.
-    if (!user) {
+    // Use a single derived access status to avoid divergent gating logic.
+    const status = deriveAccessStatus({ authLoading, user });
+
+    // During loading: freeze the UI (no redirects, no step changes).
+    if (status.kind === "loading") return;
+
+    // Signed out
+    if (status.kind === "signed_out") {
       if (step !== "auth") setStep("auth");
       return;
     }
 
-    // If user is authenticated but terms not accepted, force "terms"
+    // Terms gate (after sign-in, before any org/billing decisions)
     if (!termsAccepted) {
       if (step !== "terms") setStep("terms");
       return;
     }
 
-    // Check access and route appropriately (guard against partial user payloads)
-    const accessAllowed = Boolean(user?.access?.allowed);
-    if (!accessAllowed) {
-      const reason = user?.access?.reason || "unknown";
-
-      if (reason === "no_organization" && step !== "org_setup") {
-        setStep("org_setup");
-        return;
-      }
-
-      if (reason === "subscription_required" && user?.access?.isAdmin) {
-        if (step !== "billing") setStep("billing");
-        return;
-      }
-
-      if (step !== "blocked") {
-        setStep("blocked");
-        return;
-      }
+    // Post-terms gating
+    if (status.kind === "no_org") {
+      const next: OnboardingStep = status.canCreateOrg ? "org_setup" : "no_org";
+      if (step !== next) setStep(next);
       return;
     }
 
-    // If auth + terms accepted + access allowed, "start" or "app" are allowed.
-    if (step === "auth" || step === "terms" || step === "org_setup" || step === "billing" || step === "blocked") {
+    if (status.kind === "billing_required") {
+      if (step !== "billing") setStep("billing");
+      return;
+    }
+
+    if (status.kind === "blocked_domain") {
+      if (step !== "blocked") setStep("blocked");
+      return;
+    }
+
+    // Ready
+    if (
+      step === "auth" ||
+      step === "terms" ||
+      step === "no_org" ||
+      step === "org_setup" ||
+      step === "billing" ||
+      step === "blocked"
+    ) {
       setStep("start");
     }
-  }, [step, user, termsAccepted]);
+  }, [step, user, termsAccepted, authLoading]);
 
   // Convenience: safe email display (prevents TS 'possibly null')
   const userEmail = user?.email ?? "";
