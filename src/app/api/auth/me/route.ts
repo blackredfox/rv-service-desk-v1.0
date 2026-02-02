@@ -139,13 +139,13 @@ export async function GET() {
   }
 }
 
-function computeAccess(
+async function computeAccess(
   email: string,
   org: Organization | null,
   member: OrgMember | null,
   requireSubscription: boolean,
   bypassDomainGating: boolean
-): MeResponse["access"] {
+): Promise<MeResponse["access"]> {
   const isAdmin = member?.role === "admin";
   const domain = getEmailDomain(email);
 
