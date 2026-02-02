@@ -340,12 +340,12 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
     messages: c.messages
       .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
       .map((m: unknown) => ({
-        id: m.id,
-        caseId: m.caseId,
-        role: m.role as "user" | "assistant",
-        content: m.content,
-        language: (m.language ?? c.inputLanguage) as Language,
-        createdAt: m.createdAt.toISOString(),
+        id: (m as AnyObj).id,
+        caseId: (m as AnyObj).caseId,
+        role: (m as AnyObj).role as "user" | "assistant",
+        content: (m as AnyObj).content,
+        language: ((m as AnyObj).language ?? c.inputLanguage) as Language,
+        createdAt: (m as AnyObj).createdAt.toISOString(),
       })),
   };
 }
