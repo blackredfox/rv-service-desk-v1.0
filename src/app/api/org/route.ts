@@ -112,8 +112,10 @@ export async function POST(req: Request) {
         );
       }
       
-      // Block personal domains
-      if (isPersonalDomain(email)) {
+      // Block personal domains (production behavior)
+      // DEV ONLY: allow personal domains to create org in local dev when bypass is enabled.
+      const bypassDomainGating = isDevBypassDomainGatingEnabled();
+      if (!bypassDomainGating && isPersonalDomain(email)) {
         return NextResponse.json(
           { error: "Personal email domains (gmail, yahoo, etc.) are not allowed. Please use a corporate email." },
           { status: 400 }
