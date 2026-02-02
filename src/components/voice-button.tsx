@@ -74,9 +74,7 @@ export function VoiceButton({ onTranscript, disabled }: Props) {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
-  useEffect(() => {
-    setSupported(isSpeechRecognitionSupported());
-  }, []);
+  // supported state is initialized lazily above; no effect needed.
 
   const startListening = useCallback(() => {
     if (!supported || listening) return;
