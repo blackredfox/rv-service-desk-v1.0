@@ -256,7 +256,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       updatedAt: true,
     },
   });
-  return rows.map((r: unknown) => ({
+  return rows.map((r: AnyObj) => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -438,7 +438,7 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
     },
   });
 
-  return rows.map((r: unknown) => ({
+  return rows.map((r: AnyObj) => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),

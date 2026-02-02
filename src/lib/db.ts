@@ -1,15 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // NOTE: Prisma client types are generated ("prisma generate").
-// In local dev, DATABASE_URL may be intentionally unset, so generated client
-// may not exist. To keep typecheck working without generated artifacts,
+// In this environment, DATABASE_URL may be intentionally unset, so generated client
+// may not exist. To keep typecheck + runtime working without generated artifacts,
 // we use a minimal structural type.
 export type PrismaClientType = {
-  case: unknown;
-  message: unknown;
-  user: unknown;
-  subscription: unknown;
-  event: unknown;
-  analyticsEvent: unknown;
-  paymentTransaction: unknown;
+  case: any;
+  message: any;
+  user: any;
+  subscription: any;
+  event: any;
+  analyticsEvent: any;
+  paymentTransaction: any;
   $disconnect: () => Promise<void>;
 };
 
