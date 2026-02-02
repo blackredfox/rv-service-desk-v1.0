@@ -124,7 +124,8 @@ function computeAccess(
   email: string,
   org: Organization | null,
   member: OrgMember | null,
-  requireSubscription: boolean
+  requireSubscription: boolean,
+  bypassDomainGating: boolean
 ): MeResponse["access"] {
   const isAdmin = member?.role === "admin";
   
