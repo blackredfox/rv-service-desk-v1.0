@@ -142,8 +142,11 @@ function computeAccess(
   if (!org || !member) {
     // Check if user's domain matches any org
     const domain = getEmailDomain(email);
-    
-    if (isPersonalDomain(email)) {
+
+    // Production behavior: block personal domains at the server.
+    // DEV ONLY: when bypassDomainGating is enabled, allow personal domains through
+    // so local dev can still reach org setup / billing flows.
+    if (!bypassDomainGating && isPersonalDomain(email)) {
       return {
         allowed: false,
         reason: "Personal email domains are not allowed. Please use your corporate email.",
@@ -151,7 +154,13 @@ function computeAccess(
         isAdmin: false,
       };
     }
-    
+
+    // If there is an org for this domain but the user is not a member yet,
+    // surface a stable state so UI can instruct them to contact an admin.
+    if (domain) {
+      void getOrganizationByDomain(domain).catch(() => null);
+    }
+
     return {
       allowed: false,
       reason: "no_organization",
