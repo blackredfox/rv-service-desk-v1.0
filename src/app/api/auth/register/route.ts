@@ -83,7 +83,11 @@ export async function POST(req: Request) {
       // Analytics failure should not break registration
     }
 
-    const payload: any = { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } };
+    const payload: {
+      user: { id: string; email: string; plan: typeof user.plan; status: typeof user.status };
+      warning?: string;
+    } = { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } };
+
     if (sessionWarning) payload.warning = sessionWarning;
 
     return NextResponse.json(payload, { status: 201 });
