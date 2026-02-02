@@ -307,28 +307,29 @@ export default function Home() {
   const expectedStepAfterWelcome = useMemo<OnboardingStep>(() => {
     // Not authenticated
     if (!user) return "auth";
-    
+
     // Terms not accepted
     if (!termsAccepted) return "terms";
-    
-    // Check access status
-    if (!user.access.allowed) {
-      const reason = user.access.reason || "";
-      
-      // No organization - need to set one up (for corporate users)
+
+    // Check access status (guard against partial user payloads)
+    const accessAllowed = Boolean(user?.access?.allowed);
+    if (!accessAllowed) {
+      const reason = user?.access?.reason || "unknown";
+
+      // No organization - need to set one up
       if (reason === "no_organization") {
         return "org_setup";
       }
-      
+
       // Subscription required - admin sees paywall
-      if (reason === "subscription_required" && user.access.isAdmin) {
+      if (reason === "subscription_required" && user?.access?.isAdmin) {
         return "billing";
       }
-      
+
       // Other blocked states
       return "blocked";
     }
-    
+
     // All good - ready to start
     return "start";
   }, [user, termsAccepted]);
