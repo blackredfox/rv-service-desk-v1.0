@@ -8,6 +8,8 @@ export type PrismaClientType = {
   user: any;
   subscription: any;
   event: any;
+  analyticsEvent: any;
+  paymentTransaction: any;
   $disconnect: () => Promise<void>;
 };
 
