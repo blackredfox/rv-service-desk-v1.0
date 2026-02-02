@@ -173,13 +173,20 @@ function computeAccess(
       };
     }
 
+    // Determine if an org already exists for this domain.
+    // - If org exists, user should contact admin (cannot create)
+    // - If no org exists, user can create org
+    const existingOrgForDomain = domain ? await getOrganizationByDomain(domain) : null;
+
     return {
       allowed: false,
       reason: "no_organization",
-      message: "No organization found for your email domain.",
+      message: existingOrgForDomain
+        ? "An organization exists for your email domain, but you are not a member. Please contact your administrator."
+        : "No organization found for your email domain.",
       requiresSubscription: true,
       isAdmin: false,
-      canCreateOrg: true,
+      canCreateOrg: !existingOrgForDomain,
       defaultDomain: domain || undefined,
     };
   }
