@@ -505,7 +505,7 @@ export default function Home() {
     );
   }
 
-  // 7) Start (explicit step before app)
+  // 8) Start (explicit step before app)
   if (step === "start") {
     return <StartScreen onStart={() => setStep("app")} />;
   }
