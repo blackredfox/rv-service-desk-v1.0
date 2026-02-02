@@ -2,6 +2,11 @@ import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 import { trackEvent } from "@/lib/analytics";
 
+
+// Local structural helpers to avoid depending on generated Prisma types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObj = any;
+
 export type CaseSummary = {
   id: string;
   title: string;
