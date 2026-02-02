@@ -491,7 +491,7 @@ export default function Home() {
     );
   }
 
-  // 6) Blocked screen (various reasons)
+  // 7) Blocked screen (various reasons)
   if (step === "blocked") {
     return (
       <AccessBlockedScreen
