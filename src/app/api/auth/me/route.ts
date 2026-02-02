@@ -83,8 +83,12 @@ export async function GET() {
       org = await getOrganization(member.orgId);
     }
     
+    // DEV ONLY: bypass corporate-domain gating for local testing.
+    // Server-side authoritative; impossible to enable in prod (see isDevBypassDomainGatingEnabled).
+    const bypassDomainGating = isDevBypassDomainGatingEnabled();
+
     // Compute access
-    const access = computeAccess(email, org, member, REQUIRE_SUBSCRIPTION);
+    const access = computeAccess(email, org, member, REQUIRE_SUBSCRIPTION, bypassDomainGating);
     
     const response: MeResponse = {
       id: uid,
