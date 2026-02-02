@@ -21,9 +21,19 @@ export type AuthUser = {
   // Access status
   access: {
     allowed: boolean;
-    reason?: string;
+    reason?:
+      | "blocked_domain"
+      | "no_organization"
+      | "subscription_required"
+      | "seat_limit_exceeded"
+      | "inactive"
+      | "pending"
+      | "unknown";
+    message?: string;
     requiresSubscription: boolean;
     isAdmin: boolean;
+    canCreateOrg?: boolean;
+    defaultDomain?: string;
   };
 };
 
