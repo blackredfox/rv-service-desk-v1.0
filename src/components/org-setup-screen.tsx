@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { isClientDevBypassDomainGatingHintEnabled } from "@/lib/dev-flags";
 
 type Props = {
   onComplete: () => void;
