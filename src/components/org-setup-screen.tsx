@@ -35,11 +35,11 @@ export function OrgSetupScreen({ onComplete }: Props) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    
+
     try {
       // Use user's domain if no domains specified
       const finalDomains = domains.length > 0 ? domains : [userDomain];
-      
+
       const res = await fetch("/api/org", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,18 +50,21 @@ export function OrgSetupScreen({ onComplete }: Props) {
         }),
         credentials: "same-origin",
       });
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to create organization");
       }
-      
+
       const data = await res.json();
       setCreatedOrgId(data.organization.id);
-      
+
       // Refresh user data
       await refresh();
-      
+
+      // Notify parent (may advance step machine)
+      onComplete();
+
       // Move to seats selection
       setStep("seats");
     } catch (err) {
