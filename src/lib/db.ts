@@ -1,5 +1,9 @@
 import type { PrismaClient as PrismaClientType } from "@prisma/client";
 
+// NOTE: Prisma client types may be unavailable in local dev if `prisma generate`
+// hasn't been run (e.g., DATABASE_URL missing). We keep runtime imports guarded
+// and typecheck-friendly by loosening the constructor import below.
+
 declare global {
   // Cached instance for dev hot-reload.
   var __prisma: PrismaClientType | null | undefined;
