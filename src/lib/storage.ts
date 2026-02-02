@@ -566,8 +566,8 @@ async function listMessagesForContextDb(caseId: string, take = 30) {
   });
 
   return rows
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    .filter((m: any) => m.role === "user" || m.role === "assistant")
+    .map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content }));
 }
 
 async function hasDb() {
