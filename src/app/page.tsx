@@ -16,14 +16,15 @@ import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
 import type { LanguageMode } from "@/lib/api";
 
-type OnboardingStep = 
-  | "welcome" 
-  | "auth" 
-  | "terms" 
-  | "org_setup"   // Create organization (if no org)
-  | "billing"     // Subscribe (if org exists but no subscription)
-  | "blocked"     // Access blocked (member issues)
-  | "start" 
+type OnboardingStep =
+  | "welcome"
+  | "auth"
+  | "terms"
+  | "no_org" // No organization exists for the user's domain (show create-org or contact-admin)
+  | "org_setup" // Create organization
+  | "billing" // Subscribe (if org exists but no subscription)
+  | "blocked" // Access blocked (various reasons)
+  | "start"
   | "app";
 
 /**
