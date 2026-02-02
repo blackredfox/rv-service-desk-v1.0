@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getFirebaseAuth } from "@/lib/firebase-admin";
+import { isDevBypassDomainGatingEnabled } from "@/lib/dev-flags";
 import {
   getMemberByUid,
   getMemberByEmail,
