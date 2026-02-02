@@ -185,7 +185,23 @@ async function computeAccess(
       };
     }
 
-    // Determine if an org already exists for this domain.
+    // DEV ONLY: When bypass is enabled and the user uses a personal email,
+    // we still want a deterministic path to proceed by creating a DEV org.
+    // In this mode, encourage using a non-personal test domain like `local.test`.
+    if (bypassDomainGating && isPersonalDomain(email)) {
+      return {
+        allowed: false,
+        reason: "no_organization",
+        message:
+          "DEV MODE: Create a test organization to continue (e.g., use a domain like local.test).",
+        requiresSubscription: true,
+        isAdmin: false,
+        canCreateOrg: true,
+        defaultDomain: "local.test",
+      };
+    }
+
+    // Otherwise, determine if an org already exists for this domain.
     // - If org exists, user should contact admin (cannot create)
     // - If no org exists, user can create org
     const existingOrgForDomain = domain ? await getOrganizationByDomain(domain) : null;
