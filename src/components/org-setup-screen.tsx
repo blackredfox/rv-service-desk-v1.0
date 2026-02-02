@@ -31,6 +31,15 @@ export function OrgSetupScreen({ onComplete }: Props) {
   
   // Extract user's email domain
   const userDomain = user?.email?.split("@")[1] || "";
+
+  // DEV UX: for personal emails, default to a safe fake corp domain.
+  const defaultDomain = useMemo(() => {
+    const devHint = isClientDevBypassDomainGatingHintEnabled();
+    if (!devHint) return userDomain;
+    const personal = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"];
+    if (personal.includes(userDomain.toLowerCase())) return "local.test";
+    return userDomain;
+  }, [userDomain]);
   
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault();
