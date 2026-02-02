@@ -480,7 +480,7 @@ export default function Home() {
     );
   }
 
-  // 5) Billing paywall (admin subscribes)
+  // 6) Billing paywall (admin subscribes)
   if (step === "billing") {
     return (
       <BillingPaywall
