@@ -24,8 +24,14 @@ export async function getPrisma(): Promise<PrismaClientType | null> {
   }
 
   try {
-    const { PrismaClient } = await import("@prisma/client");
-    const client = new PrismaClient();
+    // Prisma's generated runtime may not exist if prisma generate wasn't run.
+    // Use a guarded dynamic import and cast to avoid hard TS dependency on generated types.
+    const mod = (await import("@prisma/client")) as unknown as { PrismaClient?: new () => PrismaClientType };
+    if (!mod.PrismaClient) {
+      global.__prisma = null;
+      return null;
+    }
+    const client = new mod.PrismaClient();
     global.__prisma = client;
     return client;
   } catch {
