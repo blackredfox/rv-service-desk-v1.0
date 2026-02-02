@@ -314,27 +314,21 @@ export default function Home() {
     // Terms not accepted
     if (!termsAccepted) return "terms";
 
-    // Check access status (guard against partial user payloads)
-    const accessAllowed = Boolean(user?.access?.allowed);
-    if (!accessAllowed) {
-      const reason = user?.access?.reason || "unknown";
+    const accessStatus = deriveAccessStatus({ authLoading: false, user });
 
-      // No organization - need to set one up
-      if (reason === "no_organization") {
-        return "org_setup";
-      }
-
-      // Subscription required - admin sees paywall
-      if (reason === "subscription_required" && user?.access?.isAdmin) {
+    switch (accessStatus.kind) {
+      case "no_org":
+        // If user can create an org, we go straight to org setup.
+        // Otherwise we show a stable "No organization" screen.
+        return accessStatus.canCreateOrg ? "org_setup" : "no_org";
+      case "billing_required":
         return "billing";
-      }
-
-      // Other blocked states
-      return "blocked";
+      case "blocked_domain":
+        return "blocked";
+      case "ready":
+      default:
+        return "start";
     }
-
-    // All good - ready to start
-    return "start";
   }, [user, termsAccepted]);
 
   // Sync step with state
