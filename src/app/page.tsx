@@ -382,10 +382,14 @@ export default function Home() {
   // Convenience: safe email display (prevents TS 'possibly null')
   const userEmail = user?.email ?? "";
 
-  // Loading gate (but do NOT force login; we still want Welcome first)
+  // Loading gate: keep stable UI while auth/me is unresolved.
+  // No redirects, no step flips during loading.
   if (authLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
+      <div
+        data-testid="auth-loading"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--background)] text-[var(--foreground)]"
+      >
         <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
           Loading...
         </div>
