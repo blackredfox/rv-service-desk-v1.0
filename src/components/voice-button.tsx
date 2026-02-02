@@ -70,7 +70,7 @@ function getSpeechRecognitionClass(): SpeechRecognitionConstructor | null {
 }
 
 export function VoiceButton({ onTranscript, disabled }: Props) {
-  const [supported, setSupported] = useState(false);
+  const [supported] = useState(() => isSpeechRecognitionSupported());
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
