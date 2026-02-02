@@ -155,12 +155,6 @@ function computeAccess(
       };
     }
 
-    // If there is an org for this domain but the user is not a member yet,
-    // surface a stable state so UI can instruct them to contact an admin.
-    if (domain) {
-      void getOrganizationByDomain(domain).catch(() => null);
-    }
-
     return {
       allowed: false,
       reason: "no_organization",
