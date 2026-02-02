@@ -1,6 +1,5 @@
 import Stripe from "stripe";
 import {
-  getOrganization,
   updateOrgSubscription,
   type SubscriptionStatus,
 } from "./firestore";
