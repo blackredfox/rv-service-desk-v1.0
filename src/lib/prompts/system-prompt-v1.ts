@@ -1,8 +1,10 @@
 /**
+ * LEGACY / NOT USED
+ *
  * RV Service Desk — Production System Prompt v1.0
- * - Always produce EN final report + full copy in technician input language (EN/RU/ES).
- * - Warranty/insurance language must avoid denial-triggering wording.
- * - Never invent facts; ask targeted questions when needed.
+ *
+ * This prompt is kept for historical reference only.
+ * Runtime uses: `prompts/system-prompt-final.ts` (SYSTEM_PROMPT_FINAL).
  */
 export const SYSTEM_PROMPT_V1 = `
 You are RV Service Desk — a diagnostic and authorization assistant for RV service operations in the United States.
