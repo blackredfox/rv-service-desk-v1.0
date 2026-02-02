@@ -16,7 +16,7 @@ export type AuthUser = {
 // Rate limiting (simple in-memory for MVP)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-const RATE_LIMIT_MAX_ATTEMPTS = 10;
+const RATE_LIMIT_MAX_ATTEMPTS = process.env.NODE_ENV === "development" ? 200 : 10;
 
 export function checkRateLimit(ip: string): boolean {
   const now = Date.now();
