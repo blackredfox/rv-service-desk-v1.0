@@ -62,11 +62,12 @@ export function OrgSetupScreen({ onComplete }: Props) {
       // Refresh user data
       await refresh();
 
-      // Notify parent (may advance step machine)
+      // Notify parent (advances gating state machine)
       onComplete();
 
-      // Move to seats selection
-      setStep("seats");
+      // Billing is handled by the main gating state machine (BillingPaywall).
+      // Keep this screen stable; parent will transition to the next step.
+
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create organization";
       setError(msg);
