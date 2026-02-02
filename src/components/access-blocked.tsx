@@ -21,29 +21,43 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
   switch (reason) {
     case "no_organization":
       title = "No Organization";
-      message = "Your email domain is not registered with any organization.";
+      message = messageProp || "Your email domain is not registered with any organization.";
       showContactAdmin = true;
       break;
-      
+
+    case "blocked_domain":
+      title = "Access Restricted";
+      message = messageProp || "Please use your corporate email to sign in.";
+      showContactSupport = true;
+      break;
+
     case "subscription_required":
       title = "Subscription Required";
-      message = "Your organization needs an active subscription to access RV Service Desk.";
+      message = messageProp || "Your organization needs an active subscription to access RV Service Desk.";
       if (isAdmin) {
         // Admin should see the paywall, not this screen
-        message = "Please subscribe to continue.";
+        message = messageProp || "Please subscribe to continue.";
       }
       showRefresh = true;
       break;
-      
+
     case "seat_limit_exceeded":
       title = "Seat Limit Reached";
-      message = isAdmin
+      message = messageProp || (isAdmin
         ? "Your organization has exceeded its seat limit. Please purchase more seats."
-        : "Seat limit reached. Contact your administrator to add seats.";
+        : "Seat limit reached. Contact your administrator to add seats.");
       showRefresh = true;
       if (!isAdmin) showContactAdmin = true;
       break;
-      
+
+    case "inactive":
+    case "pending":
+      title = "Access Restricted";
+      message = messageProp || reason;
+      showRefresh = true;
+      showContactAdmin = true;
+      break;
+
     default:
       // Use the reason as the message
       showRefresh = true;
