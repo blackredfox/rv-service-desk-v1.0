@@ -107,7 +107,7 @@ export async function GET() {
     const bypassDomainGating = isDevBypassDomainGatingEnabled();
 
     // Compute access
-    const access = computeAccess(email, org, member, REQUIRE_SUBSCRIPTION, bypassDomainGating);
+    const access = await computeAccess(email, org, member, REQUIRE_SUBSCRIPTION, bypassDomainGating);
     
     const response: MeResponse = {
       id: uid,
