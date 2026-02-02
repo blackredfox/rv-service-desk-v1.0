@@ -36,7 +36,7 @@ function loadServiceAccount(): FirebaseServiceAccountJson {
     : path.join(process.cwd(), keyPath);
 
   if (!fs.existsSync(fullPath)) {
-    throw new Error(`Firebase admin key file not found at: ${fullPath}`);
+    throw new Error(`Firebase admin key file not found at: ${fullPath}. Set FIREBASE_ADMIN_KEY_PATH to your service account json.`);
   }
 
   const raw = fs.readFileSync(fullPath, "utf8");
