@@ -20,11 +20,12 @@ type FirebaseServiceAccountJson = {
 };
 
 function loadServiceAccount(): FirebaseServiceAccountJson {
-  const keyPath = process.env.FIREBASE_ADMIN_KEY_PATH;
+  const keyPath = process.env.FIREBASE_ADMIN_KEY_PATH || "firebase-admin.json";
 
-  if (!keyPath) {
-    throw new Error("FIREBASE_ADMIN_KEY_PATH is not set");
-  }
+  // If FIREBASE_ADMIN_KEY_PATH isn't set, we fall back to the repo-local
+  // firebase-admin.json for local development.
+  // In production, FIREBASE_ADMIN_KEY_PATH should be set explicitly.
+
 
   const fullPath = path.isAbsolute(keyPath)
     ? keyPath
