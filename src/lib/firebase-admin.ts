@@ -20,12 +20,16 @@ type FirebaseServiceAccountJson = {
 };
 
 function loadServiceAccount(): FirebaseServiceAccountJson {
-  const keyPath = process.env.FIREBASE_ADMIN_KEY_PATH || "firebase-admin.json";
+  const envPath = process.env.FIREBASE_ADMIN_KEY_PATH;
 
-  // If FIREBASE_ADMIN_KEY_PATH isn't set, we fall back to the repo-local
-  // firebase-admin.json for local development.
-  // In production, FIREBASE_ADMIN_KEY_PATH should be set explicitly.
+  // Production must always provide an explicit service account path.
+  if (process.env.NODE_ENV === "production" && !envPath) {
+    throw new Error("FIREBASE_ADMIN_KEY_PATH is not set");
+  }
 
+  // Local dev convenience: default to ./secrets/firebase-admin.json.
+  // This keeps credentials out of the repo root and aligns with documented setup.
+  const keyPath = envPath || "./secrets/firebase-admin.json";
 
   const fullPath = path.isAbsolute(keyPath)
     ? keyPath
