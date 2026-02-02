@@ -37,9 +37,28 @@ export type MeResponse = {
   // Access status
   access: {
     allowed: boolean;
-    reason?: string;
+    /**
+     * Stable reason code for UI gating.
+     * Avoid using free-form messages for control-flow.
+     */
+    reason?:
+      | "blocked_domain"
+      | "no_organization"
+      | "subscription_required"
+      | "seat_limit_exceeded"
+      | "inactive"
+      | "pending"
+      | "unknown";
+    /** User-facing message (optional). */
+    message?: string;
+    /** True if subscription gating is enabled in this environment. */
     requiresSubscription: boolean;
+    /** Member is admin of the org (if member exists). */
     isAdmin: boolean;
+    /** When no org exists, whether the user can create one. */
+    canCreateOrg?: boolean;
+    /** Suggested default domain for org creation. */
+    defaultDomain?: string;
   };
 };
 
