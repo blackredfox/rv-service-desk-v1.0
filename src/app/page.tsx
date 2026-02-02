@@ -10,7 +10,9 @@ import { LoginScreen } from "@/components/login-screen";
 import { OrgSetupScreen } from "@/components/org-setup-screen";
 import { BillingPaywall } from "@/components/billing-paywall";
 import { AccessBlockedScreen } from "@/components/access-blocked";
+import { NoOrganizationScreen } from "@/components/no-organization";
 import { useAuth } from "@/hooks/use-auth";
+import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
 import type { LanguageMode } from "@/lib/api";
 
