@@ -21,7 +21,7 @@ function getStripe(): Stripe {
 }
 
 // Price per seat per month in cents
-const SEAT_PRICE_CENTS = 1999; // $19.99
+// (Reserved for future inline pricing UI; billing uses Stripe price ID)
 
 /**
  * Create a Stripe Checkout session for seat-based subscription
