@@ -158,6 +158,18 @@ async function computeAccess(
     };
   }
 
+  // Production behavior: block personal domains regardless of org membership.
+  // DEV ONLY: allow when bypassDomainGating is enabled.
+  if (!bypassDomainGating && isPersonalDomain(email)) {
+    return {
+      allowed: false,
+      reason: "blocked_domain",
+      message: "Personal email domains are not allowed. Please use your corporate email.",
+      requiresSubscription: true,
+      isAdmin: false,
+    };
+  }
+
   // No organization membership
   if (!org || !member) {
     // Production behavior: block personal domains at the server.
