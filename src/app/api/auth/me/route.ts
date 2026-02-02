@@ -147,7 +147,8 @@ function computeAccess(
   bypassDomainGating: boolean
 ): MeResponse["access"] {
   const isAdmin = member?.role === "admin";
-  
+  const domain = getEmailDomain(email);
+
   // If subscription not required (dev mode), allow access
   if (!requireSubscription) {
     return {
@@ -156,19 +157,17 @@ function computeAccess(
       isAdmin,
     };
   }
-  
+
   // No organization membership
   if (!org || !member) {
-    // Check if user's domain matches any org
-    const domain = getEmailDomain(email);
-
     // Production behavior: block personal domains at the server.
     // DEV ONLY: when bypassDomainGating is enabled, allow personal domains through
-    // so local dev can still reach org setup / billing flows.
+    // so local dev can still reach org setup flows.
     if (!bypassDomainGating && isPersonalDomain(email)) {
       return {
         allowed: false,
-        reason: "Personal email domains are not allowed. Please use your corporate email.",
+        reason: "blocked_domain",
+        message: "Personal email domains are not allowed. Please use your corporate email.",
         requiresSubscription: true,
         isAdmin: false,
       };
@@ -177,53 +176,62 @@ function computeAccess(
     return {
       allowed: false,
       reason: "no_organization",
+      message: "No organization found for your email domain.",
       requiresSubscription: true,
       isAdmin: false,
+      canCreateOrg: true,
+      defaultDomain: domain || undefined,
     };
   }
-  
+
   // Member status check
   if (member.status === "inactive") {
     return {
       allowed: false,
-      reason: "Your account has been deactivated. Contact your administrator.",
+      reason: "inactive",
+      message: "Your account has been deactivated. Contact your administrator.",
       requiresSubscription: true,
       isAdmin,
     };
   }
-  
+
   if (member.status === "pending") {
     return {
       allowed: false,
-      reason: "Your account is pending approval. Contact your administrator.",
+      reason: "pending",
+      message: "Your account is pending approval. Contact your administrator.",
       requiresSubscription: true,
       isAdmin,
     };
   }
-  
+
   // Subscription check
   const activeStatuses = ["active", "trialing"];
   if (!activeStatuses.includes(org.subscriptionStatus)) {
     return {
       allowed: false,
-      reason: isAdmin ? "subscription_required" : "Subscription inactive. Contact your administrator.",
+      reason: "subscription_required",
+      message: isAdmin
+        ? "subscription_required"
+        : "Subscription inactive. Contact your administrator.",
       requiresSubscription: true,
       isAdmin,
     };
   }
-  
+
   // Seat limit check
   if (org.activeSeatCount > org.seatLimit) {
     return {
       allowed: false,
-      reason: isAdmin 
-        ? "seat_limit_exceeded" 
+      reason: "seat_limit_exceeded",
+      message: isAdmin
+        ? "seat_limit_exceeded"
         : "Seat limit reached. Contact your administrator to add seats.",
       requiresSubscription: true,
       isAdmin,
     };
   }
-  
+
   // All checks passed
   return {
     allowed: true,
