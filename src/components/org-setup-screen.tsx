@@ -225,9 +225,9 @@ export function OrgSetupScreen({ onComplete }: Props) {
                 </div>
                 
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {domains.length === 0 && userDomain && (
+                  {domains.length === 0 && defaultDomain && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                      {userDomain}
+                      {defaultDomain}
                       <span className="text-zinc-400">(default)</span>
                     </span>
                   )}
