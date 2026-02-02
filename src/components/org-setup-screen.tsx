@@ -37,7 +37,10 @@ export function OrgSetupScreen({ onComplete }: Props) {
     const devHint = isClientDevBypassDomainGatingHintEnabled();
     if (!devHint) return userDomain;
     const personal = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"];
-    if (personal.includes(userDomain.toLowerCase())) return "local.test";
+    if (personal.includes(userDomain.toLowerCase())) {
+      const suffix = (user?.id || "dev").slice(0, 6).toLowerCase();
+      return `dev-${suffix}.local.test`;
+    }
     return userDomain;
   }, [userDomain]);
   

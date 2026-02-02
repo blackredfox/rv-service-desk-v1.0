@@ -107,7 +107,14 @@ export async function GET() {
     const bypassDomainGating = isDevBypassDomainGatingEnabled();
 
     // Compute access
-    const access = await computeAccess(email, org, member, REQUIRE_SUBSCRIPTION, bypassDomainGating);
+    const access = await computeAccess(
+      email,
+      org,
+      member,
+      REQUIRE_SUBSCRIPTION,
+      bypassDomainGating,
+      decodedClaims.user_id
+    );
     
     const response: MeResponse = {
       id: uid,
@@ -144,7 +151,8 @@ async function computeAccess(
   org: Organization | null,
   member: OrgMember | null,
   requireSubscription: boolean,
-  bypassDomainGating: boolean
+  bypassDomainGating: boolean,
+  userId: string
 ): Promise<MeResponse["access"]> {
   const isAdmin = member?.role === "admin";
   const domain = getEmailDomain(email);
@@ -189,15 +197,17 @@ async function computeAccess(
     // we still want a deterministic path to proceed by creating a DEV org.
     // In this mode, encourage using a non-personal test domain like `local.test`.
     if (bypassDomainGating && isPersonalDomain(email)) {
+      const suffix = userId ? userId.slice(0, 6).toLowerCase() : "dev";
+      const suggested = `dev-${suffix}.local.test`;
       return {
         allowed: false,
         reason: "no_organization",
         message:
-          "DEV MODE: Create a test organization to continue (e.g., use a domain like local.test).",
+          "DEV MODE: Create a test organization to continue (a unique dev domain is suggested).",
         requiresSubscription: true,
         isAdmin: false,
         canCreateOrg: true,
-        defaultDomain: "local.test",
+        defaultDomain: suggested,
       };
     }
 
