@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT_V1 } from "@/lib/prompts/system-prompt-v1";
+import { SYSTEM_PROMPT_FINAL } from "@/prompts/system-prompt-final";
 import { normalizeLanguageMode, type LanguageMode } from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
