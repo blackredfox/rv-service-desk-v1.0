@@ -6,7 +6,6 @@ import {
   getMemberByUid,
   getMemberByEmail,
   getOrganization,
-  getOrganizationByDomain,
   getEmailDomain,
   isPersonalDomain,
   type Organization,
