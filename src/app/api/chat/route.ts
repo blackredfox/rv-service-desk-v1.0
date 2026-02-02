@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     stream: true,
     temperature: 0.2,
     messages: buildOpenAiMessages({
-      system: SYSTEM_PROMPT_V1,
+      system: SYSTEM_PROMPT_FINAL,
       history,
       userMessage: message,
       attachments,
