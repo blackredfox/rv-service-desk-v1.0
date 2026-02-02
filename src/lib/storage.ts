@@ -333,8 +333,8 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       updatedAt: c.updatedAt.toISOString(),
     },
     messages: c.messages
-      .filter((m: any) => m.role === "user" || m.role === "assistant")
-      .map((m: any) => ({
+      .filter((m: unknown) => (m as any).role === "user" || (m as any).role === "assistant")
+      .map((m: unknown) => ({
         id: m.id,
         caseId: m.caseId,
         role: m.role as "user" | "assistant",
