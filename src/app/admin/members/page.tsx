@@ -143,11 +143,11 @@ export default function AdminMembersPage() {
         throw new Error(data.error || "Failed to add member");
       }
 
-      // Success
+      // Success - refresh both members list and auth context (for seat counter)
       setAddEmail("");
       setAddRole("member");
       setShowAddForm(false);
-      await fetchMembers();
+      await Promise.all([fetchMembers(), refresh()]);
     } catch (e) {
       setAddError(e instanceof Error ? e.message : "Failed to add member");
     } finally {
