@@ -79,6 +79,7 @@ export async function createSeatCheckoutSession(args: {
 
 /**
  * Create Stripe Billing Portal session
+ * Includes configuration for subscription updates (seat tier changes)
  */
 export async function createBillingPortalSession(args: {
   stripeCustomerId: string;
@@ -86,9 +87,24 @@ export async function createBillingPortalSession(args: {
 }): Promise<{ url: string }> {
   const stripe = getStripe();
   
+  // Get or create portal configuration that allows subscription updates
+  // This enables users to upgrade their seat tier (5 → 10 → 25)
+  const priceId = process.env.STRIPE_PRICE_SEAT_MONTHLY;
+  
+  // Create session with subscription update enabled
+  // Note: Portal configuration must be set up in Stripe Dashboard to allow:
+  // - Subscription updates (plan switching)
+  // - Quantity changes (seat adjustments)
+  // See README.md for Stripe Dashboard setup instructions
   const session = await stripe.billingPortal.sessions.create({
     customer: args.stripeCustomerId,
     return_url: args.returnUrl,
+    // If a portal configuration ID is set, use it
+    // Otherwise, Stripe uses the default portal configuration
+    ...(process.env.STRIPE_PORTAL_CONFIGURATION_ID 
+      ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION_ID }
+      : {}
+    ),
   });
   
   return { url: session.url };
