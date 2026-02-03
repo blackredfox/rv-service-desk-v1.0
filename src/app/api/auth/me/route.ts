@@ -9,6 +9,7 @@ import {
   getOrganizationByDomain,
   getEmailDomain,
   isPersonalDomain,
+  updateMember,
   type Organization,
   type OrgMember,
 } from "@/lib/firestore";
