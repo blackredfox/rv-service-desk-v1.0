@@ -226,6 +226,24 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
     
+    // Count active admins for safety check
+    const activeAdminCount = allMembers.filter(
+      m => m.role === "admin" && m.status === "active"
+    ).length;
+
+    // Prevent removing/deactivating last admin
+    if (targetMember.role === "admin" && targetMember.status === "active") {
+      if (activeAdminCount <= 1) {
+        // Check if trying to demote or deactivate
+        if (role === "member" || status === "inactive") {
+          return NextResponse.json(
+            { error: "Cannot remove last admin. Promote another admin first." },
+            { status: 403 }
+          );
+        }
+      }
+    }
+    
     // If activating a member, check seat availability
     if (status === "active" && targetMember.status !== "active") {
       const org = await getOrganization(adminMember.orgId);
