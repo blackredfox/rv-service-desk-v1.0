@@ -469,12 +469,42 @@ export default function Home() {
     const message = status.kind === "no_org" ? status.message : undefined;
 
     return (
-      <NoOrganizationScreen
-        message={message}
-        canCreateOrg={canCreateOrg}
-        defaultDomain={defaultDomain}
-        onCreateOrg={() => setStep("org_setup")}
-      />
+      <>
+        <NoOrganizationScreen
+          message={message}
+          canCreateOrg={canCreateOrg}
+          defaultDomain={defaultDomain}
+          onCreateOrg={() => setStep("org_setup")}
+        />
+        <SupportButton
+          diagnostics={{
+            email: user?.email,
+            accessReason: user?.access?.reason,
+            accessAllowed: user?.access?.allowed,
+          }}
+        />
+      </>
+    );
+  }
+
+  // 4b) Not a member (org exists but user not added)
+  if (step === "not_a_member") {
+    return (
+      <>
+        <AccessBlockedScreen
+          reason="not_a_member"
+          message={user?.access?.message || "Contact your administrator to be added."}
+          isAdmin={false}
+          onLogout={() => void logout()}
+        />
+        <SupportButton
+          diagnostics={{
+            email: user?.email,
+            accessReason: "not_a_member",
+            accessAllowed: false,
+          }}
+        />
+      </>
     );
   }
 
