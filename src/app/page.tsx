@@ -750,6 +750,19 @@ export default function Home() {
         markdown={termsMarkdown}
         onClose={() => setShowTermsModal(false)}
       />
+
+      {/* Support Button */}
+      <SupportButton
+        diagnostics={{
+          email: user?.email,
+          orgId: user?.organization?.id,
+          orgName: user?.organization?.name,
+          memberRole: user?.membership?.role,
+          memberStatus: user?.membership?.status,
+          accessReason: user?.access?.reason,
+          accessAllowed: user?.access?.allowed,
+        }}
+      />
     </div>
   );
 }
