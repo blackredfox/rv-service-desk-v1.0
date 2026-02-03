@@ -535,37 +535,11 @@ export default function Home() {
     );
   }
 
-  // 8) Admin Onboarding (invite team CTA after org setup)
-  if (step === "start" && showAdminOnboarding && user?.access?.isAdmin) {
-    return (
-      <>
-        <AdminOnboardingScreen
-          orgName={user?.organization?.name}
-          onSkip={() => {
-            setShowAdminOnboarding(false);
-            setStep("app");
-          }}
-        />
-        <SupportButton
-          accountData={{
-            email: user?.email,
-            orgId: user?.organization?.id,
-            orgName: user?.organization?.name,
-            memberRole: user?.membership?.role,
-            memberStatus: user?.membership?.status,
-            seatCount: user?.organization?.activeSeatCount,
-            seatLimit: user?.organization?.seatLimit,
-            accessReason: user?.access?.reason,
-            accessAllowed: user?.access?.allowed,
-          }}
-        />
-      </>
-    );
-  }
-
-  // 9) Start (explicit step before app)
-  if (step === "start") {
-    return <StartScreen onStart={() => setStep("app")} />;
+  // 8) Admin Onboarding (invite team CTA after billing success)
+  // Now shown as a banner on the main app instead of a separate screen
+  if (step === "app" && showAdminOnboarding && user?.access?.isAdmin) {
+    // We'll show this as a dismissible banner in the app
+    // Fall through to main app render
   }
 
   // 9) Main app
@@ -574,6 +548,40 @@ export default function Home() {
       <Sidebar activeCaseId={activeCaseId} onSelectCase={setActiveCaseId} disabled={false} />
 
       <div className="flex h-full flex-1 flex-col">
+        {/* Admin Onboarding Banner */}
+        {showAdminOnboarding && user?.access?.isAdmin && (
+          <div
+            data-testid="admin-onboard-banner"
+            className="flex items-center justify-between gap-4 border-b border-green-200 bg-green-50 px-4 py-3 dark:border-green-900/50 dark:bg-green-950/30"
+          >
+            <div className="flex items-center gap-3">
+              <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                {user?.organization?.name || "Organization"} is ready! Invite your team to get started.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href="/admin/members"
+                data-testid="admin-onboard-invite-link"
+                className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-400"
+              >
+                Invite Team
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowAdminOnboarding(false)}
+                data-testid="admin-onboard-dismiss"
+                className="rounded-md px-2 py-1 text-xs text-green-700 hover:bg-green-100 dark:text-green-300 dark:hover:bg-green-900/30"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white/70 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
           <div className="flex items-center gap-3">
             <div className="text-sm font-semibold">RV Service Desk</div>
