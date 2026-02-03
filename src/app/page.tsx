@@ -354,7 +354,7 @@ export default function Home() {
       return;
     }
 
-    // Ready
+    // Ready - go directly to app
     if (
       step === "auth" ||
       step === "terms" ||
@@ -364,7 +364,7 @@ export default function Home() {
       step === "billing" ||
       step === "blocked"
     ) {
-      setStep("start");
+      setStep("app");
     }
   }, [step, user, termsAccepted, authLoading]);
 
