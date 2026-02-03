@@ -299,7 +299,7 @@ async function computeAccess(
       reason: "seat_limit_exceeded",
       message: isAdmin
         ? "seat_limit_exceeded"
-        : "Seat limit reached. Contact your administrator to add seats.",
+        : "Seat limit reached. Ask your administrator to upgrade seats or deactivate someone.",
       requiresSubscription: true,
       isAdmin,
     };
