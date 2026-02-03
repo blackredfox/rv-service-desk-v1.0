@@ -269,10 +269,24 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Prom
  * Handle subscription deleted event
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
-  const orgId = subscription.metadata?.orgId;
+  let orgId = subscription.metadata?.orgId;
+  
+  // If orgId not in metadata, look up by customer ID
+  if (!orgId && subscription.customer) {
+    const customerId = typeof subscription.customer === "string" 
+      ? subscription.customer 
+      : subscription.customer.id;
+    
+    const { getOrgByStripeCustomerId } = await import("./firestore");
+    const org = await getOrgByStripeCustomerId(customerId);
+    
+    if (org) {
+      orgId = org.id;
+    }
+  }
   
   if (!orgId) {
-    console.error("[Stripe Webhook] Missing orgId in subscription metadata");
+    console.error("[Stripe Webhook] Cannot find org for subscription deletion");
     return;
   }
   
