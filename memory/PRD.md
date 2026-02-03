@@ -163,8 +163,10 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - ✅ Invite-only enforcement (not_a_member reason)
 - ✅ Admin Dashboard for member management
 
-### P1 (Important)
-- [ ] Member invitation emails (currently record-only)
+### P1 (Important) - DONE
+- ✅ Member invitation emails (transactional, MVP)
+
+### P1 (Important) - Remaining
 - [ ] Seat increase/decrease via Stripe portal integration
 
 ### P2 (Nice to Have)
