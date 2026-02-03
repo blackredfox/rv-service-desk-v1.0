@@ -13,11 +13,15 @@ export function AuthProvider({ children }: Props) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "same-origin" });
       if (res.ok) {
         const data = (await res.json()) as AuthUser;
         setUser(data);
+      } else if (res.status === 401) {
+        // Expected when signed out; do not log as an error.
+        setUser(null);
       } else {
         setUser(null);
       }

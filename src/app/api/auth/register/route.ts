@@ -64,12 +64,10 @@ export async function POST(req: Request) {
     // Try to create a session cookie by signing in the new user via REST
     // If this fails we still return 201 but include a helpful warning.
     let sessionWarning: string | null = null;
-    let cookieSet = false;
     try {
       const idToken = await verifyFirebasePassword(email, password);
       const sessionCookie = await createFirebaseSessionCookie(idToken);
       await setSessionCookie(sessionCookie);
-      cookieSet = true;
     } catch (err) {
       // Do not log sensitive tokens; log a short message for server diagnostics
       console.error("Failed to create session cookie after registration:",
@@ -85,7 +83,11 @@ export async function POST(req: Request) {
       // Analytics failure should not break registration
     }
 
-    const payload: any = { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } };
+    const payload: {
+      user: { id: string; email: string; plan: typeof user.plan; status: typeof user.status };
+      warning?: string;
+    } = { user: { id: user.id, email: user.email, plan: user.plan, status: user.status } };
+
     if (sessionWarning) payload.warning = sessionWarning;
 
     return NextResponse.json(payload, { status: 201 });

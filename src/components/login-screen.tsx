@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { isClientDevBypassDomainGatingHintEnabled } from "@/lib/dev-flags";
 
 type Props = {
   onAuthed?: () => void;
@@ -68,6 +69,15 @@ export function LoginScreen(props: Props) {
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">RV Service Desk</h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{title} to continue</p>
+
+          {isClientDevBypassDomainGatingHintEnabled() ? (
+            <div
+              data-testid="dev-bypass-hint"
+              className="mx-auto mt-3 max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+            >
+              DEV ONLY: domain gating bypass is enabled. You can sign in with personal emails.
+            </div>
+          ) : null}
         </div>
 
         <div className="mb-3 flex items-center justify-center gap-2">

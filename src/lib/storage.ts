@@ -2,6 +2,11 @@ import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 import { trackEvent } from "@/lib/analytics";
 
+
+// Local structural helpers to avoid depending on generated Prisma types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObj = any;
+
 export type CaseSummary = {
   id: string;
   title: string;
@@ -251,7 +256,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       updatedAt: true,
     },
   });
-  return rows.map((r) => ({
+  return rows.map((r: AnyObj) => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -333,14 +338,14 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       updatedAt: c.updatedAt.toISOString(),
     },
     messages: c.messages
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .map((m) => ({
-        id: m.id,
-        caseId: m.caseId,
-        role: m.role as "user" | "assistant",
-        content: m.content,
-        language: (m.language ?? c.inputLanguage) as Language,
-        createdAt: m.createdAt.toISOString(),
+      .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
+      .map((m: unknown) => ({
+        id: (m as AnyObj).id,
+        caseId: (m as AnyObj).caseId,
+        role: (m as AnyObj).role as "user" | "assistant",
+        content: (m as AnyObj).content,
+        language: ((m as AnyObj).language ?? c.inputLanguage) as Language,
+        createdAt: (m as AnyObj).createdAt.toISOString(),
       })),
   };
 }
@@ -433,7 +438,7 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
     },
   });
 
-  return rows.map((r) => ({
+  return rows.map((r: AnyObj) => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -566,8 +571,8 @@ async function listMessagesForContextDb(caseId: string, take = 30) {
   });
 
   return rows
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
+    .map((m: unknown) => ({ role: (m as AnyObj).role as "user" | "assistant", content: (m as AnyObj).content }));
 }
 
 async function hasDb() {

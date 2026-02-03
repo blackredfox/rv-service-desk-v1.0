@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT_V1 } from "@/lib/prompts/system-prompt-v1";
+import { SYSTEM_PROMPT_FINAL } from "../../../../prompts/system-prompt-final";
 import { normalizeLanguageMode, type LanguageMode } from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     stream: true,
     temperature: 0.2,
     messages: buildOpenAiMessages({
-      system: SYSTEM_PROMPT_V1,
+      system: SYSTEM_PROMPT_FINAL,
       history,
       userMessage: message,
       attachments,

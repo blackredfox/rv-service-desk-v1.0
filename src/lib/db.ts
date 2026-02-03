@@ -1,4 +1,22 @@
-import type { PrismaClient as PrismaClientType } from "@prisma/client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// NOTE: Prisma client types are generated ("prisma generate").
+// In this environment, DATABASE_URL may be intentionally unset, so generated client
+// may not exist. To keep typecheck + runtime working without generated artifacts,
+// we use a minimal structural type.
+export type PrismaClientType = {
+  case: any;
+  message: any;
+  user: any;
+  subscription: any;
+  event: any;
+  analyticsEvent: any;
+  paymentTransaction: any;
+  $disconnect: () => Promise<void>;
+};
+
+// NOTE: Prisma client types may be unavailable in local dev if `prisma generate`
+// hasn't been run (e.g., DATABASE_URL missing). We keep runtime imports guarded
+// and typecheck-friendly by loosening the constructor import below.
 
 declare global {
   // Cached instance for dev hot-reload.
@@ -20,8 +38,14 @@ export async function getPrisma(): Promise<PrismaClientType | null> {
   }
 
   try {
-    const { PrismaClient } = await import("@prisma/client");
-    const client = new PrismaClient();
+    // Prisma's generated runtime may not exist if prisma generate wasn't run.
+    // Use a guarded dynamic import and cast to avoid hard TS dependency on generated types.
+    const mod = (await import("@prisma/client")) as unknown as { PrismaClient?: new () => PrismaClientType };
+    if (!mod.PrismaClient) {
+      global.__prisma = null;
+      return null;
+    }
+    const client = new mod.PrismaClient();
     global.__prisma = client;
     return client;
   } catch {

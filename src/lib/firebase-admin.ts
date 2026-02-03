@@ -20,18 +20,23 @@ type FirebaseServiceAccountJson = {
 };
 
 function loadServiceAccount(): FirebaseServiceAccountJson {
-  const keyPath = process.env.FIREBASE_ADMIN_KEY_PATH;
+  const envPath = process.env.FIREBASE_ADMIN_KEY_PATH;
 
-  if (!keyPath) {
+  // Production must always provide an explicit service account path.
+  if (process.env.NODE_ENV === "production" && !envPath) {
     throw new Error("FIREBASE_ADMIN_KEY_PATH is not set");
   }
+
+  // Local dev convenience: default to ./secrets/firebase-admin.json.
+  // This keeps credentials out of the repo root and aligns with documented setup.
+  const keyPath = envPath || "./secrets/firebase-admin.json";
 
   const fullPath = path.isAbsolute(keyPath)
     ? keyPath
     : path.join(process.cwd(), keyPath);
 
   if (!fs.existsSync(fullPath)) {
-    throw new Error(`Firebase admin key file not found at: ${fullPath}`);
+    throw new Error(`Firebase admin key file not found at: ${fullPath}. Set FIREBASE_ADMIN_KEY_PATH to your service account json.`);
   }
 
   const raw = fs.readFileSync(fullPath, "utf8");
