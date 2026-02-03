@@ -11,6 +11,7 @@ import { OrgSetupScreen } from "@/components/org-setup-screen";
 import { BillingPaywall } from "@/components/billing-paywall";
 import { AccessBlockedScreen } from "@/components/access-blocked";
 import { NoOrganizationScreen } from "@/components/no-organization";
+import { SupportButton } from "@/components/support-button";
 import { useAuth } from "@/hooks/use-auth";
 import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
