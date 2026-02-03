@@ -33,7 +33,7 @@ type Tab = "members" | "activity";
 
 export default function AdminMembersPage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, refresh } = useAuth();
 
   const [activeTab, setActiveTab] = useState<Tab>("members");
   
