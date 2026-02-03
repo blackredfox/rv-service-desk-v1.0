@@ -150,7 +150,11 @@ function TermsAcceptanceScreen(props: {
 export default function Home() {
   const { user, loading: authLoading, logout, refresh } = useAuth();
 
-  const [step, setStep] = useState<OnboardingStep>("welcome");
+  const [step, setStep] = useState<OnboardingStep>(() => {
+    // If user returns from admin page (has session), skip welcome
+    // We'll check properly after auth loads
+    return "welcome";
+  });
 
   const [termsVersion, setTermsVersion] = useState<string>("v1.0");
   const [termsMarkdown, setTermsMarkdown] = useState<string>("");
