@@ -24,6 +24,7 @@ export type AuthUser = {
     reason?:
       | "blocked_domain"
       | "no_organization"
+      | "not_a_member"
       | "subscription_required"
       | "seat_limit_exceeded"
       | "inactive"
