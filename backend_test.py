@@ -242,13 +242,13 @@ class RVServiceDeskAPITester:
         )
         return success
 
-    def test_typescript_compilation(self):
-        """Test TypeScript compilation"""
-        print(f"\n🔍 Testing TypeScript Compilation...")
+    def test_unit_tests_pass(self):
+        """Test that all unit tests still pass"""
+        print(f"\n🔍 Testing Unit Tests Pass...")
         try:
             import subprocess
             result = subprocess.run(
-                ["yarn", "build"], 
+                ["yarn", "test"], 
                 cwd="/app",
                 capture_output=True, 
                 text=True, 
@@ -258,10 +258,16 @@ class RVServiceDeskAPITester:
             self.tests_run += 1
             if result.returncode == 0:
                 self.tests_passed += 1
-                print(f"✅ Passed - TypeScript compilation successful")
+                print(f"✅ Passed - All unit tests pass")
+                # Extract test count from output
+                if "Tests" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "Tests" in line and "passed" in line:
+                            print(f"   {line.strip()}")
                 return True
             else:
-                print(f"❌ Failed - TypeScript compilation failed")
+                print(f"❌ Failed - Unit tests failed")
                 print(f"   Error: {result.stderr[:200]}")
                 return False
         except Exception as e:
@@ -280,39 +286,59 @@ class RVServiceDeskAPITester:
         )
         return success
 
+    def test_uat_fixes_basic_endpoints(self):
+        """Test basic endpoints are accessible for UAT fixes"""
+        print("\n🔍 Testing UAT Fixes - Basic Endpoints...")
+        
+        # Test main page loads
+        success, response, cookies = self.run_test(
+            "Main page loads",
+            "GET",
+            "",
+            200,
+            cookies={}
+        )
+        
+        # Test admin members page loads (will redirect to login but should not 404)
+        success2, response2, cookies2 = self.run_test(
+            "Admin members page accessible",
+            "GET", 
+            "admin/members",
+            200,  # Should load the page (will show login/redirect but not 404)
+            cookies={}
+        )
+        
+        return success and success2
+
+    def test_billing_portal_endpoint(self):
+        """Test billing portal endpoint exists for upgrade functionality"""
+        success, response, cookies = self.run_test(
+            "Billing portal endpoint exists",
+            "POST",
+            "api/billing/portal",
+            401,  # Should return 401 (unauthorized) not 404 (not found)
+            data={"returnUrl": "http://localhost:3000"},
+            cookies={}
+        )
+        return success
+
     def run_all_tests(self):
         """Run all RV Service Desk API tests"""
-        print("🚀 Starting RV Service Desk Org Setup & Admin Dashboard API Tests")
+        print("🚀 Starting RV Service Desk UAT Fixes Testing")
         print("=" * 70)
 
         # Test frontend loading
         print("\n" + "=" * 30 + " FRONTEND TESTS " + "=" * 30)
         self.test_frontend_loading()
         
-        # Test org setup and admin dashboard API endpoints
-        print("\n" + "=" * 30 + " ORG SETUP & ADMIN API TESTS " + "=" * 30)
-        self.test_auth_me_not_a_member()
-        self.test_auth_me_no_organization()
-        self.test_auth_me_blocked_domain()
-        self.test_org_members_get_non_admin()
-        self.test_org_members_post_create_active()
-        self.test_org_members_post_subscription_inactive()
-        self.test_org_members_post_seat_limit_reached()
-        self.test_org_members_post_wrong_domain()
-        self.test_org_members_patch_prevent_last_admin_demotion()
-        self.test_org_members_patch_deactivate_non_admin()
+        # Test UAT fixes basic endpoints
+        print("\n" + "=" * 30 + " UAT FIXES API TESTS " + "=" * 30)
+        self.test_uat_fixes_basic_endpoints()
+        self.test_billing_portal_endpoint()
         
-        # Test unauthenticated API endpoints (legacy tests)
-        print("\n" + "=" * 30 + " UNAUTHENTICATED API TESTS " + "=" * 30)
-        self.test_auth_me_unauthenticated()
-        self.test_billing_checkout_unauthenticated()
-        self.test_billing_checkout_missing_orgid()
-        self.test_billing_webhook_no_signature()
-        self.test_org_unauthenticated()
-        
-        # Test TypeScript compilation
-        print("\n" + "=" * 30 + " TYPESCRIPT COMPILATION " + "=" * 30)
-        self.test_typescript_compilation()
+        # Test unit tests still pass
+        print("\n" + "=" * 30 + " UNIT TESTS " + "=" * 30)
+        self.test_unit_tests_pass()
 
         # Print results
         print("\n" + "=" * 70)

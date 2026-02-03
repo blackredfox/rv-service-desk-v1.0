@@ -14,11 +14,16 @@ Implement Org Setup & Admin Dashboard for RV Service Desk:
 
 ### UX Polish (Feb 3, 2026)
 A) Session Behavior - Session-based cookies (expires when browser closes)
-B) Navigation Consistency - Single global header, "Back to Dashboard" routes to /
+B) Navigation Consistency - Single global header, "Back to Dashboard" routes to /?from=admin
 C) Admin Onboarding Flow - Removed "All Set / Start" screen, go directly to dashboard
 D) Admin Members Dashboard - Seat counter updates immediately after add/remove
 E) Help/Support Button - Renamed "Copy Diagnostics" → "Copy Account Details"
 F) Top Bar Label - Renamed "Input" → "Input language"
+
+### UAT Fixes (Feb 3, 2026)
+A) Back to Dashboard - Routes to /?from=admin to skip welcome for authenticated users
+B) Copy Report Button - Added in chat workspace to copy generated report (not chat transcript)
+C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONFIGURATION_ID support
 
 ## Architecture
 

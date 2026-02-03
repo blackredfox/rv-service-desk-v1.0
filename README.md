@@ -182,6 +182,45 @@ stripe listen --forward-to localhost:3000/api/billing/webhook
 
 ---
 
+## Enable Upgrades in Stripe Customer Portal
+
+To allow customers to upgrade their seat tier (5 → 10 → 25), configure the Stripe Customer Portal:
+
+### Step 1: Create Portal Configuration
+
+1. Go to [Stripe Dashboard → Settings → Customer Portal](https://dashboard.stripe.com/settings/billing/portal)
+2. Enable **"Allow customers to update subscriptions"**
+3. Under "Products", add your seat-based price(s)
+4. Enable **"Allow quantity changes"** if you want flexible seat counts
+5. Save the configuration
+
+### Step 2: Configure Allowed Price Changes (Optional)
+
+If using multiple price tiers (e.g., 5/10/25 seats):
+
+1. Create separate Stripe Prices for each tier
+2. In Portal Settings → Products → Edit
+3. Add all tier prices to the "Allowed prices" list
+4. Enable "Proration" for mid-cycle upgrades
+
+### Step 3: Set Portal Configuration ID (Optional)
+
+If you have multiple portal configurations:
+
+1. Copy the Configuration ID from Stripe Dashboard (starts with `bpc_`)
+2. Add to `.env`:
+   ```
+   STRIPE_PORTAL_CONFIGURATION_ID=bpc_xxxxx
+   ```
+
+### Webhook Events for Seat Updates
+
+The app handles these events for subscription changes:
+- `customer.subscription.updated` - Updates seat limit from quantity
+- `invoice.payment_succeeded` - Confirms seat count after payment
+
+---
+
 ## Database Schema
 
 Key models:

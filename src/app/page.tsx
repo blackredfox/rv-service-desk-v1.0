@@ -150,7 +150,11 @@ function TermsAcceptanceScreen(props: {
 export default function Home() {
   const { user, loading: authLoading, logout, refresh } = useAuth();
 
-  const [step, setStep] = useState<OnboardingStep>("welcome");
+  const [step, setStep] = useState<OnboardingStep>(() => {
+    // If user returns from admin page (has session), skip welcome
+    // We'll check properly after auth loads
+    return "welcome";
+  });
 
   const [termsVersion, setTermsVersion] = useState<string>("v1.0");
   const [termsMarkdown, setTermsMarkdown] = useState<string>("");
@@ -169,10 +173,11 @@ export default function Home() {
   // Admin onboarding flag (show invite team CTA after org setup)
   const [showAdminOnboarding, setShowAdminOnboarding] = useState(false);
 
-  // Check for billing callback params
+  // Check for billing callback params AND returning from admin pages
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const billingStatus = params.get("billing");
+    const fromAdmin = params.get("from");
     
     if (billingStatus === "success") {
       // Refresh user data to get updated subscription
@@ -183,6 +188,12 @@ export default function Home() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (billingStatus === "cancel") {
       // Just clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    
+    // If returning from admin page, skip welcome and go directly to app
+    if (fromAdmin === "admin") {
+      setStep("app");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [refresh]);
