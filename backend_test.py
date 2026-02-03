@@ -242,13 +242,13 @@ class RVServiceDeskAPITester:
         )
         return success
 
-    def test_typescript_compilation(self):
-        """Test TypeScript compilation"""
-        print(f"\n🔍 Testing TypeScript Compilation...")
+    def test_unit_tests_pass(self):
+        """Test that all unit tests still pass"""
+        print(f"\n🔍 Testing Unit Tests Pass...")
         try:
             import subprocess
             result = subprocess.run(
-                ["yarn", "build"], 
+                ["yarn", "test"], 
                 cwd="/app",
                 capture_output=True, 
                 text=True, 
@@ -258,10 +258,16 @@ class RVServiceDeskAPITester:
             self.tests_run += 1
             if result.returncode == 0:
                 self.tests_passed += 1
-                print(f"✅ Passed - TypeScript compilation successful")
+                print(f"✅ Passed - All unit tests pass")
+                # Extract test count from output
+                if "Tests" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "Tests" in line and "passed" in line:
+                            print(f"   {line.strip()}")
                 return True
             else:
-                print(f"❌ Failed - TypeScript compilation failed")
+                print(f"❌ Failed - Unit tests failed")
                 print(f"   Error: {result.stderr[:200]}")
                 return False
         except Exception as e:
