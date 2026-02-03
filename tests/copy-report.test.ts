@@ -61,7 +61,7 @@ Replace bypass valve and test system.
         { role: "user", content: "I have a water leak" },
         { role: "assistant", content: "Let me help you diagnose that." },
         { role: "user", content: "It's under the sink" },
-        { role: "assistant", content: "## Service Report\n\n**Issue:** Water leak under sink\n\n### Diagnosis\nPlumbing connection loose." },
+        { role: "assistant", content: "## Service Report\n\n**Issue:** Water leak under sink\n\n### Diagnosis\nPlumbing connection loose. This is additional content to make the message longer than 100 characters which is required for detection." },
       ];
 
       // Only the last assistant message with report structure should be copied
