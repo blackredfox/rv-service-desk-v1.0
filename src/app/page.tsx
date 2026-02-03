@@ -11,6 +11,7 @@ import { OrgSetupScreen } from "@/components/org-setup-screen";
 import { BillingPaywall } from "@/components/billing-paywall";
 import { AccessBlockedScreen } from "@/components/access-blocked";
 import { NoOrganizationScreen } from "@/components/no-organization";
+import { SupportButton } from "@/components/support-button";
 import { useAuth } from "@/hooks/use-auth";
 import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
@@ -21,17 +22,18 @@ type OnboardingStep =
   | "auth"
   | "terms"
   | "no_org" // No organization exists for the user's domain (show create-org or contact-admin)
+  | "not_a_member" // Org exists but user not added (invite-only)
   | "org_setup" // Create organization
   | "billing" // Subscribe (if org exists but no subscription)
   | "blocked" // Access blocked (various reasons)
-  | "start"
+  | "admin_onboard" // Admin first-time onboarding (invite team CTA)
   | "app";
 
 /**
  * NOTE (maintainability):
  * - We keep onboarding steps as a small state-machine in one place.
  * - No setState calls inside render branches (avoids React warnings + future debugging pain).
- * - B2B flow: welcome -> auth -> terms -> org_setup/billing -> start -> app
+ * - B2B flow: welcome -> auth -> terms -> org_setup/billing -> app
  */
 
 function WelcomeScreen(props: { onContinue: () => void }) {
@@ -145,38 +147,6 @@ function TermsAcceptanceScreen(props: {
   );
 }
 
-function StartScreen(props: { onStart: () => void }) {
-  const { onStart } = props;
-
-  return (
-    <div className="flex h-dvh w-full items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
-      <div className="mx-4 w-full max-w-xl rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/60">
-        <div className="mb-3 text-xl font-semibold">All set</div>
-
-        <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-200">
-          You can now start a case and chat with the assistant.
-        </p>
-
-        <div className="mt-6 flex items-center justify-end">
-          <button
-            type="button"
-            onClick={onStart}
-            data-testid="start-btn"
-            className="
-              rounded-xl px-5 py-2 text-sm font-semibold
-              text-white
-              bg-zinc-900 hover:bg-zinc-800
-              dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200
-            "
-          >
-            Start
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   const { user, loading: authLoading, logout, refresh } = useAuth();
 
@@ -196,6 +166,9 @@ export default function Home() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Admin onboarding flag (show invite team CTA after org setup)
+  const [showAdminOnboarding, setShowAdminOnboarding] = useState(false);
+
   // Check for billing callback params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -204,6 +177,8 @@ export default function Home() {
     if (billingStatus === "success") {
       // Refresh user data to get updated subscription
       void refresh();
+      // Show admin onboarding after successful billing
+      setShowAdminOnboarding(true);
       // Clean URL
       window.history.replaceState({}, "", window.location.pathname);
     } else if (billingStatus === "cancel") {
@@ -321,13 +296,15 @@ export default function Home() {
         // If user can create an org, we go straight to org setup.
         // Otherwise we show a stable "No organization" screen.
         return accessStatus.canCreateOrg ? "org_setup" : "no_org";
+      case "not_a_member":
+        return "not_a_member";
       case "billing_required":
         return "billing";
       case "blocked_domain":
         return "blocked";
       case "ready":
       default:
-        return "start";
+        return "app";
     }
   }, [user, termsAccepted]);
 
@@ -361,6 +338,11 @@ export default function Home() {
       return;
     }
 
+    if (status.kind === "not_a_member") {
+      if (step !== "not_a_member") setStep("not_a_member");
+      return;
+    }
+
     if (status.kind === "billing_required") {
       if (step !== "billing") setStep("billing");
       return;
@@ -371,16 +353,17 @@ export default function Home() {
       return;
     }
 
-    // Ready
+    // Ready - go directly to app
     if (
       step === "auth" ||
       step === "terms" ||
       step === "no_org" ||
+      step === "not_a_member" ||
       step === "org_setup" ||
       step === "billing" ||
       step === "blocked"
     ) {
-      setStep("start");
+      setStep("app");
     }
   }, [step, user, termsAccepted, authLoading]);
 
@@ -458,12 +441,42 @@ export default function Home() {
     const message = status.kind === "no_org" ? status.message : undefined;
 
     return (
-      <NoOrganizationScreen
-        message={message}
-        canCreateOrg={canCreateOrg}
-        defaultDomain={defaultDomain}
-        onCreateOrg={() => setStep("org_setup")}
-      />
+      <>
+        <NoOrganizationScreen
+          message={message}
+          canCreateOrg={canCreateOrg}
+          defaultDomain={defaultDomain}
+          onCreateOrg={() => setStep("org_setup")}
+        />
+        <SupportButton
+          accountData={{
+            email: user?.email,
+            accessReason: user?.access?.reason,
+            accessAllowed: user?.access?.allowed,
+          }}
+        />
+      </>
+    );
+  }
+
+  // 4b) Not a member (org exists but user not added)
+  if (step === "not_a_member") {
+    return (
+      <>
+        <AccessBlockedScreen
+          reason="not_a_member"
+          message={user?.access?.message || "Contact your administrator to be added."}
+          isAdmin={false}
+          onLogout={() => void logout()}
+        />
+        <SupportButton
+          accountData={{
+            email: user?.email,
+            accessReason: "not_a_member",
+            accessAllowed: false,
+          }}
+        />
+      </>
     );
   }
 
@@ -494,20 +507,38 @@ export default function Home() {
   // 7) Blocked screen (various reasons)
   if (step === "blocked") {
     return (
-      <AccessBlockedScreen
-        reason={user?.access?.reason || "unknown"}
-        message={user?.access?.message}
-        isAdmin={user?.access?.isAdmin}
-        onRefresh={() => {
-          void refresh();
-        }}
-      />
+      <>
+        <AccessBlockedScreen
+          reason={user?.access?.reason || "unknown"}
+          message={user?.access?.message}
+          isAdmin={user?.access?.isAdmin}
+          onRefresh={() => {
+            void refresh();
+          }}
+          onLogout={() => void logout()}
+        />
+        <SupportButton
+          accountData={{
+            email: user?.email,
+            orgId: user?.organization?.id,
+            orgName: user?.organization?.name,
+            memberRole: user?.membership?.role,
+            memberStatus: user?.membership?.status,
+            seatCount: user?.organization?.activeSeatCount,
+            seatLimit: user?.organization?.seatLimit,
+            accessReason: user?.access?.reason,
+            accessAllowed: user?.access?.allowed,
+          }}
+        />
+      </>
     );
   }
 
-  // 8) Start (explicit step before app)
-  if (step === "start") {
-    return <StartScreen onStart={() => setStep("app")} />;
+  // 8) Admin Onboarding (invite team CTA after billing success)
+  // Now shown as a banner on the main app instead of a separate screen
+  if (step === "app" && showAdminOnboarding && user?.access?.isAdmin) {
+    // We'll show this as a dismissible banner in the app
+    // Fall through to main app render
   }
 
   // 9) Main app
@@ -516,6 +547,40 @@ export default function Home() {
       <Sidebar activeCaseId={activeCaseId} onSelectCase={setActiveCaseId} disabled={false} />
 
       <div className="flex h-full flex-1 flex-col">
+        {/* Admin Onboarding Banner */}
+        {showAdminOnboarding && user?.access?.isAdmin && (
+          <div
+            data-testid="admin-onboard-banner"
+            className="flex items-center justify-between gap-4 border-b border-green-200 bg-green-50 px-4 py-3 dark:border-green-900/50 dark:bg-green-950/30"
+          >
+            <div className="flex items-center gap-3">
+              <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                {user?.organization?.name || "Organization"} is ready! Invite your team to get started.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href="/admin/members"
+                data-testid="admin-onboard-invite-link"
+                className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-400"
+              >
+                Invite Team
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowAdminOnboarding(false)}
+                data-testid="admin-onboard-dismiss"
+                className="rounded-md px-2 py-1 text-xs text-green-700 hover:bg-green-100 dark:text-green-300 dark:hover:bg-green-900/30"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white/70 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
           <div className="flex items-center gap-3">
             <div className="text-sm font-semibold">RV Service Desk</div>
@@ -609,6 +674,23 @@ export default function Home() {
                     </button>
                   )}
 
+                  {/* Admin Members Dashboard (admin only) */}
+                  {user?.access.isAdmin && (
+                    <a
+                      href="/admin/members"
+                      role="menuitem"
+                      data-testid="admin-members-link"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="
+                        block w-full px-3 py-2 text-left text-xs
+                        text-zinc-700 hover:bg-zinc-50
+                        dark:text-zinc-200 dark:hover:bg-zinc-900
+                      "
+                    >
+                      Manage Members
+                    </a>
+                  )}
+
                   <button
                     type="button"
                     role="menuitem"
@@ -677,6 +759,19 @@ export default function Home() {
         title="Terms of Use & Privacy Notice"
         markdown={termsMarkdown}
         onClose={() => setShowTermsModal(false)}
+      />
+
+      {/* Support Button */}
+      <SupportButton
+        accountData={{
+          email: user?.email,
+          orgId: user?.organization?.id,
+          orgName: user?.organization?.name,
+          memberRole: user?.membership?.role,
+          memberStatus: user?.membership?.status,
+          accessReason: user?.access?.reason,
+          accessAllowed: user?.access?.allowed,
+        }}
       />
     </div>
   );

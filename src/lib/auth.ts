@@ -107,6 +107,7 @@ export async function verifyFirebaseSessionCookie(
 
 /**
  * Set session cookie in response
+ * Uses session cookie (no maxAge) so it expires when browser closes
  */
 export async function setSessionCookie(sessionCookie: string) {
   const cookieStore = await cookies();
@@ -114,7 +115,7 @@ export async function setSessionCookie(sessionCookie: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
+    // No maxAge = session cookie that expires when browser closes
     path: "/",
   });
 }

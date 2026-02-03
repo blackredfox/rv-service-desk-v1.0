@@ -5,12 +5,13 @@ type Props = {
   message?: string;
   isAdmin?: boolean;
   onRefresh?: () => void;
+  onLogout?: () => void;
 };
 
 /**
  * Screen shown when access is blocked for various reasons
  */
-export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onRefresh }: Props) {
+export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onRefresh, onLogout }: Props) {
   // Determine message based on reason
   let title = "Access Restricted";
   let message = messageProp || reason;
@@ -19,6 +20,13 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
   let showContactSupport = false;
   
   switch (reason) {
+    case "not_a_member":
+      title = "Access Required";
+      message = messageProp || "Contact your administrator to be added.";
+      showContactAdmin = true;
+      showContactSupport = true;
+      break;
+
     case "no_organization":
       title = "No Organization";
       message = messageProp || "Your email domain is not registered with any organization.";
@@ -35,7 +43,6 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
       title = "Subscription Required";
       message = messageProp || "Your organization needs an active subscription to access RV Service Desk.";
       if (isAdmin) {
-        // Admin should see the paywall, not this screen
         message = messageProp || "Please subscribe to continue.";
       }
       showRefresh = true;
@@ -51,15 +58,20 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
       break;
 
     case "inactive":
+      title = "Account Deactivated";
+      message = messageProp || "Your account has been deactivated. Contact your administrator.";
+      showRefresh = true;
+      showContactAdmin = true;
+      break;
+
     case "pending":
-      title = "Access Restricted";
-      message = messageProp || reason;
+      title = "Account Pending";
+      message = messageProp || "Your account is pending approval. Contact your administrator.";
       showRefresh = true;
       showContactAdmin = true;
       break;
 
     default:
-      // Use the reason as the message
       showRefresh = true;
       showContactAdmin = !isAdmin;
   }
@@ -111,6 +123,18 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
               </button>
             )}
             
+            {/* Logout button - always shown */}
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                data-testid="blocked-logout-button"
+                className="w-full rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                Logout
+              </button>
+            )}
+            
             {showContactAdmin && (
               <div className="text-xs text-zinc-500 dark:text-zinc-400">
                 Please contact your organization administrator for assistance.
@@ -120,6 +144,7 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
             {showContactSupport && (
               <a
                 href="mailto:support@rvservicedesk.com"
+                data-testid="blocked-contact-support"
                 className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200"
               >
                 Contact Support

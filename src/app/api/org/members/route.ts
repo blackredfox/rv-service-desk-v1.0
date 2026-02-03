@@ -146,14 +146,14 @@ export async function POST(req: Request) {
       );
     }
     
-    // Create member (pending status until they sign up)
+    // Create member with active status (admin explicitly grants access)
     // Note: We use a placeholder UID that will be updated when they register
     const newMember = await createMember({
       orgId: org.id,
-      uid: `pending_${Date.now()}`, // Temporary UID
+      uid: `pending_${Date.now()}`, // Temporary UID until user signs up
       email,
       role,
-      status: "pending",
+      status: "active",
     });
     
     return NextResponse.json({
@@ -224,6 +224,24 @@ export async function PATCH(req: Request) {
     
     if (!targetMember) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+    
+    // Count active admins for safety check
+    const activeAdminCount = allMembers.filter(
+      m => m.role === "admin" && m.status === "active"
+    ).length;
+
+    // Prevent removing/deactivating last admin
+    if (targetMember.role === "admin" && targetMember.status === "active") {
+      if (activeAdminCount <= 1) {
+        // Check if trying to demote or deactivate
+        if (role === "member" || status === "inactive") {
+          return NextResponse.json(
+            { error: "Cannot remove last admin. Promote another admin first." },
+            { status: 403 }
+          );
+        }
+      }
     }
     
     // If activating a member, check seat availability
