@@ -171,7 +171,8 @@ export default function AdminMembersPage() {
         throw new Error(data.error || "Failed to update member");
       }
 
-      await fetchMembers();
+      // Refresh both members list and auth context (for seat counter)
+      await Promise.all([fetchMembers(), refresh()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update member");
     } finally {
