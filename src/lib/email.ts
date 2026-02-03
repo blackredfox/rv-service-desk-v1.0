@@ -38,7 +38,8 @@ export async function sendEmail(params: SendEmailParams): Promise<string> {
   console.log(`[Email] Sending to ${to}: "${subject}"`);
 
   try {
-    const { data, error } = await resend.emails.send({
+    const client = getResendClient();
+    const { data, error } = await client.emails.send({
       from: `${APP_NAME} <${SENDER_EMAIL}>`,
       to: [to],
       subject,
