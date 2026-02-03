@@ -504,7 +504,7 @@ export default function Home() {
           onLogout={() => void logout()}
         />
         <SupportButton
-          diagnostics={{
+          accountData={{
             email: user?.email,
             accessReason: "not_a_member",
             accessAllowed: false,
