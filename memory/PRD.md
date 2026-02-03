@@ -44,6 +44,14 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - Added `/api/debug/org-seats` endpoint for troubleshooting
 - Webhook always saves `stripeCustomerId` to ensure future lookups work
 
+### Seat Counter UI Sync Fix (Feb 3, 2026)
+- **Fixed**: UI now correctly counts only `active` members towards seat usage (excludes inactive/pending)
+- **Added**: Refresh button (↻) in admin dashboard header to manually sync org data after Stripe upgrades
+  - Button has `data-testid="refresh-org-data"` for testing
+  - Triggers `auth.refresh()` + `fetchMembers()` to get fresh data from `/api/auth/me`
+- **Added**: Helper text "Already upgraded? Click the refresh button (↻) in the header to sync." when seat limit reached
+- This completes the end-to-end fix for the seat limit sync issue after Stripe subscription upgrades
+
 ## Architecture
 
 ### Tech Stack
