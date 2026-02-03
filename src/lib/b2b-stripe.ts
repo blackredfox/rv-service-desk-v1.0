@@ -14,7 +14,7 @@ function getStripe(): Stripe {
     }
     stripeInstance = new Stripe(secretKey, {
       // Keep aligned with the installed Stripe SDK's supported apiVersion union.
-      apiVersion: "2026-01-28.clover",
+      apiVersion: "2025-12-15.clover",
     });
   }
   return stripeInstance;
