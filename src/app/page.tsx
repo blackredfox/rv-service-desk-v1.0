@@ -34,7 +34,7 @@ type OnboardingStep =
  * NOTE (maintainability):
  * - We keep onboarding steps as a small state-machine in one place.
  * - No setState calls inside render branches (avoids React warnings + future debugging pain).
- * - B2B flow: welcome -> auth -> terms -> org_setup/billing -> start -> app
+ * - B2B flow: welcome -> auth -> terms -> org_setup/billing -> app
  */
 
 function WelcomeScreen(props: { onContinue: () => void }) {
