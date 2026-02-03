@@ -460,9 +460,34 @@ export default function AdminMembersPage() {
               )}
 
               {activeSeatCount >= seatLimit && !showAddForm && (
-                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                  Seat limit reached. Purchase more seats to add members.
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Seat limit reached.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/billing/portal", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ returnUrl: window.location.href }),
+                          credentials: "same-origin",
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          window.location.href = data.url;
+                        }
+                      } catch {
+                        setError("Failed to open billing portal");
+                      }
+                    }}
+                    data-testid="upgrade-seats-button"
+                    className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Upgrade seats →
+                  </button>
+                </div>
               )}
             </div>
 
