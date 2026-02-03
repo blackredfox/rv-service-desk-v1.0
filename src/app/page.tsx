@@ -211,6 +211,8 @@ export default function Home() {
     if (billingStatus === "success") {
       // Refresh user data to get updated subscription
       void refresh();
+      // Show admin onboarding after successful billing
+      setShowAdminOnboarding(true);
       // Clean URL
       window.history.replaceState({}, "", window.location.pathname);
     } else if (billingStatus === "cancel") {
