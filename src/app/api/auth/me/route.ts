@@ -262,7 +262,7 @@ async function computeAccess(
     return {
       allowed: false,
       reason: "inactive",
-      message: "Your account has been deactivated. Contact your administrator.",
+      message: "Your account is inactive. Ask your administrator to activate you.",
       requiresSubscription: true,
       isAdmin,
     };
