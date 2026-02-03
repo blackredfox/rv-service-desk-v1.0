@@ -173,10 +173,11 @@ export default function Home() {
   // Admin onboarding flag (show invite team CTA after org setup)
   const [showAdminOnboarding, setShowAdminOnboarding] = useState(false);
 
-  // Check for billing callback params
+  // Check for billing callback params AND returning from admin pages
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const billingStatus = params.get("billing");
+    const fromAdmin = params.get("from");
     
     if (billingStatus === "success") {
       // Refresh user data to get updated subscription
@@ -187,6 +188,12 @@ export default function Home() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (billingStatus === "cancel") {
       // Just clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    
+    // If returning from admin page, skip welcome and go directly to app
+    if (fromAdmin === "admin") {
+      setStep("app");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [refresh]);
