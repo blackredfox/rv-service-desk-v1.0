@@ -69,20 +69,31 @@ Implement Org Setup & Admin Dashboard for RV Service Desk:
 - `/api/org/members` (PATCH) - Update member status/role
   - Prevents demoting/deactivating last admin
 
+- `/api/org/activity` (GET) - Get team activity metrics (admin only)
+  - Last login timestamp per member
+  - Cases created (7d / 30d)
+  - Total messages sent
+  - Sorted by most inactive first (default)
+
 ### Frontend
 - `AccessBlockedScreen` - Shows Logout button and Contact Support
 - `SupportButton` - Floating button with modal for contact + copy diagnostics
 - `AdminOnboardingScreen` - "Invite your team" CTA after org setup
-- `/admin/members` - Admin dashboard for member management
-  - Members list with email, role, status, created date
-  - Add member form with domain validation
-  - Activate/deactivate and promote/demote controls
+- `/admin/members` - Admin dashboard with tabs:
+  - **Members tab**: Member list with add/activate/deactivate/promote controls
+  - **Activity tab**: Sortable table showing:
+    - Member email
+    - Last login (with inactive highlighting)
+    - Cases in last 7/30 days
+    - Total messages
+    - Status badge
   - Last admin protection
 - Main app shows "Manage Members" link in user menu for admins
 
-### Tests (72 total passing)
+### Tests (76 total passing)
 - `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
 - `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
+- `tests/org-activity.test.ts` - 4 tests for activity API
 - `tests/access-blocked.test.tsx` - 11 tests for UI component
 
 ## Prioritized Backlog
