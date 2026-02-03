@@ -785,12 +785,14 @@ export default function AdminMembersPage() {
 
       {/* Support Button */}
       <SupportButton
-        diagnostics={{
+        accountData={{
           email: user?.email,
           orgId: orgId,
           orgName: orgName,
           memberRole: user?.membership?.role,
           memberStatus: user?.membership?.status,
+          seatCount: activeSeatCount,
+          seatLimit: seatLimit,
           accessReason: user?.access?.reason,
           accessAllowed: user?.access?.allowed,
         }}
