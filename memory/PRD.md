@@ -44,7 +44,20 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - Added `/api/debug/org-seats` endpoint for troubleshooting
 - Webhook always saves `stripeCustomerId` to ensure future lookups work
 
-### Seat Counter UI Sync Fix (Feb 3, 2026)
+### Member Invitation Emails (Feb 3, 2026)
+- **MVP Implementation**: Plain transactional email sent when admin adds a new member
+- **Email Provider**: Resend (easily swappable via `/app/src/lib/email.ts`)
+- **Email Content**: 
+  - Subject: "You've been invited to join {orgName}"
+  - Body: Org name, inviter email (if available), sign-in link, domain guidance
+- **Behavior**: 
+  - Fire-and-forget (email failure doesn't block member creation)
+  - HTML sanitization to prevent XSS
+  - Lazy client initialization for test compatibility
+- **Configuration**: 
+  - `RESEND_API_KEY` - API key from resend.com
+  - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
+  - `APP_NAME` - Defaults to "RV Service Desk"
 - **Fixed**: UI now correctly counts only `active` members towards seat usage (excludes inactive/pending)
 - **Added**: Refresh button (↻) in admin dashboard header to manually sync org data after Stripe upgrades
   - Button has `data-testid="refresh-org-data"` for testing
