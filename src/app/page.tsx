@@ -22,9 +22,11 @@ type OnboardingStep =
   | "auth"
   | "terms"
   | "no_org" // No organization exists for the user's domain (show create-org or contact-admin)
+  | "not_a_member" // Org exists but user not added (invite-only)
   | "org_setup" // Create organization
   | "billing" // Subscribe (if org exists but no subscription)
   | "blocked" // Access blocked (various reasons)
+  | "admin_onboard" // Admin first-time onboarding (invite team CTA)
   | "start"
   | "app";
 
