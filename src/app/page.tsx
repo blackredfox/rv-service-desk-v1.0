@@ -28,7 +28,6 @@ type OnboardingStep =
   | "billing" // Subscribe (if org exists but no subscription)
   | "blocked" // Access blocked (various reasons)
   | "admin_onboard" // Admin first-time onboarding (invite team CTA)
-  | "start"
   | "app";
 
 /**
