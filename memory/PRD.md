@@ -89,18 +89,16 @@ F) Top Bar Label - Renamed "Input" → "Input language"
 
 ### Frontend
 - `AccessBlockedScreen` - Shows Logout button and Contact Support
-- `SupportButton` - Floating button with modal for contact + copy diagnostics
-- `AdminOnboardingScreen` - "Invite your team" CTA after org setup
+- `SupportButton` - Floating button with modal for contact + **Copy Account Details** (renamed from diagnostics)
+  - Copies: Email, Role, Organization, Org ID, Seats (X/Y), Current page, App version, Timestamp
+  - Does NOT include chat messages or case content
+- `LanguageSelector` - Label renamed from "Input" to **"Input language"**
 - `/admin/members` - Admin dashboard with tabs:
   - **Members tab**: Member list with add/activate/deactivate/promote controls
-  - **Activity tab**: Sortable table showing:
-    - Member email
-    - Last login (with inactive highlighting)
-    - Cases in last 7/30 days
-    - Total messages
-    - Status badge
-  - Last admin protection
-- Main app shows "Manage Members" link in user menu for admins
+  - **Activity tab**: Sortable table (last login, cases, messages)
+  - Navigation: "Back to Dashboard" link (no standalone logout button)
+  - Seat counter updates immediately after member changes
+- Admin onboarding: Dismissible banner on app (not separate screen)
 
 ### Tests (76 total passing)
 - `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
