@@ -5,7 +5,7 @@ import json
 import sys
 from datetime import datetime
 
-class B2BBillingAPITester:
+class RVServiceDeskAPITester:
     def __init__(self, base_url="http://localhost:3000"):
         self.base_url = base_url
         self.tests_run = 0
