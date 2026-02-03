@@ -12,13 +12,21 @@ Implement Org Setup & Admin Dashboard for RV Service Desk:
 5. Support Button: Floating bottom-right on blocked screens and chat workspace
 6. Admin Onboarding: Show 'Invite your team' CTA after org setup
 
+### UX Polish (Feb 3, 2026)
+A) Session Behavior - Session-based cookies (expires when browser closes)
+B) Navigation Consistency - Single global header, "Back to Dashboard" routes to /
+C) Admin Onboarding Flow - Removed "All Set / Start" screen, go directly to dashboard
+D) Admin Members Dashboard - Seat counter updates immediately after add/remove
+E) Help/Support Button - Renamed "Copy Diagnostics" → "Copy Account Details"
+F) Top Bar Label - Renamed "Input" → "Input language"
+
 ## Architecture
 
 ### Tech Stack
 - **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS 4
 - **Backend**: Next.js API Routes, Firebase Admin SDK
 - **Database**: Firestore (primary), PostgreSQL/Prisma (optional)
-- **Auth**: Firebase Auth with server-side session cookies
+- **Auth**: Firebase Auth with server-side session cookies (browser session persistence)
 - **Billing**: Stripe (seat-based subscriptions)
 
 ### Data Model (Firestore)
@@ -51,6 +59,10 @@ Implement Org Setup & Admin Dashboard for RV Service Desk:
 10. ✅ Support button on blocked screens and chat
 
 ## What's Been Implemented (Feb 3, 2026)
+
+### Session & Auth (UX Polish)
+- Session cookies no longer have `maxAge` → expire when browser closes
+- No custom "logout on window close" hacks needed
 
 ### Backend - Org Setup & Admin Dashboard
 - `/api/auth/me` - Returns access reasons:
