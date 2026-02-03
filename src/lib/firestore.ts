@@ -291,6 +291,8 @@ export async function updateOrgSubscription(
  * Find organization by Stripe customer ID
  */
 export async function getOrgByStripeCustomerId(customerId: string): Promise<Organization | null> {
+  console.log(`[Stripe Sync] Looking up org by stripeCustomerId: ${customerId}`);
+  
   const db = getFirestore();
   const snapshot = await db
     .collection("organizations")
@@ -298,10 +300,15 @@ export async function getOrgByStripeCustomerId(customerId: string): Promise<Orga
     .limit(1)
     .get();
   
-  if (snapshot.empty) return null;
+  if (snapshot.empty) {
+    console.log(`[Stripe Sync] No org found with stripeCustomerId: ${customerId}`);
+    return null;
+  }
   
   const doc = snapshot.docs[0];
-  return { id: doc.id, ...doc.data() } as Organization;
+  const org = { id: doc.id, ...doc.data() } as Organization;
+  console.log(`[Stripe Sync] Found org ${org.id} (${org.name}) by stripeCustomerId`);
+  return org;
 }
 
 // ============== Domain Validation ==============
