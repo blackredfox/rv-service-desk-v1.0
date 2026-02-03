@@ -4,6 +4,7 @@ export type AccessStatusKind =
   | "loading"
   | "signed_out"
   | "blocked_domain"
+  | "not_a_member"
   | "no_org"
   | "billing_required"
   | "ready";
@@ -12,6 +13,7 @@ export type AccessStatus =
   | { kind: "loading" }
   | { kind: "signed_out" }
   | { kind: "blocked_domain"; message?: string }
+  | { kind: "not_a_member"; message?: string }
   | { kind: "no_org"; canCreateOrg: boolean; defaultDomain?: string; message?: string }
   | { kind: "billing_required"; message?: string }
   | { kind: "ready" };
@@ -37,6 +39,8 @@ export function deriveAccessStatus(args: {
   switch (reason) {
     case "blocked_domain":
       return { kind: "blocked_domain", message: user.access?.message };
+    case "not_a_member":
+      return { kind: "not_a_member", message: user.access?.message };
     case "no_organization":
       return {
         kind: "no_org",
@@ -47,6 +51,11 @@ export function deriveAccessStatus(args: {
     case "subscription_required":
       // Only admins get the paywall UI; non-admins see blocked screen.
       if (user.access?.isAdmin) return { kind: "billing_required", message: user.access?.message };
+      return { kind: "blocked_domain", message: user.access?.message };
+    case "seat_limit_exceeded":
+      return { kind: "blocked_domain", message: user.access?.message };
+    case "inactive":
+    case "pending":
       return { kind: "blocked_domain", message: user.access?.message };
     default:
       return { kind: "blocked_domain", message: user.access?.message };
