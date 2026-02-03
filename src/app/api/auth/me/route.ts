@@ -85,21 +85,31 @@ export async function GET() {
     const uid = decodedClaims.uid;
     const email = decodedClaims.email || "";
     
+    console.log(`[API /api/auth/me] Checking access for uid=${uid}, email=${email}`);
+    
     // Get membership by UID first
     let member: OrgMember | null = await getMemberByUid(uid);
+    
+    if (member) {
+      console.log(`[API /api/auth/me] Found member by UID: ${member.id}, role=${member.role}, status=${member.status}`);
+    }
     
     // If no member by UID, try to claim membership by email
     // This handles the case where admin pre-added the member before they signed up
     if (!member && email) {
+      console.log(`[API /api/auth/me] No member found by UID, checking email: ${email}`);
       const memberByEmail = await getMemberByEmail(email);
+      
       if (memberByEmail) {
+        console.log(`[API /api/auth/me] Found member by email: ${memberByEmail.id}, uid=${memberByEmail.uid}, role=${memberByEmail.role}, status=${memberByEmail.status}`);
+        
         // Check if this member record can be claimed
         // (has a placeholder UID that starts with "pending_")
         const isPlaceholderUid = memberByEmail.uid.startsWith("pending_");
         
         if (isPlaceholderUid) {
           // Claim this membership by updating the UID
-          console.log(`[API /api/auth/me] Claiming membership for ${email} (member ID: ${memberByEmail.id})`);
+          console.log(`[API /api/auth/me] Claiming membership for ${email} (member ID: ${memberByEmail.id}, replacing ${memberByEmail.uid} with ${uid})`);
           await updateMember(memberByEmail.id, { uid });
           
           // Update the member object with new UID
@@ -107,9 +117,15 @@ export async function GET() {
         } else if (memberByEmail.uid !== uid) {
           // Email exists but UID doesn't match and it's not a placeholder
           // This could be a security issue - someone else already claimed this email
-          console.warn(`[API /api/auth/me] Email ${email} already claimed by different UID`);
+          console.warn(`[API /api/auth/me] Email ${email} already claimed by different UID: ${memberByEmail.uid}`);
           // Don't return the member - let it fall through to not_a_member handling
+        } else {
+          // UIDs match - this shouldn't happen since getMemberByUid would have found it
+          console.log(`[API /api/auth/me] Member UID matches (unexpected path)`);
+          member = memberByEmail;
         }
+      } else {
+        console.log(`[API /api/auth/me] No member found by email`);
       }
     }
     
@@ -117,6 +133,9 @@ export async function GET() {
     
     if (member) {
       org = await getOrganization(member.orgId);
+      if (org) {
+        console.log(`[API /api/auth/me] Found org: ${org.id}, name=${org.name}, seatLimit=${org.seatLimit}, activeSeatCount=${org.activeSeatCount}`);
+      }
     }
     
     // DEV ONLY: bypass corporate-domain gating for local testing.
