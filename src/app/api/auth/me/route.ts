@@ -212,19 +212,30 @@ async function computeAccess(
     }
 
     // Otherwise, determine if an org already exists for this domain.
-    // - If org exists, user should contact admin (cannot create)
-    // - If no org exists, user can create org
+    // - If org exists, user is not_a_member (must contact admin)
+    // - If no org exists, user can create org (no_organization)
     const existingOrgForDomain = domain ? await getOrganizationByDomain(domain) : null;
 
+    if (existingOrgForDomain) {
+      // Org exists but user is not a member - distinct reason code
+      return {
+        allowed: false,
+        reason: "not_a_member",
+        message: "Contact your administrator to be added.",
+        requiresSubscription: true,
+        isAdmin: false,
+        canCreateOrg: false,
+      };
+    }
+
+    // No org exists for domain - user can create one
     return {
       allowed: false,
       reason: "no_organization",
-      message: existingOrgForDomain
-        ? "An organization exists for your email domain, but you are not a member. Please contact your administrator."
-        : "No organization found for your email domain.",
+      message: "No organization found for your email domain.",
       requiresSubscription: true,
       isAdmin: false,
-      canCreateOrg: !existingOrgForDomain,
+      canCreateOrg: true,
       defaultDomain: domain || undefined,
     };
   }
