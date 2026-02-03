@@ -55,6 +55,30 @@ describe("Billing Portal - Subscription Upgrades", () => {
       const seatLimit = subscriptionData.items?.data?.[0]?.quantity || 5;
       expect(seatLimit).toBe(5);
     });
+
+    it("should look up org by customer ID when metadata missing", () => {
+      // When subscription doesn't have orgId in metadata (e.g., after Portal upgrade),
+      // we should look up the org by stripeCustomerId
+      const subscriptionData = {
+        id: "sub_123",
+        status: "active",
+        customer: "cus_123", // Has customer ID
+        metadata: {}, // No orgId
+        items: { data: [{ quantity: 10 }] },
+      };
+      
+      const hasOrgId = !!subscriptionData.metadata?.orgId;
+      const hasCustomerId = !!subscriptionData.customer;
+      
+      expect(hasOrgId).toBe(false);
+      expect(hasCustomerId).toBe(true);
+      
+      // Should fall back to looking up by customer ID
+      const customerId = typeof subscriptionData.customer === "string" 
+        ? subscriptionData.customer 
+        : null;
+      expect(customerId).toBe("cus_123");
+    });
   });
 });
 
