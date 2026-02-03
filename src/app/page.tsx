@@ -483,7 +483,7 @@ export default function Home() {
           onCreateOrg={() => setStep("org_setup")}
         />
         <SupportButton
-          diagnostics={{
+          accountData={{
             email: user?.email,
             accessReason: user?.access?.reason,
             accessAllowed: user?.access?.allowed,
