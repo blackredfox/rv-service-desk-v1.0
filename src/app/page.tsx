@@ -366,6 +366,11 @@ export default function Home() {
       return;
     }
 
+    if (status.kind === "not_a_member") {
+      if (step !== "not_a_member") setStep("not_a_member");
+      return;
+    }
+
     if (status.kind === "billing_required") {
       if (step !== "billing") setStep("billing");
       return;
@@ -381,6 +386,7 @@ export default function Home() {
       step === "auth" ||
       step === "terms" ||
       step === "no_org" ||
+      step === "not_a_member" ||
       step === "org_setup" ||
       step === "billing" ||
       step === "blocked"
