@@ -305,7 +305,7 @@ export default function Home() {
         return "blocked";
       case "ready":
       default:
-        return "start";
+        return "app";
     }
   }, [user, termsAccepted]);
 
