@@ -487,33 +487,38 @@ export default function AdminMembersPage() {
               )}
 
               {activeSeatCount >= seatLimit && !showAddForm && (
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Seat limit reached.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/billing/portal", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ returnUrl: window.location.href }),
-                          credentials: "same-origin",
-                        });
-                        if (res.ok) {
-                          const data = await res.json();
-                          window.location.href = data.url;
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Seat limit reached.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/billing/portal", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ returnUrl: window.location.href }),
+                            credentials: "same-origin",
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            window.location.href = data.url;
+                          }
+                        } catch {
+                          setError("Failed to open billing portal");
                         }
-                      } catch {
-                        setError("Failed to open billing portal");
-                      }
-                    }}
-                    data-testid="upgrade-seats-button"
-                    className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Upgrade seats →
-                  </button>
+                      }}
+                      data-testid="upgrade-seats-button"
+                      className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Upgrade seats →
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500">
+                    Already upgraded? Click the refresh button (↻) in the header to sync.
+                  </p>
                 </div>
               )}
             </div>
