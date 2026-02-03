@@ -146,14 +146,14 @@ export async function POST(req: Request) {
       );
     }
     
-    // Create member (pending status until they sign up)
+    // Create member with active status (admin explicitly grants access)
     // Note: We use a placeholder UID that will be updated when they register
     const newMember = await createMember({
       orgId: org.id,
-      uid: `pending_${Date.now()}`, // Temporary UID
+      uid: `pending_${Date.now()}`, // Temporary UID until user signs up
       email,
       role,
-      status: "pending",
+      status: "active",
     });
     
     return NextResponse.json({
