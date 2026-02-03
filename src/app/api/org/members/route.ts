@@ -10,6 +10,7 @@ import {
   recalculateActiveSeatCount,
   type OrgMember,
 } from "@/lib/firestore";
+import { sendInvitationEmail } from "@/lib/email";
 
 const SESSION_COOKIE_NAME = "rv_session";
 
