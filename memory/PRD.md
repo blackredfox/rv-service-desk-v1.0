@@ -145,12 +145,13 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - Seat counter updates immediately after member changes
 - Admin onboarding: Dismissible banner on app (not separate screen)
 
-### Tests (76 total passing)
+### Tests (124 total passing)
 - `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
 - `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
 - `tests/org-activity.test.ts` - 4 tests for activity API
 - `tests/access-blocked.test.tsx` - 11 tests for UI component
 - `tests/seat-counter-refresh.test.ts` - 13 tests for seat counter and refresh button bug fix
+- `tests/member-invitation-email.test.ts` - 8 tests for invitation email functionality
 
 ## Prioritized Backlog
 
