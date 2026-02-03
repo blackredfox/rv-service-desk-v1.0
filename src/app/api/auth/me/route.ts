@@ -84,16 +84,31 @@ export async function GET() {
     const uid = decodedClaims.uid;
     const email = decodedClaims.email || "";
     
-    // Get membership
+    // Get membership by UID first
     let member: OrgMember | null = await getMemberByUid(uid);
     
-    // If no member by UID, try by email (for pending members)
+    // If no member by UID, try to claim membership by email
+    // This handles the case where admin pre-added the member before they signed up
     if (!member && email) {
       const memberByEmail = await getMemberByEmail(email);
-      if (memberByEmail && memberByEmail.status === "pending") {
-        // Update the pending member with actual UID
-        // This happens when admin invited them before they signed up
-        member = memberByEmail;
+      if (memberByEmail) {
+        // Check if this member record can be claimed
+        // (has a placeholder UID that starts with "pending_")
+        const isPlaceholderUid = memberByEmail.uid.startsWith("pending_");
+        
+        if (isPlaceholderUid) {
+          // Claim this membership by updating the UID
+          console.log(`[API /api/auth/me] Claiming membership for ${email} (member ID: ${memberByEmail.id})`);
+          await updateMember(memberByEmail.id, { uid });
+          
+          // Update the member object with new UID
+          member = { ...memberByEmail, uid };
+        } else if (memberByEmail.uid !== uid) {
+          // Email exists but UID doesn't match and it's not a placeholder
+          // This could be a security issue - someone else already claimed this email
+          console.warn(`[API /api/auth/me] Email ${email} already claimed by different UID`);
+          // Don't return the member - let it fall through to not_a_member handling
+        }
       }
     }
     
