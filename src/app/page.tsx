@@ -552,12 +552,14 @@ export default function Home() {
           onLogout={() => void logout()}
         />
         <SupportButton
-          diagnostics={{
+          accountData={{
             email: user?.email,
             orgId: user?.organization?.id,
             orgName: user?.organization?.name,
             memberRole: user?.membership?.role,
             memberStatus: user?.membership?.status,
+            seatCount: user?.organization?.activeSeatCount,
+            seatLimit: user?.organization?.seatLimit,
             accessReason: user?.access?.reason,
             accessAllowed: user?.access?.allowed,
           }}
@@ -578,12 +580,14 @@ export default function Home() {
           }}
         />
         <SupportButton
-          diagnostics={{
+          accountData={{
             email: user?.email,
             orgId: user?.organization?.id,
             orgName: user?.organization?.name,
             memberRole: user?.membership?.role,
             memberStatus: user?.membership?.status,
+            seatCount: user?.organization?.activeSeatCount,
+            seatLimit: user?.organization?.seatLimit,
             accessReason: user?.access?.reason,
             accessAllowed: user?.access?.allowed,
           }}
