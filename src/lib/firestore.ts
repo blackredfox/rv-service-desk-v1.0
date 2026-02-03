@@ -262,7 +262,29 @@ export async function updateOrgSubscription(
     currentPeriodEnd?: string;
   }
 ): Promise<void> {
-  await updateOrganization(orgId, data);
+  console.log(`[Stripe Sync] Updating org ${orgId} with:`, JSON.stringify(data));
+  
+  // Only include defined values in update
+  const updateData: Partial<Organization> = {
+    subscriptionStatus: data.subscriptionStatus,
+  };
+  
+  if (data.seatLimit !== undefined) {
+    updateData.seatLimit = data.seatLimit;
+    console.log(`[Stripe Sync] Updating org ${orgId} seatLimit to ${data.seatLimit}`);
+  }
+  if (data.stripeCustomerId !== undefined) {
+    updateData.stripeCustomerId = data.stripeCustomerId;
+  }
+  if (data.stripeSubscriptionId !== undefined) {
+    updateData.stripeSubscriptionId = data.stripeSubscriptionId;
+  }
+  if (data.currentPeriodEnd !== undefined) {
+    updateData.currentPeriodEnd = data.currentPeriodEnd;
+  }
+  
+  await updateOrganization(orgId, updateData);
+  console.log(`[Stripe Sync] Successfully updated org ${orgId}`);
 }
 
 /**
