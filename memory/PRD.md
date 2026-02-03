@@ -31,6 +31,12 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - Inactive members see "Account Inactive" message with admin contact
 - Seat limit blocking shows clear upgrade message
 - Security: Cannot claim if email already has non-placeholder UID
+- Added comprehensive logging for debugging claim flow
+
+### Stripe Webhook Sync Fix (Feb 3, 2026)
+- Webhook now looks up org by `stripeCustomerId` when `metadata.orgId` is missing
+- This fixes seat limit not updating after Portal upgrades
+- Both `customer.subscription.updated` and `customer.subscription.deleted` events now fallback to customer ID lookup
 
 ## Architecture
 
