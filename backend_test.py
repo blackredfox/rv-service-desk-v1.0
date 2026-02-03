@@ -322,14 +322,52 @@ class RVServiceDeskAPITester:
         )
         return success
 
+    def test_member_claim_functionality(self):
+        """Test member claim functionality through unit tests"""
+        print(f"\n🔍 Testing Member Claim Functionality...")
+        try:
+            import subprocess
+            # Run only the member claim tests
+            result = subprocess.run(
+                ["yarn", "test", "tests/member-claim.test.ts"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - Member claim tests pass")
+                # Extract test details from output
+                if "✓" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "✓" in line and "member-claim" in line:
+                            print(f"   {line.strip()}")
+                return True
+            else:
+                print(f"❌ Failed - Member claim tests failed")
+                print(f"   Error: {result.stderr[:300]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all RV Service Desk API tests"""
-        print("🚀 Starting RV Service Desk UAT Fixes Testing")
+        print("🚀 Starting RV Service Desk Member Claim Testing")
         print("=" * 70)
 
         # Test frontend loading
         print("\n" + "=" * 30 + " FRONTEND TESTS " + "=" * 30)
         self.test_frontend_loading()
+        
+        # Test member claim functionality specifically
+        print("\n" + "=" * 30 + " MEMBER CLAIM TESTS " + "=" * 30)
+        self.test_member_claim_functionality()
         
         # Test UAT fixes basic endpoints
         print("\n" + "=" * 30 + " UAT FIXES API TESTS " + "=" * 30)
