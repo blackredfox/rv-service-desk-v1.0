@@ -3,17 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 /**
  * Tests for member invitation email functionality
  * MVP: Plain transactional email with org name and sign-in link
+ * 
+ * Note: Resend is mocked globally in tests/setup.ts
  */
-
-// Mock Resend at module level
-vi.mock("resend", () => {
-  const mockSend = vi.fn().mockResolvedValue({ data: { id: "test_email_123" }, error: null });
-  return {
-    Resend: class MockResend {
-      emails = { send: mockSend };
-    },
-  };
-});
 
 describe("Member Invitation Emails", () => {
   beforeEach(() => {
