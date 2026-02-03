@@ -5,14 +5,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * MVP: Plain transactional email with org name and sign-in link
  */
 
-// Mock Resend
-vi.mock("resend", () => ({
-  Resend: vi.fn().mockImplementation(() => ({
-    emails: {
-      send: vi.fn().mockResolvedValue({ data: { id: "test_email_123" }, error: null }),
+// Mock Resend at module level
+vi.mock("resend", () => {
+  const mockSend = vi.fn().mockResolvedValue({ data: { id: "test_email_123" }, error: null });
+  return {
+    Resend: class MockResend {
+      emails = { send: mockSend };
     },
-  })),
-}));
+  };
+});
 
 describe("Member Invitation Emails", () => {
   beforeEach(() => {
