@@ -664,6 +664,23 @@ export default function Home() {
                     </button>
                   )}
 
+                  {/* Admin Members Dashboard (admin only) */}
+                  {user?.access.isAdmin && (
+                    <a
+                      href="/admin/members"
+                      role="menuitem"
+                      data-testid="admin-members-link"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="
+                        block w-full px-3 py-2 text-left text-xs
+                        text-zinc-700 hover:bg-zinc-50
+                        dark:text-zinc-200 dark:hover:bg-zinc-900
+                      "
+                    >
+                      Manage Members
+                    </a>
+                  )}
+
                   <button
                     type="button"
                     role="menuitem"
