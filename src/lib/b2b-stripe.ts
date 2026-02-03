@@ -221,13 +221,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
   let orgId = subscription.metadata?.orgId;
+  const customerId = typeof subscription.customer === "string" 
+    ? subscription.customer 
+    : subscription.customer?.id;
   
   // If orgId not in metadata, look up by customer ID
-  if (!orgId && subscription.customer) {
-    const customerId = typeof subscription.customer === "string" 
-      ? subscription.customer 
-      : subscription.customer.id;
-    
+  if (!orgId && customerId) {
     console.log(`[Stripe Webhook] No orgId in metadata, looking up by customer ${customerId}`);
     
     const { getOrgByStripeCustomerId } = await import("./firestore");
@@ -255,12 +254,13 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Prom
   // Get period end
   const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
   
-  console.log(`[Stripe Webhook] Subscription ${subscription.status} for org ${orgId}, seats: ${seatLimit}`);
+  console.log(`[Stripe Webhook] Subscription ${subscription.status} for org ${orgId}, seats: ${seatLimit}, customerId: ${customerId}`);
   
   await updateOrgSubscription(orgId, {
     subscriptionStatus: status,
     seatLimit,
     stripeSubscriptionId: subscription.id,
+    stripeCustomerId: customerId, // Ensure customer ID is always saved
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
   });
 }
