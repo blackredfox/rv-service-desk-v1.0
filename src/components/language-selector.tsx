@@ -10,7 +10,7 @@ type Props = {
 export function LanguageSelector({ value, onChange }: Props) {
   return (
     <div data-testid="language-selector" className="flex items-center gap-2">
-      <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Input</label>
+      <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Input language</label>
       <select
         data-testid="language-selector-select"
         value={value}
