@@ -137,6 +137,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
 - `tests/org-activity.test.ts` - 4 tests for activity API
 - `tests/access-blocked.test.tsx` - 11 tests for UI component
+- `tests/seat-counter-refresh.test.ts` - 13 tests for seat counter and refresh button bug fix
 
 ## Prioritized Backlog
 
