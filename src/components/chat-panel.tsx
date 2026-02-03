@@ -44,6 +44,38 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     setInput((prev) => (prev ? `${prev} ${text}` : text));
   }, []);
 
+  // Get the latest assistant report (if exists)
+  // Report is identified by having structured content (multiple sections)
+  const latestReport = useMemo(() => {
+    const assistantMessages = messages.filter(m => m.role === "assistant" && m.content.length > 100);
+    if (assistantMessages.length === 0) return null;
+    
+    // Return the last substantial assistant message as the report
+    const lastMessage = assistantMessages[assistantMessages.length - 1];
+    
+    // Check if it looks like a report (has structured content)
+    // Reports typically have section headers or multiple paragraphs
+    const hasStructure = lastMessage.content.includes("\n\n") || 
+                         lastMessage.content.includes("---") ||
+                         lastMessage.content.includes("**") ||
+                         lastMessage.content.includes("##");
+    
+    return hasStructure ? lastMessage.content : null;
+  }, [messages]);
+
+  // Handle copy report
+  const handleCopyReport = useCallback(async () => {
+    if (!latestReport) return;
+    
+    try {
+      await navigator.clipboard.writeText(latestReport);
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 2000);
+    } catch {
+      setError("Failed to copy report");
+    }
+  }, [latestReport]);
+
   useEffect(() => {
     if (!caseId) {
       setMessages([]);
