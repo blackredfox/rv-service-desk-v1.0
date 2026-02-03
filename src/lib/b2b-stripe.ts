@@ -220,10 +220,27 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
  * Handle subscription created/updated event
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
-  const orgId = subscription.metadata?.orgId;
+  let orgId = subscription.metadata?.orgId;
+  
+  // If orgId not in metadata, look up by customer ID
+  if (!orgId && subscription.customer) {
+    const customerId = typeof subscription.customer === "string" 
+      ? subscription.customer 
+      : subscription.customer.id;
+    
+    console.log(`[Stripe Webhook] No orgId in metadata, looking up by customer ${customerId}`);
+    
+    const { getOrgByStripeCustomerId } = await import("./firestore");
+    const org = await getOrgByStripeCustomerId(customerId);
+    
+    if (org) {
+      orgId = org.id;
+      console.log(`[Stripe Webhook] Found org ${orgId} by customer ID`);
+    }
+  }
   
   if (!orgId) {
-    console.error("[Stripe Webhook] Missing orgId in subscription metadata");
+    console.error("[Stripe Webhook] Cannot find org for subscription update - no orgId in metadata and no org found by customer ID");
     return;
   }
   
