@@ -763,7 +763,7 @@ export default function Home() {
 
       {/* Support Button */}
       <SupportButton
-        diagnostics={{
+        accountData={{
           email: user?.email,
           orgId: user?.organization?.id,
           orgName: user?.organization?.name,
