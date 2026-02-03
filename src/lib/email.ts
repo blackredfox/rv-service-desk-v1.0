@@ -7,8 +7,15 @@
 
 import { Resend } from "resend";
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize Resend client to avoid issues during testing
+let resend: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 // Sender email - use Resend's test domain or your verified domain
 const SENDER_EMAIL = process.env.SENDER_EMAIL || "onboarding@resend.dev";
