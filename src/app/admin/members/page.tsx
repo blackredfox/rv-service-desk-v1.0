@@ -283,7 +283,7 @@ export default function AdminMembersPage() {
           <div>
             <button
               type="button"
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/?from=admin")}
               data-testid="back-to-dashboard"
               className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             >
