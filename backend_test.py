@@ -281,15 +281,28 @@ class RVServiceDeskAPITester:
         return success
 
     def run_all_tests(self):
-        """Run all B2B Billing API tests"""
-        print("🚀 Starting B2B Billing API Tests")
-        print("=" * 50)
+        """Run all RV Service Desk API tests"""
+        print("🚀 Starting RV Service Desk Org Setup & Admin Dashboard API Tests")
+        print("=" * 70)
 
         # Test frontend loading
         print("\n" + "=" * 30 + " FRONTEND TESTS " + "=" * 30)
         self.test_frontend_loading()
         
-        # Test unauthenticated API endpoints
+        # Test org setup and admin dashboard API endpoints
+        print("\n" + "=" * 30 + " ORG SETUP & ADMIN API TESTS " + "=" * 30)
+        self.test_auth_me_not_a_member()
+        self.test_auth_me_no_organization()
+        self.test_auth_me_blocked_domain()
+        self.test_org_members_get_non_admin()
+        self.test_org_members_post_create_active()
+        self.test_org_members_post_subscription_inactive()
+        self.test_org_members_post_seat_limit_reached()
+        self.test_org_members_post_wrong_domain()
+        self.test_org_members_patch_prevent_last_admin_demotion()
+        self.test_org_members_patch_deactivate_non_admin()
+        
+        # Test unauthenticated API endpoints (legacy tests)
         print("\n" + "=" * 30 + " UNAUTHENTICATED API TESTS " + "=" * 30)
         self.test_auth_me_unauthenticated()
         self.test_billing_checkout_unauthenticated()
@@ -302,14 +315,14 @@ class RVServiceDeskAPITester:
         self.test_typescript_compilation()
 
         # Print results
-        print("\n" + "=" * 50)
-        print(f"📊 B2B Billing API Tests Results: {self.tests_passed}/{self.tests_run} passed")
+        print("\n" + "=" * 70)
+        print(f"📊 RV Service Desk API Tests Results: {self.tests_passed}/{self.tests_run} passed")
         
         if self.tests_passed == self.tests_run:
-            print("🎉 All B2B Billing API tests passed!")
+            print("🎉 All RV Service Desk API tests passed!")
             return 0
         else:
-            print("⚠️  Some B2B Billing API tests failed")
+            print("⚠️  Some RV Service Desk API tests failed")
             return 1
 
 def main():
