@@ -169,6 +169,10 @@ export async function GET() {
       access,
     };
     
+    if (org) {
+      console.log(`[API /api/auth/me] Returning org data: seatLimit=${org.seatLimit}, activeSeatCount=${org.activeSeatCount}, subscriptionStatus=${org.subscriptionStatus}`);
+    }
+    
     return NextResponse.json(response);
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to get user";
