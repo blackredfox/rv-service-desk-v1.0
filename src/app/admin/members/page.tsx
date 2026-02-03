@@ -64,7 +64,16 @@ export default function AdminMembersPage() {
   const orgId = user?.organization?.id;
   const orgName = user?.organization?.name;
   const seatLimit = user?.organization?.seatLimit || 0;
-  const activeSeatCount = user?.organization?.activeSeatCount || 0;
+  
+  // Calculate active seat count from local members list (more accurate than stored value)
+  // Only count members with status === "active"
+  const localActiveSeatCount = members.filter(m => m.status === "active").length;
+  
+  // Use local count when we have members loaded, fallback to org's stored value
+  const activeSeatCount = members.length > 0 ? localActiveSeatCount : (user?.organization?.activeSeatCount || 0);
+  
+  // Check if we can add more members
+  const canAddMember = activeSeatCount < seatLimit;
 
   const fetchMembers = useCallback(async () => {
     try {
