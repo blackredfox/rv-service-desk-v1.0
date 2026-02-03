@@ -200,6 +200,9 @@ export default function Home() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Admin onboarding flag (show invite team CTA after org setup)
+  const [showAdminOnboarding, setShowAdminOnboarding] = useState(false);
+
   // Check for billing callback params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
