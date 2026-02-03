@@ -535,14 +535,28 @@ export default function Home() {
   // 7) Blocked screen (various reasons)
   if (step === "blocked") {
     return (
-      <AccessBlockedScreen
-        reason={user?.access?.reason || "unknown"}
-        message={user?.access?.message}
-        isAdmin={user?.access?.isAdmin}
-        onRefresh={() => {
-          void refresh();
-        }}
-      />
+      <>
+        <AccessBlockedScreen
+          reason={user?.access?.reason || "unknown"}
+          message={user?.access?.message}
+          isAdmin={user?.access?.isAdmin}
+          onRefresh={() => {
+            void refresh();
+          }}
+          onLogout={() => void logout()}
+        />
+        <SupportButton
+          diagnostics={{
+            email: user?.email,
+            orgId: user?.organization?.id,
+            orgName: user?.organization?.name,
+            memberRole: user?.membership?.role,
+            memberStatus: user?.membership?.status,
+            accessReason: user?.access?.reason,
+            accessAllowed: user?.access?.allowed,
+          }}
+        />
+      </>
     );
   }
 
