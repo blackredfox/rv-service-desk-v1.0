@@ -324,6 +324,8 @@ export default function Home() {
         // If user can create an org, we go straight to org setup.
         // Otherwise we show a stable "No organization" screen.
         return accessStatus.canCreateOrg ? "org_setup" : "no_org";
+      case "not_a_member":
+        return "not_a_member";
       case "billing_required":
         return "billing";
       case "blocked_domain":
