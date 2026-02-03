@@ -25,6 +25,13 @@ A) Back to Dashboard - Routes to /?from=admin to skip welcome for authenticated 
 B) Copy Report Button - Added in chat workspace to copy generated report (not chat transcript)
 C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONFIGURATION_ID support
 
+### Member Claim Fix (Feb 3, 2026)
+- Pre-added members can now claim their org membership on first sign-up
+- Placeholder UIDs (`pending_xxx`) are automatically replaced with real Firebase UID
+- Inactive members see "Account Inactive" message with admin contact
+- Seat limit blocking shows clear upgrade message
+- Security: Cannot claim if email already has non-placeholder UID
+
 ## Architecture
 
 ### Tech Stack
