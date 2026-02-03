@@ -37,6 +37,12 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - Webhook now looks up org by `stripeCustomerId` when `metadata.orgId` is missing
 - This fixes seat limit not updating after Portal upgrades
 - Both `customer.subscription.updated` and `customer.subscription.deleted` events now fallback to customer ID lookup
+- Added comprehensive logging:
+  - `[Stripe Webhook] Received event: X`
+  - `[Stripe Sync] Updating org X seatLimit to Y`
+  - `[API /api/auth/me] Returning org data: seatLimit=X`
+- Added `/api/debug/org-seats` endpoint for troubleshooting
+- Webhook always saves `stripeCustomerId` to ensure future lookups work
 
 ## Architecture
 
