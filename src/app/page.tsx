@@ -566,7 +566,33 @@ export default function Home() {
     );
   }
 
-  // 8) Start (explicit step before app)
+  // 8) Admin Onboarding (invite team CTA after org setup)
+  if (step === "start" && showAdminOnboarding && user?.access?.isAdmin) {
+    return (
+      <>
+        <AdminOnboardingScreen
+          orgName={user?.organization?.name}
+          onSkip={() => {
+            setShowAdminOnboarding(false);
+            setStep("app");
+          }}
+        />
+        <SupportButton
+          diagnostics={{
+            email: user?.email,
+            orgId: user?.organization?.id,
+            orgName: user?.organization?.name,
+            memberRole: user?.membership?.role,
+            memberStatus: user?.membership?.status,
+            accessReason: user?.access?.reason,
+            accessAllowed: user?.access?.allowed,
+          }}
+        />
+      </>
+    );
+  }
+
+  // 9) Start (explicit step before app)
   if (step === "start") {
     return <StartScreen onStart={() => setStep("app")} />;
   }
