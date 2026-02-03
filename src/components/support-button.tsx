@@ -1,73 +1,73 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 
-type DiagnosticsData = {
+type AccountData = {
   email?: string;
   orgId?: string;
   orgName?: string;
   memberRole?: string;
   memberStatus?: string;
+  seatCount?: number;
+  seatLimit?: number;
   accessReason?: string;
   accessAllowed?: boolean;
   appVersion?: string;
 };
 
 type Props = {
-  diagnostics?: DiagnosticsData;
+  accountData?: AccountData;
 };
 
 /**
- * Floating support button with modal for contact + diagnostics copy
+ * Floating support button with modal for contact + copy account details
  */
-export function SupportButton({ diagnostics }: Props) {
+export function SupportButton({ accountData }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const pathname = usePathname();
 
-  const appVersion = diagnostics?.appVersion || process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0";
+  const appVersion = accountData?.appVersion || process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0";
 
-  function formatDiagnostics(): string {
+  function formatAccountDetails(): string {
     const lines = [
-      "--- RV Service Desk Diagnostics ---",
-      `Timestamp: ${new Date().toISOString()}`,
-      `App Version: ${appVersion}`,
+      "RV Service Desk – Account Details",
+      "--------------------------------",
     ];
 
-    if (diagnostics?.email) {
-      lines.push(`Email: ${diagnostics.email}`);
+    if (accountData?.email) {
+      lines.push(`Email: ${accountData.email}`);
     }
-    if (diagnostics?.orgId) {
-      lines.push(`Org ID: ${diagnostics.orgId}`);
+    if (accountData?.memberRole) {
+      lines.push(`Role: ${accountData.memberRole}`);
     }
-    if (diagnostics?.orgName) {
-      lines.push(`Org Name: ${diagnostics.orgName}`);
+    if (accountData?.orgName) {
+      lines.push(`Organization: ${accountData.orgName}`);
     }
-    if (diagnostics?.memberRole) {
-      lines.push(`Role: ${diagnostics.memberRole}`);
+    if (accountData?.orgId) {
+      lines.push(`Org ID: ${accountData.orgId}`);
     }
-    if (diagnostics?.memberStatus) {
-      lines.push(`Status: ${diagnostics.memberStatus}`);
+    if (accountData?.seatCount !== undefined && accountData?.seatLimit !== undefined) {
+      lines.push(`Seats: ${accountData.seatCount} / ${accountData.seatLimit}`);
     }
-    if (diagnostics?.accessReason) {
-      lines.push(`Access Reason: ${diagnostics.accessReason}`);
-    }
-    if (diagnostics?.accessAllowed !== undefined) {
-      lines.push(`Access Allowed: ${diagnostics.accessAllowed}`);
-    }
+    
+    lines.push(`Current page: ${pathname || "/"}`);
+    lines.push(`App version: ${appVersion}`);
+    lines.push(`Timestamp: ${new Date().toISOString()}`);
 
-    lines.push("-----------------------------------");
     return lines.join("\n");
   }
 
-  async function handleCopyDiagnostics() {
+  async function handleCopyAccountDetails() {
     try {
-      await navigator.clipboard.writeText(formatDiagnostics());
+      await navigator.clipboard.writeText(formatAccountDetails());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for browsers without clipboard API
       const textarea = document.createElement("textarea");
-      textarea.value = formatDiagnostics();
+      textarea.value = formatAccountDetails();
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand("copy");
@@ -171,11 +171,11 @@ export function SupportButton({ diagnostics }: Props) {
                 Contact Support
               </a>
 
-              {/* Copy Diagnostics */}
+              {/* Copy Account Details */}
               <button
                 type="button"
-                onClick={handleCopyDiagnostics}
-                data-testid="copy-diagnostics-button"
+                onClick={handleCopyAccountDetails}
+                data-testid="copy-account-details-button"
                 className="
                   flex w-full items-center justify-center gap-2
                   rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700
@@ -195,14 +195,14 @@ export function SupportButton({ diagnostics }: Props) {
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    Copy Diagnostics
+                    Copy Account Details
                   </>
                 )}
               </button>
             </div>
 
             <p className="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
-              Include diagnostics when contacting support for faster resolution.
+              Include account details when contacting support for faster resolution.
             </p>
           </div>
         </div>
