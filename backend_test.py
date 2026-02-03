@@ -417,7 +417,7 @@ class RVServiceDeskAPITester:
 
     def run_all_tests(self):
         """Run all RV Service Desk API tests"""
-        print("🚀 Starting RV Service Desk Member Claim Testing")
+        print("🚀 Starting RV Service Desk Critical Issues Testing")
         print("=" * 70)
 
         # Test frontend loading
@@ -428,8 +428,13 @@ class RVServiceDeskAPITester:
         print("\n" + "=" * 30 + " MEMBER CLAIM TESTS " + "=" * 30)
         self.test_member_claim_functionality()
         
+        # Test Stripe webhook functionality
+        print("\n" + "=" * 30 + " STRIPE WEBHOOK TESTS " + "=" * 30)
+        self.test_stripe_webhook_functionality()
+        self.test_webhook_endpoint_exists()
+        
         # Test UAT fixes basic endpoints
-        print("\n" + "=" * 30 + " UAT FIXES API TESTS " + "=" * 30)
+        print("\n" + "=" * 30 + " API ENDPOINT TESTS " + "=" * 30)
         self.test_uat_fixes_basic_endpoints()
         self.test_billing_portal_endpoint()
         
