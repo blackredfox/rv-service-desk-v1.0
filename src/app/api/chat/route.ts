@@ -331,28 +331,125 @@ export async function POST(req: Request) {
 
         full = result.response;
 
-        // Stream tokens to client
-        for (const char of full) {
-          if (aborted) break;
-          controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-        }
-
-        // Send validation info
-        if (!validation.valid) {
-          controller.enqueue(
-            encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
-          );
-        }
-
-        // Save assistant message with effective output language
-        if (!aborted && full.trim()) {
-          await storage.appendMessage({
-            caseId: ensuredCase.id,
-            role: "assistant",
-            content: full,
-            language: outputPolicy.effective,
-            userId: user?.id,
+        // ========================================
+        // AUTOMATIC MODE TRANSITION
+        // ========================================
+        // Check if LLM signaled a transition (e.g., isolation complete)
+        const transitionResult = detectTransitionSignal(full);
+        
+        if (transitionResult && currentMode === "diagnostic" && !aborted) {
+          console.log(`[Chat API v2] Auto-transition detected: diagnostic → ${transitionResult.newMode}`);
+          
+          // Stream the transition message first
+          for (const char of transitionResult.cleanedResponse) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+          
+          // Save the transition message
+          if (transitionResult.cleanedResponse.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: transitionResult.cleanedResponse,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+          
+          // Update mode in database
+          currentMode = transitionResult.newMode;
+          await storage.updateCase(ensuredCase.id, { mode: currentMode });
+          
+          // Emit mode change event
+          controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
+          
+          // Add a visual separator
+          const separator = "\n\n";
+          for (const char of separator) {
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+          
+          // Now generate the final report with the new mode prompt
+          const finalReportPrompt = composePromptV2({
+            mode: currentMode,
+            inputDetected: inputLanguage.detected,
+            outputEffective: outputPolicy.effective,
           });
+          
+          // Get updated history (including the transition message)
+          const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+          
+          const finalReportBody = {
+            model: "gpt-4o-mini",
+            stream: false,
+            temperature: 0.2,
+            messages: buildOpenAiMessages({
+              system: finalReportPrompt,
+              history: updatedHistory,
+              userMessage: "Generate the Portal-Cause report based on the completed diagnostic isolation.",
+              attachments: undefined,
+            }),
+          };
+          
+          const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
+          
+          if (!finalResult.error && finalResult.response.trim()) {
+            // Validate the final report
+            const finalValidation = validateOutput(finalResult.response, currentMode);
+            logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
+            
+            let finalContent = finalResult.response;
+            
+            // If validation fails, use fallback
+            if (!finalValidation.valid) {
+              console.log(`[Chat API v2] Final report validation failed, using fallback`);
+              finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+            }
+            
+            // Stream the final report
+            for (const char of finalContent) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            // Save the final report
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: finalContent,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+            
+            full = transitionResult.cleanedResponse + separator + finalContent;
+          } else if (finalResult.error) {
+            console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
+          }
+        } else {
+          // No transition - stream the response normally
+          for (const char of full) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+
+          // Send validation info
+          if (!validation.valid) {
+            controller.enqueue(
+              encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
+            );
+          }
+
+          // Save assistant message with effective output language
+          if (!aborted && full.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: full,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
         }
 
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
