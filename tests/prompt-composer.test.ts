@@ -54,9 +54,9 @@ describe("Prompt Files", () => {
     
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("FINAL REPORT MODE");
-    expect(content).toContain("Portal-Cause text");
-    expect(content).toContain("Paragraph order");
-    expect(content).toContain("Labor justification");
+    expect(content).toContain("Portal-Cause");
+    expect(content).toContain("OUTPUT FORMAT");
+    expect(content).toContain("Labor");
     expect(content).toContain("--- TRANSLATION ---");
   });
 });
