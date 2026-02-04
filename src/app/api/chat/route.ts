@@ -99,7 +99,7 @@ function buildOpenAiMessages(args: {
 }
 
 /**
- * Call OpenAI and stream the response
+ * Call OpenAI (non-streaming) and return the response
  */
 async function callOpenAI(
   apiKey: string,
@@ -117,43 +117,30 @@ async function callOpenAI(
       body: JSON.stringify(body),
     });
 
-    if (!upstream.ok || !upstream.body) {
+    if (!upstream.ok) {
       const text = await upstream.text().catch(() => "");
       return { response: "", error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500) };
     }
 
-    const reader = upstream.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let full = "";
+    // Non-streaming: read the full JSON response
+    const json = await upstream.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string };
+    };
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.replace(/^data:\s*/, "");
-        if (payload === "[DONE]") break;
-
-        try {
-          const json = JSON.parse(payload) as {
-            choices?: { delta?: { content?: string } }[];
-          };
-          const token = json?.choices?.[0]?.delta?.content;
-          if (token) full += token;
-        } catch {
-          // Ignore malformed lines
-        }
-      }
+    // Check for API error in response
+    if (json.error) {
+      return { response: "", error: `OpenAI error: ${json.error.message || "Unknown"}` };
     }
 
-    return { response: full };
+    // Extract content from chat completions format
+    const content = json.choices?.[0]?.message?.content ?? "";
+    
+    if (!content) {
+      console.warn("[Chat API] Empty content from OpenAI response:", JSON.stringify(json).slice(0, 500));
+    }
+
+    return { response: content };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     return { response: "", error: msg };
