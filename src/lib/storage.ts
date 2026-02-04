@@ -284,6 +284,7 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
       userId: true,
       inputLanguage: true,
       languageSource: true,
+      mode: true,
       createdAt: true,
       updatedAt: true,
     },
