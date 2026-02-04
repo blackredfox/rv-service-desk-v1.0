@@ -15,7 +15,7 @@ describe("System Prompt v3.2", () => {
 
   describe("buildSystemPrompt", () => {
     it("should include dialogue language in context", async () => {
-      const { buildSystemPrompt } = await import("../../../prompts/system-prompt-final");
+      const { buildSystemPrompt } = await import("@prompts/system-prompt-final");
 
       const prompt = buildSystemPrompt({
         dialogueLanguage: "RU",
@@ -27,7 +27,7 @@ describe("System Prompt v3.2", () => {
     });
 
     it("should include DIAGNOSTICS state reminders", async () => {
-      const { buildSystemPrompt } = await import("../../../prompts/system-prompt-final");
+      const { buildSystemPrompt } = await import("@prompts/system-prompt-final");
 
       const prompt = buildSystemPrompt({
         dialogueLanguage: "ES",
@@ -41,7 +41,7 @@ describe("System Prompt v3.2", () => {
     });
 
     it("should include CAUSE_OUTPUT state reminders", async () => {
-      const { buildSystemPrompt } = await import("../../../prompts/system-prompt-final");
+      const { buildSystemPrompt } = await import("@prompts/system-prompt-final");
 
       const prompt = buildSystemPrompt({
         dialogueLanguage: "RU",
@@ -55,13 +55,13 @@ describe("System Prompt v3.2", () => {
     });
 
     it("should contain water pump = NON-COMPLEX classification", async () => {
-      const { SYSTEM_PROMPT_FINAL } = await import("../../../prompts/system-prompt-final");
+      const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
 
       expect(SYSTEM_PROMPT_FINAL).toContain("Water pump = NON-COMPLEX");
     });
 
     it("should contain STATE AWARENESS section", async () => {
-      const { SYSTEM_PROMPT_FINAL } = await import("../../../prompts/system-prompt-final");
+      const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
 
       expect(SYSTEM_PROMPT_FINAL).toContain("STATE AWARENESS (CRITICAL)");
       expect(SYSTEM_PROMPT_FINAL).toContain('STATE = "DIAGNOSTICS"');
@@ -69,7 +69,7 @@ describe("System Prompt v3.2", () => {
     });
 
     it("should contain PROHIBITED BEHAVIOR section", async () => {
-      const { SYSTEM_PROMPT_FINAL } = await import("../../../prompts/system-prompt-final");
+      const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
 
       expect(SYSTEM_PROMPT_FINAL).toContain("Do NOT give advice");
       expect(SYSTEM_PROMPT_FINAL).toContain("Do NOT explain diagnostics");
