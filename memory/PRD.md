@@ -58,6 +58,22 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Payload v2: Input Language Detection + Output Policy (Feb 4, 2026)
+- **Problem**: Selector value was corrupting `inputLanguage`, making detection impossible
+- **Solution**: Payload v2 contract separating detection from output policy
+- **New Types** (`/app/src/lib/lang.ts`):
+  - `InputLanguageV2`: `{ detected, source, confidence, reason }`
+  - `OutputLanguagePolicyV2`: `{ mode, effective, strategy }`
+  - `detectInputLanguageV2(text)`: Always detects from message text
+  - `computeOutputPolicy(mode, detected)`: Computes effective output
+- **SSE Event**: New `{type:"language"}` event with detection results
+- **Prompt Composer v2** (`composePromptV2`):
+  - Uses `inputDetected` for "Technician input language"
+  - Uses `outputEffective` for "All dialogue MUST be in"
+  - Final report translates to `inputDetected` (what tech reads)
+- **Fallback**: Uses `outputEffective` language for dialogue
+- **Tests**: 19 new tests in `payload-v2.test.ts`
+
 ### Fix Spanish Validation Fallback Drift (Feb 4, 2026)
 - **Problem**: EMPTY_OUTPUT validation fallback was hardcoded in Spanish, causing all fallback responses to appear as Spanish regardless of selected language
 - **Fix**: Localized fallback messages for all modes
