@@ -1,79 +1,164 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 /**
  * Tests for RV Service Desk prompt enforcement and API contract
+ * 
+ * Runtime uses: prompts/system/SYSTEM_PROMPT_BASE.txt (loaded by src/lib/prompt-composer.ts)
+ * 
  * Ensures:
  * - Language rules are never violated
  * - State machine is enforced
  * - Output validation catches violations
  */
 
-describe("System Prompt v3.2", () => {
+// Load actual runtime prompts
+const promptsDir = join(process.cwd(), "prompts");
+const SYSTEM_BASE = readFileSync(join(promptsDir, "system", "SYSTEM_PROMPT_BASE.txt"), "utf-8");
+const MODE_DIAGNOSTIC = readFileSync(join(promptsDir, "modes", "MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
+const MODE_FINAL_REPORT = readFileSync(join(promptsDir, "modes", "MODE_PROMPT_FINAL_REPORT.txt"), "utf-8");
+
+describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  describe("buildSystemPrompt", () => {
+  describe("composePrompt (from prompt-composer)", () => {
     it("should include dialogue language in context", async () => {
-      const { buildSystemPrompt } = await import("@prompts/system-prompt-final");
+      const { composePrompt } = await import("@/lib/prompt-composer");
 
-      const prompt = buildSystemPrompt({
+      const prompt = composePrompt({
+        mode: "diagnostic",
         dialogueLanguage: "RU",
-        currentState: "DIAGNOSTICS",
       });
 
-      expect(prompt).toContain("Dialogue Language: RU");
-      expect(prompt).toContain("Current State: DIAGNOSTICS");
+      expect(prompt).toContain("CURRENT DIALOGUE LANGUAGE: RU");
+      expect(prompt).toContain("DIAGNOSTIC MODE");
     });
 
-    it("should include DIAGNOSTICS state reminders", async () => {
-      const { buildSystemPrompt } = await import("@prompts/system-prompt-final");
+    it("should include diagnostic mode content", async () => {
+      const { composePrompt } = await import("@/lib/prompt-composer");
 
-      const prompt = buildSystemPrompt({
+      const prompt = composePrompt({
+        mode: "diagnostic",
         dialogueLanguage: "ES",
-        currentState: "DIAGNOSTICS",
       });
 
-      expect(prompt).toContain("You are in DIAGNOSTICS state");
-      expect(prompt).toContain("Output MUST be in ES ONLY");
-      expect(prompt).toContain("English is FORBIDDEN");
-      expect(prompt).toContain("Ask ONE question only");
+      expect(prompt).toContain("DIAGNOSTIC MODE");
+      expect(prompt).toContain("ONE question at a time");
+      expect(prompt).toContain("Output diagnostic questions in ES");
     });
 
-    it("should include CAUSE_OUTPUT state reminders", async () => {
-      const { buildSystemPrompt } = await import("@prompts/system-prompt-final");
+    it("should include final_report mode content", async () => {
+      const { composePrompt } = await import("@/lib/prompt-composer");
 
-      const prompt = buildSystemPrompt({
+      const prompt = composePrompt({
+        mode: "final_report",
         dialogueLanguage: "RU",
-        currentState: "CAUSE_OUTPUT",
       });
 
-      expect(prompt).toContain("You are in CAUSE_OUTPUT state");
-      expect(prompt).toContain("Output English Cause text first");
+      expect(prompt).toContain("FINAL REPORT MODE");
       expect(prompt).toContain("--- TRANSLATION ---");
-      expect(prompt).toContain("literal RU translation");
+      expect(prompt).toContain("Labor justification");
+    });
+  });
+
+  describe("SYSTEM_PROMPT_BASE.txt content", () => {
+    it("should contain LANGUAGE RULES section", () => {
+      expect(SYSTEM_BASE).toContain("LANGUAGE RULES:");
+      expect(SYSTEM_BASE).toContain("technician's language");
+      expect(SYSTEM_BASE).toContain("100% English");
     });
 
-    it("should contain water pump = NON-COMPLEX classification", async () => {
-      const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
-
-      expect(SYSTEM_PROMPT_FINAL).toContain("Water pump = NON-COMPLEX");
+    it("should contain WORDING SAFETY section", () => {
+      expect(SYSTEM_BASE).toContain("WORDING SAFETY:");
+      expect(SYSTEM_BASE).toContain("denial-triggering words");
+      expect(SYSTEM_BASE).toContain("broken");
+      expect(SYSTEM_BASE).toContain("failed");
+      expect(SYSTEM_BASE).toContain("defective");
     });
 
-    it("should contain STATE AWARENESS section", async () => {
-      const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
-
-      expect(SYSTEM_PROMPT_FINAL).toContain("STATE AWARENESS (CRITICAL)");
-      expect(SYSTEM_PROMPT_FINAL).toContain('STATE = "DIAGNOSTICS"');
-      expect(SYSTEM_PROMPT_FINAL).toContain('STATE = "CAUSE_OUTPUT"');
+    it("should contain BEHAVIOR RULES section", () => {
+      expect(SYSTEM_BASE).toContain("BEHAVIOR RULES:");
+      expect(SYSTEM_BASE).toContain("Never jump to conclusions");
+      expect(SYSTEM_BASE).toContain("Never generate authorization or final output unless explicitly allowed");
     });
 
-    it("should contain PROHIBITED BEHAVIOR section", async () => {
-      const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
+    it("should contain FORMAT RULES section", () => {
+      expect(SYSTEM_BASE).toContain("FORMAT RULES:");
+      expect(SYSTEM_BASE).toContain("Plain text only");
+      expect(SYSTEM_BASE).toContain("No tables");
+    });
 
-      expect(SYSTEM_PROMPT_FINAL).toContain("Do NOT give advice");
-      expect(SYSTEM_PROMPT_FINAL).toContain("Do NOT explain diagnostics");
-      expect(SYSTEM_PROMPT_FINAL).toContain("Do NOT improvise procedures");
+    it("should NOT be a chatbot", () => {
+      expect(SYSTEM_BASE).toContain("NOT a chatbot");
+      expect(SYSTEM_BASE).toContain("NOT provide advice");
+    });
+  });
+
+  describe("MODE_PROMPT_DIAGNOSTIC.txt content", () => {
+    it("should list complex equipment", () => {
+      expect(MODE_DIAGNOSTIC).toContain("complex equipment");
+      expect(MODE_DIAGNOSTIC).toContain("Roof AC / heat pumps");
+      expect(MODE_DIAGNOSTIC).toContain("furnaces");
+      expect(MODE_DIAGNOSTIC).toContain("slide-outs");
+      expect(MODE_DIAGNOSTIC).toContain("leveling systems");
+      expect(MODE_DIAGNOSTIC).toContain("inverters / converters");
+      expect(MODE_DIAGNOSTIC).toContain("refrigerators");
+    });
+
+    it("should enforce ONE question rule", () => {
+      expect(MODE_DIAGNOSTIC).toContain("ONE question at a time");
+    });
+
+    it("should prohibit authorization in diagnostic mode", () => {
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT generate authorization");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT suggest repair or replacement");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT estimate labor");
+    });
+
+    it("should contain POST-REPAIR RULE", () => {
+      expect(MODE_DIAGNOSTIC).toContain("POST-REPAIR RULE");
+      expect(MODE_DIAGNOSTIC).toContain("Return to diagnostic form behavior");
+    });
+
+    it("should contain MECHANICAL SYSTEM RULE", () => {
+      expect(MODE_DIAGNOSTIC).toContain("MECHANICAL SYSTEM RULE");
+      expect(MODE_DIAGNOSTIC).toContain("motor operates when powered directly");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT recommend motor replacement");
+    });
+
+    it("should contain CONSUMER APPLIANCE RULE", () => {
+      expect(MODE_DIAGNOSTIC).toContain("CONSUMER APPLIANCE RULE");
+      expect(MODE_DIAGNOSTIC).toContain("TVs, microwaves, stereos");
+      expect(MODE_DIAGNOSTIC).toContain("non-repairable");
+    });
+  });
+
+  describe("MODE_PROMPT_FINAL_REPORT.txt content", () => {
+    it("should require translation separator", () => {
+      expect(MODE_FINAL_REPORT).toContain("--- TRANSLATION ---");
+    });
+
+    it("should specify paragraph order", () => {
+      expect(MODE_FINAL_REPORT).toContain("Paragraph order");
+      expect(MODE_FINAL_REPORT).toContain("Observed symptoms");
+      expect(MODE_FINAL_REPORT).toContain("Diagnostic checks performed");
+      expect(MODE_FINAL_REPORT).toContain("Verified condition");
+      expect(MODE_FINAL_REPORT).toContain("Required repair or replacement");
+      expect(MODE_FINAL_REPORT).toContain("Labor justification");
+    });
+
+    it("should require labor breakdown", () => {
+      expect(MODE_FINAL_REPORT).toContain("LABOR REQUIREMENTS");
+      expect(MODE_FINAL_REPORT).toContain("Task-level breakdown");
+      expect(MODE_FINAL_REPORT).toContain("Total labor stated");
+    });
+
+    it("should enforce plain format", () => {
+      expect(MODE_FINAL_REPORT).toContain("No headers");
+      expect(MODE_FINAL_REPORT).toContain("No numbering");
     });
   });
 });
@@ -213,10 +298,8 @@ Labor: Remove and replace water pump - 1.5 hours. Total labor: 1.5 hours.
 describe("API Contract", () => {
   describe("State inference from history", () => {
     it("should default to DIAGNOSTICS for empty history", async () => {
-      // The inferStateFromHistory function should return DIAGNOSTICS by default
       const history: { role: "user" | "assistant"; content: string }[] = [];
       
-      // Check last assistant message for translation separator
       let state: "DIAGNOSTICS" | "CAUSE_OUTPUT" = "DIAGNOSTICS";
       for (let i = history.length - 1; i >= 0; i--) {
         if (history[i].role === "assistant") {
@@ -257,7 +340,6 @@ describe("API Contract", () => {
         dialogueLanguage: "RU" as const,
       };
       
-      // API should use explicit language
       const dialogueLanguage = body.dialogueLanguage || "EN";
       expect(dialogueLanguage).toBe("RU");
     });
@@ -267,7 +349,7 @@ describe("API Contract", () => {
         message: "test",
       };
       
-      const effectiveLanguage = "EN" as const; // Would be inferred
+      const effectiveLanguage = "EN" as const;
       const dialogueLanguage = (body as { dialogueLanguage?: "EN" | "RU" | "ES" }).dialogueLanguage || effectiveLanguage;
       expect(dialogueLanguage).toBe("EN");
     });
@@ -296,22 +378,20 @@ describe("API Contract", () => {
   });
 });
 
-describe("Complex Equipment Classification", () => {
-  it("should list complex equipment in prompt", async () => {
-    const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
-
-    expect(SYSTEM_PROMPT_FINAL).toContain("Roof AC / heat pumps");
-    expect(SYSTEM_PROMPT_FINAL).toContain("Furnaces");
-    expect(SYSTEM_PROMPT_FINAL).toContain("Slide-out systems");
-    expect(SYSTEM_PROMPT_FINAL).toContain("Leveling systems");
-    expect(SYSTEM_PROMPT_FINAL).toContain("Inverters / converters");
-    expect(SYSTEM_PROMPT_FINAL).toContain("Refrigerators");
+describe("Complex Equipment Classification (from MODE_PROMPT_DIAGNOSTIC)", () => {
+  it("should list all complex equipment types", () => {
+    expect(MODE_DIAGNOSTIC).toContain("Roof AC / heat pumps");
+    expect(MODE_DIAGNOSTIC).toContain("furnaces");
+    expect(MODE_DIAGNOSTIC).toContain("slide-outs");
+    expect(MODE_DIAGNOSTIC).toContain("leveling systems");
+    expect(MODE_DIAGNOSTIC).toContain("inverters / converters");
+    expect(MODE_DIAGNOSTIC).toContain("refrigerators");
   });
 
-  it("should explicitly mark water pump as NON-COMPLEX", async () => {
-    const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
-
-    expect(SYSTEM_PROMPT_FINAL).toContain("Water pump = NON-COMPLEX");
-    expect(SYSTEM_PROMPT_FINAL).toContain("You MUST NOT override this classification");
+  it("should NOT list water pump as complex equipment", () => {
+    // Water pump is NOT in the complex equipment list
+    // It's a simple system that doesn't require diagnostic form mode
+    const complexEquipmentSection = MODE_DIAGNOSTIC.split("Complex systems include:")[1]?.split("\n\n")[0] || "";
+    expect(complexEquipmentSection.toLowerCase()).not.toContain("water pump");
   });
 });
