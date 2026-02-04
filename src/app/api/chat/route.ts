@@ -162,24 +162,56 @@ export async function POST(req: Request) {
   }
 
   const languageMode = normalizeLanguageMode(body?.languageMode);
-  const { language: effectiveLanguage, languageSource } = storage.inferLanguageForMessage(
-    message,
-    languageMode
-  );
-  const dialogueLanguage: Language = body?.dialogueLanguage || effectiveLanguage;
+  
+  // Determine the input language:
+  // 1. If explicit language selected (not AUTO), use that
+  // 2. If AUTO, detect from message
+  let inputLanguage: Language;
+  let languageSource: "AUTO" | "MANUAL";
+  
+  if (languageMode !== "AUTO") {
+    // User explicitly selected a language - always use it
+    inputLanguage = languageMode;
+    languageSource = "MANUAL";
+  } else {
+    // Auto-detect from message content
+    const detected = storage.inferLanguageForMessage(message, "AUTO");
+    inputLanguage = detected.language;
+    languageSource = "AUTO";
+  }
 
   const attachments = body?.attachments?.filter(
     (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
   );
 
-  // Ensure case exists and get current mode
+  // Ensure case exists
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
-    inputLanguage: dialogueLanguage,
+    inputLanguage,
     languageSource,
     userId: user?.id,
   });
+
+  // Determine the effective language for this request:
+  // - If user explicitly selected a language (not AUTO), ALWAYS use it (override case)
+  // - If AUTO and case already has a language, use case language (language lock)
+  // - If AUTO and new case, use detected language
+  let effectiveLanguage: Language;
+  
+  if (languageMode !== "AUTO") {
+    // Explicit selection always overrides
+    effectiveLanguage = languageMode;
+    
+    // Update case if language changed
+    if (ensuredCase.inputLanguage !== effectiveLanguage) {
+      await storage.updateCase(ensuredCase.id, { inputLanguage: effectiveLanguage });
+      console.log(`[Chat API] Language override: ${ensuredCase.inputLanguage} → ${effectiveLanguage}`);
+    }
+  } else {
+    // AUTO mode: use case's locked language if it exists, else use detected
+    effectiveLanguage = ensuredCase.inputLanguage || inputLanguage;
+  }
 
   // Get current mode from case
   let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
@@ -193,24 +225,24 @@ export async function POST(req: Request) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
-  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, mode=${currentMode}, lang=${dialogueLanguage}`);
+  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, mode=${currentMode}, lang=${effectiveLanguage}, source=${languageSource}`);
 
   // Persist user message
   await storage.appendMessage({
     caseId: ensuredCase.id,
     role: "user",
     content: message,
-    language: dialogueLanguage,
+    language: effectiveLanguage,
     userId: user?.id,
   });
 
   // Load conversation history (memory window)
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
-  // Compose system prompt based on mode
+  // Compose system prompt based on mode and language
   const systemPrompt = composePrompt({
     mode: currentMode,
-    dialogueLanguage,
+    dialogueLanguage: effectiveLanguage,
   });
 
   const encoder = new TextEncoder();
