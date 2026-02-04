@@ -28,12 +28,23 @@ const FINAL_REPORT_INDICATORS = [
   /diagnostic\s+check/i,
 ];
 
-// Safe fallback responses
-export const SAFE_FALLBACKS = {
-  diagnostic: "¿Puede proporcionar más información sobre el problema?", // Generic RU/ES fallback
-  diagnostic_en: "Can you provide more information about the issue?",
-  authorization: "Information not provided; need additional diagnostic verification.",
-  final_report: "Unable to generate compliant report. Please provide complete diagnostic information.",
+// Safe fallback responses - LOCALIZED by language
+export const FALLBACK_QUESTIONS: Record<"EN" | "RU" | "ES", string> = {
+  EN: "Can you provide more information about the issue?",
+  RU: "Можете предоставить больше информации о проблеме?",
+  ES: "¿Puede proporcionar más información sobre el problema?",
+} as const;
+
+export const FALLBACK_AUTHORIZATION: Record<"EN" | "RU" | "ES", string> = {
+  EN: "Information not provided; need additional diagnostic verification.",
+  RU: "Информация не предоставлена; требуется дополнительная диагностическая проверка.",
+  ES: "Información no proporcionada; se necesita verificación diagnóstica adicional.",
+} as const;
+
+export const FALLBACK_FINAL_REPORT: Record<"EN" | "RU" | "ES", string> = {
+  EN: "Unable to generate compliant report. Please provide complete diagnostic information.",
+  RU: "Невозможно сгенерировать соответствующий отчёт. Пожалуйста, предоставьте полную диагностическую информацию.",
+  ES: "No se puede generar un informe compatible. Proporcione información de diagnóstico completa.",
 } as const;
 
 /**
