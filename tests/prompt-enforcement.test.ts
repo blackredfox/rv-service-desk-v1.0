@@ -298,7 +298,7 @@ describe("API Contract", () => {
 
 describe("Complex Equipment Classification", () => {
   it("should list complex equipment in prompt", async () => {
-    const { SYSTEM_PROMPT_FINAL } = await import("../../../prompts/system-prompt-final");
+    const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
 
     expect(SYSTEM_PROMPT_FINAL).toContain("Roof AC / heat pumps");
     expect(SYSTEM_PROMPT_FINAL).toContain("Furnaces");
@@ -309,7 +309,7 @@ describe("Complex Equipment Classification", () => {
   });
 
   it("should explicitly mark water pump as NON-COMPLEX", async () => {
-    const { SYSTEM_PROMPT_FINAL } = await import("../../../prompts/system-prompt-final");
+    const { SYSTEM_PROMPT_FINAL } = await import("@prompts/system-prompt-final");
 
     expect(SYSTEM_PROMPT_FINAL).toContain("Water pump = NON-COMPLEX");
     expect(SYSTEM_PROMPT_FINAL).toContain("You MUST NOT override this classification");
