@@ -81,7 +81,8 @@ describe("Prompt Composer", () => {
 
       expect(prompt).toContain("RV Service Desk");
       expect(prompt).toContain("DIAGNOSTIC MODE");
-      expect(prompt).toContain("CURRENT DIALOGUE LANGUAGE: RU");
+      expect(prompt).toContain("LANGUAGE DIRECTIVE (MANDATORY)");
+      expect(prompt).toContain("RU (Russian)");
     });
 
     it("should compose authorization mode prompt", async () => {
@@ -94,7 +95,8 @@ describe("Prompt Composer", () => {
 
       expect(prompt).toContain("RV Service Desk");
       expect(prompt).toContain("AUTHORIZATION MODE");
-      expect(prompt).toContain("CURRENT DIALOGUE LANGUAGE: EN");
+      expect(prompt).toContain("LANGUAGE DIRECTIVE (MANDATORY)");
+      expect(prompt).toContain("EN (English)");
     });
 
     it("should compose final_report mode prompt", async () => {
@@ -107,7 +109,7 @@ describe("Prompt Composer", () => {
 
       expect(prompt).toContain("RV Service Desk");
       expect(prompt).toContain("FINAL REPORT MODE");
-      expect(prompt).toContain("CURRENT DIALOGUE LANGUAGE: ES");
+      expect(prompt).toContain("translate the full output into Spanish (ES)");
     });
 
     it("should include additional constraints when provided", async () => {
