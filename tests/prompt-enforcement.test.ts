@@ -100,13 +100,13 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
   describe("MODE_PROMPT_DIAGNOSTIC.txt content", () => {
     it("should list complex equipment", () => {
-      expect(MODE_DIAGNOSTIC).toContain("complex equipment");
+      expect(MODE_DIAGNOSTIC).toContain("COMPLEX SYSTEMS");
       expect(MODE_DIAGNOSTIC).toContain("Roof AC / heat pumps");
-      expect(MODE_DIAGNOSTIC).toContain("furnaces");
-      expect(MODE_DIAGNOSTIC).toContain("slide-outs");
-      expect(MODE_DIAGNOSTIC).toContain("leveling systems");
-      expect(MODE_DIAGNOSTIC).toContain("inverters / converters");
-      expect(MODE_DIAGNOSTIC).toContain("refrigerators");
+      expect(MODE_DIAGNOSTIC).toContain("Furnaces");
+      expect(MODE_DIAGNOSTIC).toContain("Slide-out systems");
+      expect(MODE_DIAGNOSTIC).toContain("Leveling systems");
+      expect(MODE_DIAGNOSTIC).toContain("Inverters / converters");
+      expect(MODE_DIAGNOSTIC).toContain("Refrigerators");
     });
 
     it("should enforce ONE question rule", () => {
@@ -121,7 +121,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
     it("should contain POST-REPAIR RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("POST-REPAIR RULE");
-      expect(MODE_DIAGNOSTIC).toContain("Return to diagnostic form behavior");
+      expect(MODE_DIAGNOSTIC).toContain("Return to Guided Diagnostics");
     });
 
     it("should contain MECHANICAL SYSTEM RULE", () => {
