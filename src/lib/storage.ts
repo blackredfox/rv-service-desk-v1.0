@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 import { trackEvent } from "@/lib/analytics";
+import type { CaseMode } from "./prompt-composer";
 
 
 // Local structural helpers to avoid depending on generated Prisma types.
@@ -13,6 +14,7 @@ export type CaseSummary = {
   userId?: string | null;
   inputLanguage: Language;
   languageSource: "AUTO" | "MANUAL";
+  mode: CaseMode;
   createdAt: string;
   updatedAt: string;
 };
