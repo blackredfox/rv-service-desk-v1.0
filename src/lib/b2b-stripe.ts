@@ -357,3 +357,48 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
     console.error("[Stripe Webhook] Error handling invoice failure:", err);
   }
 }
+
+
+/**
+ * Sync seat limit from Stripe for an organization
+ * This fetches the current subscription from Stripe and updates the org's seatLimit
+ * Used by the manual refresh endpoint to ensure UI reflects Stripe's source of truth
+ */
+export async function syncSeatsFromStripe(stripeCustomerId: string): Promise<{
+  seatLimit: number;
+  subscriptionStatus: SubscriptionStatus;
+} | null> {
+  const stripe = getStripe();
+  
+  console.log(`[Stripe Sync] Fetching subscriptions for customer ${stripeCustomerId}`);
+  
+  try {
+    // List active subscriptions for this customer
+    const subscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: "all",
+      limit: 1,
+    });
+    
+    if (!subscriptions.data.length) {
+      console.log(`[Stripe Sync] No subscriptions found for customer ${stripeCustomerId}`);
+      return null;
+    }
+    
+    const subscription = subscriptions.data[0];
+    const status = mapStripeStatus(subscription.status);
+    
+    // Calculate seatLimit by summing quantity from ALL subscription items
+    const seatLimit = subscription.items?.data?.reduce(
+      (sum, item) => sum + (item.quantity ?? 0),
+      0
+    ) || 5;
+    
+    console.log(`[Stripe Sync] Customer ${stripeCustomerId}: status=${status}, seatLimit=${seatLimit}`);
+    
+    return { seatLimit, subscriptionStatus: status };
+  } catch (err) {
+    console.error("[Stripe Sync] Error fetching subscription:", err);
+    throw err;
+  }
+}
