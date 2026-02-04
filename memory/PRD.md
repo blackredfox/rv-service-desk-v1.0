@@ -58,6 +58,19 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Fix Duplicate System Prompt Sources (Feb 4, 2026)
+- **Problem**: Two competing system prompt sources causing language drift
+  - `prompts/system/SYSTEM_PROMPT_BASE.txt` (correct runtime source)
+  - `prompts/system-prompt-final.ts` (legacy, causing confusion)
+- **Fix**: Single runtime source = `prompts/system/SYSTEM_PROMPT_BASE.txt`
+  - Created shared types file: `src/lib/types/diagnostic.ts`
+  - Updated `output-validator.ts` to use shared types
+  - Fixed comment in `system-prompt-v1.ts` to point to correct source
+  - Updated tests to validate actual runtime behavior
+  - Deleted legacy `prompts/system-prompt-final.ts`
+  - Removed `@prompts` alias from vitest.config.ts
+- **Tests**: All 212 tests pass
+
 ### Prompt Split & Composer Architecture (Feb 4, 2026)
 - **D1 - Split Prompts**: Customer prompt split into 4 operational blocks:
   - `prompts/system/SYSTEM_PROMPT_BASE.txt` - Immutable laws/guardrails
