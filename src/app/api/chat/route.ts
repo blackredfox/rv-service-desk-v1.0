@@ -1,8 +1,16 @@
-import { normalizeLanguageMode, type LanguageMode, type Language } from "@/lib/lang";
+import { 
+  normalizeLanguageMode, 
+  detectInputLanguageV2, 
+  computeOutputPolicy,
+  type LanguageMode, 
+  type Language,
+  type InputLanguageV2,
+  type OutputLanguagePolicyV2,
+} from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import { 
-  composePrompt, 
+  composePromptV2, 
   detectModeCommand, 
   buildMessagesWithMemory,
   type CaseMode,
@@ -22,13 +30,24 @@ type Attachment = {
   dataUrl: string;
 };
 
-type ChatBody = {
+/**
+ * Payload v2 request body
+ */
+type ChatBodyV2 = {
+  v?: 2;
   caseId?: string;
   message: string;
+  
+  // V2: output policy (selector value)
+  output?: {
+    mode?: LanguageMode;
+  };
+  
+  // Legacy v1 fields (backward compatibility)
   languageMode?: LanguageMode;
-  attachments?: Attachment[];
-  /** Explicit dialogue language (optional override) */
   dialogueLanguage?: Language;
+  
+  attachments?: Attachment[];
 };
 
 function sseEncode(data: unknown) {
@@ -152,7 +171,7 @@ export async function POST(req: Request) {
 
   const user = await getCurrentUser();
 
-  const body = (await req.json().catch(() => null)) as ChatBody | null;
+  const body = (await req.json().catch(() => null)) as ChatBodyV2 | null;
   const message = (body?.message ?? "").trim();
   if (!message) {
     return new Response(
@@ -161,57 +180,35 @@ export async function POST(req: Request) {
     );
   }
 
-  const languageMode = normalizeLanguageMode(body?.languageMode);
+  // ========================================
+  // PAYLOAD V2: Language Detection & Policy
+  // ========================================
   
-  // Determine the input language:
-  // 1. If explicit language selected (not AUTO), use that
-  // 2. If AUTO, detect from message
-  let inputLanguage: Language;
-  let languageSource: "AUTO" | "MANUAL";
+  // 1. ALWAYS detect input language from message text (source of truth)
+  const inputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
   
-  if (languageMode !== "AUTO") {
-    // User explicitly selected a language - always use it
-    inputLanguage = languageMode;
-    languageSource = "MANUAL";
-  } else {
-    // Auto-detect from message content
-    const detected = storage.inferLanguageForMessage(message, "AUTO");
-    inputLanguage = detected.language;
-    languageSource = "AUTO";
-  }
+  // 2. Get output mode from request (v2 or legacy v1)
+  const outputMode: LanguageMode = normalizeLanguageMode(
+    body?.output?.mode ?? body?.languageMode
+  );
+  
+  // 3. Compute effective output language
+  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, inputLanguage.detected);
+  
+  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}`);
 
   const attachments = body?.attachments?.filter(
     (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
   );
 
-  // Ensure case exists
+  // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
-    inputLanguage,
-    languageSource,
+    inputLanguage: inputLanguage.detected,
+    languageSource: outputPolicy.strategy === "auto" ? "AUTO" : "MANUAL",
     userId: user?.id,
   });
-
-  // Determine the effective language for this request:
-  // - If user explicitly selected a language (not AUTO), ALWAYS use it (override case)
-  // - If AUTO and case already has a language, use case language (language lock)
-  // - If AUTO and new case, use detected language
-  let effectiveLanguage: Language;
-  
-  if (languageMode !== "AUTO") {
-    // Explicit selection always overrides
-    effectiveLanguage = languageMode;
-    
-    // Update case if language changed
-    if (ensuredCase.inputLanguage !== effectiveLanguage) {
-      await storage.updateCase(ensuredCase.id, { inputLanguage: effectiveLanguage });
-      console.log(`[Chat API] Language override: ${ensuredCase.inputLanguage} → ${effectiveLanguage}`);
-    }
-  } else {
-    // AUTO mode: use case's locked language if it exists, else use detected
-    effectiveLanguage = ensuredCase.inputLanguage || inputLanguage;
-  }
 
   // Get current mode from case
   let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
@@ -219,30 +216,30 @@ export async function POST(req: Request) {
   // Check for explicit mode transition commands
   const commandMode = detectModeCommand(message);
   if (commandMode && commandMode !== currentMode) {
-    console.log(`[Chat API] Mode transition: ${currentMode} → ${commandMode} (explicit command)`);
+    console.log(`[Chat API v2] Mode transition: ${currentMode} → ${commandMode} (explicit command)`);
     currentMode = commandMode;
-    // Persist mode change
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
-  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, mode=${currentMode}, lang=${effectiveLanguage}, source=${languageSource}`);
-
-  // Persist user message
+  // Persist user message with detected language
   await storage.appendMessage({
     caseId: ensuredCase.id,
     role: "user",
     content: message,
-    language: effectiveLanguage,
+    language: inputLanguage.detected,
     userId: user?.id,
   });
 
   // Load conversation history (memory window)
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
-  // Compose system prompt based on mode and language
-  const systemPrompt = composePrompt({
+  // Compose system prompt using v2 semantics:
+  // - inputDetected: what language user wrote in
+  // - outputEffective: what language assistant must respond in
+  const systemPrompt = composePromptV2({
     mode: currentMode,
-    dialogueLanguage: effectiveLanguage,
+    inputDetected: inputLanguage.detected,
+    outputEffective: outputPolicy.effective,
   });
 
   const encoder = new TextEncoder();
@@ -261,13 +258,26 @@ export async function POST(req: Request) {
       req.signal.addEventListener("abort", onAbort, { once: true });
 
       try {
+        // Emit case ID
         controller.enqueue(encoder.encode(sseEncode({ type: "case", caseId: ensuredCase.id })));
+        
+        // Emit v2 language event (new!)
+        controller.enqueue(encoder.encode(sseEncode({
+          type: "language",
+          inputDetected: inputLanguage.detected,
+          outputMode: outputPolicy.mode,
+          outputEffective: outputPolicy.effective,
+          detector: inputLanguage.source,
+          confidence: inputLanguage.confidence,
+        })));
+        
+        // Emit mode
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
         // Build initial request
         const openAiBody = {
           model: "gpt-4o-mini",
-          stream: false, // Use non-streaming for validation/retry
+          stream: false,
           temperature: 0.2,
           messages: buildOpenAiMessages({
             system: systemPrompt,
@@ -295,7 +305,7 @@ export async function POST(req: Request) {
 
         // If validation fails, retry once with correction
         if (!validation.valid && !aborted) {
-          console.log(`[Chat API] Validation failed, retrying with correction...`);
+          console.log(`[Chat API v2] Validation failed, retrying with correction...`);
           
           const correctionInstruction = buildCorrectionInstruction(validation.violations);
           
@@ -317,10 +327,10 @@ export async function POST(req: Request) {
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
-          // If still fails, use safe fallback
+          // If still fails, use safe fallback with EFFECTIVE OUTPUT language
           if (!validation.valid || result.error) {
-            console.log(`[Chat API] Retry failed, using safe fallback`);
-            result.response = getSafeFallback(currentMode, effectiveLanguage);
+            console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
+            result.response = getSafeFallback(currentMode, outputPolicy.effective);
             
             controller.enqueue(
               encoder.encode(sseEncode({ 
@@ -346,13 +356,13 @@ export async function POST(req: Request) {
           );
         }
 
-        // Save assistant message
+        // Save assistant message with effective output language
         if (!aborted && full.trim()) {
           await storage.appendMessage({
             caseId: ensuredCase.id,
             role: "assistant",
             content: full,
-            language: effectiveLanguage,
+            language: outputPolicy.effective,
             userId: user?.id,
           });
         }
