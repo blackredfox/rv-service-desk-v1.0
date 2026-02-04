@@ -99,6 +99,7 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     title: clampTitle(input.title ?? "New Case"),
     inputLanguage: "EN" as Language,
     languageSource: "AUTO" as const,
+    mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
     deletedAt: null,
