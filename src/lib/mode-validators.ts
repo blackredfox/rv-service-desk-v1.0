@@ -79,6 +79,9 @@ function looksLikeFinalReport(text: string): boolean {
   return matchCount >= 3;
 }
 
+// Transition signal marker
+const TRANSITION_MARKER = "[TRANSITION: FINAL_REPORT]";
+
 /**
  * Check if diagnostic output has at least one question and not too many
  * Guided Diagnostics format allows multi-line output with ONE question at the end
@@ -90,14 +93,40 @@ function hasValidDiagnosticQuestions(text: string): { valid: boolean; count: num
 }
 
 /**
+ * Check if output is a valid transition response (isolation complete)
+ */
+function isTransitionResponse(text: string): boolean {
+  return text.includes(TRANSITION_MARKER);
+}
+
+/**
  * Validate diagnostic mode output
  * 
  * Guided Diagnostics format allows:
  * - Multi-line header (System, Classification, Mode, Status)
  * - ONE diagnostic question at the end
+ * - OR a transition response (isolation complete, no question)
  */
 export function validateDiagnosticOutput(text: string): ValidationResult {
   const violations: string[] = [];
+
+  // Check if this is a transition response (isolation complete)
+  if (isTransitionResponse(text)) {
+    // Transition responses are valid - they signal mode change
+    // Only check for prohibited words
+    const prohibited = containsProhibitedWords(text);
+    if (prohibited.length > 0) {
+      violations.push(`PROHIBITED_WORDS: Contains denial-trigger words: ${prohibited.join(", ")}`);
+    }
+    
+    return {
+      valid: violations.length === 0,
+      violations,
+      suggestion: violations.length > 0 
+        ? "Remove denial-trigger words from the transition response."
+        : undefined,
+    };
+  }
 
   // Must not look like a final report
   if (looksLikeFinalReport(text)) {
