@@ -80,15 +80,21 @@ function looksLikeFinalReport(text: string): boolean {
 }
 
 /**
- * Check if text is a single question (for diagnostic mode)
+ * Check if diagnostic output has at least one question and not too many
+ * Guided Diagnostics format allows multi-line output with ONE question at the end
  */
-function isSingleQuestion(text: string): boolean {
+function hasValidDiagnosticQuestions(text: string): { valid: boolean; count: number } {
   const questionMarks = (text.match(/\?/g) || []).length;
-  return questionMarks === 1;
+  // Allow 1-2 questions (for clarifications) but no more
+  return { valid: questionMarks >= 1 && questionMarks <= 2, count: questionMarks };
 }
 
 /**
  * Validate diagnostic mode output
+ * 
+ * Guided Diagnostics format allows:
+ * - Multi-line header (System, Classification, Mode, Status)
+ * - ONE diagnostic question at the end
  */
 export function validateDiagnosticOutput(text: string): ValidationResult {
   const violations: string[] = [];
@@ -103,12 +109,12 @@ export function validateDiagnosticOutput(text: string): ValidationResult {
     violations.push("DIAGNOSTIC_DRIFT: Output contains translation separator (final report format)");
   }
 
-  // Should be a single question (soft rule - warn but don't fail)
-  const questionCount = (text.match(/\?/g) || []).length;
-  if (questionCount === 0) {
+  // Should have at least one question, but not too many
+  const questionCheck = hasValidDiagnosticQuestions(text);
+  if (questionCheck.count === 0) {
     violations.push("DIAGNOSTIC_QUESTION: Output does not contain a question");
-  } else if (questionCount > 1) {
-    violations.push(`DIAGNOSTIC_QUESTION: Output contains ${questionCount} questions (should be 1)`);
+  } else if (questionCheck.count > 2) {
+    violations.push(`DIAGNOSTIC_QUESTION: Output contains ${questionCheck.count} questions (max 2 allowed)`);
   }
 
   // Must not contain prohibited words
@@ -121,7 +127,7 @@ export function validateDiagnosticOutput(text: string): ValidationResult {
     valid: violations.length === 0,
     violations,
     suggestion: violations.length > 0 
-      ? "Produce a single diagnostic question without authorization or report content."
+      ? "Produce diagnostic output with system info and ONE specific diagnostic question."
       : undefined,
   };
 }
