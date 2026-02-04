@@ -93,6 +93,29 @@ export function detectModeCommand(message: string): CaseMode | null {
 }
 
 /**
+ * Check if the LLM response contains a transition signal
+ * Returns the new mode and cleaned response, or null if no transition
+ */
+export function detectTransitionSignal(response: string): {
+  newMode: CaseMode;
+  cleanedResponse: string;
+} | null {
+  if (response.includes(TRANSITION_SIGNAL)) {
+    // Remove the transition signal from the response
+    const cleanedResponse = response
+      .replace(TRANSITION_SIGNAL, "")
+      .trim();
+    
+    return {
+      newMode: "final_report",
+      cleanedResponse,
+    };
+  }
+  
+  return null;
+}
+
+/**
  * Language name mapping for clearer directives
  */
 const LANGUAGE_NAMES: Record<string, string> = {
