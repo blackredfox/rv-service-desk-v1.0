@@ -216,29 +216,65 @@ Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation
     });
   });
 
-  describe("Safe Fallbacks", () => {
-    it("should return diagnostic fallback for diagnostic mode", async () => {
+  describe("Safe Fallbacks (Localized)", () => {
+    it("should return English fallback for EN language", async () => {
       const { getSafeFallback } = await import("@/lib/mode-validators");
 
-      const fallbackEN = getSafeFallback("diagnostic", "EN");
-      expect(fallbackEN).toContain("provide more information");
-
-      const fallbackRU = getSafeFallback("diagnostic", "RU");
-      expect(fallbackRU).toContain("información"); // Spanish fallback is default
+      const fallback = getSafeFallback("diagnostic", "EN");
+      expect(fallback).toBe("Can you provide more information about the issue?");
     });
 
-    it("should return authorization fallback", async () => {
+    it("should return Russian fallback for RU language", async () => {
       const { getSafeFallback } = await import("@/lib/mode-validators");
 
-      const fallback = getSafeFallback("authorization");
-      expect(fallback).toContain("Information not provided");
+      const fallback = getSafeFallback("diagnostic", "RU");
+      expect(fallback).toBe("Можете предоставить больше информации о проблеме?");
+      // Must NOT be Spanish
+      expect(fallback).not.toContain("información");
+      expect(fallback).not.toContain("problema");
     });
 
-    it("should return final report fallback", async () => {
+    it("should return Spanish fallback for ES language", async () => {
       const { getSafeFallback } = await import("@/lib/mode-validators");
 
-      const fallback = getSafeFallback("final_report");
-      expect(fallback).toContain("Unable to generate compliant report");
+      const fallback = getSafeFallback("diagnostic", "ES");
+      expect(fallback).toBe("¿Puede proporcionar más información sobre el problema?");
+    });
+
+    it("should return localized authorization fallback", async () => {
+      const { getSafeFallback } = await import("@/lib/mode-validators");
+
+      const fallbackEN = getSafeFallback("authorization", "EN");
+      expect(fallbackEN).toContain("Information not provided");
+
+      const fallbackRU = getSafeFallback("authorization", "RU");
+      expect(fallbackRU).toContain("Информация не предоставлена");
+
+      const fallbackES = getSafeFallback("authorization", "ES");
+      expect(fallbackES).toContain("Información no proporcionada");
+    });
+
+    it("should return localized final report fallback", async () => {
+      const { getSafeFallback } = await import("@/lib/mode-validators");
+
+      const fallbackEN = getSafeFallback("final_report", "EN");
+      expect(fallbackEN).toContain("Unable to generate compliant report");
+
+      const fallbackRU = getSafeFallback("final_report", "RU");
+      expect(fallbackRU).toContain("Невозможно сгенерировать");
+    });
+
+    it("should default to EN for unknown/undefined language", async () => {
+      const { getSafeFallback } = await import("@/lib/mode-validators");
+
+      const fallback1 = getSafeFallback("diagnostic", undefined);
+      expect(fallback1).toBe("Can you provide more information about the issue?");
+
+      const fallback2 = getSafeFallback("diagnostic", "AUTO");
+      expect(fallback2).toBe("Can you provide more information about the issue?");
+
+      const fallback3 = getSafeFallback("diagnostic", "XX");
+      expect(fallback3).toBe("Can you provide more information about the issue?");
     });
   });
 
