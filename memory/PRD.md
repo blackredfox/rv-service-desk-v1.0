@@ -58,12 +58,20 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
-- **Fixed**: UI now correctly counts only `active` members towards seat usage (excludes inactive/pending)
-- **Added**: Refresh button (↻) in admin dashboard header to manually sync org data after Stripe upgrades
-  - Button has `data-testid="refresh-org-data"` for testing
-  - Triggers `auth.refresh()` + `fetchMembers()` to get fresh data from `/api/auth/me`
-- **Added**: Helper text "Already upgraded? Click the refresh button (↻) in the header to sync." when seat limit reached
-- This completes the end-to-end fix for the seat limit sync issue after Stripe subscription upgrades
+### Stripe Seat Limit Sync Fix - Source of Truth (Feb 4, 2026)
+- **Root cause**: Refresh button only refetched cached data, didn't sync from Stripe
+- **Fix**: Created `POST /api/billing/sync-seats` endpoint that fetches subscription from Stripe
+- **Architecture**:
+  - `b2b-stripe.ts` is the ONLY source of truth for B2B subscriptions
+  - `stripe.ts` is for individual subscriptions (Prisma) - separate concern
+  - seatLimit calculated: `subscription.items.data.reduce((sum, item) => sum + item.quantity, 0)`
+- **Refresh button now**:
+  1. Calls `POST /api/billing/sync-seats` (syncs from Stripe)
+  2. Calls `refresh()` (refetch /api/auth/me)
+  3. Calls `fetchMembers()` (refetch member list)
+- **Webhook**: Already correctly uses `b2b-stripe.ts`, fixed to sum ALL item quantities
+- **New endpoint**: `POST /api/billing/sync-seats` (admin only)
+- **Tests**: 11 new tests in `/app/tests/stripe-seat-sync.test.ts`
 
 ## Architecture
 
