@@ -5,7 +5,7 @@
  * Violations are logged but do not crash the app.
  */
 
-import type { DiagnosticState } from "../../prompts/system-prompt-final";
+import type { DiagnosticState } from "./types/diagnostic";
 import type { Language } from "./lang";
 
 export type ValidationResult = {
