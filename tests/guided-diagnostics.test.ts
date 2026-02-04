@@ -248,3 +248,92 @@ describe("Fallback Behavior", () => {
     });
   });
 });
+
+describe("Automatic Mode Transition", () => {
+  describe("detectTransitionSignal", () => {
+    it("should detect transition signal in LLM response", async () => {
+      const { detectTransitionSignal } = await import("@/lib/prompt-composer");
+
+      const response = `Зафиксировано: масса проверена, целостность подтверждена.
+
+Isolation complete. Conditions met. Transitioning to Portal-Cause Mode.
+
+[TRANSITION: FINAL_REPORT]`;
+
+      const result = detectTransitionSignal(response);
+
+      expect(result).not.toBeNull();
+      expect(result?.newMode).toBe("final_report");
+      expect(result?.cleanedResponse).not.toContain("[TRANSITION: FINAL_REPORT]");
+      expect(result?.cleanedResponse).toContain("Isolation complete");
+    });
+
+    it("should return null when no transition signal present", async () => {
+      const { detectTransitionSignal } = await import("@/lib/prompt-composer");
+
+      const response = `System: Water pump
+Classification: Non-complex
+Mode: Guided Diagnostics
+
+Step 2: Is 12V DC present at the pump motor terminals?`;
+
+      const result = detectTransitionSignal(response);
+
+      expect(result).toBeNull();
+    });
+
+    it("should clean transition marker from response", async () => {
+      const { detectTransitionSignal } = await import("@/lib/prompt-composer");
+
+      const response = `Isolation complete. [TRANSITION: FINAL_REPORT]`;
+
+      const result = detectTransitionSignal(response);
+
+      expect(result?.cleanedResponse).toBe("Isolation complete.");
+    });
+  });
+
+  describe("validateDiagnosticOutput with transition", () => {
+    it("should allow transition response without question", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
+
+      const transitionOutput = `Зафиксировано: масса проверена, целостность подтверждена.
+
+Isolation complete. Conditions met. Transitioning to Portal-Cause Mode.
+
+[TRANSITION: FINAL_REPORT]`;
+
+      const result = validateDiagnosticOutput(transitionOutput);
+
+      expect(result.valid).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it("should reject transition response with prohibited words", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
+
+      const transitionOutput = `The pump is broken and damaged.
+
+[TRANSITION: FINAL_REPORT]`;
+
+      const result = validateDiagnosticOutput(transitionOutput);
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("PROHIBITED_WORDS"))).toBe(true);
+    });
+  });
+
+  describe("Transition prompt content", () => {
+    it("should have transition signal instructions in diagnostic prompt", async () => {
+      const { readFileSync } = await import("fs");
+      const { join } = await import("path");
+      
+      const promptPath = join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt");
+      const promptContent = readFileSync(promptPath, "utf-8");
+      
+      expect(promptContent).toContain("[TRANSITION: FINAL_REPORT]");
+      expect(promptContent).toContain("WHEN READY TO TRANSITION");
+      expect(promptContent).toContain("Isolation complete");
+    });
+  });
+});
