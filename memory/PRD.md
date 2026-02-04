@@ -58,6 +58,22 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Prompt Enforcement & API Contract Fix (Feb 4, 2026)
+- **System Prompt v3.2**: Model-agnostic, deterministic diagnostic engine
+- **STATE Machine**: Explicit `DIAGNOSTICS` and `CAUSE_OUTPUT` states
+- **API Contract**:
+  - `dialogueLanguage` passed explicitly on every request
+  - `currentState` passed explicitly (or inferred from history)
+  - Validation of response language and format
+- **Output Validator** (`/app/src/lib/output-validator.ts`):
+  - Detects English during non-EN diagnostics
+  - Detects translation separator in wrong state
+  - Detects multiple questions (only ONE allowed)
+  - Validates Cause format (no headers, no numbered lists)
+  - Logs violations (non-blocking)
+- **Complex Equipment Classification**: Locked list, water pump = NON-COMPLEX
+- **Tests**: 23 new tests in `/app/tests/prompt-enforcement.test.ts`
+
 ### Stripe Seat Limit Sync Fix - Source of Truth (Feb 4, 2026)
 - **Root cause**: Refresh button only refetched cached data, didn't sync from Stripe
 - **Fix**: Created `POST /api/billing/sync-seats` endpoint that fetches subscription from Stripe
@@ -153,7 +169,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - Seat counter updates immediately after member changes
 - Admin onboarding: Dismissible banner on app (not separate screen)
 
-### Tests (135 total passing)
+### Tests (158 total passing)
 - `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
 - `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
 - `tests/org-activity.test.ts` - 4 tests for activity API
@@ -161,6 +177,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - `tests/seat-counter-refresh.test.ts` - 13 tests for seat counter and refresh button
 - `tests/member-invitation-email.test.ts` - 8 tests for invitation email functionality
 - `tests/stripe-seat-sync.test.ts` - 11 tests for Stripe seat limit sync and source of truth
+- `tests/prompt-enforcement.test.ts` - 23 tests for prompt v3.2, state machine, and output validation
 
 ## Prioritized Backlog
 
