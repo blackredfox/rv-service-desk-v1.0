@@ -20,6 +20,9 @@ export const MODE_COMMANDS = {
   AUTHORIZATION: "START AUTHORIZATION REQUEST",
 } as const;
 
+// Transition signal that LLM outputs when ready to change mode
+export const TRANSITION_SIGNAL = "[TRANSITION: FINAL_REPORT]";
+
 // Prohibited denial-trigger words
 export const PROHIBITED_WORDS = [
   "broken",
