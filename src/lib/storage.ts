@@ -528,6 +528,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
           title: true,
           userId: true,
           inputLanguage: true,
+      mode: true,
           languageSource: true,
           createdAt: true,
           updatedAt: true,
