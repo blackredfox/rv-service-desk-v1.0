@@ -217,13 +217,38 @@ export function validateOutput(text: string, mode: CaseMode): ValidationResult {
 }
 
 /**
- * Get safe fallback response for a mode
+ * Normalize language to a valid Language type
+ * Never returns AUTO - defaults to EN if unknown
+ */
+function normalizeLanguage(lang?: string): "EN" | "RU" | "ES" {
+  const upper = (lang || "").toUpperCase();
+  if (upper === "RU" || upper === "ES" || upper === "EN") {
+    return upper as "EN" | "RU" | "ES";
+  }
+  // Default to EN for unknown/AUTO
+  console.warn(`[Fallback] Unknown language "${lang}", defaulting to EN`);
+  return "EN";
+}
+
+/**
+ * Get safe fallback response for a mode, localized to the effective language
+ * 
+ * @param mode - The current case mode
+ * @param language - The effective dialogue language (EN/RU/ES, NOT AUTO)
  */
 export function getSafeFallback(mode: CaseMode, language?: string): string {
-  if (mode === "diagnostic") {
-    return language === "EN" ? SAFE_FALLBACKS.diagnostic_en : SAFE_FALLBACKS.diagnostic;
+  const lang = normalizeLanguage(language);
+
+  switch (mode) {
+    case "diagnostic":
+      return FALLBACK_QUESTIONS[lang];
+    case "authorization":
+      return FALLBACK_AUTHORIZATION[lang];
+    case "final_report":
+      return FALLBACK_FINAL_REPORT[lang];
+    default:
+      return FALLBACK_QUESTIONS[lang];
   }
-  return SAFE_FALLBACKS[mode] || SAFE_FALLBACKS.diagnostic_en;
 }
 
 /**
