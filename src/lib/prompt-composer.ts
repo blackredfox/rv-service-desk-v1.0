@@ -200,6 +200,47 @@ export function composePrompt(args: {
 }
 
 /**
+ * Compose the full system prompt for a request (v2 - proper input/output separation)
+ * 
+ * @param mode - Current case mode (diagnostic/authorization/final_report)
+ * @param inputDetected - The language the technician wrote in (always detected from message)
+ * @param outputEffective - The language the assistant must respond in (may be forced)
+ */
+export function composePromptV2(args: {
+  mode: CaseMode;
+  inputDetected: string;
+  outputEffective: string;
+  additionalConstraints?: string;
+}): string {
+  const { mode, inputDetected, outputEffective, additionalConstraints } = args;
+  const prompts = loadPrompts();
+
+  const parts: string[] = [
+    prompts.SYSTEM_BASE,
+    "",
+    "---",
+    "",
+    getModePrompt(mode),
+  ];
+
+  // Add v2 language directive with separate input/output languages
+  parts.push("");
+  parts.push("---");
+  parts.push("");
+  parts.push(buildLanguageDirectiveV2({ inputDetected, outputEffective, mode }));
+
+  // Add additional constraints if provided
+  if (additionalConstraints) {
+    parts.push("");
+    parts.push("---");
+    parts.push("");
+    parts.push(additionalConstraints);
+  }
+
+  return parts.join("\n");
+}
+
+/**
  * Build messages array for LLM with memory window
  */
 export function buildMessagesWithMemory(args: {
