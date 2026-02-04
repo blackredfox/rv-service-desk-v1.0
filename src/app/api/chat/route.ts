@@ -1,7 +1,8 @@
-import { SYSTEM_PROMPT_FINAL } from "../../../../prompts/system-prompt-final";
-import { normalizeLanguageMode, type LanguageMode } from "@/lib/lang";
+import { SYSTEM_PROMPT_FINAL, buildSystemPrompt, type DiagnosticState } from "../../../../prompts/system-prompt-final";
+import { normalizeLanguageMode, type LanguageMode, type Language } from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
+import { validateResponse, logValidationViolations } from "@/lib/output-validator";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,10 @@ type ChatBody = {
   message: string;
   languageMode?: LanguageMode;
   attachments?: Attachment[];
+  /** Explicit dialogue language (required for API contract) */
+  dialogueLanguage?: Language;
+  /** Explicit current state (required for API contract) */
+  currentState?: DiagnosticState;
 };
 
 function sseEncode(data: unknown) {
@@ -24,6 +29,27 @@ function sseEncode(data: unknown) {
 type OpenAiMessageContent =
   | string
   | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
+
+/**
+ * Infer diagnostic state from conversation history
+ * - If assistant last message contains "--- TRANSLATION ---", we're in CAUSE_OUTPUT
+ * - Otherwise, we're in DIAGNOSTICS
+ */
+function inferStateFromHistory(history: { role: "user" | "assistant"; content: string }[]): DiagnosticState {
+  // Find the last assistant message
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "assistant") {
+      const content = history[i].content;
+      // If last assistant message has translation separator, likely in CAUSE_OUTPUT
+      if (content.includes("--- TRANSLATION ---")) {
+        return "CAUSE_OUTPUT";
+      }
+      break;
+    }
+  }
+  // Default to DIAGNOSTICS
+  return "DIAGNOSTICS";
+}
 
 function buildOpenAiMessages(args: {
   system: string;
@@ -86,6 +112,9 @@ export async function POST(req: Request) {
     languageMode
   );
 
+  // API Contract: Use explicit dialogueLanguage if provided, otherwise infer
+  const dialogueLanguage: Language = body?.dialogueLanguage || effectiveLanguage;
+
   // Session-only attachments (images are used for this request only, not stored)
   const attachments = body?.attachments?.filter(
     (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
@@ -95,7 +124,7 @@ export async function POST(req: Request) {
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
-    inputLanguage: effectiveLanguage,
+    inputLanguage: dialogueLanguage,
     languageSource,
     userId: user?.id,
   });
@@ -103,13 +132,24 @@ export async function POST(req: Request) {
   // Load last 30 messages for context
   const history = await storage.listMessagesForContext(ensuredCase.id, 30);
 
+  // API Contract: Use explicit currentState if provided, otherwise infer from history
+  const currentState: DiagnosticState = body?.currentState || inferStateFromHistory(history);
+
+  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, dialogueLanguage=${dialogueLanguage}, currentState=${currentState}`);
+
   // Persist user message (without attachments - session only)
   await storage.appendMessage({
     caseId: ensuredCase.id,
     role: "user",
     content: message,
-    language: effectiveLanguage,
+    language: dialogueLanguage,
     userId: user?.id,
+  });
+
+  // Build system prompt with explicit state and language context
+  const systemPrompt = buildSystemPrompt({
+    dialogueLanguage,
+    currentState,
   });
 
   const openAiBody = {
@@ -117,7 +157,7 @@ export async function POST(req: Request) {
     stream: true,
     temperature: 0.2,
     messages: buildOpenAiMessages({
-      system: SYSTEM_PROMPT_FINAL,
+      system: systemPrompt,
       history,
       userMessage: message,
       attachments,
@@ -209,13 +249,41 @@ export async function POST(req: Request) {
           }
         }
 
+        // Validate the response (non-blocking)
+        if (full.trim()) {
+          const validation = validateResponse({
+            response: full,
+            currentState,
+            dialogueLanguage,
+          });
+
+          if (!validation.valid) {
+            logValidationViolations(validation.violations, {
+              caseId: ensuredCase.id,
+              state: currentState,
+              language: dialogueLanguage,
+            });
+
+            // Send validation info to client (for debugging, non-blocking)
+            controller.enqueue(
+              encoder.encode(
+                sseEncode({
+                  type: "validation",
+                  valid: false,
+                  violations: validation.violations,
+                })
+              )
+            );
+          }
+        }
+
         // Save assistant message (skip persistence if client aborted)
         if (!aborted && full.trim()) {
           await storage.appendMessage({
             caseId: ensuredCase.id,
             role: "assistant",
             content: full,
-            language: effectiveLanguage,
+            language: dialogueLanguage,
             userId: user?.id,
           });
         }
