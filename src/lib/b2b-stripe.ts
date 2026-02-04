@@ -220,30 +220,48 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
  * Handle subscription created/updated event
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
-  const orgId = subscription.metadata?.orgId;
+  let orgId = subscription.metadata?.orgId;
+  const customerId = typeof subscription.customer === "string" 
+    ? subscription.customer 
+    : subscription.customer?.id;
+  
+  // If orgId not in metadata, look up by customer ID
+  if (!orgId && customerId) {
+    console.log(`[Stripe Webhook] No orgId in metadata, looking up by customer ${customerId}`);
+    
+    const { getOrgByStripeCustomerId } = await import("./firestore");
+    const org = await getOrgByStripeCustomerId(customerId);
+    
+    if (org) {
+      orgId = org.id;
+      console.log(`[Stripe Webhook] Found org ${orgId} by customer ID`);
+    }
+  }
   
   if (!orgId) {
-    console.error("[Stripe Webhook] Missing orgId in subscription metadata");
+    console.error("[Stripe Webhook] Cannot find org for subscription update - no orgId in metadata and no org found by customer ID");
     return;
   }
   
   const status = mapStripeStatus(subscription.status);
   
-  // Get quantity from line items
-  let seatLimit = 5;
-  if (subscription.items?.data?.[0]?.quantity) {
-    seatLimit = subscription.items.data[0].quantity;
-  }
+  // Calculate seatLimit by summing quantity from ALL subscription items
+  // This is the single source of truth from Stripe
+  const seatLimit = subscription.items?.data?.reduce(
+    (sum, item) => sum + (item.quantity ?? 0),
+    0
+  ) || 5;
   
   // Get period end
   const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
   
-  console.log(`[Stripe Webhook] Subscription ${subscription.status} for org ${orgId}, seats: ${seatLimit}`);
+  console.log(`[Stripe Webhook] Subscription ${subscription.status} for org ${orgId}, seats: ${seatLimit}, customerId: ${customerId}`);
   
   await updateOrgSubscription(orgId, {
     subscriptionStatus: status,
     seatLimit,
     stripeSubscriptionId: subscription.id,
+    stripeCustomerId: customerId, // Ensure customer ID is always saved
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
   });
 }
@@ -252,10 +270,24 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Prom
  * Handle subscription deleted event
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
-  const orgId = subscription.metadata?.orgId;
+  let orgId = subscription.metadata?.orgId;
+  
+  // If orgId not in metadata, look up by customer ID
+  if (!orgId && subscription.customer) {
+    const customerId = typeof subscription.customer === "string" 
+      ? subscription.customer 
+      : subscription.customer.id;
+    
+    const { getOrgByStripeCustomerId } = await import("./firestore");
+    const org = await getOrgByStripeCustomerId(customerId);
+    
+    if (org) {
+      orgId = org.id;
+    }
+  }
   
   if (!orgId) {
-    console.error("[Stripe Webhook] Missing orgId in subscription metadata");
+    console.error("[Stripe Webhook] Cannot find org for subscription deletion");
     return;
   }
   
@@ -281,11 +313,11 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice): Promise<v
     const orgId = subscription.metadata?.orgId;
     
     if (orgId) {
-      // Get quantity from line items
-      let seatLimit = 5;
-      if (subscription.items?.data?.[0]?.quantity) {
-        seatLimit = subscription.items.data[0].quantity;
-      }
+      // Calculate seatLimit by summing quantity from ALL subscription items
+      const seatLimit = subscription.items?.data?.reduce(
+        (sum, item) => sum + (item.quantity ?? 0),
+        0
+      ) || 5;
       
       const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
       
@@ -323,5 +355,50 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
     }
   } catch (err) {
     console.error("[Stripe Webhook] Error handling invoice failure:", err);
+  }
+}
+
+
+/**
+ * Sync seat limit from Stripe for an organization
+ * This fetches the current subscription from Stripe and updates the org's seatLimit
+ * Used by the manual refresh endpoint to ensure UI reflects Stripe's source of truth
+ */
+export async function syncSeatsFromStripe(stripeCustomerId: string): Promise<{
+  seatLimit: number;
+  subscriptionStatus: SubscriptionStatus;
+} | null> {
+  const stripe = getStripe();
+  
+  console.log(`[Stripe Sync] Fetching subscriptions for customer ${stripeCustomerId}`);
+  
+  try {
+    // List active subscriptions for this customer
+    const subscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: "all",
+      limit: 1,
+    });
+    
+    if (!subscriptions.data.length) {
+      console.log(`[Stripe Sync] No subscriptions found for customer ${stripeCustomerId}`);
+      return null;
+    }
+    
+    const subscription = subscriptions.data[0];
+    const status = mapStripeStatus(subscription.status);
+    
+    // Calculate seatLimit by summing quantity from ALL subscription items
+    const seatLimit = subscription.items?.data?.reduce(
+      (sum, item) => sum + (item.quantity ?? 0),
+      0
+    ) || 5;
+    
+    console.log(`[Stripe Sync] Customer ${stripeCustomerId}: status=${status}, seatLimit=${seatLimit}`);
+    
+    return { seatLimit, subscriptionStatus: status };
+  } catch (err) {
+    console.error("[Stripe Sync] Error fetching subscription:", err);
+    throw err;
   }
 }

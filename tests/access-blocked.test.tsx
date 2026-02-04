@@ -111,7 +111,7 @@ describe("AccessBlockedScreen Component", () => {
       const message = screen.getByTestId("blocked-message");
       
       expect(title.textContent).toBe("Seat Limit Reached");
-      expect(message.textContent).toContain("Contact your administrator");
+      expect(message.textContent).toContain("Ask your administrator");
     });
 
     it("should show admin-specific message for admin", () => {
@@ -138,7 +138,7 @@ describe("AccessBlockedScreen Component", () => {
       );
       
       const title = screen.getByTestId("blocked-title");
-      expect(title.textContent).toBe("Account Deactivated");
+      expect(title.textContent).toBe("Account Inactive");
     });
 
     it("should show correct title for pending", () => {

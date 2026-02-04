@@ -64,7 +64,16 @@ export default function AdminMembersPage() {
   const orgId = user?.organization?.id;
   const orgName = user?.organization?.name;
   const seatLimit = user?.organization?.seatLimit || 0;
-  const activeSeatCount = user?.organization?.activeSeatCount || 0;
+  
+  // Calculate active seat count from local members list (more accurate than stored value)
+  // Only count members with status === "active"
+  const localActiveSeatCount = members.filter(m => m.status === "active").length;
+  
+  // Use local count when we have members loaded, fallback to org's stored value
+  const activeSeatCount = members.length > 0 ? localActiveSeatCount : (user?.organization?.activeSeatCount || 0);
+  
+  // Check if we can add more members
+  const canAddMember = activeSeatCount < seatLimit;
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -300,6 +309,38 @@ export default function AdminMembersPage() {
             <div data-testid="seat-counter" className="text-right text-xs text-zinc-500 dark:text-zinc-400">
               <div>{activeSeatCount} / {seatLimit} seats</div>
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  // First, sync seat limit from Stripe (source of truth)
+                  const syncRes = await fetch("/api/billing/sync-seats", {
+                    method: "POST",
+                    credentials: "same-origin",
+                  });
+                  if (!syncRes.ok) {
+                    const data = await syncRes.json().catch(() => ({}));
+                    console.warn("[Refresh] Seat sync failed:", data.error || syncRes.status);
+                  }
+                } catch (e) {
+                  console.warn("[Refresh] Seat sync error:", e);
+                }
+                // Then refresh auth context and members list
+                await refresh();
+                await fetchMembers();
+              }}
+              data-testid="refresh-org-data"
+              title="Sync from Stripe and refresh data (use after upgrading subscription)"
+              className="
+                rounded-md border border-zinc-200 p-1.5 text-zinc-500 
+                hover:bg-zinc-50 hover:text-zinc-700
+                dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200
+              "
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
@@ -460,33 +501,38 @@ export default function AdminMembersPage() {
               )}
 
               {activeSeatCount >= seatLimit && !showAddForm && (
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Seat limit reached.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/billing/portal", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ returnUrl: window.location.href }),
-                          credentials: "same-origin",
-                        });
-                        if (res.ok) {
-                          const data = await res.json();
-                          window.location.href = data.url;
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Seat limit reached.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/billing/portal", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ returnUrl: window.location.href }),
+                            credentials: "same-origin",
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            window.location.href = data.url;
+                          }
+                        } catch {
+                          setError("Failed to open billing portal");
                         }
-                      } catch {
-                        setError("Failed to open billing portal");
-                      }
-                    }}
-                    data-testid="upgrade-seats-button"
-                    className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Upgrade seats →
-                  </button>
+                      }}
+                      data-testid="upgrade-seats-button"
+                      className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Upgrade seats →
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500">
+                    Already upgraded? Click the refresh button (↻) in the header to sync.
+                  </p>
                 </div>
               )}
             </div>

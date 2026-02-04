@@ -25,6 +25,54 @@ A) Back to Dashboard - Routes to /?from=admin to skip welcome for authenticated 
 B) Copy Report Button - Added in chat workspace to copy generated report (not chat transcript)
 C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONFIGURATION_ID support
 
+### Member Claim Fix (Feb 3, 2026)
+- Pre-added members can now claim their org membership on first sign-up
+- Placeholder UIDs (`pending_xxx`) are automatically replaced with real Firebase UID
+- Inactive members see "Account Inactive" message with admin contact
+- Seat limit blocking shows clear upgrade message
+- Security: Cannot claim if email already has non-placeholder UID
+- Added comprehensive logging for debugging claim flow
+
+### Stripe Webhook Sync Fix (Feb 3, 2026)
+- Webhook now looks up org by `stripeCustomerId` when `metadata.orgId` is missing
+- This fixes seat limit not updating after Portal upgrades
+- Both `customer.subscription.updated` and `customer.subscription.deleted` events now fallback to customer ID lookup
+- Added comprehensive logging:
+  - `[Stripe Webhook] Received event: X`
+  - `[Stripe Sync] Updating org X seatLimit to Y`
+  - `[API /api/auth/me] Returning org data: seatLimit=X`
+- Added `/api/debug/org-seats` endpoint for troubleshooting
+- Webhook always saves `stripeCustomerId` to ensure future lookups work
+
+### Member Invitation Emails (Feb 3, 2026)
+- **MVP Implementation**: Plain transactional email sent when admin adds a new member
+- **Email Provider**: Resend (easily swappable via `/app/src/lib/email.ts`)
+- **Email Content**: 
+  - Subject: "You've been invited to join {orgName}"
+  - Body: Org name, inviter email (if available), sign-in link, domain guidance
+- **Behavior**: 
+  - Fire-and-forget (email failure doesn't block member creation)
+  - HTML sanitization to prevent XSS
+  - Lazy client initialization for test compatibility
+- **Configuration**: 
+  - `RESEND_API_KEY` - API key from resend.com
+  - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
+  - `APP_NAME` - Defaults to "RV Service Desk"
+### Stripe Seat Limit Sync Fix - Source of Truth (Feb 4, 2026)
+- **Root cause**: Refresh button only refetched cached data, didn't sync from Stripe
+- **Fix**: Created `POST /api/billing/sync-seats` endpoint that fetches subscription from Stripe
+- **Architecture**:
+  - `b2b-stripe.ts` is the ONLY source of truth for B2B subscriptions
+  - `stripe.ts` is for individual subscriptions (Prisma) - separate concern
+  - seatLimit calculated: `subscription.items.data.reduce((sum, item) => sum + item.quantity, 0)`
+- **Refresh button now**:
+  1. Calls `POST /api/billing/sync-seats` (syncs from Stripe)
+  2. Calls `refresh()` (refetch /api/auth/me)
+  3. Calls `fetchMembers()` (refetch member list)
+- **Webhook**: Already correctly uses `b2b-stripe.ts`, fixed to sum ALL item quantities
+- **New endpoint**: `POST /api/billing/sync-seats` (admin only)
+- **Tests**: 11 new tests in `/app/tests/stripe-seat-sync.test.ts`
+
 ## Architecture
 
 ### Tech Stack
@@ -105,11 +153,14 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - Seat counter updates immediately after member changes
 - Admin onboarding: Dismissible banner on app (not separate screen)
 
-### Tests (76 total passing)
+### Tests (135 total passing)
 - `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
 - `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
 - `tests/org-activity.test.ts` - 4 tests for activity API
 - `tests/access-blocked.test.tsx` - 11 tests for UI component
+- `tests/seat-counter-refresh.test.ts` - 13 tests for seat counter and refresh button
+- `tests/member-invitation-email.test.ts` - 8 tests for invitation email functionality
+- `tests/stripe-seat-sync.test.ts` - 11 tests for Stripe seat limit sync and source of truth
 
 ## Prioritized Backlog
 
@@ -121,8 +172,10 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - ✅ Invite-only enforcement (not_a_member reason)
 - ✅ Admin Dashboard for member management
 
-### P1 (Important)
-- [ ] Member invitation emails (currently record-only)
+### P1 (Important) - DONE
+- ✅ Member invitation emails (transactional, MVP)
+
+### P1 (Important) - Remaining
 - [ ] Seat increase/decrease via Stripe portal integration
 
 ### P2 (Nice to Have)

@@ -322,17 +322,119 @@ class RVServiceDeskAPITester:
         )
         return success
 
+    def test_member_claim_functionality(self):
+        """Test member claim functionality through unit tests"""
+        print(f"\n🔍 Testing Member Claim Functionality...")
+        try:
+            import subprocess
+            # Run only the member claim tests
+            result = subprocess.run(
+                ["yarn", "test", "tests/member-claim.test.ts"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - Member claim tests pass")
+                
+                # Check for specific log messages that indicate the fixes are working
+                if "[API /api/auth/me] Claiming membership" in result.stdout:
+                    print(f"   ✅ Found expected log: '[API /api/auth/me] Claiming membership'")
+                else:
+                    print(f"   ⚠️  Expected log '[API /api/auth/me] Claiming membership' not found")
+                
+                # Extract test details from output
+                if "✓" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "✓" in line and "member-claim" in line:
+                            print(f"   {line.strip()}")
+                return True
+            else:
+                print(f"❌ Failed - Member claim tests failed")
+                print(f"   Error: {result.stderr[:300]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+
+    def test_stripe_webhook_functionality(self):
+        """Test Stripe webhook functionality through unit tests"""
+        print(f"\n🔍 Testing Stripe Webhook Functionality...")
+        try:
+            import subprocess
+            # Run the billing portal upgrade tests
+            result = subprocess.run(
+                ["yarn", "test", "tests/billing-portal-upgrades.test.ts"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - Stripe webhook tests pass")
+                
+                # Extract test count
+                if "Tests" in result.stdout and "passed" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "Tests" in line and "passed" in line:
+                            print(f"   {line.strip()}")
+                return True
+            else:
+                print(f"❌ Failed - Stripe webhook tests failed")
+                print(f"   Error: {result.stderr[:300]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+
+    def test_webhook_endpoint_exists(self):
+        """Test that webhook endpoint exists and handles missing signature correctly"""
+        success, response, cookies = self.run_test(
+            "Webhook endpoint - Missing signature",
+            "POST",
+            "api/billing/webhook",
+            400,  # Should return 400 for missing signature
+            data={"type": "test"},
+            cookies={}
+        )
+        
+        # Check if the response mentions missing signature
+        if success and "signature" in str(response).lower():
+            print(f"   ✅ Webhook correctly rejects missing signature")
+        
+        return success
+
     def run_all_tests(self):
         """Run all RV Service Desk API tests"""
-        print("🚀 Starting RV Service Desk UAT Fixes Testing")
+        print("🚀 Starting RV Service Desk Critical Issues Testing")
         print("=" * 70)
 
         # Test frontend loading
         print("\n" + "=" * 30 + " FRONTEND TESTS " + "=" * 30)
         self.test_frontend_loading()
         
+        # Test member claim functionality specifically
+        print("\n" + "=" * 30 + " MEMBER CLAIM TESTS " + "=" * 30)
+        self.test_member_claim_functionality()
+        
+        # Test Stripe webhook functionality
+        print("\n" + "=" * 30 + " STRIPE WEBHOOK TESTS " + "=" * 30)
+        self.test_stripe_webhook_functionality()
+        self.test_webhook_endpoint_exists()
+        
         # Test UAT fixes basic endpoints
-        print("\n" + "=" * 30 + " UAT FIXES API TESTS " + "=" * 30)
+        print("\n" + "=" * 30 + " API ENDPOINT TESTS " + "=" * 30)
         self.test_uat_fixes_basic_endpoints()
         self.test_billing_portal_endpoint()
         

@@ -10,6 +10,7 @@ import {
   recalculateActiveSeatCount,
   type OrgMember,
 } from "@/lib/firestore";
+import { sendInvitationEmail } from "@/lib/email";
 
 const SESSION_COOKIE_NAME = "rv_session";
 
@@ -155,6 +156,19 @@ export async function POST(req: Request) {
       role,
       status: "active",
     });
+    
+    // Send invitation email (fire-and-forget, don't block on failure)
+    try {
+      await sendInvitationEmail({
+        to: email,
+        orgName: org.name,
+        inviterEmail: decodedClaims.email,
+      });
+      console.log(`[API /api/org/members POST] Invitation email sent to ${email}`);
+    } catch (emailError) {
+      // Log but don't fail the request - member is already created
+      console.error(`[API /api/org/members POST] Failed to send invitation email to ${email}:`, emailError);
+    }
     
     return NextResponse.json({
       member: {

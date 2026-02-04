@@ -52,14 +52,14 @@ export function AccessBlockedScreen({ reason, message: messageProp, isAdmin, onR
       title = "Seat Limit Reached";
       message = messageProp || (isAdmin
         ? "Your organization has exceeded its seat limit. Please purchase more seats."
-        : "Seat limit reached. Contact your administrator to add seats.");
+        : "Seat limit reached. Ask your administrator to upgrade seats or deactivate someone.");
       showRefresh = true;
       if (!isAdmin) showContactAdmin = true;
       break;
 
     case "inactive":
-      title = "Account Deactivated";
-      message = messageProp || "Your account has been deactivated. Contact your administrator.";
+      title = "Account Inactive";
+      message = messageProp || "Your account is inactive. Ask your administrator to activate you.";
       showRefresh = true;
       showContactAdmin = true;
       break;
