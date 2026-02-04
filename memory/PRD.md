@@ -58,6 +58,16 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Fix Spanish Validation Fallback Drift (Feb 4, 2026)
+- **Problem**: EMPTY_OUTPUT validation fallback was hardcoded in Spanish, causing all fallback responses to appear as Spanish regardless of selected language
+- **Fix**: Localized fallback messages for all modes
+  - `FALLBACK_QUESTIONS`: EN/RU/ES diagnostic questions
+  - `FALLBACK_AUTHORIZATION`: EN/RU/ES authorization messages
+  - `FALLBACK_FINAL_REPORT`: EN/RU/ES report messages
+- **`getSafeFallback(mode, language)`** now returns localized text
+- **Default behavior**: Unknown/AUTO language defaults to EN (with warning log)
+- **Tests**: 6 new localization tests added to `mode-validators.test.ts`
+
 ### Input Language Lock Fix (Feb 4, 2026)
 - **Problem**: Russian input treated as Spanish, language drift across messages
 - **Fix**: Server-controlled language lock per case
