@@ -320,7 +320,7 @@ export async function POST(req: Request) {
           // If still fails, use safe fallback
           if (!validation.valid || result.error) {
             console.log(`[Chat API] Retry failed, using safe fallback`);
-            result.response = getSafeFallback(currentMode, dialogueLanguage);
+            result.response = getSafeFallback(currentMode, effectiveLanguage);
             
             controller.enqueue(
               encoder.encode(sseEncode({ 
@@ -352,7 +352,7 @@ export async function POST(req: Request) {
             caseId: ensuredCase.id,
             role: "assistant",
             content: full,
-            language: dialogueLanguage,
+            language: effectiveLanguage,
             userId: user?.id,
           });
         }
