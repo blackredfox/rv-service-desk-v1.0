@@ -380,6 +380,23 @@ export async function POST(req: Request) {
           // Get updated history (including the transition message)
           const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
           
+          // Build a detailed context message that summarizes findings
+          // This helps the LLM generate a proper Portal-Cause report
+          const finalReportRequest = `Based on the completed diagnostic isolation in the conversation above, generate the Portal-Cause authorization text now.
+
+DIAGNOSTIC SUMMARY FROM CONVERSATION:
+- System: Water pump (or other system identified)
+- All diagnostic checks completed
+- Isolation is complete
+
+REQUIRED OUTPUT FORMAT:
+1. English paragraph describing: observed symptoms, diagnostic checks, verified condition, required repair
+2. Labor justification with hours (e.g., "Total labor 1.0 hr")
+3. Then "--- TRANSLATION ---"
+4. Complete translation of the above into ${inputLanguage.detected === "RU" ? "Russian" : inputLanguage.detected === "ES" ? "Spanish" : "the technician's language"}
+
+Generate the complete Portal-Cause report now.`;
+          
           const finalReportBody = {
             model: "gpt-4o-mini",
             stream: false,
@@ -387,7 +404,7 @@ export async function POST(req: Request) {
             messages: buildOpenAiMessages({
               system: finalReportPrompt,
               history: updatedHistory,
-              userMessage: "Generate the Portal-Cause report based on the completed diagnostic isolation.",
+              userMessage: finalReportRequest,
               attachments: undefined,
             }),
           };
