@@ -58,6 +58,20 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Input Language Lock Fix (Feb 4, 2026)
+- **Problem**: Russian input treated as Spanish, language drift across messages
+- **Fix**: Server-controlled language lock per case
+- **Logic**:
+  - Explicit language selection (EN/RU/ES) always overrides
+  - AUTO mode: locks to detected language on first message
+  - Once locked, AUTO respects case language (no re-detection)
+  - Mid-case dropdown change updates case language immediately
+- **Hard Language Directive**: Added to every LLM call
+  - Diagnostic/Auth: "All dialogue MUST be in {language}. Do not respond in any other language."
+  - Final Report: "English first, then --- TRANSLATION --- into {language}"
+- **New function**: `buildLanguageDirective()` in `prompt-composer.ts`
+- **Tests**: 19 new tests in `input-language-lock.test.ts`
+
 ### Fix Duplicate System Prompt Sources (Feb 4, 2026)
 - **Problem**: Two competing system prompt sources causing language drift
   - `prompts/system/SYSTEM_PROMPT_BASE.txt` (correct runtime source)
