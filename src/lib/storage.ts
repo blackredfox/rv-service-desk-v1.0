@@ -386,6 +386,7 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
         userId: true,
         inputLanguage: true,
         languageSource: true,
+      mode: true,
         createdAt: true,
         updatedAt: true,
       },
