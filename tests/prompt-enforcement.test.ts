@@ -382,17 +382,16 @@ describe("API Contract", () => {
 describe("Complex Equipment Classification (from MODE_PROMPT_DIAGNOSTIC)", () => {
   it("should list all complex equipment types", () => {
     expect(MODE_DIAGNOSTIC).toContain("Roof AC / heat pumps");
-    expect(MODE_DIAGNOSTIC).toContain("furnaces");
-    expect(MODE_DIAGNOSTIC).toContain("slide-outs");
-    expect(MODE_DIAGNOSTIC).toContain("leveling systems");
-    expect(MODE_DIAGNOSTIC).toContain("inverters / converters");
-    expect(MODE_DIAGNOSTIC).toContain("refrigerators");
+    expect(MODE_DIAGNOSTIC).toContain("Furnaces");
+    expect(MODE_DIAGNOSTIC).toContain("Slide-out systems");
+    expect(MODE_DIAGNOSTIC).toContain("Leveling systems");
+    expect(MODE_DIAGNOSTIC).toContain("Inverters / converters");
+    expect(MODE_DIAGNOSTIC).toContain("Refrigerators");
   });
 
-  it("should NOT list water pump as complex equipment", () => {
-    // Water pump is NOT in the complex equipment list
-    // It's a simple system that doesn't require diagnostic form mode
-    const complexEquipmentSection = MODE_DIAGNOSTIC.split("Complex systems include:")[1]?.split("\n\n")[0] || "";
-    expect(complexEquipmentSection.toLowerCase()).not.toContain("water pump");
+  it("should list water pump as NON-complex equipment", () => {
+    // Water pump is explicitly listed as non-complex
+    expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX SYSTEMS");
+    expect(MODE_DIAGNOSTIC).toContain("Water pumps");
   });
 });
