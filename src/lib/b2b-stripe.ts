@@ -245,11 +245,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription): Prom
   
   const status = mapStripeStatus(subscription.status);
   
-  // Get quantity from line items
-  let seatLimit = 5;
-  if (subscription.items?.data?.[0]?.quantity) {
-    seatLimit = subscription.items.data[0].quantity;
-  }
+  // Calculate seatLimit by summing quantity from ALL subscription items
+  // This is the single source of truth from Stripe
+  const seatLimit = subscription.items?.data?.reduce(
+    (sum, item) => sum + (item.quantity ?? 0),
+    0
+  ) || 5;
   
   // Get period end
   const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
