@@ -58,6 +58,25 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Prompt Split & Composer Architecture (Feb 4, 2026)
+- **D1 - Split Prompts**: Customer prompt split into 4 operational blocks:
+  - `prompts/system/SYSTEM_PROMPT_BASE.txt` - Immutable laws/guardrails
+  - `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt` - Diagnostic form behavior
+  - `prompts/modes/MODE_PROMPT_AUTHORIZATION.txt` - Authorization text generation
+  - `prompts/modes/MODE_PROMPT_FINAL_REPORT.txt` - Portal-Cause format
+- **D2 - Prompt Composer** (`/app/src/lib/prompt-composer.ts`):
+  - Deterministic composition based on `case.mode`
+  - Explicit command transitions only: `START FINAL REPORT`, `START AUTHORIZATION REQUEST`
+  - Memory window (N=12 messages)
+  - Never infers mode from meaning
+- **D3 - Mode Validators** (`/app/src/lib/mode-validators.ts`):
+  - Diagnostic: Must be single question, blocks final report content
+  - Final Report: Requires `--- TRANSLATION ---`, labor, correct format
+  - Prohibited words detection: broken, failed, defective, etc.
+  - Retry once with correction, then safe fallback
+- **D4 - Tests**: 42 new tests in `prompt-composer.test.ts` and `mode-validators.test.ts`
+- **Schema**: Added `mode` field to Case model (diagnostic | authorization | final_report)
+
 ### Prompt Enforcement & API Contract Fix (Feb 4, 2026)
 - **System Prompt v3.2**: Model-agnostic, deterministic diagnostic engine
 - **STATE Machine**: Explicit `DIAGNOSTICS` and `CAUSE_OUTPUT` states
