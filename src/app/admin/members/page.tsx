@@ -312,11 +312,25 @@ export default function AdminMembersPage() {
             <button
               type="button"
               onClick={async () => {
+                try {
+                  // First, sync seat limit from Stripe (source of truth)
+                  const syncRes = await fetch("/api/billing/sync-seats", {
+                    method: "POST",
+                    credentials: "same-origin",
+                  });
+                  if (!syncRes.ok) {
+                    const data = await syncRes.json().catch(() => ({}));
+                    console.warn("[Refresh] Seat sync failed:", data.error || syncRes.status);
+                  }
+                } catch (e) {
+                  console.warn("[Refresh] Seat sync error:", e);
+                }
+                // Then refresh auth context and members list
                 await refresh();
                 await fetchMembers();
               }}
               data-testid="refresh-org-data"
-              title="Refresh organization data (use after upgrading subscription)"
+              title="Sync from Stripe and refresh data (use after upgrading subscription)"
               className="
                 rounded-md border border-zinc-200 p-1.5 text-zinc-500 
                 hover:bg-zinc-50 hover:text-zinc-700
