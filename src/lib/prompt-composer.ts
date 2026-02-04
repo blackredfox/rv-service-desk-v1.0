@@ -99,8 +99,8 @@ const LANGUAGE_NAMES: Record<string, string> = {
 };
 
 /**
- * Build a HARD language directive for LLM
- * This directive is prepended to ensure the model follows language rules
+ * Build a HARD language directive for LLM (v1 - single language)
+ * @deprecated Use buildLanguageDirectiveV2 for proper input/output separation
  */
 export function buildLanguageDirective(args: {
   inputLanguage: string;
@@ -126,7 +126,43 @@ Do not use English unless the technician's language is English.`;
 }
 
 /**
- * Compose the full system prompt for a request
+ * Build a HARD language directive for LLM (v2 - separate input/output)
+ * 
+ * @param inputDetected - The language the technician wrote in
+ * @param outputEffective - The language the assistant must respond in
+ * @param mode - Current case mode
+ */
+export function buildLanguageDirectiveV2(args: {
+  inputDetected: string;
+  outputEffective: string;
+  mode: CaseMode;
+}): string {
+  const { inputDetected, outputEffective, mode } = args;
+  const inputLangName = LANGUAGE_NAMES[inputDetected] || inputDetected;
+  const outputLangName = LANGUAGE_NAMES[outputEffective] || outputEffective;
+
+  if (mode === "final_report") {
+    // Final report: English first, then translate to DETECTED input language
+    // (so technician reads translation in the language they wrote in)
+    return `LANGUAGE DIRECTIVE (MANDATORY):
+Technician input language: ${inputDetected} (${inputLangName}).
+Final output MUST be English first.
+Then output '--- TRANSLATION ---' and translate the full output into ${inputLangName} (${inputDetected}).
+Do not mix languages inside the English block.
+The translation must be complete and literal.`;
+  }
+
+  // For diagnostic and authorization modes
+  // Use the EFFECTIVE output language (which may be forced)
+  return `LANGUAGE DIRECTIVE (MANDATORY):
+Technician input language: ${inputDetected} (${inputLangName}).
+All dialogue MUST be in ${outputLangName} (${outputEffective}).
+Do not respond in any other language.
+Do not use English unless the output language is English.`;
+}
+
+/**
+ * Compose the full system prompt for a request (v1 - backward compatible)
  */
 export function composePrompt(args: {
   mode: CaseMode;
