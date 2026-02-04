@@ -11,7 +11,8 @@ import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import { 
   composePromptV2, 
-  detectModeCommand, 
+  detectModeCommand,
+  detectTransitionSignal,
   buildMessagesWithMemory,
   type CaseMode,
   DEFAULT_MEMORY_WINDOW,
