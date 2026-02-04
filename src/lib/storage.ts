@@ -223,6 +223,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     title: clampTitleSeed(input.titleSeed),
     inputLanguage: input.inputLanguage,
     languageSource: input.languageSource,
+    mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
     deletedAt: null,
