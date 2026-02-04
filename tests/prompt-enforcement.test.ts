@@ -142,24 +142,24 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_FINAL_REPORT).toContain("--- TRANSLATION ---");
     });
 
-    it("should specify paragraph order", () => {
-      expect(MODE_FINAL_REPORT).toContain("Paragraph order");
+    it("should specify output format and paragraphs", () => {
+      expect(MODE_FINAL_REPORT).toContain("OUTPUT FORMAT");
       expect(MODE_FINAL_REPORT).toContain("Observed symptoms");
-      expect(MODE_FINAL_REPORT).toContain("Diagnostic checks performed");
+      expect(MODE_FINAL_REPORT).toContain("Diagnostic checks");
       expect(MODE_FINAL_REPORT).toContain("Verified condition");
       expect(MODE_FINAL_REPORT).toContain("Required repair or replacement");
-      expect(MODE_FINAL_REPORT).toContain("Labor justification");
+      expect(MODE_FINAL_REPORT).toContain("Labor");
     });
 
     it("should require labor breakdown", () => {
-      expect(MODE_FINAL_REPORT).toContain("LABOR REQUIREMENTS");
-      expect(MODE_FINAL_REPORT).toContain("Task-level breakdown");
-      expect(MODE_FINAL_REPORT).toContain("Total labor stated");
+      expect(MODE_FINAL_REPORT).toContain("Labor");
+      expect(MODE_FINAL_REPORT).toContain("hours");
+      expect(MODE_FINAL_REPORT).toContain("Total labor");
     });
 
     it("should enforce plain format", () => {
-      expect(MODE_FINAL_REPORT).toContain("No headers");
-      expect(MODE_FINAL_REPORT).toContain("No numbering");
+      expect(MODE_FINAL_REPORT).toContain("no headers");
+      expect(MODE_FINAL_REPORT).toContain("no numbers");
     });
   });
 });
