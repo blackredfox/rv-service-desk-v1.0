@@ -131,6 +131,7 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
     title: input.title ? clampTitle(input.title) : c.title,
     inputLanguage: input.inputLanguage ?? c.inputLanguage,
     languageSource: input.languageSource ?? c.languageSource,
+    mode: input.mode ?? c.mode,
     updatedAt: nowIso(),
   };
   store.cases.set(caseId, updated);
