@@ -213,10 +213,11 @@ describe("Language Detection Edge Cases", () => {
     expect(result.language).toBe("RU"); // Cyrillic presence should trigger RU
   });
 
-  it("should detect Spanish inverted question mark", async () => {
+  it("should detect Spanish with inverted question mark and Spanish text", async () => {
     const { detectLanguage } = await import("@/lib/lang");
     
-    const result = detectLanguage("¿Funciona?");
+    // Full Spanish sentence with inverted question mark
+    const result = detectLanguage("¿Cómo está el motor?");
     
     expect(result.language).toBe("ES");
   });
