@@ -90,6 +90,42 @@ export function detectModeCommand(message: string): CaseMode | null {
 }
 
 /**
+ * Language name mapping for clearer directives
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  EN: "English",
+  RU: "Russian",
+  ES: "Spanish",
+};
+
+/**
+ * Build a HARD language directive for LLM
+ * This directive is prepended to ensure the model follows language rules
+ */
+export function buildLanguageDirective(args: {
+  inputLanguage: string;
+  mode: CaseMode;
+}): string {
+  const { inputLanguage, mode } = args;
+  const langName = LANGUAGE_NAMES[inputLanguage] || inputLanguage;
+
+  if (mode === "final_report") {
+    return `LANGUAGE DIRECTIVE (MANDATORY):
+Final output MUST be English first.
+Then output '--- TRANSLATION ---' and translate the full output into ${langName} (${inputLanguage}).
+Do not mix languages inside the English block.
+The translation must be complete and literal.`;
+  }
+
+  // For diagnostic and authorization modes
+  return `LANGUAGE DIRECTIVE (MANDATORY):
+Technician input language: ${inputLanguage} (${langName}).
+All dialogue MUST be in ${langName}.
+Do not respond in any other language.
+Do not use English unless the technician's language is English.`;
+}
+
+/**
  * Compose the full system prompt for a request
  */
 export function composePrompt(args: {
@@ -108,13 +144,12 @@ export function composePrompt(args: {
     getModePrompt(mode),
   ];
 
-  // Add language context if provided
+  // Add HARD language directive if provided
   if (dialogueLanguage) {
     parts.push("");
     parts.push("---");
     parts.push("");
-    parts.push(`CURRENT DIALOGUE LANGUAGE: ${dialogueLanguage}`);
-    parts.push(`Output diagnostic questions in ${dialogueLanguage}.`);
+    parts.push(buildLanguageDirective({ inputLanguage: dialogueLanguage, mode }));
   }
 
   // Add additional constraints if provided
