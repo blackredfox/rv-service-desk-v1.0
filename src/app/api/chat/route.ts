@@ -1,14 +1,25 @@
-import { SYSTEM_PROMPT_FINAL, buildSystemPrompt, type DiagnosticState } from "../../../../prompts/system-prompt-final";
 import { normalizeLanguageMode, type LanguageMode, type Language } from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
-import { validateResponse, logValidationViolations } from "@/lib/output-validator";
+import { 
+  composePrompt, 
+  detectModeCommand, 
+  buildMessagesWithMemory,
+  type CaseMode,
+  DEFAULT_MEMORY_WINDOW,
+} from "@/lib/prompt-composer";
+import {
+  validateOutput,
+  getSafeFallback,
+  buildCorrectionInstruction,
+  logValidation,
+} from "@/lib/mode-validators";
 
 export const runtime = "nodejs";
 
 type Attachment = {
   type: "image";
-  dataUrl: string; // base64 data URL, e.g., "data:image/jpeg;base64,..."
+  dataUrl: string;
 };
 
 type ChatBody = {
@@ -16,10 +27,8 @@ type ChatBody = {
   message: string;
   languageMode?: LanguageMode;
   attachments?: Attachment[];
-  /** Explicit dialogue language (required for API contract) */
+  /** Explicit dialogue language (optional override) */
   dialogueLanguage?: Language;
-  /** Explicit current state (required for API contract) */
-  currentState?: DiagnosticState;
 };
 
 function sseEncode(data: unknown) {
@@ -30,32 +39,12 @@ type OpenAiMessageContent =
   | string
   | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
-/**
- * Infer diagnostic state from conversation history
- * - If assistant last message contains "--- TRANSLATION ---", we're in CAUSE_OUTPUT
- * - Otherwise, we're in DIAGNOSTICS
- */
-function inferStateFromHistory(history: { role: "user" | "assistant"; content: string }[]): DiagnosticState {
-  // Find the last assistant message
-  for (let i = history.length - 1; i >= 0; i--) {
-    if (history[i].role === "assistant") {
-      const content = history[i].content;
-      // If last assistant message has translation separator, likely in CAUSE_OUTPUT
-      if (content.includes("--- TRANSLATION ---")) {
-        return "CAUSE_OUTPUT";
-      }
-      break;
-    }
-  }
-  // Default to DIAGNOSTICS
-  return "DIAGNOSTICS";
-}
-
 function buildOpenAiMessages(args: {
   system: string;
   history: { role: "user" | "assistant"; content: string }[];
   userMessage: string;
   attachments?: Attachment[];
+  correctionInstruction?: string;
 }): Array<{ role: string; content: OpenAiMessageContent }> {
   const messages: Array<{ role: string; content: OpenAiMessageContent }> = [
     { role: "system", content: args.system },
@@ -82,7 +71,74 @@ function buildOpenAiMessages(args: {
     messages.push({ role: "user", content: args.userMessage });
   }
 
+  // Add correction instruction if retrying
+  if (args.correctionInstruction) {
+    messages.push({ role: "user", content: args.correctionInstruction });
+  }
+
   return messages;
+}
+
+/**
+ * Call OpenAI and stream the response
+ */
+async function callOpenAI(
+  apiKey: string,
+  body: object,
+  signal: AbortSignal
+): Promise<{ response: string; error?: string }> {
+  try {
+    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      const text = await upstream.text().catch(() => "");
+      return { response: "", error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500) };
+    }
+
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let full = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.replace(/^data:\s*/, "");
+        if (payload === "[DONE]") break;
+
+        try {
+          const json = JSON.parse(payload) as {
+            choices?: { delta?: { content?: string } }[];
+          };
+          const token = json?.choices?.[0]?.delta?.content;
+          if (token) full += token;
+        } catch {
+          // Ignore malformed lines
+        }
+      }
+    }
+
+    return { response: full };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return { response: "", error: msg };
+  }
 }
 
 export async function POST(req: Request) {
@@ -94,7 +150,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Get current user (optional for backward compatibility)
   const user = await getCurrentUser();
 
   const body = (await req.json().catch(() => null)) as ChatBody | null;
@@ -111,16 +166,13 @@ export async function POST(req: Request) {
     message,
     languageMode
   );
-
-  // API Contract: Use explicit dialogueLanguage if provided, otherwise infer
   const dialogueLanguage: Language = body?.dialogueLanguage || effectiveLanguage;
 
-  // Session-only attachments (images are used for this request only, not stored)
   const attachments = body?.attachments?.filter(
     (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
   );
 
-  // Ensure a case exists
+  // Ensure case exists and get current mode
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
@@ -129,15 +181,21 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  // Load last 30 messages for context
-  const history = await storage.listMessagesForContext(ensuredCase.id, 30);
+  // Get current mode from case
+  let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
 
-  // API Contract: Use explicit currentState if provided, otherwise infer from history
-  const currentState: DiagnosticState = body?.currentState || inferStateFromHistory(history);
+  // Check for explicit mode transition commands
+  const commandMode = detectModeCommand(message);
+  if (commandMode && commandMode !== currentMode) {
+    console.log(`[Chat API] Mode transition: ${currentMode} → ${commandMode} (explicit command)`);
+    currentMode = commandMode;
+    // Persist mode change
+    await storage.updateCase(ensuredCase.id, { mode: currentMode });
+  }
 
-  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, dialogueLanguage=${dialogueLanguage}, currentState=${currentState}`);
+  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, mode=${currentMode}, lang=${dialogueLanguage}`);
 
-  // Persist user message (without attachments - session only)
+  // Persist user message
   await storage.appendMessage({
     caseId: ensuredCase.id,
     role: "user",
@@ -146,23 +204,14 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  // Build system prompt with explicit state and language context
-  const systemPrompt = buildSystemPrompt({
-    dialogueLanguage,
-    currentState,
-  });
+  // Load conversation history (memory window)
+  const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
-  const openAiBody = {
-    model: "gpt-4o-mini",
-    stream: true,
-    temperature: 0.2,
-    messages: buildOpenAiMessages({
-      system: systemPrompt,
-      history,
-      userMessage: message,
-      attachments,
-    }),
-  };
+  // Compose system prompt based on mode
+  const systemPrompt = composePrompt({
+    mode: currentMode,
+    dialogueLanguage,
+  });
 
   const encoder = new TextEncoder();
   const ac = new AbortController();
@@ -174,110 +223,98 @@ export async function POST(req: Request) {
 
       const onAbort = () => {
         aborted = true;
-        try {
-          ac.abort();
-        } catch {
-          // ignore
-        }
+        try { ac.abort(); } catch { /* ignore */ }
       };
 
-      // Abort upstream request if client disconnects
       req.signal.addEventListener("abort", onAbort, { once: true });
 
       try {
         controller.enqueue(encoder.encode(sseEncode({ type: "case", caseId: ensuredCase.id })));
+        controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
-        const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          signal: ac.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiBody),
-        });
+        // Build initial request
+        const openAiBody = {
+          model: "gpt-4o-mini",
+          stream: false, // Use non-streaming for validation/retry
+          temperature: 0.2,
+          messages: buildOpenAiMessages({
+            system: systemPrompt,
+            history,
+            userMessage: message,
+            attachments,
+          }),
+        };
 
-        if (!upstream.ok || !upstream.body) {
-          const text = await upstream.text().catch(() => "");
+        // First attempt
+        let result = await callOpenAI(apiKey, openAiBody, ac.signal);
+
+        if (result.error) {
           controller.enqueue(
-            encoder.encode(
-              sseEncode({
-                type: "error",
-                code: "UPSTREAM_ERROR",
-                message: `Upstream error (${upstream.status}) ${text}`.slice(0, 500),
-              })
-            )
+            encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.error }))
           );
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
 
-        const reader = upstream.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+        // Validate output
+        let validation = validateOutput(result.response, currentMode);
+        logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
-        while (true) {
-          if (aborted) break;
-          const { value, done } = await reader.read();
-          if (done) break;
+        // If validation fails, retry once with correction
+        if (!validation.valid && !aborted) {
+          console.log(`[Chat API] Validation failed, retrying with correction...`);
+          
+          const correctionInstruction = buildCorrectionInstruction(validation.violations);
+          
+          const retryBody = {
+            ...openAiBody,
+            messages: buildOpenAiMessages({
+              system: systemPrompt,
+              history,
+              userMessage: message,
+              attachments,
+              correctionInstruction,
+            }),
+          };
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+          result = await callOpenAI(apiKey, retryBody, ac.signal);
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const payload = trimmed.replace(/^data:\s*/, "");
-            if (payload === "[DONE]") {
-              break;
-            }
-
-            try {
-              const json = JSON.parse(payload) as unknown as {
-                choices?: { delta?: { content?: string } }[];
-              };
-              const token: string | undefined = json?.choices?.[0]?.delta?.content;
-              if (token) {
-                full += token;
-                controller.enqueue(encoder.encode(sseEncode({ type: "token", token })));
-              }
-            } catch {
-              // Ignore malformed lines
-            }
+          if (!result.error) {
+            validation = validateOutput(result.response, currentMode);
+            logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
-        }
 
-        // Validate the response (non-blocking)
-        if (full.trim()) {
-          const validation = validateResponse({
-            response: full,
-            currentState,
-            dialogueLanguage,
-          });
-
-          if (!validation.valid) {
-            logValidationViolations(validation.violations, {
-              caseId: ensuredCase.id,
-              state: currentState,
-              language: dialogueLanguage,
-            });
-
-            // Send validation info to client (for debugging, non-blocking)
+          // If still fails, use safe fallback
+          if (!validation.valid || result.error) {
+            console.log(`[Chat API] Retry failed, using safe fallback`);
+            result.response = getSafeFallback(currentMode, dialogueLanguage);
+            
             controller.enqueue(
-              encoder.encode(
-                sseEncode({
-                  type: "validation",
-                  valid: false,
-                  violations: validation.violations,
-                })
-              )
+              encoder.encode(sseEncode({ 
+                type: "validation_fallback", 
+                violations: validation.violations 
+              }))
             );
           }
         }
 
-        // Save assistant message (skip persistence if client aborted)
+        full = result.response;
+
+        // Stream tokens to client
+        for (const char of full) {
+          if (aborted) break;
+          controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+        }
+
+        // Send validation info
+        if (!validation.valid) {
+          controller.enqueue(
+            encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
+          );
+        }
+
+        // Save assistant message
         if (!aborted && full.trim()) {
           await storage.appendMessage({
             caseId: ensuredCase.id,
@@ -291,7 +328,6 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } catch (e: unknown) {
-        // If the client disconnected, just stop.
         if (aborted) {
           controller.close();
           return;
@@ -299,9 +335,7 @@ export async function POST(req: Request) {
 
         const msg = e instanceof Error ? e.message : "Unknown error";
         controller.enqueue(
-          encoder.encode(
-            sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) })
-          )
+          encoder.encode(sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) }))
         );
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
@@ -310,12 +344,7 @@ export async function POST(req: Request) {
       }
     },
     cancel() {
-      // Called if the consumer cancels the stream
-      try {
-        ac.abort();
-      } catch {
-        // ignore
-      }
+      try { ac.abort(); } catch { /* ignore */ }
     },
   });
 
