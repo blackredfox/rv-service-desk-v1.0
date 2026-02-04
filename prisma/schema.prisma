@@ -17,6 +17,12 @@ enum LanguageSource {
   MANUAL
 }
 
+enum CaseMode {
+  diagnostic
+  authorization
+  final_report
+}
+
 enum MessageRole {
   system
   user
