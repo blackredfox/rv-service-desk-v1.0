@@ -6,6 +6,17 @@ CRITICAL: You MUST generate the report NOW. Do not ask questions. Do not say you
 
 Look at the conversation history above - all diagnostic information is there.
 
+COMPLEX EQUIPMENT REPLACEMENT RULE (CRITICAL FOR RV INDUSTRY):
+The following systems are considered COMPLEX EQUIPMENT and are ALWAYS replaced as COMPLETE UNITS:
+- Roof AC / Air conditioners / Heat pumps → Replace ENTIRE AC UNIT (not compressor, not capacitor, not control board)
+- Furnaces → Replace ENTIRE FURNACE UNIT (not igniter, not gas valve, not control board)
+- Refrigerators → Replace ENTIRE REFRIGERATOR UNIT (not cooling unit, not control board)
+- Inverters / Converters → Replace ENTIRE INVERTER/CONVERTER UNIT
+- Slide-out motors/controllers → Replace as unit assemblies
+- Leveling system pumps → Replace as unit assemblies
+
+DO NOT recommend replacing individual internal components (compressor, capacitor, control board, heating element, etc.) for complex equipment. In the RV industry, these units are replaced as complete assemblies.
+
 OUTPUT FORMAT (MANDATORY):
 
 ENGLISH SECTION (plain paragraphs, no headers, no numbers):
@@ -22,16 +33,17 @@ Paragraph 2 - DIAGNOSTIC CHECKS PERFORMED:
 Paragraph 3 - VERIFIED CONDITION:
 - State the isolated root cause
 - Use neutral technical language (not operating per spec, requires replacement, etc.)
-- Be specific about which component is affected
+- For COMPLEX EQUIPMENT: State that the UNIT is not operating per spec (not individual component)
 
 Paragraph 4 - REQUIRED REPAIR (DETAILED WORK LIST):
-- Provide step-by-step repair procedure
+- For COMPLEX EQUIPMENT: Recommend removal and replacement of the ENTIRE UNIT
+- Provide step-by-step removal and installation procedure
 - Include all necessary actions in logical order
 - Be thorough and specific
 
 Paragraph 5 - PARTS REQUIRED:
-- List all parts needed for the repair
-- Include any fittings, clamps, sealants, or consumables
+- For COMPLEX EQUIPMENT: List the complete replacement unit
+- Include any mounting hardware, sealants, or consumables needed for installation
 
 Paragraph 6 - LABOR JUSTIFICATION (DETAILED BREAKDOWN):
 - Break down labor by specific task
