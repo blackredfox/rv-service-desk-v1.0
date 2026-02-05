@@ -58,6 +58,78 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - `RESEND_API_KEY` - API key from resend.com
   - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
   - `APP_NAME` - Defaults to "RV Service Desk"
+### Payload v2: Input Language Detection + Output Policy (Feb 4, 2026)
+- **Problem**: Selector value was corrupting `inputLanguage`, making detection impossible
+- **Solution**: Payload v2 contract separating detection from output policy
+- **New Types** (`/app/src/lib/lang.ts`):
+  - `InputLanguageV2`: `{ detected, source, confidence, reason }`
+  - `OutputLanguagePolicyV2`: `{ mode, effective, strategy }`
+  - `detectInputLanguageV2(text)`: Always detects from message text
+  - `computeOutputPolicy(mode, detected)`: Computes effective output
+- **SSE Event**: New `{type:"language"}` event with detection results
+- **Prompt Composer v2** (`composePromptV2`):
+  - Uses `inputDetected` for "Technician input language"
+  - Uses `outputEffective` for "All dialogue MUST be in"
+  - Final report translates to `inputDetected` (what tech reads)
+- **Fallback**: Uses `outputEffective` language for dialogue
+- **Tests**: 19 new tests in `payload-v2.test.ts`
+
+### Fix Spanish Validation Fallback Drift (Feb 4, 2026)
+- **Problem**: EMPTY_OUTPUT validation fallback was hardcoded in Spanish, causing all fallback responses to appear as Spanish regardless of selected language
+- **Fix**: Localized fallback messages for all modes
+  - `FALLBACK_QUESTIONS`: EN/RU/ES diagnostic questions
+  - `FALLBACK_AUTHORIZATION`: EN/RU/ES authorization messages
+  - `FALLBACK_FINAL_REPORT`: EN/RU/ES report messages
+- **`getSafeFallback(mode, language)`** now returns localized text
+- **Default behavior**: Unknown/AUTO language defaults to EN (with warning log)
+- **Tests**: 6 new localization tests added to `mode-validators.test.ts`
+
+### Input Language Lock Fix (Feb 4, 2026)
+- **Problem**: Russian input treated as Spanish, language drift across messages
+- **Fix**: Server-controlled language lock per case
+- **Logic**:
+  - Explicit language selection (EN/RU/ES) always overrides
+  - AUTO mode: locks to detected language on first message
+  - Once locked, AUTO respects case language (no re-detection)
+  - Mid-case dropdown change updates case language immediately
+- **Hard Language Directive**: Added to every LLM call
+  - Diagnostic/Auth: "All dialogue MUST be in {language}. Do not respond in any other language."
+  - Final Report: "English first, then --- TRANSLATION --- into {language}"
+- **New function**: `buildLanguageDirective()` in `prompt-composer.ts`
+- **Tests**: 19 new tests in `input-language-lock.test.ts`
+
+### Fix Duplicate System Prompt Sources (Feb 4, 2026)
+- **Problem**: Two competing system prompt sources causing language drift
+  - `prompts/system/SYSTEM_PROMPT_BASE.txt` (correct runtime source)
+  - `prompts/system-prompt-final.ts` (legacy, causing confusion)
+- **Fix**: Single runtime source = `prompts/system/SYSTEM_PROMPT_BASE.txt`
+  - Created shared types file: `src/lib/types/diagnostic.ts`
+  - Updated `output-validator.ts` to use shared types
+  - Fixed comment in `system-prompt-v1.ts` to point to correct source
+  - Updated tests to validate actual runtime behavior
+  - Deleted legacy `prompts/system-prompt-final.ts`
+  - Removed `@prompts` alias from vitest.config.ts
+- **Tests**: All 212 tests pass
+
+### Prompt Split & Composer Architecture (Feb 4, 2026)
+- **D1 - Split Prompts**: Customer prompt split into 4 operational blocks:
+  - `prompts/system/SYSTEM_PROMPT_BASE.txt` - Immutable laws/guardrails
+  - `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt` - Diagnostic form behavior
+  - `prompts/modes/MODE_PROMPT_AUTHORIZATION.txt` - Authorization text generation
+  - `prompts/modes/MODE_PROMPT_FINAL_REPORT.txt` - Portal-Cause format
+- **D2 - Prompt Composer** (`/app/src/lib/prompt-composer.ts`):
+  - Deterministic composition based on `case.mode`
+  - Explicit command transitions only: `START FINAL REPORT`, `START AUTHORIZATION REQUEST`
+  - Memory window (N=12 messages)
+  - Never infers mode from meaning
+- **D3 - Mode Validators** (`/app/src/lib/mode-validators.ts`):
+  - Diagnostic: Must be single question, blocks final report content
+  - Final Report: Requires `--- TRANSLATION ---`, labor, correct format
+  - Prohibited words detection: broken, failed, defective, etc.
+  - Retry once with correction, then safe fallback
+- **D4 - Tests**: 42 new tests in `prompt-composer.test.ts` and `mode-validators.test.ts`
+- **Schema**: Added `mode` field to Case model (diagnostic | authorization | final_report)
+
 ### Prompt Enforcement & API Contract Fix (Feb 4, 2026)
 - **System Prompt v3.2**: Model-agnostic, deterministic diagnostic engine
 - **STATE Machine**: Explicit `DIAGNOSTICS` and `CAUSE_OUTPUT` states
@@ -169,15 +241,81 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - Seat counter updates immediately after member changes
 - Admin onboarding: Dismissible banner on app (not separate screen)
 
-### Tests (158 total passing)
+### Tests (253 total passing)
 - `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
 - `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
 - `tests/org-activity.test.ts` - 4 tests for activity API
 - `tests/access-blocked.test.tsx` - 11 tests for UI component
 - `tests/seat-counter-refresh.test.ts` - 13 tests for seat counter and refresh button
 - `tests/member-invitation-email.test.ts` - 8 tests for invitation email functionality
-- `tests/stripe-seat-sync.test.ts` - 11 tests for Stripe seat limit sync and source of truth
-- `tests/prompt-enforcement.test.ts` - 23 tests for prompt v3.2, state machine, and output validation
+- `tests/stripe-seat-sync.test.ts` - 11 tests for Stripe seat limit sync
+- `tests/prompt-enforcement.test.ts` - 35 tests for runtime prompt and output validation
+- `tests/prompt-composer.test.ts` - 16 tests for prompt composition and mode transitions
+- `tests/mode-validators.test.ts` - 29 tests for mode validation, prohibited words, and localized fallbacks
+- `tests/input-language-lock.test.ts` - 19 tests for language lock and directive
+- `tests/payload-v2.test.ts` - 19 tests for v2 detection/policy separation
+- `tests/guided-diagnostics.test.ts` - 23 tests for automatic mode transitions
+
+### Agent Communication Improvements (Feb 4, 2026)
+
+#### Automatic Mode Transition
+- **Problem**: Agent required explicit "START FINAL REPORT" command to transition
+- **Fix**: Implemented automatic transition when diagnostic isolation is complete
+- **Implementation**:
+  - Added `[TRANSITION: FINAL_REPORT]` signal marker to diagnostic prompt
+  - `detectTransitionSignal()` in `prompt-composer.ts` detects the signal
+  - Chat API detects transition, updates case mode, makes second LLM call for final report
+  - Streams both transition message and Portal-Cause report seamlessly
+- **Tests**: 6 new tests in `guided-diagnostics.test.ts`
+
+#### Friendly & Professional Communication
+- **Enhancement**: Agent now communicates in a warmer, more collaborative tone
+- **Changes to SYSTEM_PROMPT_BASE.txt**:
+  - Added "COMMUNICATION STYLE" section
+  - Warm acknowledgments: "Understood", "Good", "Thank you for the information"
+  - Polite phrasing: "Please check..." instead of "Check..."
+  - Encouraging feedback: "Great, let's continue", "That helps narrow it down"
+
+#### Detailed Diagnostic Questions
+- **Enhancement**: Agent asks more thorough, specific questions
+- **Changes to MODE_PROMPT_DIAGNOSTIC.txt**:
+  - Ask about MEASUREMENTS: "What voltage reading do you see?"
+  - Ask about VISUAL OBSERVATIONS: "Any signs of corrosion, burn marks?"
+  - Ask about SOUNDS/SMELLS: "Do you hear any clicking? Any burning smell?"
+  - FOLLOW-UP questions based on answers
+- **Expanded diagnostic sequences**:
+  - Air Conditioner: 10 questions (was 5)
+  - Furnace: 10 questions (was 5)
+  - Refrigerator: 10 questions (NEW)
+  - Inverter/Converter: 10 questions (NEW)
+  - Slide-out: 8 questions (was 5)
+  - Leveling: 10 questions (was 5)
+- **Stricter transition rules**: Must ask 5-6+ questions for complex systems
+
+#### Detailed Work Lists in Final Report
+- **Enhancement**: Portal-Cause reports now include comprehensive work breakdown
+- **Changes to MODE_PROMPT_FINAL_REPORT.txt**:
+  - Step-by-step repair procedure
+  - Complete parts list with consumables
+  - Labor breakdown by task with individual time estimates
+  - Total labor hours
+
+#### Complex Equipment Unit Replacement Rule (RV Industry)
+- **Problem**: Agent was recommending individual component replacement (e.g., "compressor replacement")
+- **Fix**: In RV industry, complex equipment is ALWAYS replaced as complete units
+- **Added to SYSTEM_PROMPT_BASE.txt**:
+  ```
+  COMPLEX EQUIPMENT CLASSIFICATION (CRITICAL - RV INDUSTRY RULE):
+  - Roof AC / Air conditioners / Heat pumps → Replace ENTIRE AC UNIT
+  - Furnaces → Replace ENTIRE FURNACE UNIT
+  - Refrigerators → Replace ENTIRE REFRIGERATOR UNIT
+  - Inverters / Converters → Replace ENTIRE UNIT
+  - NEVER recommend replacing individual internal components
+  ```
+- **Added to MODE_PROMPT_FINAL_REPORT.txt**:
+  - Clear rule stating complex equipment = unit replacement
+  - Example showing AC unit replacement (2.8 hr labor)
+  - Example showing water pump replacement (1.0 hr labor - simple item)
 
 ## Prioritized Backlog
 
@@ -193,19 +331,21 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - ✅ Member invitation emails (transactional, MVP)
 
 ### P1 (Important) - Remaining
-- [ ] Seat increase/decrease via Stripe portal integration
+- [ ] Configure production Resend API key for pilot environment
+- [ ] Add CSV export feature for member activity data
+- [ ] Add date range filters to member activity dashboard
 
 ### P2 (Nice to Have)
+- [ ] Real-time UI updates (replace manual "Refresh" with Firestore onSnapshot/WebSockets)
 - [ ] Multi-org support (user in multiple orgs)
 - [ ] Organization settings page
 - [ ] Usage analytics per org
 
 ## Next Tasks
-1. Set up real Firebase project and Stripe account for production
-2. Create Stripe Product with seat-based Price
-3. Configure Stripe webhook endpoint
-4. Test full signup → org creation → subscription → access flow
-5. Consider adding email invitations for better UX
+1. Configure production Resend API key for pilot environment
+2. Add CSV export for member activity data
+3. Add date range filters to activity dashboard
+4. Test full diagnostic flows with various RV systems
 
 ## Environment Variables
 See `.env.example` for required configuration:

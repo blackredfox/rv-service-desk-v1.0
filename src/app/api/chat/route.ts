@@ -1,25 +1,54 @@
-import { SYSTEM_PROMPT_FINAL, buildSystemPrompt, type DiagnosticState } from "../../../../prompts/system-prompt-final";
-import { normalizeLanguageMode, type LanguageMode, type Language } from "@/lib/lang";
+import { 
+  normalizeLanguageMode, 
+  detectInputLanguageV2, 
+  computeOutputPolicy,
+  type LanguageMode, 
+  type Language,
+  type InputLanguageV2,
+  type OutputLanguagePolicyV2,
+} from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
-import { validateResponse, logValidationViolations } from "@/lib/output-validator";
+import { 
+  composePromptV2, 
+  detectModeCommand,
+  detectTransitionSignal,
+  buildMessagesWithMemory,
+  type CaseMode,
+  DEFAULT_MEMORY_WINDOW,
+} from "@/lib/prompt-composer";
+import {
+  validateOutput,
+  getSafeFallback,
+  buildCorrectionInstruction,
+  logValidation,
+} from "@/lib/mode-validators";
 
 export const runtime = "nodejs";
 
 type Attachment = {
   type: "image";
-  dataUrl: string; // base64 data URL, e.g., "data:image/jpeg;base64,..."
+  dataUrl: string;
 };
 
-type ChatBody = {
+/**
+ * Payload v2 request body
+ */
+type ChatBodyV2 = {
+  v?: 2;
   caseId?: string;
   message: string;
+  
+  // V2: output policy (selector value)
+  output?: {
+    mode?: LanguageMode;
+  };
+  
+  // Legacy v1 fields (backward compatibility)
   languageMode?: LanguageMode;
-  attachments?: Attachment[];
-  /** Explicit dialogue language (required for API contract) */
   dialogueLanguage?: Language;
-  /** Explicit current state (required for API contract) */
-  currentState?: DiagnosticState;
+  
+  attachments?: Attachment[];
 };
 
 function sseEncode(data: unknown) {
@@ -30,32 +59,12 @@ type OpenAiMessageContent =
   | string
   | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
-/**
- * Infer diagnostic state from conversation history
- * - If assistant last message contains "--- TRANSLATION ---", we're in CAUSE_OUTPUT
- * - Otherwise, we're in DIAGNOSTICS
- */
-function inferStateFromHistory(history: { role: "user" | "assistant"; content: string }[]): DiagnosticState {
-  // Find the last assistant message
-  for (let i = history.length - 1; i >= 0; i--) {
-    if (history[i].role === "assistant") {
-      const content = history[i].content;
-      // If last assistant message has translation separator, likely in CAUSE_OUTPUT
-      if (content.includes("--- TRANSLATION ---")) {
-        return "CAUSE_OUTPUT";
-      }
-      break;
-    }
-  }
-  // Default to DIAGNOSTICS
-  return "DIAGNOSTICS";
-}
-
 function buildOpenAiMessages(args: {
   system: string;
   history: { role: "user" | "assistant"; content: string }[];
   userMessage: string;
   attachments?: Attachment[];
+  correctionInstruction?: string;
 }): Array<{ role: string; content: OpenAiMessageContent }> {
   const messages: Array<{ role: string; content: OpenAiMessageContent }> = [
     { role: "system", content: args.system },
@@ -82,7 +91,61 @@ function buildOpenAiMessages(args: {
     messages.push({ role: "user", content: args.userMessage });
   }
 
+  // Add correction instruction if retrying
+  if (args.correctionInstruction) {
+    messages.push({ role: "user", content: args.correctionInstruction });
+  }
+
   return messages;
+}
+
+/**
+ * Call OpenAI (non-streaming) and return the response
+ */
+async function callOpenAI(
+  apiKey: string,
+  body: object,
+  signal: AbortSignal
+): Promise<{ response: string; error?: string }> {
+  try {
+    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => "");
+      return { response: "", error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500) };
+    }
+
+    // Non-streaming: read the full JSON response
+    const json = await upstream.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string };
+    };
+
+    // Check for API error in response
+    if (json.error) {
+      return { response: "", error: `OpenAI error: ${json.error.message || "Unknown"}` };
+    }
+
+    // Extract content from chat completions format
+    const content = json.choices?.[0]?.message?.content ?? "";
+    
+    if (!content) {
+      console.warn("[Chat API] Empty content from OpenAI response:", JSON.stringify(json).slice(0, 500));
+    }
+
+    return { response: content };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return { response: "", error: msg };
+  }
 }
 
 export async function POST(req: Request) {
@@ -94,10 +157,9 @@ export async function POST(req: Request) {
     );
   }
 
-  // Get current user (optional for backward compatibility)
   const user = await getCurrentUser();
 
-  const body = (await req.json().catch(() => null)) as ChatBody | null;
+  const body = (await req.json().catch(() => null)) as ChatBodyV2 | null;
   const message = (body?.message ?? "").trim();
   if (!message) {
     return new Response(
@@ -106,63 +168,67 @@ export async function POST(req: Request) {
     );
   }
 
-  const languageMode = normalizeLanguageMode(body?.languageMode);
-  const { language: effectiveLanguage, languageSource } = storage.inferLanguageForMessage(
-    message,
-    languageMode
+  // ========================================
+  // PAYLOAD V2: Language Detection & Policy
+  // ========================================
+  
+  // 1. ALWAYS detect input language from message text (source of truth)
+  const inputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
+  
+  // 2. Get output mode from request (v2 or legacy v1)
+  const outputMode: LanguageMode = normalizeLanguageMode(
+    body?.output?.mode ?? body?.languageMode
   );
+  
+  // 3. Compute effective output language
+  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, inputLanguage.detected);
+  
+  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}`);
 
-  // API Contract: Use explicit dialogueLanguage if provided, otherwise infer
-  const dialogueLanguage: Language = body?.dialogueLanguage || effectiveLanguage;
-
-  // Session-only attachments (images are used for this request only, not stored)
   const attachments = body?.attachments?.filter(
     (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
   );
 
-  // Ensure a case exists
+  // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
-    inputLanguage: dialogueLanguage,
-    languageSource,
+    inputLanguage: inputLanguage.detected,
+    languageSource: outputPolicy.strategy === "auto" ? "AUTO" : "MANUAL",
     userId: user?.id,
   });
 
-  // Load last 30 messages for context
-  const history = await storage.listMessagesForContext(ensuredCase.id, 30);
+  // Get current mode from case
+  let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
 
-  // API Contract: Use explicit currentState if provided, otherwise infer from history
-  const currentState: DiagnosticState = body?.currentState || inferStateFromHistory(history);
+  // Check for explicit mode transition commands
+  const commandMode = detectModeCommand(message);
+  if (commandMode && commandMode !== currentMode) {
+    console.log(`[Chat API v2] Mode transition: ${currentMode} → ${commandMode} (explicit command)`);
+    currentMode = commandMode;
+    await storage.updateCase(ensuredCase.id, { mode: currentMode });
+  }
 
-  console.log(`[Chat API] Request: caseId=${ensuredCase.id}, dialogueLanguage=${dialogueLanguage}, currentState=${currentState}`);
-
-  // Persist user message (without attachments - session only)
+  // Persist user message with detected language
   await storage.appendMessage({
     caseId: ensuredCase.id,
     role: "user",
     content: message,
-    language: dialogueLanguage,
+    language: inputLanguage.detected,
     userId: user?.id,
   });
 
-  // Build system prompt with explicit state and language context
-  const systemPrompt = buildSystemPrompt({
-    dialogueLanguage,
-    currentState,
-  });
+  // Load conversation history (memory window)
+  const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
-  const openAiBody = {
-    model: "gpt-4o-mini",
-    stream: true,
-    temperature: 0.2,
-    messages: buildOpenAiMessages({
-      system: systemPrompt,
-      history,
-      userMessage: message,
-      attachments,
-    }),
-  };
+  // Compose system prompt using v2 semantics:
+  // - inputDetected: what language user wrote in
+  // - outputEffective: what language assistant must respond in
+  const systemPrompt = composePromptV2({
+    mode: currentMode,
+    inputDetected: inputLanguage.detected,
+    outputEffective: outputPolicy.effective,
+  });
 
   const encoder = new TextEncoder();
   const ac = new AbortController();
@@ -174,124 +240,238 @@ export async function POST(req: Request) {
 
       const onAbort = () => {
         aborted = true;
-        try {
-          ac.abort();
-        } catch {
-          // ignore
-        }
+        try { ac.abort(); } catch { /* ignore */ }
       };
 
-      // Abort upstream request if client disconnects
       req.signal.addEventListener("abort", onAbort, { once: true });
 
       try {
+        // Emit case ID
         controller.enqueue(encoder.encode(sseEncode({ type: "case", caseId: ensuredCase.id })));
+        
+        // Emit v2 language event (new!)
+        controller.enqueue(encoder.encode(sseEncode({
+          type: "language",
+          inputDetected: inputLanguage.detected,
+          outputMode: outputPolicy.mode,
+          outputEffective: outputPolicy.effective,
+          detector: inputLanguage.source,
+          confidence: inputLanguage.confidence,
+        })));
+        
+        // Emit mode
+        controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
-        const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          signal: ac.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiBody),
-        });
+        // Build initial request
+        const openAiBody = {
+          model: "gpt-4o-mini",
+          stream: false,
+          temperature: 0.2,
+          messages: buildOpenAiMessages({
+            system: systemPrompt,
+            history,
+            userMessage: message,
+            attachments,
+          }),
+        };
 
-        if (!upstream.ok || !upstream.body) {
-          const text = await upstream.text().catch(() => "");
+        // First attempt
+        let result = await callOpenAI(apiKey, openAiBody, ac.signal);
+
+        if (result.error) {
           controller.enqueue(
-            encoder.encode(
-              sseEncode({
-                type: "error",
-                code: "UPSTREAM_ERROR",
-                message: `Upstream error (${upstream.status}) ${text}`.slice(0, 500),
-              })
-            )
+            encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.error }))
           );
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
 
-        const reader = upstream.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+        // Validate output
+        let validation = validateOutput(result.response, currentMode);
+        logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
-        while (true) {
-          if (aborted) break;
-          const { value, done } = await reader.read();
-          if (done) break;
+        // If validation fails, retry once with correction
+        if (!validation.valid && !aborted) {
+          console.log(`[Chat API v2] Validation failed, retrying with correction...`);
+          
+          const correctionInstruction = buildCorrectionInstruction(validation.violations);
+          
+          const retryBody = {
+            ...openAiBody,
+            messages: buildOpenAiMessages({
+              system: systemPrompt,
+              history,
+              userMessage: message,
+              attachments,
+              correctionInstruction,
+            }),
+          };
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+          result = await callOpenAI(apiKey, retryBody, ac.signal);
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const payload = trimmed.replace(/^data:\s*/, "");
-            if (payload === "[DONE]") {
-              break;
-            }
-
-            try {
-              const json = JSON.parse(payload) as unknown as {
-                choices?: { delta?: { content?: string } }[];
-              };
-              const token: string | undefined = json?.choices?.[0]?.delta?.content;
-              if (token) {
-                full += token;
-                controller.enqueue(encoder.encode(sseEncode({ type: "token", token })));
-              }
-            } catch {
-              // Ignore malformed lines
-            }
+          if (!result.error) {
+            validation = validateOutput(result.response, currentMode);
+            logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
-        }
 
-        // Validate the response (non-blocking)
-        if (full.trim()) {
-          const validation = validateResponse({
-            response: full,
-            currentState,
-            dialogueLanguage,
-          });
-
-          if (!validation.valid) {
-            logValidationViolations(validation.violations, {
-              caseId: ensuredCase.id,
-              state: currentState,
-              language: dialogueLanguage,
-            });
-
-            // Send validation info to client (for debugging, non-blocking)
+          // If still fails, use safe fallback with EFFECTIVE OUTPUT language
+          if (!validation.valid || result.error) {
+            console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
+            result.response = getSafeFallback(currentMode, outputPolicy.effective);
+            
             controller.enqueue(
-              encoder.encode(
-                sseEncode({
-                  type: "validation",
-                  valid: false,
-                  violations: validation.violations,
-                })
-              )
+              encoder.encode(sseEncode({ 
+                type: "validation_fallback", 
+                violations: validation.violations 
+              }))
             );
           }
         }
 
-        // Save assistant message (skip persistence if client aborted)
-        if (!aborted && full.trim()) {
-          await storage.appendMessage({
-            caseId: ensuredCase.id,
-            role: "assistant",
-            content: full,
-            language: dialogueLanguage,
-            userId: user?.id,
+        full = result.response;
+
+        // ========================================
+        // AUTOMATIC MODE TRANSITION
+        // ========================================
+        // Check if LLM signaled a transition (e.g., isolation complete)
+        const transitionResult = detectTransitionSignal(full);
+        
+        if (transitionResult && currentMode === "diagnostic" && !aborted) {
+          console.log(`[Chat API v2] Auto-transition detected: diagnostic → ${transitionResult.newMode}`);
+          
+          // Stream the transition message first
+          for (const char of transitionResult.cleanedResponse) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+          
+          // Save the transition message
+          if (transitionResult.cleanedResponse.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: transitionResult.cleanedResponse,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+          
+          // Update mode in database
+          currentMode = transitionResult.newMode;
+          await storage.updateCase(ensuredCase.id, { mode: currentMode });
+          
+          // Emit mode change event
+          controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
+          
+          // Add a visual separator
+          const separator = "\n\n";
+          for (const char of separator) {
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+          
+          // Now generate the final report with the new mode prompt
+          const finalReportPrompt = composePromptV2({
+            mode: currentMode,
+            inputDetected: inputLanguage.detected,
+            outputEffective: outputPolicy.effective,
           });
+          
+          // Get updated history (including the transition message)
+          const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+          
+          // Build a detailed context message that summarizes findings
+          // This helps the LLM generate a proper Portal-Cause report
+          const finalReportRequest = `Based on the completed diagnostic isolation in the conversation above, generate the Portal-Cause authorization text now.
+
+DIAGNOSTIC SUMMARY FROM CONVERSATION:
+- System: Water pump (or other system identified)
+- All diagnostic checks completed
+- Isolation is complete
+
+REQUIRED OUTPUT FORMAT:
+1. English paragraph describing: observed symptoms, diagnostic checks, verified condition, required repair
+2. Labor justification with hours (e.g., "Total labor 1.0 hr")
+3. Then "--- TRANSLATION ---"
+4. Complete translation of the above into ${inputLanguage.detected === "RU" ? "Russian" : inputLanguage.detected === "ES" ? "Spanish" : "the technician's language"}
+
+Generate the complete Portal-Cause report now.`;
+          
+          const finalReportBody = {
+            model: "gpt-4o-mini",
+            stream: false,
+            temperature: 0.2,
+            messages: buildOpenAiMessages({
+              system: finalReportPrompt,
+              history: updatedHistory,
+              userMessage: finalReportRequest,
+              attachments: undefined,
+            }),
+          };
+          
+          const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
+          
+          if (!finalResult.error && finalResult.response.trim()) {
+            // Validate the final report
+            const finalValidation = validateOutput(finalResult.response, currentMode);
+            logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
+            
+            let finalContent = finalResult.response;
+            
+            // If validation fails, use fallback
+            if (!finalValidation.valid) {
+              console.log(`[Chat API v2] Final report validation failed, using fallback`);
+              finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+            }
+            
+            // Stream the final report
+            for (const char of finalContent) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            // Save the final report
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: finalContent,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+            
+            full = transitionResult.cleanedResponse + separator + finalContent;
+          } else if (finalResult.error) {
+            console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
+          }
+        } else {
+          // No transition - stream the response normally
+          for (const char of full) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+
+          // Send validation info
+          if (!validation.valid) {
+            controller.enqueue(
+              encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
+            );
+          }
+
+          // Save assistant message with effective output language
+          if (!aborted && full.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: full,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
         }
 
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } catch (e: unknown) {
-        // If the client disconnected, just stop.
         if (aborted) {
           controller.close();
           return;
@@ -299,9 +479,7 @@ export async function POST(req: Request) {
 
         const msg = e instanceof Error ? e.message : "Unknown error";
         controller.enqueue(
-          encoder.encode(
-            sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) })
-          )
+          encoder.encode(sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) }))
         );
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
@@ -310,12 +488,7 @@ export async function POST(req: Request) {
       }
     },
     cancel() {
-      // Called if the consumer cancels the stream
-      try {
-        ac.abort();
-      } catch {
-        // ignore
-      }
+      try { ac.abort(); } catch { /* ignore */ }
     },
   });
 

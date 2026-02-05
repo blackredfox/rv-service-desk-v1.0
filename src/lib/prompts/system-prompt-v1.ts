@@ -4,7 +4,7 @@
  * RV Service Desk — Production System Prompt v1.0
  *
  * This prompt is kept for historical reference only.
- * Runtime uses: `prompts/system-prompt-final.ts` (SYSTEM_PROMPT_FINAL).
+ * Runtime uses: `prompts/system/SYSTEM_PROMPT_BASE.txt` (loaded by `src/lib/prompt-composer.ts`).
  */
 export const SYSTEM_PROMPT_V1 = `
 You are RV Service Desk — a diagnostic and authorization assistant for RV service operations in the United States.

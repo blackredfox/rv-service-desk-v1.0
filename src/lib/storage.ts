@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 import { trackEvent } from "@/lib/analytics";
+import type { CaseMode } from "./prompt-composer";
 
 
 // Local structural helpers to avoid depending on generated Prisma types.
@@ -13,6 +14,7 @@ export type CaseSummary = {
   userId?: string | null;
   inputLanguage: Language;
   languageSource: "AUTO" | "MANUAL";
+  mode: CaseMode;
   createdAt: string;
   updatedAt: string;
 };
@@ -40,6 +42,7 @@ type UpdateCaseInput = {
   title?: string;
   inputLanguage?: Language;
   languageSource?: "AUTO" | "MANUAL";
+  mode?: CaseMode;
 };
 
 function nowIso() {
@@ -96,6 +99,7 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     title: clampTitle(input.title ?? "New Case"),
     inputLanguage: "EN" as Language,
     languageSource: "AUTO" as const,
+    mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
     deletedAt: null,
@@ -127,6 +131,7 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
     title: input.title ? clampTitle(input.title) : c.title,
     inputLanguage: input.inputLanguage ?? c.inputLanguage,
     languageSource: input.languageSource ?? c.languageSource,
+    mode: input.mode ?? c.mode,
     updatedAt: nowIso(),
   };
   store.cases.set(caseId, updated);
@@ -218,6 +223,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     title: clampTitleSeed(input.titleSeed),
     inputLanguage: input.inputLanguage,
     languageSource: input.languageSource,
+    mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
     deletedAt: null,
@@ -252,6 +258,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       userId: true,
       inputLanguage: true,
       languageSource: true,
+      mode: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -277,6 +284,7 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
       userId: true,
       inputLanguage: true,
       languageSource: true,
+      mode: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -309,6 +317,7 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       userId: true,
       inputLanguage: true,
       languageSource: true,
+      mode: true,
       createdAt: true,
       updatedAt: true,
       messages: {
@@ -333,7 +342,8 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       title: c.title,
       userId: c.userId,
       inputLanguage: c.inputLanguage as Language,
-      languageSource: c.languageSource as "AUTO" | "MANUAL", 
+      languageSource: c.languageSource as "AUTO" | "MANUAL",
+      mode: c.mode as CaseMode,
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     },
@@ -376,6 +386,7 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
         userId: true,
         inputLanguage: true,
         languageSource: true,
+      mode: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -433,6 +444,7 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
       userId: true,
       inputLanguage: true,
       languageSource: true,
+      mode: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -516,6 +528,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
           title: true,
           userId: true,
           inputLanguage: true,
+      mode: true,
           languageSource: true,
           createdAt: true,
           updatedAt: true,
@@ -543,6 +556,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
       userId: true,
       inputLanguage: true,
       languageSource: true,
+      mode: true,
       createdAt: true,
       updatedAt: true,
     },

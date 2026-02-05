@@ -17,6 +17,12 @@ enum LanguageSource {
   MANUAL
 }
 
+enum CaseMode {
+  diagnostic
+  authorization
+  final_report
+}
+
 enum MessageRole {
   system
   user
@@ -92,6 +98,7 @@ model Case {
   userId    String
   title     String
   language  Language
+  mode      CaseMode  @default(diagnostic)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
