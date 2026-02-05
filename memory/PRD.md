@@ -254,6 +254,68 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - `tests/mode-validators.test.ts` - 29 tests for mode validation, prohibited words, and localized fallbacks
 - `tests/input-language-lock.test.ts` - 19 tests for language lock and directive
 - `tests/payload-v2.test.ts` - 19 tests for v2 detection/policy separation
+- `tests/guided-diagnostics.test.ts` - 23 tests for automatic mode transitions
+
+### Agent Communication Improvements (Feb 4, 2026)
+
+#### Automatic Mode Transition
+- **Problem**: Agent required explicit "START FINAL REPORT" command to transition
+- **Fix**: Implemented automatic transition when diagnostic isolation is complete
+- **Implementation**:
+  - Added `[TRANSITION: FINAL_REPORT]` signal marker to diagnostic prompt
+  - `detectTransitionSignal()` in `prompt-composer.ts` detects the signal
+  - Chat API detects transition, updates case mode, makes second LLM call for final report
+  - Streams both transition message and Portal-Cause report seamlessly
+- **Tests**: 6 new tests in `guided-diagnostics.test.ts`
+
+#### Friendly & Professional Communication
+- **Enhancement**: Agent now communicates in a warmer, more collaborative tone
+- **Changes to SYSTEM_PROMPT_BASE.txt**:
+  - Added "COMMUNICATION STYLE" section
+  - Warm acknowledgments: "Understood", "Good", "Thank you for the information"
+  - Polite phrasing: "Please check..." instead of "Check..."
+  - Encouraging feedback: "Great, let's continue", "That helps narrow it down"
+
+#### Detailed Diagnostic Questions
+- **Enhancement**: Agent asks more thorough, specific questions
+- **Changes to MODE_PROMPT_DIAGNOSTIC.txt**:
+  - Ask about MEASUREMENTS: "What voltage reading do you see?"
+  - Ask about VISUAL OBSERVATIONS: "Any signs of corrosion, burn marks?"
+  - Ask about SOUNDS/SMELLS: "Do you hear any clicking? Any burning smell?"
+  - FOLLOW-UP questions based on answers
+- **Expanded diagnostic sequences**:
+  - Air Conditioner: 10 questions (was 5)
+  - Furnace: 10 questions (was 5)
+  - Refrigerator: 10 questions (NEW)
+  - Inverter/Converter: 10 questions (NEW)
+  - Slide-out: 8 questions (was 5)
+  - Leveling: 10 questions (was 5)
+- **Stricter transition rules**: Must ask 5-6+ questions for complex systems
+
+#### Detailed Work Lists in Final Report
+- **Enhancement**: Portal-Cause reports now include comprehensive work breakdown
+- **Changes to MODE_PROMPT_FINAL_REPORT.txt**:
+  - Step-by-step repair procedure
+  - Complete parts list with consumables
+  - Labor breakdown by task with individual time estimates
+  - Total labor hours
+
+#### Complex Equipment Unit Replacement Rule (RV Industry)
+- **Problem**: Agent was recommending individual component replacement (e.g., "compressor replacement")
+- **Fix**: In RV industry, complex equipment is ALWAYS replaced as complete units
+- **Added to SYSTEM_PROMPT_BASE.txt**:
+  ```
+  COMPLEX EQUIPMENT CLASSIFICATION (CRITICAL - RV INDUSTRY RULE):
+  - Roof AC / Air conditioners / Heat pumps → Replace ENTIRE AC UNIT
+  - Furnaces → Replace ENTIRE FURNACE UNIT
+  - Refrigerators → Replace ENTIRE REFRIGERATOR UNIT
+  - Inverters / Converters → Replace ENTIRE UNIT
+  - NEVER recommend replacing individual internal components
+  ```
+- **Added to MODE_PROMPT_FINAL_REPORT.txt**:
+  - Clear rule stating complex equipment = unit replacement
+  - Example showing AC unit replacement (2.8 hr labor)
+  - Example showing water pump replacement (1.0 hr labor - simple item)
 
 ## Prioritized Backlog
 
