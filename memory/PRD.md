@@ -331,19 +331,21 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - ✅ Member invitation emails (transactional, MVP)
 
 ### P1 (Important) - Remaining
-- [ ] Seat increase/decrease via Stripe portal integration
+- [ ] Configure production Resend API key for pilot environment
+- [ ] Add CSV export feature for member activity data
+- [ ] Add date range filters to member activity dashboard
 
 ### P2 (Nice to Have)
+- [ ] Real-time UI updates (replace manual "Refresh" with Firestore onSnapshot/WebSockets)
 - [ ] Multi-org support (user in multiple orgs)
 - [ ] Organization settings page
 - [ ] Usage analytics per org
 
 ## Next Tasks
-1. Set up real Firebase project and Stripe account for production
-2. Create Stripe Product with seat-based Price
-3. Configure Stripe webhook endpoint
-4. Test full signup → org creation → subscription → access flow
-5. Consider adding email invitations for better UX
+1. Configure production Resend API key for pilot environment
+2. Add CSV export for member activity data
+3. Add date range filters to activity dashboard
+4. Test full diagnostic flows with various RV systems
 
 ## Environment Variables
 See `.env.example` for required configuration:
