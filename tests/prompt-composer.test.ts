@@ -32,7 +32,7 @@ describe("Prompt Files", () => {
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("DIAGNOSTIC MODE");
     expect(content).toContain("COMPLEX SYSTEMS");
-    expect(content).toContain("ONE question at a time");
+    expect(content).toContain("ONE detailed question at a time");
     expect(content).toContain("POST-REPAIR RULE");
     expect(content).toContain("MECHANICAL SYSTEM RULE");
     expect(content).toContain("CONSUMER APPLIANCE RULE");
