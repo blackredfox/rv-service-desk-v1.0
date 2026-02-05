@@ -61,15 +61,33 @@ WORDING RULES:
 - NEVER use: broken, failed, defective, bad, damaged, worn, misadjusted, leaking
 - Instead use: "not operating per spec", "requires replacement", "condition not recoverable"
 
-EXAMPLE OUTPUT:
+EXAMPLE OUTPUT FOR COMPLEX EQUIPMENT (AC UNIT):
+
+Customer reports air conditioning system not cooling. Upon inspection, indoor blower operates, outdoor condenser fan spins freely, thermostat is set correctly to cooling mode. Compressor does not start despite proper voltage present at terminals.
+
+Diagnostic checks performed: Verified indoor blower operation. Verified outdoor condenser fan operation. Confirmed thermostat settings correct. Inspected capacitor - no visible damage. Measured voltage at compressor terminals - 235V AC present. Verified contactor engages without visible damage. Checked air filters - clean and unobstructed. All necessary conditions for operation verified, compressor remains non-responsive.
+
+Roof AC unit is not operating per specification. Unit receives proper voltage and control signals but compressor does not respond under load. Condition is not recoverable at unit level. Roof AC unit requires replacement.
+
+Required repair procedure: Disconnect shore power and battery to isolate electrical system. Remove interior AC shroud and ceiling assembly trim. Disconnect thermostat wiring and control connections. Access roof and remove exterior shroud. Remove unit mounting hardware and sealant. Lift and remove AC unit from roof opening. Clean roof opening and inspect for damage. Apply new sealant to mounting gasket. Position new AC unit on roof opening. Secure with mounting hardware. Reconnect control wiring and thermostat connections. Reinstall interior ceiling assembly and shroud. Restore power connections. Test system for proper cooling operation.
+
+Parts required: Roof AC unit assembly, roof mounting gasket, sealant, mounting hardware kit.
+
+Labor breakdown: System isolation and interior disassembly - 0.5 hr. Roof access and exterior shroud removal - 0.3 hr. AC unit removal - 0.5 hr. Roof preparation and new unit installation - 0.7 hr. Wiring reconnection and interior reassembly - 0.5 hr. System testing - 0.3 hr. Total labor: 2.8 hr.
+
+--- TRANSLATION ---
+
+[Full translation in technician's language]
+
+EXAMPLE OUTPUT FOR NON-COMPLEX EQUIPMENT (WATER PUMP):
 
 Customer reports water pump not providing water flow to fixtures. Upon inspection, pump does not respond when faucets are opened. No operational noise or vibration detected from the pump unit.
 
 Diagnostic checks performed: Verified 12V DC present at pump motor terminals under demand. Measured 12.4V at positive terminal with faucet open. Ground continuity confirmed between pump housing and chassis ground point. Resistance measured less than 0.5 ohms. Visual inspection revealed no corrosion or damage to wiring connections.
 
-Water pump motor is not operating per specification. Unit receives proper voltage and has verified ground path but produces no response under load. Condition is not recoverable at unit level. Pump motor requires replacement.
+Water pump is not operating per specification. Unit receives proper voltage and has verified ground path but produces no response under load. Condition is not recoverable at unit level. Water pump requires replacement.
 
-Required repair procedure: Disconnect battery to isolate electrical system. Drain fresh water system through low-point drains. Disconnect inlet and outlet water lines from pump. Disconnect electrical connector from pump motor. Remove pump mounting hardware and extract pump from compartment. Install new pump in mounting location and secure with hardware. Reconnect inlet and outlet water lines with new clamps. Reconnect electrical connector. Restore battery connection. Fill fresh water system and prime pump. Verify operation at all fixtures and inspect for leaks.
+Required repair procedure: Disconnect battery to isolate electrical system. Drain fresh water system through low-point drains. Disconnect inlet and outlet water lines from pump. Disconnect electrical connector from pump. Remove pump mounting hardware and extract pump from compartment. Install new pump in mounting location and secure with hardware. Reconnect inlet and outlet water lines with new clamps. Reconnect electrical connector. Restore battery connection. Fill fresh water system and prime pump. Verify operation at all fixtures and inspect for leaks.
 
 Parts required: Water pump assembly, inlet hose clamp, outlet hose clamp, thread sealant tape.
 
