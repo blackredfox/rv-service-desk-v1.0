@@ -110,7 +110,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should enforce ONE question rule", () => {
-      expect(MODE_DIAGNOSTIC).toContain("ONE question at a time");
+      expect(MODE_DIAGNOSTIC).toContain("ONE detailed question at a time");
     });
 
     it("should prohibit authorization in diagnostic mode", () => {
@@ -144,10 +144,10 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
     it("should specify output format and paragraphs", () => {
       expect(MODE_FINAL_REPORT).toContain("OUTPUT FORMAT");
-      expect(MODE_FINAL_REPORT).toContain("Observed symptoms");
-      expect(MODE_FINAL_REPORT).toContain("Diagnostic checks");
-      expect(MODE_FINAL_REPORT).toContain("Verified condition");
-      expect(MODE_FINAL_REPORT).toContain("Required repair or replacement");
+      expect(MODE_FINAL_REPORT).toContain("OBSERVED SYMPTOMS");
+      expect(MODE_FINAL_REPORT).toContain("DIAGNOSTIC CHECKS");
+      expect(MODE_FINAL_REPORT).toContain("VERIFIED CONDITION");
+      expect(MODE_FINAL_REPORT).toContain("REQUIRED REPAIR");
       expect(MODE_FINAL_REPORT).toContain("Labor");
     });
 
