@@ -9,11 +9,34 @@ Look at the conversation history above - all diagnostic information is there.
 OUTPUT FORMAT (MANDATORY):
 
 ENGLISH SECTION (plain paragraphs, no headers, no numbers):
-- Paragraph 1: Observed symptoms and initial complaint
-- Paragraph 2: Diagnostic checks performed and findings
-- Paragraph 3: Verified condition and isolation result
-- Paragraph 4: Required repair or replacement action
-- Paragraph 5: Labor justification with hours breakdown and total (e.g., "Labor includes X, Y, Z. Total labor 1.0 hr.")
+
+Paragraph 1 - OBSERVED SYMPTOMS:
+- Describe the initial complaint and observed symptoms
+- Be specific about what was reported and verified
+
+Paragraph 2 - DIAGNOSTIC CHECKS PERFORMED:
+- List all diagnostic steps performed
+- Include specific measurements and observations
+- Mention what was verified and ruled out
+
+Paragraph 3 - VERIFIED CONDITION:
+- State the isolated root cause
+- Use neutral technical language (not operating per spec, requires replacement, etc.)
+- Be specific about which component is affected
+
+Paragraph 4 - REQUIRED REPAIR (DETAILED WORK LIST):
+- Provide step-by-step repair procedure
+- Include all necessary actions in logical order
+- Be thorough and specific
+
+Paragraph 5 - PARTS REQUIRED:
+- List all parts needed for the repair
+- Include any fittings, clamps, sealants, or consumables
+
+Paragraph 6 - LABOR JUSTIFICATION (DETAILED BREAKDOWN):
+- Break down labor by specific task
+- Include time estimate for each task
+- State total labor hours at the end
 
 Then output exactly:
 --- TRANSLATION ---
@@ -27,11 +50,18 @@ WORDING RULES:
 - Instead use: "not operating per spec", "requires replacement", "condition not recoverable"
 
 EXAMPLE OUTPUT:
-Water pump receives 12V power under demand. Ground circuit is verified. Pump does not respond under load and produces no operational noise. Electrical supply and control are present. Condition is not recoverable at unit level. Pump is not operating per spec and requires replacement.
 
-Remove and replace water pump. Transfer fittings as required. Restore plumbing connections. Prime system and verify normal operation.
+Customer reports water pump not providing water flow to fixtures. Upon inspection, pump does not respond when faucets are opened. No operational noise or vibration detected from the pump unit.
 
-Labor includes pump removal, installation, plumbing reconnection, system priming, and functional test. Total labor 1.0 hr.
+Diagnostic checks performed: Verified 12V DC present at pump motor terminals under demand. Measured 12.4V at positive terminal with faucet open. Ground continuity confirmed between pump housing and chassis ground point. Resistance measured less than 0.5 ohms. Visual inspection revealed no corrosion or damage to wiring connections.
+
+Water pump motor is not operating per specification. Unit receives proper voltage and has verified ground path but produces no response under load. Condition is not recoverable at unit level. Pump motor requires replacement.
+
+Required repair procedure: Disconnect battery to isolate electrical system. Drain fresh water system through low-point drains. Disconnect inlet and outlet water lines from pump. Disconnect electrical connector from pump motor. Remove pump mounting hardware and extract pump from compartment. Install new pump in mounting location and secure with hardware. Reconnect inlet and outlet water lines with new clamps. Reconnect electrical connector. Restore battery connection. Fill fresh water system and prime pump. Verify operation at all fixtures and inspect for leaks.
+
+Parts required: Water pump assembly, inlet hose clamp, outlet hose clamp, thread sealant tape.
+
+Labor breakdown: System isolation and drainage - 0.2 hr. Pump removal including line disconnection - 0.3 hr. New pump installation and line reconnection - 0.3 hr. System fill, priming, and leak testing - 0.2 hr. Total labor: 1.0 hr.
 
 --- TRANSLATION ---
 
