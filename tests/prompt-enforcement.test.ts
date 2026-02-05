@@ -46,7 +46,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       });
 
       expect(prompt).toContain("DIAGNOSTIC MODE");
-      expect(prompt).toContain("ONE question at a time");
+      expect(prompt).toContain("ONE detailed question at a time");
       expect(prompt).toContain("All dialogue MUST be in Spanish");
     });
 
@@ -60,7 +60,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
       expect(prompt).toContain("FINAL REPORT MODE");
       expect(prompt).toContain("--- TRANSLATION ---");
-      expect(prompt).toContain("Labor justification");
+      expect(prompt).toContain("LABOR JUSTIFICATION");
       expect(prompt).toContain("translate the full output into Russian");
     });
   });
