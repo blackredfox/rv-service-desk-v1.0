@@ -302,6 +302,8 @@ export function validateOutput(text: string, mode: CaseMode, includeTranslation?
       return validateAuthorizationOutput(text);
     case "final_report":
       return validateFinalReportOutput(text, includeTranslation);
+    case "labor_confirmation":
+      return validateLaborConfirmationOutput(text);
     default:
       return validateDiagnosticOutput(text);
   }
