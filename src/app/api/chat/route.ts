@@ -419,8 +419,8 @@ export async function POST(req: Request) {
           return;
         }
 
-        // Validate output
-        let validation = validateOutput(result.response, currentMode);
+        // Validate output (pass language policy for translation enforcement)
+        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
         // If validation fails, retry once with correction
