@@ -581,6 +581,136 @@ export async function POST(req: Request) {
             setLaborEstimate(ensuredCase.id, 1.0);
             full = transitionResult.cleanedResponse + separator + fallback;
           }
+        } else if (currentMode === "labor_confirmation" && !aborted) {
+          // ========================================
+          // LABOR CONFIRMATION → FINAL REPORT
+          // ========================================
+          // Parse technician's response for labor confirmation/override
+          const laborEntry = getLaborEntry(ensuredCase.id);
+          const confirmedHours = parseLaborConfirmation(message, laborEntry?.estimatedHours);
+          
+          if (confirmedHours) {
+            confirmLabor(ensuredCase.id, confirmedHours);
+            console.log(`[Chat API v2] Labor confirmed: ${confirmedHours} hr (estimate was ${laborEntry?.estimatedHours ?? "unknown"})`);
+            
+            // Transition to final_report
+            currentMode = "final_report";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+            
+            // Generate final report with confirmed labor as a hard constraint
+            const finalReportPrompt = composePromptV2({
+              mode: currentMode,
+              inputDetected: inputLanguage.detected,
+              outputEffective: outputPolicy.effective,
+              includeTranslation: langPolicy.includeTranslation,
+              translationLanguage: langPolicy.translationLanguage,
+              additionalConstraints: `LABOR BUDGET CONSTRAINT (MANDATORY - DO NOT VIOLATE):
+The technician has confirmed a total labor budget of exactly ${confirmedHours} hours.
+Your labor breakdown MUST sum to exactly ${confirmedHours} hours.
+Do NOT exceed or reduce this total under any circumstances.
+Distribute the ${confirmedHours} hours across the repair steps.
+State "Total labor: ${confirmedHours} hr" at the end of the labor section.`,
+            });
+            
+            const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+            
+            const translationInstruction = langPolicy.includeTranslation && langPolicy.translationLanguage
+              ? `\n4. Then "--- TRANSLATION ---"\n5. Complete translation of the above into ${langPolicy.translationLanguage === "RU" ? "Russian" : langPolicy.translationLanguage === "ES" ? "Spanish" : langPolicy.translationLanguage}`
+              : "";
+
+            const finalReportRequest = `The technician has confirmed a total labor budget of ${confirmedHours} hours. Generate the Portal-Cause authorization text now.
+
+REQUIRED OUTPUT FORMAT:
+1. English paragraphs describing: observed symptoms, diagnostic checks, verified condition, required repair, parts required
+2. Labor breakdown by task (individual times MUST sum to exactly ${confirmedHours} hr)
+3. "Total labor: ${confirmedHours} hr"${translationInstruction}
+
+Generate the complete Portal-Cause report now.`;
+            
+            const finalReportBody = {
+              model: "gpt-4o-mini",
+              stream: false,
+              temperature: 0.2,
+              messages: buildOpenAiMessages({
+                system: finalReportPrompt,
+                history: updatedHistory,
+                userMessage: finalReportRequest,
+                attachments: undefined,
+              }),
+            };
+            
+            const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
+            
+            if (!finalResult.error && finalResult.response.trim()) {
+              const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation);
+              logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
+              
+              let finalContent = finalResult.response;
+              
+              // Output-layer enforcement: strip translation for EN mode
+              finalContent = enforceLanguagePolicy(finalContent, langPolicy);
+              
+              // Validate labor sum consistency
+              const laborValidation = validateLaborSum(finalContent, confirmedHours);
+              if (!laborValidation.valid) {
+                console.warn(`[Chat API v2] Labor sum validation failed:`, laborValidation.violations);
+                // Don't reject — the constraint was injected, just log the drift
+              }
+              
+              // If mode validation fails, try enforcement-based recovery
+              if (!finalValidation.valid) {
+                const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation);
+                if (!postEnforcementValidation.valid) {
+                  console.log(`[Chat API v2] Final report validation failed, using fallback`);
+                  finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+                }
+              }
+              
+              // Stream the final report
+              for (const char of finalContent) {
+                if (aborted) break;
+                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              }
+              
+              // Save the final report
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: finalContent,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+              
+              full = finalContent;
+            } else if (finalResult.error) {
+              console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
+              const fallback = getSafeFallback(currentMode, outputPolicy.effective);
+              for (const char of fallback) {
+                if (aborted) break;
+                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              }
+              full = fallback;
+            }
+          } else {
+            // Could not parse confirmation — ask again
+            full = enforceLanguagePolicy(full, langPolicy);
+            for (const char of full) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            if (!aborted && full.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: full,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+          }
         } else {
           // No transition - apply output-layer enforcement before streaming
           full = enforceLanguagePolicy(full, langPolicy);
