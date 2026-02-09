@@ -162,8 +162,8 @@ export function validateResponse(args: {
   }
   
   if (currentState === "CAUSE_OUTPUT") {
-    // Rule: Must have proper Cause format
-    const causeCheck = isCauseFormatCorrect(response);
+    // Rule: Must have proper Cause format (translation separator depends on policy)
+    const causeCheck = isCauseFormatCorrect(response, includeTranslation);
     if (!causeCheck.valid) {
       violations.push(...causeCheck.issues.map(i => `FORMAT_VIOLATION: ${i}`));
     }
