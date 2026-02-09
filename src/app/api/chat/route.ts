@@ -255,6 +255,29 @@ export async function POST(req: Request) {
   }
 
   // ========================================
+  // ATTACHMENT VALIDATION
+  // ========================================
+  const rawAttachments = body?.attachments?.filter(
+    (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
+  );
+  
+  const attachmentValidation = validateAttachments(rawAttachments);
+  if (!attachmentValidation.valid) {
+    return new Response(
+      JSON.stringify({ error: attachmentValidation.error }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  
+  const attachments = rawAttachments;
+  const attachmentCount = attachments?.length ?? 0;
+  
+  // Log attachment stats (never log raw data)
+  if (attachmentCount > 0) {
+    console.log(`[Chat API v2] Attachments: count=${attachmentCount}, totalBytes=${attachmentValidation.totalBytes}`);
+  }
+
+  // ========================================
   // PAYLOAD V2: Language Detection & Policy
   // ========================================
   
