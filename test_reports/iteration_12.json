@@ -1,0 +1,44 @@
+{
+  "summary": "Successfully tested bilingual output bug fix in RV Service Desk - all language policy features working correctly",
+  "backend_issues": {},
+  "frontend_issues": {},
+  "passed_tests": [
+    "resolveLanguagePolicy: EN mode returns includeTranslation=false",
+    "resolveLanguagePolicy: RU/ES mode returns includeTranslation=true with correct translationLanguage",
+    "resolveLanguagePolicy: AUTO+EN returns includeTranslation=false, AUTO+RU/ES returns includeTranslation=true",
+    "validateFinalReportOutput: EN mode (includeTranslation=false) PASSES for English-only report",
+    "validateFinalReportOutput: EN mode (includeTranslation=false) FAILS for bilingual report with --- TRANSLATION ---",
+    "validateFinalReportOutput: RU/ES mode (includeTranslation=true) PASSES for bilingual report",
+    "validateFinalReportOutput: RU/ES mode (includeTranslation=true) FAILS for English-only report",
+    "buildLanguageDirectiveV2: final_report + includeTranslation=false produces 'English only' directive",
+    "buildLanguageDirectiveV2: final_report + includeTranslation=true produces translation instructions",
+    "SYSTEM_PROMPT_BASE.txt does NOT contain hardcoded 'provide a full literal translation into the dialogue language'",
+    "MODE_PROMPT_FINAL_REPORT.txt references LANGUAGE DIRECTIVE for translation decision",
+    "All 353 existing vitest tests pass",
+    "Language policy end-to-end scenarios: EN mode → English-only pipeline",
+    "Language policy end-to-end scenarios: RU mode → bilingual pipeline",
+    "Language policy end-to-end scenarios: AUTO + EN input → English-only pipeline",
+    "Language policy end-to-end scenarios: AUTO + RU input → bilingual pipeline",
+    "Language policy end-to-end scenarios: ES mode → bilingual pipeline",
+    "Output-layer enforcement correctly strips translation block when includeTranslation=false",
+    "Output-layer enforcement preserves translation block when includeTranslation=true"
+  ],
+  "test_report_links": [
+    "/app/tests/language-policy.test.ts",
+    "/app/tests/payload-v2.test.ts", 
+    "/app/tests/mode-validators.test.ts",
+    "/app/tests/prompt-composer.test.ts",
+    "/app/tests/prompt-enforcement.test.ts"
+  ],
+  "action_item_for_main_agent": "",
+  "updated_files": [
+    "/app/language_policy_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100%",
+    "language_policy": "100%",
+    "unit_tests": "100%"
+  },
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}
