@@ -469,7 +469,6 @@ class RVServiceDeskAPITester:
         """Test Stripe webhook functionality through unit tests"""
         print(f"\n🔍 Testing Stripe Webhook Functionality...")
         try:
-            import subprocess
             # Run the billing portal upgrade tests
             result = subprocess.run(
                 ["yarn", "test", "tests/billing-portal-upgrades.test.ts"], 
