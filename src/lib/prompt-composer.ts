@@ -9,7 +9,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 // Case modes
-export type CaseMode = "diagnostic" | "authorization" | "final_report";
+export type CaseMode = "diagnostic" | "authorization" | "final_report" | "labor_confirmation";
 
 // Default memory window (last N messages to include)
 export const DEFAULT_MEMORY_WINDOW = 12;
@@ -51,6 +51,7 @@ function loadPrompts(): Record<string, string> {
     MODE_DIAGNOSTIC: readFileSync(join(promptsDir, "modes", "MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8"),
     MODE_AUTHORIZATION: readFileSync(join(promptsDir, "modes", "MODE_PROMPT_AUTHORIZATION.txt"), "utf-8"),
     MODE_FINAL_REPORT: readFileSync(join(promptsDir, "modes", "MODE_PROMPT_FINAL_REPORT.txt"), "utf-8"),
+    MODE_LABOR_CONFIRMATION: readFileSync(join(promptsDir, "modes", "MODE_PROMPT_LABOR_CONFIRMATION.txt"), "utf-8"),
   };
 
   return promptCache;
@@ -69,6 +70,8 @@ function getModePrompt(mode: CaseMode): string {
       return prompts.MODE_AUTHORIZATION;
     case "final_report":
       return prompts.MODE_FINAL_REPORT;
+    case "labor_confirmation":
+      return prompts.MODE_LABOR_CONFIRMATION;
     default:
       return prompts.MODE_DIAGNOSTIC;
   }
