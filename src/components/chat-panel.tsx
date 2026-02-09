@@ -382,35 +382,34 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
       <div className="border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
         <div className="mx-auto max-w-2xl">
-          {/* Photo preview row */}
-          {photoAttachment && (
+          {/* Photo preview grid */}
+          {photoAttachments.length > 0 && (
             <div className="mb-3">
-              <PhotoAttachButton
-                attachment={photoAttachment}
-                onAttach={setPhotoAttachment}
-                onRemove={() => setPhotoAttachment(null)}
+              <PhotoPreviewGrid
+                attachments={photoAttachments}
+                onRemove={(id) => setPhotoAttachments((prev) => prev.filter((a) => a.id !== id))}
                 disabled={loading || disabled}
-                caseId={caseId}
               />
             </div>
           )}
           
           <div className="flex items-end gap-3">
-            {/* Photo attach button (hidden when attachment exists) */}
-            {!photoAttachment && (
+            {/* Photo attach button */}
+            <div className="relative">
               <PhotoAttachButton
-                attachment={null}
-                onAttach={setPhotoAttachment}
-                onRemove={() => setPhotoAttachment(null)}
+                attachments={photoAttachments}
+                onAttach={(attachment) => setPhotoAttachments((prev) => [...prev, attachment])}
+                onRemove={(id) => setPhotoAttachments((prev) => prev.filter((a) => a.id !== id))}
                 disabled={loading || disabled}
                 caseId={caseId}
               />
-            )}
+            </div>
             
-            {/* Voice button */}
+            {/* Voice button with language support */}
             <VoiceButton
               onTranscript={handleVoiceTranscript}
               disabled={loading || disabled}
+              language={languageMode === "AUTO" ? "EN" : languageMode}
             />
             
             <textarea
