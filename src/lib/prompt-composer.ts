@@ -154,28 +154,41 @@ Do not use English unless the technician's language is English.`;
 /**
  * Build a HARD language directive for LLM (v2 - separate input/output)
  * 
+ * Translation behavior is driven by the LanguagePolicy (declarative),
+ * NOT by ad-hoc prompt logic. The policy's `includeTranslation` field
+ * determines whether a translation section appears.
+ *
  * @param inputDetected - The language the technician wrote in
  * @param outputEffective - The language the assistant must respond in
  * @param mode - Current case mode
+ * @param includeTranslation - Whether the output must include a translation block (from LanguagePolicy)
+ * @param translationLanguage - Target language for the translation block (from LanguagePolicy)
  */
 export function buildLanguageDirectiveV2(args: {
   inputDetected: string;
   outputEffective: string;
   mode: CaseMode;
+  includeTranslation?: boolean;
+  translationLanguage?: string;
 }): string {
-  const { inputDetected, outputEffective, mode } = args;
+  const { inputDetected, outputEffective, mode, includeTranslation, translationLanguage } = args;
   const inputLangName = LANGUAGE_NAMES[inputDetected] || inputDetected;
   const outputLangName = LANGUAGE_NAMES[outputEffective] || outputEffective;
 
   if (mode === "final_report") {
-    // Final report: English first, then translate to DETECTED input language
-    // (so technician reads translation in the language they wrote in)
-    return `LANGUAGE DIRECTIVE (MANDATORY):
+    if (includeTranslation && translationLanguage) {
+      const translationLangName = LANGUAGE_NAMES[translationLanguage] || translationLanguage;
+      return `LANGUAGE DIRECTIVE (MANDATORY):
 Technician input language: ${inputDetected} (${inputLangName}).
 Final output MUST be English first.
-Then output '--- TRANSLATION ---' and translate the full output into ${inputLangName} (${inputDetected}).
+Then output '--- TRANSLATION ---' and translate the full output into ${translationLangName} (${translationLanguage}).
 Do not mix languages inside the English block.
 The translation must be complete and literal.`;
+    }
+    // No translation section (EN mode or AUTO+EN detected)
+    return `LANGUAGE DIRECTIVE (MANDATORY):
+Technician input language: ${inputDetected} (${inputLangName}).
+Final output MUST be in English only.`;
   }
 
   // For diagnostic and authorization modes
