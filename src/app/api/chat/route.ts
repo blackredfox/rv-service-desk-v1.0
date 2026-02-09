@@ -548,16 +548,23 @@ Generate the complete Portal-Cause report now.`;
           const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
           
           if (!finalResult.error && finalResult.response.trim()) {
-            // Validate the final report
-            const finalValidation = validateOutput(finalResult.response, currentMode);
+            // Validate the final report (with language policy)
+            const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation);
             logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
             
             let finalContent = finalResult.response;
             
-            // If validation fails, use fallback
+            // Output-layer enforcement: strip translation for EN mode
+            finalContent = enforceLanguagePolicy(finalContent, langPolicy);
+            
+            // If validation fails after enforcement, use fallback
             if (!finalValidation.valid) {
-              console.log(`[Chat API v2] Final report validation failed, using fallback`);
-              finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+              // Re-validate after enforcement (translation-related violation may now be resolved)
+              const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation);
+              if (!postEnforcementValidation.valid) {
+                console.log(`[Chat API v2] Final report validation failed, using fallback`);
+                finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+              }
             }
             
             // Stream the final report
