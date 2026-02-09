@@ -11,7 +11,14 @@ import {
   type ChatSseEvent,
 } from "@/lib/api";
 import { VoiceButton } from "@/components/voice-button";
-import { PhotoAttachButton, type PhotoAttachment } from "@/components/photo-attach";
+import { 
+  PhotoAttachButton, 
+  PhotoPreviewGrid,
+  type PhotoAttachment,
+  MAX_IMAGES,
+  MAX_TOTAL_BYTES,
+  calculateTotalBytes,
+} from "@/components/photo-attach";
 import { analytics } from "@/lib/client-analytics";
 
 type Props = {
@@ -27,7 +34,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [photoAttachment, setPhotoAttachment] = useState<PhotoAttachment | null>(null);
+  const [photoAttachments, setPhotoAttachments] = useState<PhotoAttachment[]>([]);
   const [reportCopied, setReportCopied] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -125,6 +132,18 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const text = input.trim();
     if (!text) return;
 
+    // Validate attachments before sending
+    if (photoAttachments.length > MAX_IMAGES) {
+      setError(`Maximum ${MAX_IMAGES} photos allowed per message.`);
+      return;
+    }
+    
+    const totalBytes = calculateTotalBytes(photoAttachments);
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      setError(`Total attachment size exceeds 5MB limit. Please remove some photos.`);
+      return;
+    }
+
     setInput("");
     setError(null);
     setLoading(true);
@@ -133,9 +152,9 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const localId = `local_${Date.now()}`;
     const now = new Date().toISOString();
 
-    // Capture and clear attachment before sending
-    const currentAttachment = photoAttachment;
-    setPhotoAttachment(null);
+    // Capture and clear attachments before sending
+    const currentAttachments = [...photoAttachments];
+    setPhotoAttachments([]);
 
     setMessages((prev) => [
       ...prev,
@@ -158,7 +177,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     ]);
 
     try {
-      // Build request body with optional attachment
+      // Build request body with optional attachments
       const requestBody: {
         caseId?: string;
         message: string;
@@ -170,10 +189,11 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
         languageMode,
       };
 
-      if (currentAttachment) {
-        requestBody.attachments = [
-          { type: "image", dataUrl: currentAttachment.dataUrl },
-        ];
+      if (currentAttachments.length > 0) {
+        requestBody.attachments = currentAttachments.map((a) => ({
+          type: "image" as const,
+          dataUrl: a.dataUrl,
+        }));
       }
 
       const body = await apiChatStreamWithAttachments(requestBody);
@@ -362,35 +382,34 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
       <div className="border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
         <div className="mx-auto max-w-2xl">
-          {/* Photo preview row */}
-          {photoAttachment && (
+          {/* Photo preview grid */}
+          {photoAttachments.length > 0 && (
             <div className="mb-3">
-              <PhotoAttachButton
-                attachment={photoAttachment}
-                onAttach={setPhotoAttachment}
-                onRemove={() => setPhotoAttachment(null)}
+              <PhotoPreviewGrid
+                attachments={photoAttachments}
+                onRemove={(id) => setPhotoAttachments((prev) => prev.filter((a) => a.id !== id))}
                 disabled={loading || disabled}
-                caseId={caseId}
               />
             </div>
           )}
           
           <div className="flex items-end gap-3">
-            {/* Photo attach button (hidden when attachment exists) */}
-            {!photoAttachment && (
+            {/* Photo attach button */}
+            <div className="relative">
               <PhotoAttachButton
-                attachment={null}
-                onAttach={setPhotoAttachment}
-                onRemove={() => setPhotoAttachment(null)}
+                attachments={photoAttachments}
+                onAttach={(attachment) => setPhotoAttachments((prev) => [...prev, attachment])}
+                onRemove={(id) => setPhotoAttachments((prev) => prev.filter((a) => a.id !== id))}
                 disabled={loading || disabled}
                 caseId={caseId}
               />
-            )}
+            </div>
             
-            {/* Voice button */}
+            {/* Voice button with language support */}
             <VoiceButton
               onTranscript={handleVoiceTranscript}
               disabled={loading || disabled}
+              language={languageMode === "AUTO" ? "EN" : languageMode}
             />
             
             <textarea

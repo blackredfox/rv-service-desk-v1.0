@@ -317,6 +317,50 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
   - Example showing AC unit replacement (2.8 hr labor)
   - Example showing water pump replacement (1.0 hr labor - simple item)
 
+### Media Pipeline Upgrade (Feb 9, 2026)
+
+#### Multi-Photo Attachments (Frontend)
+- **Files Changed**: `src/components/photo-attach.tsx`, `src/components/chat-panel.tsx`
+- **Features**:
+  - Allow up to 10 images per message
+  - Preview grid with individual removal buttons
+  - Client-side image compression (MAX_DIM=1024, JPEG_QUALITY=0.75)
+  - Payload limits enforced: MAX_IMAGES=10, MAX_TOTAL_BYTES=5MB
+  - `multiple` file input for batch selection
+  - Progress indicators showing count and total size
+
+#### Vision Integration (Backend)
+- **Files Changed**: `src/app/api/chat/route.ts`
+- **Features**:
+  - Proper OpenAI vision input format (image_url content type)
+  - Vision enforcement instruction added when images attached
+  - Agent must describe what it ACTUALLY SEES (no hallucination)
+  - Agent requests clearer photo if image is unclear
+  - Validation: max 10 images, max 6MB total, image/* only
+  - Logging: counts and byte sizes only (never raw base64)
+
+#### Voice Dictation RU/ES (Frontend Quick Win)
+- **Files Changed**: `src/components/voice-button.tsx`
+- **Features**:
+  - `recognition.lang` respects UI language selection
+  - EN → en-US, RU → ru-RU, ES → es-ES
+  - AUTO defaults to en-US
+
+#### Speech-to-Text API (Proper Solution)
+- **New File**: `src/app/api/stt/transcribe/route.ts`
+- **Endpoint**: `POST /api/stt/transcribe`
+- **Request**: multipart/form-data with `audio` file and optional `languageHint`
+- **Response**: `{ text: string, detectedLanguage: "en"|"ru"|"es" }`
+- **Backend**: OpenAI Whisper (whisper-1 model)
+- **Limits**: 10MB max audio size
+- **Formats**: wav, mp3, m4a, webm, ogg, flac
+- **No Storage**: Audio is session-only, never persisted
+
+#### Tests Added
+- `tests/chat-attachments.test.ts` - 18 tests for multi-photo validation
+- `tests/stt-transcribe.test.ts` - 14 tests for STT endpoint
+- `tests/photo-attach.test.ts` - 15 tests for frontend attachment logic
+
 ## Prioritized Backlog
 
 ### P0 (Critical) - DONE
@@ -334,6 +378,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - [ ] Configure production Resend API key for pilot environment
 - [ ] Add CSV export feature for member activity data
 - [ ] Add date range filters to member activity dashboard
+- [ ] (Optional) Switch frontend voice to MediaRecorder + STT API for cross-browser consistency
 
 ### P2 (Nice to Have)
 - [ ] Real-time UI updates (replace manual "Refresh" with Firestore onSnapshot/WebSockets)
@@ -345,7 +390,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 1. Configure production Resend API key for pilot environment
 2. Add CSV export for member activity data
 3. Add date range filters to activity dashboard
-4. Test full diagnostic flows with various RV systems
+4. Test multi-photo + vision with real RV diagnostic images
 
 ## Environment Variables
 See `.env.example` for required configuration:

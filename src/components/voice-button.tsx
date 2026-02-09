@@ -3,10 +3,27 @@
 import { useState, useCallback, useRef } from "react";
 import { analytics } from "@/lib/client-analytics";
 
+type LanguageCode = "EN" | "RU" | "ES" | "AUTO";
+
 type Props = {
   onTranscript: (text: string) => void;
   disabled?: boolean;
+  language?: LanguageCode;
 };
+
+// Map UI language to Web Speech API language code
+function getRecognitionLang(language: LanguageCode): string {
+  switch (language) {
+    case "RU":
+      return "ru-RU";
+    case "ES":
+      return "es-ES";
+    case "EN":
+    case "AUTO":
+    default:
+      return "en-US";
+  }
+}
 
 // Web Speech API type declarations
 interface SpeechRecognitionEvent extends Event {
@@ -69,7 +86,7 @@ function getSpeechRecognitionClass(): SpeechRecognitionConstructor | null {
   return win.SpeechRecognition || win.webkitSpeechRecognition || null;
 }
 
-export function VoiceButton({ onTranscript, disabled }: Props) {
+export function VoiceButton({ onTranscript, disabled, language = "EN" }: Props) {
   const [supported] = useState(() => isSpeechRecognitionSupported());
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -85,7 +102,7 @@ export function VoiceButton({ onTranscript, disabled }: Props) {
     const recognition = new SpeechRecognitionClass();
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = "en-US";
+    recognition.lang = getRecognitionLang(language);
 
     recognition.onstart = () => {
       setListening(true);
@@ -109,7 +126,7 @@ export function VoiceButton({ onTranscript, disabled }: Props) {
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [supported, listening, onTranscript]);
+  }, [supported, listening, onTranscript, language]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
