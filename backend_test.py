@@ -4,6 +4,7 @@ import requests
 import json
 import sys
 from datetime import datetime
+import subprocess
 
 class RVServiceDeskAPITester:
     def __init__(self, base_url="http://localhost:3000"):
