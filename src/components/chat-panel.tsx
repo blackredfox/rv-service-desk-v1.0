@@ -36,6 +36,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [photoAttachments, setPhotoAttachments] = useState<PhotoAttachment[]>([]);
   const [reportCopied, setReportCopied] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
