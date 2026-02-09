@@ -349,11 +349,14 @@ export async function POST(req: Request) {
   // Compose system prompt using v2 semantics:
   // - inputDetected: what language user wrote in
   // - outputEffective: what language assistant must respond in
+  // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
   const baseSystemPrompt = composePromptV2({
     mode: currentMode,
     inputDetected: inputLanguage.detected,
     outputEffective: outputPolicy.effective,
+    includeTranslation: langPolicy.includeTranslation,
+    translationLanguage: langPolicy.translationLanguage,
   });
   
   const visionInstruction = buildVisionInstruction(attachmentCount);
