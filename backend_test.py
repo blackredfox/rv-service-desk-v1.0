@@ -530,14 +530,20 @@ class RVServiceDeskAPITester:
 
     def run_all_tests(self):
         """Run all RV Service Desk API tests"""
-        print("🚀 Starting RV Service Desk Critical Issues Testing")
-        print("=" * 70)
+        print("🚀 Starting RV Service Desk Labor Confirmation Feature Testing")
+        print("=" * 80)
 
+        # Test the three main features requested
+        print("\n" + "=" * 25 + " LABOR CONFIRMATION FEATURES " + "=" * 25)
+        self.test_labor_confirmation_unit_tests()
+        self.test_copy_button_ux_unit_tests()
+        self.test_mode_validators_include_labor_confirmation()
+        
         # Test frontend loading
         print("\n" + "=" * 30 + " FRONTEND TESTS " + "=" * 30)
         self.test_frontend_loading()
         
-        # Test member claim functionality specifically
+        # Test member claim functionality specifically  
         print("\n" + "=" * 30 + " MEMBER CLAIM TESTS " + "=" * 30)
         self.test_member_claim_functionality()
         
@@ -552,18 +558,18 @@ class RVServiceDeskAPITester:
         self.test_billing_portal_endpoint()
         
         # Test unit tests still pass
-        print("\n" + "=" * 30 + " UNIT TESTS " + "=" * 30)
+        print("\n" + "=" * 30 + " COMPREHENSIVE UNIT TESTS " + "=" * 30)
         self.test_unit_tests_pass()
 
         # Print results
-        print("\n" + "=" * 70)
-        print(f"📊 RV Service Desk API Tests Results: {self.tests_passed}/{self.tests_run} passed")
+        print("\n" + "=" * 80)
+        print(f"📊 RV Service Desk Feature Tests Results: {self.tests_passed}/{self.tests_run} passed")
         
         if self.tests_passed == self.tests_run:
-            print("🎉 All RV Service Desk API tests passed!")
+            print("🎉 All RV Service Desk feature tests passed!")
             return 0
         else:
-            print("⚠️  Some RV Service Desk API tests failed")
+            print("⚠️  Some RV Service Desk feature tests failed")
             return 1
 
 def main():
