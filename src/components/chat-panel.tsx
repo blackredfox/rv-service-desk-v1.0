@@ -11,7 +11,14 @@ import {
   type ChatSseEvent,
 } from "@/lib/api";
 import { VoiceButton } from "@/components/voice-button";
-import { PhotoAttachButton, type PhotoAttachment } from "@/components/photo-attach";
+import { 
+  PhotoAttachButton, 
+  PhotoPreviewGrid,
+  type PhotoAttachment,
+  MAX_IMAGES,
+  MAX_TOTAL_BYTES,
+  calculateTotalBytes,
+} from "@/components/photo-attach";
 import { analytics } from "@/lib/client-analytics";
 
 type Props = {
@@ -27,7 +34,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [photoAttachment, setPhotoAttachment] = useState<PhotoAttachment | null>(null);
+  const [photoAttachments, setPhotoAttachments] = useState<PhotoAttachment[]>([]);
   const [reportCopied, setReportCopied] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
