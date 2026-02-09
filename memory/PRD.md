@@ -1,44 +1,63 @@
 # RV Service Desk — PRD & Implementation Memory
 
 ## Original Problem Statement
-Fix bilingual output bug: EN mode sometimes appends an additional translated section (ES/RU) to the final report. This behavior is correct for RU/ES/AUTO modes but incorrect for EN mode. Root cause: implicit/mixed responsibility between prompt composition, output validation, and language logic. Goal: make translation behavior fully declarative, not prompt-driven.
+1. **Labor Time Consistency Bug**: When user asks to break down labor, the sum increases beyond the originally estimated total. Operation-level breakdown must sum exactly to the confirmed total.
+2. **Missing Technician Confirmation Step**: Agent estimates time and proceeds directly to detailed report. Technician must be able to confirm/override total labor before breakdown.
+3. **Copy Button UX Issue**: Copy button works but gives no visual feedback.
+
+Previous session: Declarative language policy architecture fix (EN mode bilingual output bug).
 
 ## Architecture
 - **Stack**: Next.js (App Router), TypeScript, Vitest, OpenAI API
-- **Key flow**: `lang.ts` (policy) → `prompt-composer.ts` (directives) → `mode-validators.ts` (enforcement) → `route.ts` (wiring + output-layer enforcement)
+- **Key flow**: `diagnostic` → `labor_confirmation` → `final_report`
+- **Language policy**: `lang.ts` → `prompt-composer.ts` → `mode-validators.ts` → `route.ts`
 
-## What's Been Implemented (Jan 2026)
+## What's Been Implemented
 
-### Declarative Language Policy Architecture
-1. **`src/lib/lang.ts`** — Added `LanguagePolicy` type and `resolveLanguagePolicy()` as single source of truth
-   - EN → `includeTranslation: false`
-   - RU → `includeTranslation: true, translationLanguage: "RU"`
-   - ES → `includeTranslation: true, translationLanguage: "ES"`
-   - AUTO → depends on detected input language
+### Session 1 (Jan 2026) — Language Policy
+- Declarative `LanguagePolicy` in `lang.ts` (EN=no translation, RU/ES/AUTO=bilingual)
+- Output-layer enforcement in `route.ts` strips translations for EN mode
 
-2. **`src/lib/prompt-composer.ts`** — `buildLanguageDirectiveV2` and `composePromptV2` now accept `includeTranslation` / `translationLanguage` from policy. EN mode directive says "English only" (no translation mention).
+### Session 2 (Jan 2026) — Labor Confirmation + Copy UX
 
-3. **`src/lib/mode-validators.ts`** — `validateFinalReportOutput(text, includeTranslation)` enforces:
-   - `includeTranslation=true` → must contain `--- TRANSLATION ---`
-   - `includeTranslation=false` → must NOT contain `--- TRANSLATION ---`
+#### A. Labor Confirmation Phase
+- New `CaseMode: "labor_confirmation"` between diagnostic and final_report
+- `prompts/modes/MODE_PROMPT_LABOR_CONFIRMATION.txt` — LLM generates labor estimate and asks for confirmation
+- `src/lib/labor-store.ts`:
+  - `setLaborEstimate()` / `confirmLabor()` / `getConfirmedHours()` — in-memory labor store
+  - `extractLaborEstimate()` — parses LLM estimate response
+  - `parseLaborConfirmation()` — parses technician confirmation/override (supports EN, RU, ES)
+  - `validateLaborSum()` — validates breakdown sums to confirmed total
+- `route.ts` flow: diagnostic → transition → labor_confirmation → technician confirms → final_report with labor budget constraint
 
-4. **`src/lib/output-validator.ts`** — Updated `validateResponse` and `isCauseFormatCorrect` to accept `includeTranslation` param.
+#### B. Labor Sum Validation
+- `validateLaborSum()` checks:
+  - Stated total matches confirmed total
+  - Sum of individual steps matches confirmed total
+- Applied in route.ts after final report generation
 
-5. **`src/app/api/chat/route.ts`** — Wired `LanguagePolicy` through entire pipeline. Added `enforceLanguagePolicy()` output-layer enforcement that strips translation blocks for EN mode as final safety net.
+#### C. Copy Button UX
+- Per-message `copiedMessageId` state tracking in `chat-panel.tsx`
+- Visual feedback: green border + checkmark + "Copied!" text
+- Auto-reset after 1.5 seconds
+- Independent from Report Copy button state
 
-6. **Prompt files** — Removed hardcoded translation rules from `SYSTEM_PROMPT_BASE.txt` and `MODE_PROMPT_FINAL_REPORT.txt`. Translation is now controlled by dynamic directives based on policy.
-
-7. **Tests** — Added `tests/language-policy.test.ts` (28 new tests). Updated `tests/payload-v2.test.ts` for policy-driven API. All 353 tests pass.
+#### D. Tests Added
+- `tests/labor-confirmation.test.ts` — 32 tests covering labor store, parsing, validation
+- `tests/copy-button-ux.test.ts` — 9 tests covering copy feedback behavior
+- Total: 394 tests passing (41 new)
 
 ## Ownership Model
 | Concern | Owner |
 |---------|-------|
 | Content & format | Prompt files (`prompts/`) |
 | Language rules | Config (`LanguagePolicy` in `lang.ts`) |
+| Labor rules | Config (`labor-store.ts`) + validator |
 | Enforcement | Validator (`mode-validators.ts`) + output layer (`route.ts`) |
 
 ## Backlog
 - P0: None (all acceptance criteria met)
-- P1: Consider adding integration tests with mocked OpenAI responses to verify end-to-end behavior
-- P2: Add language policy admin UI for dynamic mode configuration
-- P2: Improve AUTO mode language detection (consider using LLM-based detection for ambiguous inputs)
+- P1: Add Prisma schema migration for `labor_confirmation` CaseMode + `confirmedLaborHours` field (currently in-memory only)
+- P1: Integration test with mocked OpenAI to verify full labor confirmation flow end-to-end
+- P2: Allow technician to re-confirm labor after report is generated (currently immutable)
+- P2: Add labor estimation heuristics based on system type (water pump vs AC unit)
