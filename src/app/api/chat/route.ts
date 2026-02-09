@@ -507,6 +507,8 @@ export async function POST(req: Request) {
             mode: currentMode,
             inputDetected: inputLanguage.detected,
             outputEffective: outputPolicy.effective,
+            includeTranslation: langPolicy.includeTranslation,
+            translationLanguage: langPolicy.translationLanguage,
           });
           
           // Get updated history (including the transition message)
