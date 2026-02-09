@@ -294,10 +294,6 @@ export async function POST(req: Request) {
   
   console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}`);
 
-  const attachments = body?.attachments?.filter(
-    (a) => a.type === "image" && a.dataUrl && a.dataUrl.startsWith("data:image/")
-  );
-
   // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
@@ -333,11 +329,15 @@ export async function POST(req: Request) {
   // Compose system prompt using v2 semantics:
   // - inputDetected: what language user wrote in
   // - outputEffective: what language assistant must respond in
-  const systemPrompt = composePromptV2({
+  // - Add vision instruction if images are attached
+  const baseSystemPrompt = composePromptV2({
     mode: currentMode,
     inputDetected: inputLanguage.detected,
     outputEffective: outputPolicy.effective,
   });
+  
+  const visionInstruction = buildVisionInstruction(attachmentCount);
+  const systemPrompt = baseSystemPrompt + visionInstruction;
 
   const encoder = new TextEncoder();
   const ac = new AbortController();
