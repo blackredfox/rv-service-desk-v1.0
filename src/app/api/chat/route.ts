@@ -515,7 +515,11 @@ export async function POST(req: Request) {
           const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
           
           // Build a detailed context message that summarizes findings
-          // This helps the LLM generate a proper Portal-Cause report
+          // Translation instructions are driven by LanguagePolicy (declarative)
+          const translationInstruction = langPolicy.includeTranslation && langPolicy.translationLanguage
+            ? `\n3. Then "--- TRANSLATION ---"\n4. Complete translation of the above into ${langPolicy.translationLanguage === "RU" ? "Russian" : langPolicy.translationLanguage === "ES" ? "Spanish" : langPolicy.translationLanguage}`
+            : "";
+
           const finalReportRequest = `Based on the completed diagnostic isolation in the conversation above, generate the Portal-Cause authorization text now.
 
 DIAGNOSTIC SUMMARY FROM CONVERSATION:
@@ -525,9 +529,7 @@ DIAGNOSTIC SUMMARY FROM CONVERSATION:
 
 REQUIRED OUTPUT FORMAT:
 1. English paragraph describing: observed symptoms, diagnostic checks, verified condition, required repair
-2. Labor justification with hours (e.g., "Total labor 1.0 hr")
-3. Then "--- TRANSLATION ---"
-4. Complete translation of the above into ${inputLanguage.detected === "RU" ? "Russian" : inputLanguage.detected === "ES" ? "Spanish" : "the technician's language"}
+2. Labor justification with hours (e.g., "Total labor 1.0 hr")${translationInstruction}
 
 Generate the complete Portal-Cause report now.`;
           
