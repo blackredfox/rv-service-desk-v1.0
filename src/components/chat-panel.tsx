@@ -194,9 +194,6 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           type: "image" as const,
           dataUrl: a.dataUrl,
         }));
-        requestBody.attachments = [
-          { type: "image", dataUrl: currentAttachment.dataUrl },
-        ];
       }
 
       const body = await apiChatStreamWithAttachments(requestBody);
