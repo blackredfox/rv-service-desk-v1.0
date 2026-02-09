@@ -95,13 +95,22 @@ function countQuestions(text: string): number {
 
 /**
  * Check if Cause format is correct
+ *
+ * @param includeTranslation - Whether a translation section is expected (from LanguagePolicy).
  */
-function isCauseFormatCorrect(text: string): { valid: boolean; issues: string[] } {
+function isCauseFormatCorrect(text: string, includeTranslation: boolean = true): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
   
-  // Must contain translation separator
-  if (!text.includes(TRANSLATION_SEPARATOR)) {
-    issues.push("Missing '--- TRANSLATION ---' separator");
+  if (includeTranslation) {
+    // Must contain translation separator
+    if (!text.includes(TRANSLATION_SEPARATOR)) {
+      issues.push("Missing '--- TRANSLATION ---' separator");
+    }
+  } else {
+    // EN mode: must NOT contain translation separator
+    if (text.includes(TRANSLATION_SEPARATOR)) {
+      issues.push("EN mode must not include '--- TRANSLATION ---' block");
+    }
   }
   
   // Should not have numbered lists (1. 2. 3.)
