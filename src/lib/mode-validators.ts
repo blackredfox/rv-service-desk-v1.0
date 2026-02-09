@@ -248,8 +248,11 @@ export function validateFinalReportOutput(text: string, includeTranslation: bool
 
 /**
  * Main validator dispatcher based on mode
+ *
+ * @param includeTranslation  Forwarded to final-report validator.
+ *                            Defaults to true for backward compatibility.
  */
-export function validateOutput(text: string, mode: CaseMode): ValidationResult {
+export function validateOutput(text: string, mode: CaseMode, includeTranslation?: boolean): ValidationResult {
   if (!text || !text.trim()) {
     return { valid: false, violations: ["EMPTY_OUTPUT: Response is empty"] };
   }
@@ -260,7 +263,7 @@ export function validateOutput(text: string, mode: CaseMode): ValidationResult {
     case "authorization":
       return validateAuthorizationOutput(text);
     case "final_report":
-      return validateFinalReportOutput(text);
+      return validateFinalReportOutput(text, includeTranslation);
     default:
       return validateDiagnosticOutput(text);
   }
