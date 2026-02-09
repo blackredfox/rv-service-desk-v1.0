@@ -189,13 +189,28 @@ export function validateAuthorizationOutput(text: string): ValidationResult {
 
 /**
  * Validate final report mode output
+ *
+ * Translation enforcement is driven by LanguagePolicy:
+ *   includeTranslation=true  → must contain '--- TRANSLATION ---'
+ *   includeTranslation=false → must NOT contain '--- TRANSLATION ---'
+ *
+ * @param text  - LLM output to validate
+ * @param includeTranslation - Whether a translation block is expected (from LanguagePolicy).
+ *                             Defaults to true for backward compatibility.
  */
-export function validateFinalReportOutput(text: string): ValidationResult {
+export function validateFinalReportOutput(text: string, includeTranslation: boolean = true): ValidationResult {
   const violations: string[] = [];
 
-  // Must contain translation separator
-  if (!text.includes(TRANSLATION_SEPARATOR)) {
-    violations.push("FINAL_REPORT_FORMAT: Missing '--- TRANSLATION ---' separator");
+  if (includeTranslation) {
+    // RU / ES / AUTO-non-EN: Must contain translation separator
+    if (!text.includes(TRANSLATION_SEPARATOR)) {
+      violations.push("FINAL_REPORT_FORMAT: Missing '--- TRANSLATION ---' separator");
+    }
+  } else {
+    // EN mode: Must NOT contain translation separator
+    if (text.includes(TRANSLATION_SEPARATOR)) {
+      violations.push("FINAL_REPORT_LANG_POLICY: EN mode must not include '--- TRANSLATION ---' block");
+    }
   }
 
   // Must have labor information
