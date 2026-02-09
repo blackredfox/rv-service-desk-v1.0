@@ -116,19 +116,36 @@ describe("Payload v2: Prompt Composer", () => {
       expect(directive).toContain("All dialogue MUST be in Russian (RU)");
     });
 
-    it("should use detected language for final report translation", async () => {
+    it("should use detected language for final report translation (with policy)", async () => {
       const { buildLanguageDirectiveV2 } = await import("@/lib/prompt-composer");
       
-      // Input is Russian, output is forced to EN
-      // Translation should be to Russian (detected input)
+      // Input is Russian, RU mode → translation into Russian (policy-driven)
       const directive = buildLanguageDirectiveV2({
         inputDetected: "RU",
         outputEffective: "EN",
         mode: "final_report",
+        includeTranslation: true,
+        translationLanguage: "RU",
       });
 
       expect(directive).toContain("Technician input language: RU");
       expect(directive).toContain("translate the full output into Russian (RU)");
+    });
+
+    it("should produce English-only directive when policy says no translation", async () => {
+      const { buildLanguageDirectiveV2 } = await import("@/lib/prompt-composer");
+      
+      // EN mode → no translation (policy-driven)
+      const directive = buildLanguageDirectiveV2({
+        inputDetected: "RU",
+        outputEffective: "EN",
+        mode: "final_report",
+        includeTranslation: false,
+      });
+
+      expect(directive).toContain("Technician input language: RU");
+      expect(directive).toContain("English only");
+      expect(directive).not.toContain("translate the full output");
     });
 
     it("should distinguish input and output in directive", async () => {
