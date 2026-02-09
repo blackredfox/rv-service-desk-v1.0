@@ -47,6 +47,12 @@ export const FALLBACK_FINAL_REPORT: Record<"EN" | "RU" | "ES", string> = {
   ES: "No se puede generar un informe compatible. Proporcione información de diagnóstico completa.",
 } as const;
 
+export const FALLBACK_LABOR_CONFIRMATION: Record<"EN" | "RU" | "ES", string> = {
+  EN: "Estimated total labor: 1.0 hours\nPlease confirm this estimate, or enter a different total (e.g., '2.0 hours').",
+  RU: "Ориентировочное общее время работы: 1.0 час\nПожалуйста, подтвердите эту оценку или введите другое значение (например, '2.0 часа').",
+  ES: "Tiempo total estimado de mano de obra: 1.0 horas\nPor favor confirme esta estimación, o ingrese un total diferente (por ejemplo, '2.0 horas').",
+} as const;
+
 /**
  * Check if text contains prohibited denial-trigger words
  */
