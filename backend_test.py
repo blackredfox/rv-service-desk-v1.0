@@ -323,11 +323,112 @@ class RVServiceDeskAPITester:
         )
         return success
 
+    # === LABOR CONFIRMATION FEATURE TESTS ===
+    
+    def test_labor_confirmation_unit_tests(self):
+        """Test labor confirmation feature through unit tests"""
+        print(f"\n🔍 Testing Labor Confirmation Features...")
+        try:
+            # Run the labor confirmation tests
+            result = subprocess.run(
+                ["yarn", "test", "tests/labor-confirmation.test.ts"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - Labor confirmation tests pass")
+                
+                # Extract test count
+                if "Tests" in result.stdout and "passed" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "Tests" in line and "passed" in line:
+                            print(f"   {line.strip()}")
+                return True
+            else:
+                print(f"❌ Failed - Labor confirmation tests failed")
+                print(f"   Error: {result.stderr[:300]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+
+    def test_copy_button_ux_unit_tests(self):
+        """Test copy button UX feature through unit tests"""
+        print(f"\n🔍 Testing Copy Button UX Features...")
+        try:
+            # Run the copy button UX tests
+            result = subprocess.run(
+                ["yarn", "test", "tests/copy-button-ux.test.ts"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - Copy button UX tests pass")
+                
+                # Extract test count
+                if "Tests" in result.stdout and "passed" in result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if "Tests" in line and "passed" in line:
+                            print(f"   {line.strip()}")
+                return True
+            else:
+                print(f"❌ Failed - Copy button UX tests failed")
+                print(f"   Error: {result.stderr[:300]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+            
+    def test_mode_validators_include_labor_confirmation(self):
+        """Test that mode validators handle labor_confirmation mode"""
+        print(f"\n🔍 Testing Mode Validators include labor_confirmation...")
+        try:
+            # Run the mode validator tests
+            result = subprocess.run(
+                ["yarn", "test", "tests/mode-validators.test.ts"], 
+                cwd="/app",
+                capture_output=True, 
+                text=True, 
+                timeout=60
+            )
+            
+            self.tests_run += 1
+            if result.returncode == 0:
+                self.tests_passed += 1
+                print(f"✅ Passed - Mode validator tests pass")
+                
+                # Check for specific functionality
+                if "labor_confirmation" in result.stdout.lower():
+                    print(f"   ✅ labor_confirmation mode found in test output")
+                
+                return True
+            else:
+                print(f"❌ Failed - Mode validator tests failed")
+                print(f"   Error: {result.stderr[:300]}")
+                return False
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
+
     def test_member_claim_functionality(self):
         """Test member claim functionality through unit tests"""
         print(f"\n🔍 Testing Member Claim Functionality...")
         try:
-            import subprocess
             # Run only the member claim tests
             result = subprocess.run(
                 ["yarn", "test", "tests/member-claim.test.ts"], 
