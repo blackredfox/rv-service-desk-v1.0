@@ -121,13 +121,17 @@ function isCauseFormatCorrect(text: string): { valid: boolean; issues: string[] 
 
 /**
  * Validate AI response against rules
+ *
+ * @param includeTranslation - Whether a translation block is expected (from LanguagePolicy).
+ *                             Defaults to true for backward compat with existing callers.
  */
 export function validateResponse(args: {
   response: string;
   currentState: DiagnosticState;
   dialogueLanguage: Language;
+  includeTranslation?: boolean;
 }): ValidationResult {
-  const { response, currentState, dialogueLanguage } = args;
+  const { response, currentState, dialogueLanguage, includeTranslation = true } = args;
   const violations: string[] = [];
   
   if (!response || !response.trim()) {
