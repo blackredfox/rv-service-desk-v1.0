@@ -132,6 +132,18 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const text = input.trim();
     if (!text) return;
 
+    // Validate attachments before sending
+    if (photoAttachments.length > MAX_IMAGES) {
+      setError(`Maximum ${MAX_IMAGES} photos allowed per message.`);
+      return;
+    }
+    
+    const totalBytes = calculateTotalBytes(photoAttachments);
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      setError(`Total attachment size exceeds 5MB limit. Please remove some photos.`);
+      return;
+    }
+
     setInput("");
     setError(null);
     setLoading(true);
@@ -140,9 +152,9 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const localId = `local_${Date.now()}`;
     const now = new Date().toISOString();
 
-    // Capture and clear attachment before sending
-    const currentAttachment = photoAttachment;
-    setPhotoAttachment(null);
+    // Capture and clear attachments before sending
+    const currentAttachments = [...photoAttachments];
+    setPhotoAttachments([]);
 
     setMessages((prev) => [
       ...prev,
@@ -165,7 +177,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     ]);
 
     try {
-      // Build request body with optional attachment
+      // Build request body with optional attachments
       const requestBody: {
         caseId?: string;
         message: string;
@@ -177,7 +189,11 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
         languageMode,
       };
 
-      if (currentAttachment) {
+      if (currentAttachments.length > 0) {
+        requestBody.attachments = currentAttachments.map((a) => ({
+          type: "image" as const,
+          dataUrl: a.dataUrl,
+        }));
         requestBody.attachments = [
           { type: "image", dataUrl: currentAttachment.dataUrl },
         ];
