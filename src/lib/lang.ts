@@ -97,3 +97,47 @@ export function normalizeLanguageMode(input: unknown): LanguageMode {
   if (input === "EN" || input === "RU" || input === "ES") return input;
   return "AUTO";
 }
+
+/**
+ * Declarative language policy for output composition.
+ * Single source of truth for translation behavior.
+ *
+ * | Mode | Primary Output | Translation Included | Translation Language |
+ * |------|---------------|---------------------|---------------------|
+ * | EN   | English       | No                  | —                   |
+ * | RU   | English       | Yes                 | Russian             |
+ * | ES   | English       | Yes                 | Spanish             |
+ * | AUTO | English       | Depends on detected | Detected language   |
+ */
+export type LanguagePolicy = {
+  mode: LanguageMode;
+  primaryOutput: Language;
+  includeTranslation: boolean;
+  translationLanguage?: Language;
+};
+
+/**
+ * Resolve the declarative language policy from mode + detected input.
+ * This function is the SINGLE SOURCE OF TRUTH for whether translation
+ * should appear in the output. Nothing else decides this.
+ */
+export function resolveLanguagePolicy(
+  mode: LanguageMode,
+  inputDetected: Language,
+): LanguagePolicy {
+  switch (mode) {
+    case "EN":
+      return { mode: "EN", primaryOutput: "EN", includeTranslation: false };
+    case "RU":
+      return { mode: "RU", primaryOutput: "EN", includeTranslation: true, translationLanguage: "RU" };
+    case "ES":
+      return { mode: "ES", primaryOutput: "EN", includeTranslation: true, translationLanguage: "ES" };
+    case "AUTO":
+      if (inputDetected === "EN") {
+        return { mode: "AUTO", primaryOutput: "EN", includeTranslation: false };
+      }
+      return { mode: "AUTO", primaryOutput: "EN", includeTranslation: true, translationLanguage: inputDetected };
+    default:
+      return { mode: "EN", primaryOutput: "EN", includeTranslation: false };
+  }
+}
