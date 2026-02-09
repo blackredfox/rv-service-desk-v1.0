@@ -345,6 +345,8 @@ export function getSafeFallback(mode: CaseMode, language?: string): string {
       return FALLBACK_AUTHORIZATION[lang];
     case "final_report":
       return FALLBACK_FINAL_REPORT[lang];
+    case "labor_confirmation":
+      return FALLBACK_LABOR_CONFIRMATION[lang];
     default:
       return FALLBACK_QUESTIONS[lang];
   }
