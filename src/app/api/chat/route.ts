@@ -28,6 +28,21 @@ import {
 
 export const runtime = "nodejs";
 
+// Translation separator (must match mode-validators / output-validator)
+const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
+
+/**
+ * Output-layer enforcement: strip translation block when policy says none.
+ * This is the final safety net — even if the LLM produces a translation,
+ * it will be removed before the user sees it.
+ */
+function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
+  if (!policy.includeTranslation && text.includes(TRANSLATION_SEPARATOR)) {
+    return text.split(TRANSLATION_SEPARATOR)[0].trim();
+  }
+  return text;
+}
+
 // Attachment validation constants
 const MAX_ATTACHMENTS = 10;
 const MAX_TOTAL_ATTACHMENT_BYTES = 6_000_000; // 6MB server-side (slightly higher than client)
