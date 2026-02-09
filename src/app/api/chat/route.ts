@@ -309,7 +309,10 @@ export async function POST(req: Request) {
   // 3. Compute effective output language
   const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, inputLanguage.detected);
   
-  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}`);
+  // 4. Resolve declarative language policy (single source of truth for translation behavior)
+  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, inputLanguage.detected);
+  
+  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}`);
 
   // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
