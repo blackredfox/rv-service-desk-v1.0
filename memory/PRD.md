@@ -378,6 +378,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 - [ ] Configure production Resend API key for pilot environment
 - [ ] Add CSV export feature for member activity data
 - [ ] Add date range filters to member activity dashboard
+- [ ] (Optional) Switch frontend voice to MediaRecorder + STT API for cross-browser consistency
 
 ### P2 (Nice to Have)
 - [ ] Real-time UI updates (replace manual "Refresh" with Firestore onSnapshot/WebSockets)
@@ -389,7 +390,7 @@ C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONF
 1. Configure production Resend API key for pilot environment
 2. Add CSV export for member activity data
 3. Add date range filters to activity dashboard
-4. Test full diagnostic flows with various RV systems
+4. Test multi-photo + vision with real RV diagnostic images
 
 ## Environment Variables
 See `.env.example` for required configuration:
