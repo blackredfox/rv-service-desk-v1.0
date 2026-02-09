@@ -244,14 +244,18 @@ export function composePrompt(args: {
  * @param mode - Current case mode (diagnostic/authorization/final_report)
  * @param inputDetected - The language the technician wrote in (always detected from message)
  * @param outputEffective - The language the assistant must respond in (may be forced)
+ * @param includeTranslation - Whether the output must include a translation block (from LanguagePolicy)
+ * @param translationLanguage - Target language for the translation block (from LanguagePolicy)
  */
 export function composePromptV2(args: {
   mode: CaseMode;
   inputDetected: string;
   outputEffective: string;
+  includeTranslation?: boolean;
+  translationLanguage?: string;
   additionalConstraints?: string;
 }): string {
-  const { mode, inputDetected, outputEffective, additionalConstraints } = args;
+  const { mode, inputDetected, outputEffective, includeTranslation, translationLanguage, additionalConstraints } = args;
   const prompts = loadPrompts();
 
   const parts: string[] = [
