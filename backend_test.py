@@ -247,7 +247,6 @@ class RVServiceDeskAPITester:
         """Test that all unit tests still pass"""
         print(f"\n🔍 Testing Unit Tests Pass...")
         try:
-            import subprocess
             result = subprocess.run(
                 ["yarn", "test"], 
                 cwd="/app",
@@ -266,6 +265,19 @@ class RVServiceDeskAPITester:
                     for line in lines:
                         if "Tests" in line and "passed" in line:
                             print(f"   {line.strip()}")
+                            break
+                
+                # Check for specific features
+                test_results = {
+                    "labor confirmation": "labor-confirmation" in result.stdout.lower(),
+                    "copy button ux": "copy-button-ux" in result.stdout.lower(),
+                    "mode validators": "mode-validators" in result.stdout.lower(),
+                }
+                
+                for feature, found in test_results.items():
+                    status = "✅" if found else "⚠️ "
+                    print(f"   {status} {feature} tests {'found' if found else 'not found'}")
+                
                 return True
             else:
                 print(f"❌ Failed - Unit tests failed")
