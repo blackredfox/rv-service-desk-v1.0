@@ -587,7 +587,10 @@ Generate the complete Portal-Cause report now.`;
             console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
           }
         } else {
-          // No transition - stream the response normally
+          // No transition - apply output-layer enforcement before streaming
+          full = enforceLanguagePolicy(full, langPolicy);
+
+          // Stream the response normally
           for (const char of full) {
             if (aborted) break;
             controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
