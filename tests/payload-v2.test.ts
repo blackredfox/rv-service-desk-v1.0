@@ -236,27 +236,54 @@ describe("Payload v2: End-to-End Scenarios", () => {
     });
   });
 
-  describe("Scenario 4: Final report translation language", () => {
-    it("should translate to detected input language, not forced output", async () => {
-      const { detectInputLanguageV2, computeOutputPolicy, buildLanguageDirectiveV2 } = await import("@/lib/lang");
-      const { buildLanguageDirectiveV2: composerDirective } = await import("@/lib/prompt-composer");
+  describe("Scenario 4: Final report translation language (policy-driven)", () => {
+    it("should translate to detected input language when policy includes translation", async () => {
+      const { detectInputLanguageV2, resolveLanguagePolicy } = await import("@/lib/lang");
+      const { buildLanguageDirectiveV2 } = await import("@/lib/prompt-composer");
       
-      // User writes in Russian, forces EN output
+      // User writes in Russian, RU mode
       const message = "Насос проверен и не работает";
       const inputLang = detectInputLanguageV2(message);
-      const outputPolicy = computeOutputPolicy("EN", inputLang.detected);
+      const policy = resolveLanguagePolicy("RU", inputLang.detected);
 
       expect(inputLang.detected).toBe("RU");
-      expect(outputPolicy.effective).toBe("EN");
+      expect(policy.includeTranslation).toBe(true);
+      expect(policy.translationLanguage).toBe("RU");
 
-      // Final report should translate to Russian (what user reads)
-      const directive = composerDirective({
+      // Final report directive should include translation to Russian
+      const directive = buildLanguageDirectiveV2({
         inputDetected: inputLang.detected,
-        outputEffective: outputPolicy.effective,
+        outputEffective: policy.primaryOutput,
         mode: "final_report",
+        includeTranslation: policy.includeTranslation,
+        translationLanguage: policy.translationLanguage,
       });
 
       expect(directive).toContain("translate the full output into Russian (RU)");
+    });
+
+    it("should NOT translate when EN mode, even with RU input", async () => {
+      const { detectInputLanguageV2, resolveLanguagePolicy } = await import("@/lib/lang");
+      const { buildLanguageDirectiveV2 } = await import("@/lib/prompt-composer");
+      
+      // User writes in Russian, but EN mode selected
+      const message = "Насос проверен и не работает";
+      const inputLang = detectInputLanguageV2(message);
+      const policy = resolveLanguagePolicy("EN", inputLang.detected);
+
+      expect(inputLang.detected).toBe("RU");
+      expect(policy.includeTranslation).toBe(false);
+
+      const directive = buildLanguageDirectiveV2({
+        inputDetected: inputLang.detected,
+        outputEffective: policy.primaryOutput,
+        mode: "final_report",
+        includeTranslation: policy.includeTranslation,
+        translationLanguage: policy.translationLanguage,
+      });
+
+      expect(directive).toContain("English only");
+      expect(directive).not.toContain("translate the full output");
     });
   });
 });
