@@ -443,7 +443,7 @@ export async function POST(req: Request) {
           result = await callOpenAI(apiKey, retryBody, ac.signal);
 
           if (!result.error) {
-            validation = validateOutput(result.response, currentMode);
+            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
