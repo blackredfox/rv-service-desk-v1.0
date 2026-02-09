@@ -332,11 +332,28 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                       onClick={() => {
                         void navigator.clipboard
                           .writeText(m.content)
+                          .then(() => {
+                            setCopiedMessageId(m.id);
+                            setTimeout(() => setCopiedMessageId((prev) => prev === m.id ? null : prev), 1500);
+                          })
                           .catch(() => setError("Copy failed"));
                       }}
-                      className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                      className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-all duration-200 ${
+                        copiedMessageId === m.id
+                          ? "border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400"
+                          : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                      }`}
                     >
-                      Copy
+                      {copiedMessageId === m.id ? (
+                        <>
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied!
+                        </>
+                      ) : (
+                        "Copy"
+                      )}
                     </button>
 
                     {showSystemCopy ? (
