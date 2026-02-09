@@ -267,10 +267,11 @@ export function composePromptV2(args: {
   ];
 
   // Add v2 language directive with separate input/output languages
+  // Translation behavior is driven by LanguagePolicy (declarative)
   parts.push("");
   parts.push("---");
   parts.push("");
-  parts.push(buildLanguageDirectiveV2({ inputDetected, outputEffective, mode }));
+  parts.push(buildLanguageDirectiveV2({ inputDetected, outputEffective, mode, includeTranslation, translationLanguage }));
 
   // Add additional constraints if provided
   if (additionalConstraints) {
