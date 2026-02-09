@@ -1,2 +1,7 @@
-// Enable jest-dom matchers for Vitest (e.g., toBeInTheDocument)
-import "@testing-library/jest-dom/vitest";
+/**
+ * Legacy / unused Vitest setup file.
+ * This project uses ./tests/setup.ts via vitest.config.ts.
+ * Keep this file minimal to avoid accidental breakage.
+ */
+
+export {};
