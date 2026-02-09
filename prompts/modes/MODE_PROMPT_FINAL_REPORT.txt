@@ -50,11 +50,11 @@ Paragraph 6 - LABOR JUSTIFICATION (DETAILED BREAKDOWN):
 - Include time estimate for each task
 - State total labor hours at the end
 
-Then output exactly:
+If the LANGUAGE DIRECTIVE specifies a translation, output exactly:
 --- TRANSLATION ---
 
-TRANSLATION SECTION:
-- Complete literal translation of ALL paragraphs above into the technician's dialogue language
+Then provide a complete literal translation of ALL paragraphs above into the specified language.
+If no translation is requested, end after the labor paragraph.
 
 WORDING RULES:
 - Use neutral technical language

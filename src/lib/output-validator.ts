@@ -95,13 +95,22 @@ function countQuestions(text: string): number {
 
 /**
  * Check if Cause format is correct
+ *
+ * @param includeTranslation - Whether a translation section is expected (from LanguagePolicy).
  */
-function isCauseFormatCorrect(text: string): { valid: boolean; issues: string[] } {
+function isCauseFormatCorrect(text: string, includeTranslation: boolean = true): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
   
-  // Must contain translation separator
-  if (!text.includes(TRANSLATION_SEPARATOR)) {
-    issues.push("Missing '--- TRANSLATION ---' separator");
+  if (includeTranslation) {
+    // Must contain translation separator
+    if (!text.includes(TRANSLATION_SEPARATOR)) {
+      issues.push("Missing '--- TRANSLATION ---' separator");
+    }
+  } else {
+    // EN mode: must NOT contain translation separator
+    if (text.includes(TRANSLATION_SEPARATOR)) {
+      issues.push("EN mode must not include '--- TRANSLATION ---' block");
+    }
   }
   
   // Should not have numbered lists (1. 2. 3.)
@@ -121,13 +130,17 @@ function isCauseFormatCorrect(text: string): { valid: boolean; issues: string[] 
 
 /**
  * Validate AI response against rules
+ *
+ * @param includeTranslation - Whether a translation block is expected (from LanguagePolicy).
+ *                             Defaults to true for backward compat with existing callers.
  */
 export function validateResponse(args: {
   response: string;
   currentState: DiagnosticState;
   dialogueLanguage: Language;
+  includeTranslation?: boolean;
 }): ValidationResult {
-  const { response, currentState, dialogueLanguage } = args;
+  const { response, currentState, dialogueLanguage, includeTranslation = true } = args;
   const violations: string[] = [];
   
   if (!response || !response.trim()) {
@@ -158,8 +171,8 @@ export function validateResponse(args: {
   }
   
   if (currentState === "CAUSE_OUTPUT") {
-    // Rule: Must have proper Cause format
-    const causeCheck = isCauseFormatCorrect(response);
+    // Rule: Must have proper Cause format (translation separator depends on policy)
+    const causeCheck = isCauseFormatCorrect(response, includeTranslation);
     if (!causeCheck.valid) {
       violations.push(...causeCheck.issues.map(i => `FORMAT_VIOLATION: ${i}`));
     }

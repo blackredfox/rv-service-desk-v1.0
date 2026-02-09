@@ -1,404 +1,44 @@
-# RV Service Desk - Product Requirements Document
-
-## Overview
-RV Service Desk is a Next.js web application for RV technicians to structure diagnostics and generate service documentation with AI assistance.
+# RV Service Desk — PRD & Implementation Memory
 
 ## Original Problem Statement
-Implement Org Setup & Admin Dashboard for RV Service Desk:
-1. Org Setup: First user with corporate domain becomes admin. All others need explicit invite.
-2. Access Reasons: Backend returns `not_a_member` when org exists but user not added
-3. AccessBlockedScreen: Must have Logout button and Contact Support link
-4. Admin Dashboard at /admin/members: List members, add member (status=active), update member status/role
-5. Support Button: Floating bottom-right on blocked screens and chat workspace
-6. Admin Onboarding: Show 'Invite your team' CTA after org setup
-
-### UX Polish (Feb 3, 2026)
-A) Session Behavior - Session-based cookies (expires when browser closes)
-B) Navigation Consistency - Single global header, "Back to Dashboard" routes to /?from=admin
-C) Admin Onboarding Flow - Removed "All Set / Start" screen, go directly to dashboard
-D) Admin Members Dashboard - Seat counter updates immediately after add/remove
-E) Help/Support Button - Renamed "Copy Diagnostics" → "Copy Account Details"
-F) Top Bar Label - Renamed "Input" → "Input language"
-
-### UAT Fixes (Feb 3, 2026)
-A) Back to Dashboard - Routes to /?from=admin to skip welcome for authenticated users
-B) Copy Report Button - Added in chat workspace to copy generated report (not chat transcript)
-C) Stripe Billing Portal - Enabled subscription upgrades with STRIPE_PORTAL_CONFIGURATION_ID support
-
-### Member Claim Fix (Feb 3, 2026)
-- Pre-added members can now claim their org membership on first sign-up
-- Placeholder UIDs (`pending_xxx`) are automatically replaced with real Firebase UID
-- Inactive members see "Account Inactive" message with admin contact
-- Seat limit blocking shows clear upgrade message
-- Security: Cannot claim if email already has non-placeholder UID
-- Added comprehensive logging for debugging claim flow
-
-### Stripe Webhook Sync Fix (Feb 3, 2026)
-- Webhook now looks up org by `stripeCustomerId` when `metadata.orgId` is missing
-- This fixes seat limit not updating after Portal upgrades
-- Both `customer.subscription.updated` and `customer.subscription.deleted` events now fallback to customer ID lookup
-- Added comprehensive logging:
-  - `[Stripe Webhook] Received event: X`
-  - `[Stripe Sync] Updating org X seatLimit to Y`
-  - `[API /api/auth/me] Returning org data: seatLimit=X`
-- Added `/api/debug/org-seats` endpoint for troubleshooting
-- Webhook always saves `stripeCustomerId` to ensure future lookups work
-
-### Member Invitation Emails (Feb 3, 2026)
-- **MVP Implementation**: Plain transactional email sent when admin adds a new member
-- **Email Provider**: Resend (easily swappable via `/app/src/lib/email.ts`)
-- **Email Content**: 
-  - Subject: "You've been invited to join {orgName}"
-  - Body: Org name, inviter email (if available), sign-in link, domain guidance
-- **Behavior**: 
-  - Fire-and-forget (email failure doesn't block member creation)
-  - HTML sanitization to prevent XSS
-  - Lazy client initialization for test compatibility
-- **Configuration**: 
-  - `RESEND_API_KEY` - API key from resend.com
-  - `SENDER_EMAIL` - Defaults to onboarding@resend.dev
-  - `APP_NAME` - Defaults to "RV Service Desk"
-### Payload v2: Input Language Detection + Output Policy (Feb 4, 2026)
-- **Problem**: Selector value was corrupting `inputLanguage`, making detection impossible
-- **Solution**: Payload v2 contract separating detection from output policy
-- **New Types** (`/app/src/lib/lang.ts`):
-  - `InputLanguageV2`: `{ detected, source, confidence, reason }`
-  - `OutputLanguagePolicyV2`: `{ mode, effective, strategy }`
-  - `detectInputLanguageV2(text)`: Always detects from message text
-  - `computeOutputPolicy(mode, detected)`: Computes effective output
-- **SSE Event**: New `{type:"language"}` event with detection results
-- **Prompt Composer v2** (`composePromptV2`):
-  - Uses `inputDetected` for "Technician input language"
-  - Uses `outputEffective` for "All dialogue MUST be in"
-  - Final report translates to `inputDetected` (what tech reads)
-- **Fallback**: Uses `outputEffective` language for dialogue
-- **Tests**: 19 new tests in `payload-v2.test.ts`
-
-### Fix Spanish Validation Fallback Drift (Feb 4, 2026)
-- **Problem**: EMPTY_OUTPUT validation fallback was hardcoded in Spanish, causing all fallback responses to appear as Spanish regardless of selected language
-- **Fix**: Localized fallback messages for all modes
-  - `FALLBACK_QUESTIONS`: EN/RU/ES diagnostic questions
-  - `FALLBACK_AUTHORIZATION`: EN/RU/ES authorization messages
-  - `FALLBACK_FINAL_REPORT`: EN/RU/ES report messages
-- **`getSafeFallback(mode, language)`** now returns localized text
-- **Default behavior**: Unknown/AUTO language defaults to EN (with warning log)
-- **Tests**: 6 new localization tests added to `mode-validators.test.ts`
-
-### Input Language Lock Fix (Feb 4, 2026)
-- **Problem**: Russian input treated as Spanish, language drift across messages
-- **Fix**: Server-controlled language lock per case
-- **Logic**:
-  - Explicit language selection (EN/RU/ES) always overrides
-  - AUTO mode: locks to detected language on first message
-  - Once locked, AUTO respects case language (no re-detection)
-  - Mid-case dropdown change updates case language immediately
-- **Hard Language Directive**: Added to every LLM call
-  - Diagnostic/Auth: "All dialogue MUST be in {language}. Do not respond in any other language."
-  - Final Report: "English first, then --- TRANSLATION --- into {language}"
-- **New function**: `buildLanguageDirective()` in `prompt-composer.ts`
-- **Tests**: 19 new tests in `input-language-lock.test.ts`
-
-### Fix Duplicate System Prompt Sources (Feb 4, 2026)
-- **Problem**: Two competing system prompt sources causing language drift
-  - `prompts/system/SYSTEM_PROMPT_BASE.txt` (correct runtime source)
-  - `prompts/system-prompt-final.ts` (legacy, causing confusion)
-- **Fix**: Single runtime source = `prompts/system/SYSTEM_PROMPT_BASE.txt`
-  - Created shared types file: `src/lib/types/diagnostic.ts`
-  - Updated `output-validator.ts` to use shared types
-  - Fixed comment in `system-prompt-v1.ts` to point to correct source
-  - Updated tests to validate actual runtime behavior
-  - Deleted legacy `prompts/system-prompt-final.ts`
-  - Removed `@prompts` alias from vitest.config.ts
-- **Tests**: All 212 tests pass
-
-### Prompt Split & Composer Architecture (Feb 4, 2026)
-- **D1 - Split Prompts**: Customer prompt split into 4 operational blocks:
-  - `prompts/system/SYSTEM_PROMPT_BASE.txt` - Immutable laws/guardrails
-  - `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt` - Diagnostic form behavior
-  - `prompts/modes/MODE_PROMPT_AUTHORIZATION.txt` - Authorization text generation
-  - `prompts/modes/MODE_PROMPT_FINAL_REPORT.txt` - Portal-Cause format
-- **D2 - Prompt Composer** (`/app/src/lib/prompt-composer.ts`):
-  - Deterministic composition based on `case.mode`
-  - Explicit command transitions only: `START FINAL REPORT`, `START AUTHORIZATION REQUEST`
-  - Memory window (N=12 messages)
-  - Never infers mode from meaning
-- **D3 - Mode Validators** (`/app/src/lib/mode-validators.ts`):
-  - Diagnostic: Must be single question, blocks final report content
-  - Final Report: Requires `--- TRANSLATION ---`, labor, correct format
-  - Prohibited words detection: broken, failed, defective, etc.
-  - Retry once with correction, then safe fallback
-- **D4 - Tests**: 42 new tests in `prompt-composer.test.ts` and `mode-validators.test.ts`
-- **Schema**: Added `mode` field to Case model (diagnostic | authorization | final_report)
-
-### Prompt Enforcement & API Contract Fix (Feb 4, 2026)
-- **System Prompt v3.2**: Model-agnostic, deterministic diagnostic engine
-- **STATE Machine**: Explicit `DIAGNOSTICS` and `CAUSE_OUTPUT` states
-- **API Contract**:
-  - `dialogueLanguage` passed explicitly on every request
-  - `currentState` passed explicitly (or inferred from history)
-  - Validation of response language and format
-- **Output Validator** (`/app/src/lib/output-validator.ts`):
-  - Detects English during non-EN diagnostics
-  - Detects translation separator in wrong state
-  - Detects multiple questions (only ONE allowed)
-  - Validates Cause format (no headers, no numbered lists)
-  - Logs violations (non-blocking)
-- **Complex Equipment Classification**: Locked list, water pump = NON-COMPLEX
-- **Tests**: 23 new tests in `/app/tests/prompt-enforcement.test.ts`
-
-### Stripe Seat Limit Sync Fix - Source of Truth (Feb 4, 2026)
-- **Root cause**: Refresh button only refetched cached data, didn't sync from Stripe
-- **Fix**: Created `POST /api/billing/sync-seats` endpoint that fetches subscription from Stripe
-- **Architecture**:
-  - `b2b-stripe.ts` is the ONLY source of truth for B2B subscriptions
-  - `stripe.ts` is for individual subscriptions (Prisma) - separate concern
-  - seatLimit calculated: `subscription.items.data.reduce((sum, item) => sum + item.quantity, 0)`
-- **Refresh button now**:
-  1. Calls `POST /api/billing/sync-seats` (syncs from Stripe)
-  2. Calls `refresh()` (refetch /api/auth/me)
-  3. Calls `fetchMembers()` (refetch member list)
-- **Webhook**: Already correctly uses `b2b-stripe.ts`, fixed to sum ALL item quantities
-- **New endpoint**: `POST /api/billing/sync-seats` (admin only)
-- **Tests**: 11 new tests in `/app/tests/stripe-seat-sync.test.ts`
+Fix bilingual output bug: EN mode sometimes appends an additional translated section (ES/RU) to the final report. This behavior is correct for RU/ES/AUTO modes but incorrect for EN mode. Root cause: implicit/mixed responsibility between prompt composition, output validation, and language logic. Goal: make translation behavior fully declarative, not prompt-driven.
 
 ## Architecture
+- **Stack**: Next.js (App Router), TypeScript, Vitest, OpenAI API
+- **Key flow**: `lang.ts` (policy) → `prompt-composer.ts` (directives) → `mode-validators.ts` (enforcement) → `route.ts` (wiring + output-layer enforcement)
 
-### Tech Stack
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS 4
-- **Backend**: Next.js API Routes, Firebase Admin SDK
-- **Database**: Firestore (primary), PostgreSQL/Prisma (optional)
-- **Auth**: Firebase Auth with server-side session cookies (browser session persistence)
-- **Billing**: Stripe (seat-based subscriptions)
+## What's Been Implemented (Jan 2026)
 
-### Data Model (Firestore)
-- `organizations/{orgId}` - Company info, subscription status, seat limits
-- `orgMembers/{memberId}` - User membership with role (admin/member)
+### Declarative Language Policy Architecture
+1. **`src/lib/lang.ts`** — Added `LanguagePolicy` type and `resolveLanguagePolicy()` as single source of truth
+   - EN → `includeTranslation: false`
+   - RU → `includeTranslation: true, translationLanguage: "RU"`
+   - ES → `includeTranslation: true, translationLanguage: "ES"`
+   - AUTO → depends on detected input language
 
-## User Personas
+2. **`src/lib/prompt-composer.ts`** — `buildLanguageDirectiveV2` and `composePromptV2` now accept `includeTranslation` / `translationLanguage` from policy. EN mode directive says "English only" (no translation mention).
 
-### Organization Admin
-- Creates and manages organization
-- Sets approved email domains
-- Selects seat count and manages billing
-- Invites/removes team members
+3. **`src/lib/mode-validators.ts`** — `validateFinalReportOutput(text, includeTranslation)` enforces:
+   - `includeTranslation=true` → must contain `--- TRANSLATION ---`
+   - `includeTranslation=false` → must NOT contain `--- TRANSLATION ---`
 
-### Technician (Member)
-- Signs up with corporate email
-- Uses app within seat limits
-- Cannot access billing
+4. **`src/lib/output-validator.ts`** — Updated `validateResponse` and `isCauseFormatCorrect` to accept `includeTranslation` param.
 
-## Core Requirements (Static)
-1. ✅ Firebase Auth with session cookies
-2. ✅ Terms acceptance flow
-3. ✅ Organization creation with domain validation
-4. ✅ Seat-based Stripe subscription checkout
-5. ✅ Webhook handler for subscription events
-6. ✅ Access gating based on subscription + seat limits
-7. ✅ Admin/Member role differentiation
-8. ✅ Invite-only access enforcement
-9. ✅ Admin Dashboard for member management
-10. ✅ Support button on blocked screens and chat
+5. **`src/app/api/chat/route.ts`** — Wired `LanguagePolicy` through entire pipeline. Added `enforceLanguagePolicy()` output-layer enforcement that strips translation blocks for EN mode as final safety net.
 
-## What's Been Implemented (Feb 3, 2026)
+6. **Prompt files** — Removed hardcoded translation rules from `SYSTEM_PROMPT_BASE.txt` and `MODE_PROMPT_FINAL_REPORT.txt`. Translation is now controlled by dynamic directives based on policy.
 
-### Session & Auth (UX Polish)
-- Session cookies no longer have `maxAge` → expire when browser closes
-- No custom "logout on window close" hacks needed
+7. **Tests** — Added `tests/language-policy.test.ts` (28 new tests). Updated `tests/payload-v2.test.ts` for policy-driven API. All 353 tests pass.
 
-### Backend - Org Setup & Admin Dashboard
-- `/api/auth/me` - Returns access reasons:
-  - `not_a_member` - When org exists but user not added
-  - `no_organization` - When no org exists for domain (canCreateOrg flag)
-  - `blocked_domain` - For personal email domains
-  - `subscription_required` - When org needs subscription
-  - `seat_limit_exceeded` - When seats are full
-  - `inactive` / `pending` - Member status issues
+## Ownership Model
+| Concern | Owner |
+|---------|-------|
+| Content & format | Prompt files (`prompts/`) |
+| Language rules | Config (`LanguagePolicy` in `lang.ts`) |
+| Enforcement | Validator (`mode-validators.ts`) + output layer (`route.ts`) |
 
-- `/api/org/members` (GET) - List all members (admin only)
-- `/api/org/members` (POST) - Add member with `status: active`
-  - Validates email domain matches org
-  - Rejects if subscription inactive
-  - Rejects if seat limit reached
-- `/api/org/members` (PATCH) - Update member status/role
-  - Prevents demoting/deactivating last admin
-
-- `/api/org/activity` (GET) - Get team activity metrics (admin only)
-  - Last login timestamp per member
-  - Cases created (7d / 30d)
-  - Total messages sent
-  - Sorted by most inactive first (default)
-
-### Frontend
-- `AccessBlockedScreen` - Shows Logout button and Contact Support
-- `SupportButton` - Floating button with modal for contact + **Copy Account Details** (renamed from diagnostics)
-  - Copies: Email, Role, Organization, Org ID, Seats (X/Y), Current page, App version, Timestamp
-  - Does NOT include chat messages or case content
-- `LanguageSelector` - Label renamed from "Input" to **"Input language"**
-- `/admin/members` - Admin dashboard with tabs:
-  - **Members tab**: Member list with add/activate/deactivate/promote controls
-  - **Activity tab**: Sortable table (last login, cases, messages)
-  - Navigation: "Back to Dashboard" link (no standalone logout button)
-  - Seat counter updates immediately after member changes
-- Admin onboarding: Dismissible banner on app (not separate screen)
-
-### Tests (253 total passing)
-- `tests/org-access-reasons.test.ts` - 6 tests for access reason codes
-- `tests/org-admin-members.test.ts` - 9 tests for admin member APIs
-- `tests/org-activity.test.ts` - 4 tests for activity API
-- `tests/access-blocked.test.tsx` - 11 tests for UI component
-- `tests/seat-counter-refresh.test.ts` - 13 tests for seat counter and refresh button
-- `tests/member-invitation-email.test.ts` - 8 tests for invitation email functionality
-- `tests/stripe-seat-sync.test.ts` - 11 tests for Stripe seat limit sync
-- `tests/prompt-enforcement.test.ts` - 35 tests for runtime prompt and output validation
-- `tests/prompt-composer.test.ts` - 16 tests for prompt composition and mode transitions
-- `tests/mode-validators.test.ts` - 29 tests for mode validation, prohibited words, and localized fallbacks
-- `tests/input-language-lock.test.ts` - 19 tests for language lock and directive
-- `tests/payload-v2.test.ts` - 19 tests for v2 detection/policy separation
-- `tests/guided-diagnostics.test.ts` - 23 tests for automatic mode transitions
-
-### Agent Communication Improvements (Feb 4, 2026)
-
-#### Automatic Mode Transition
-- **Problem**: Agent required explicit "START FINAL REPORT" command to transition
-- **Fix**: Implemented automatic transition when diagnostic isolation is complete
-- **Implementation**:
-  - Added `[TRANSITION: FINAL_REPORT]` signal marker to diagnostic prompt
-  - `detectTransitionSignal()` in `prompt-composer.ts` detects the signal
-  - Chat API detects transition, updates case mode, makes second LLM call for final report
-  - Streams both transition message and Portal-Cause report seamlessly
-- **Tests**: 6 new tests in `guided-diagnostics.test.ts`
-
-#### Friendly & Professional Communication
-- **Enhancement**: Agent now communicates in a warmer, more collaborative tone
-- **Changes to SYSTEM_PROMPT_BASE.txt**:
-  - Added "COMMUNICATION STYLE" section
-  - Warm acknowledgments: "Understood", "Good", "Thank you for the information"
-  - Polite phrasing: "Please check..." instead of "Check..."
-  - Encouraging feedback: "Great, let's continue", "That helps narrow it down"
-
-#### Detailed Diagnostic Questions
-- **Enhancement**: Agent asks more thorough, specific questions
-- **Changes to MODE_PROMPT_DIAGNOSTIC.txt**:
-  - Ask about MEASUREMENTS: "What voltage reading do you see?"
-  - Ask about VISUAL OBSERVATIONS: "Any signs of corrosion, burn marks?"
-  - Ask about SOUNDS/SMELLS: "Do you hear any clicking? Any burning smell?"
-  - FOLLOW-UP questions based on answers
-- **Expanded diagnostic sequences**:
-  - Air Conditioner: 10 questions (was 5)
-  - Furnace: 10 questions (was 5)
-  - Refrigerator: 10 questions (NEW)
-  - Inverter/Converter: 10 questions (NEW)
-  - Slide-out: 8 questions (was 5)
-  - Leveling: 10 questions (was 5)
-- **Stricter transition rules**: Must ask 5-6+ questions for complex systems
-
-#### Detailed Work Lists in Final Report
-- **Enhancement**: Portal-Cause reports now include comprehensive work breakdown
-- **Changes to MODE_PROMPT_FINAL_REPORT.txt**:
-  - Step-by-step repair procedure
-  - Complete parts list with consumables
-  - Labor breakdown by task with individual time estimates
-  - Total labor hours
-
-#### Complex Equipment Unit Replacement Rule (RV Industry)
-- **Problem**: Agent was recommending individual component replacement (e.g., "compressor replacement")
-- **Fix**: In RV industry, complex equipment is ALWAYS replaced as complete units
-- **Added to SYSTEM_PROMPT_BASE.txt**:
-  ```
-  COMPLEX EQUIPMENT CLASSIFICATION (CRITICAL - RV INDUSTRY RULE):
-  - Roof AC / Air conditioners / Heat pumps → Replace ENTIRE AC UNIT
-  - Furnaces → Replace ENTIRE FURNACE UNIT
-  - Refrigerators → Replace ENTIRE REFRIGERATOR UNIT
-  - Inverters / Converters → Replace ENTIRE UNIT
-  - NEVER recommend replacing individual internal components
-  ```
-- **Added to MODE_PROMPT_FINAL_REPORT.txt**:
-  - Clear rule stating complex equipment = unit replacement
-  - Example showing AC unit replacement (2.8 hr labor)
-  - Example showing water pump replacement (1.0 hr labor - simple item)
-
-### Media Pipeline Upgrade (Feb 9, 2026)
-
-#### Multi-Photo Attachments (Frontend)
-- **Files Changed**: `src/components/photo-attach.tsx`, `src/components/chat-panel.tsx`
-- **Features**:
-  - Allow up to 10 images per message
-  - Preview grid with individual removal buttons
-  - Client-side image compression (MAX_DIM=1024, JPEG_QUALITY=0.75)
-  - Payload limits enforced: MAX_IMAGES=10, MAX_TOTAL_BYTES=5MB
-  - `multiple` file input for batch selection
-  - Progress indicators showing count and total size
-
-#### Vision Integration (Backend)
-- **Files Changed**: `src/app/api/chat/route.ts`
-- **Features**:
-  - Proper OpenAI vision input format (image_url content type)
-  - Vision enforcement instruction added when images attached
-  - Agent must describe what it ACTUALLY SEES (no hallucination)
-  - Agent requests clearer photo if image is unclear
-  - Validation: max 10 images, max 6MB total, image/* only
-  - Logging: counts and byte sizes only (never raw base64)
-
-#### Voice Dictation RU/ES (Frontend Quick Win)
-- **Files Changed**: `src/components/voice-button.tsx`
-- **Features**:
-  - `recognition.lang` respects UI language selection
-  - EN → en-US, RU → ru-RU, ES → es-ES
-  - AUTO defaults to en-US
-
-#### Speech-to-Text API (Proper Solution)
-- **New File**: `src/app/api/stt/transcribe/route.ts`
-- **Endpoint**: `POST /api/stt/transcribe`
-- **Request**: multipart/form-data with `audio` file and optional `languageHint`
-- **Response**: `{ text: string, detectedLanguage: "en"|"ru"|"es" }`
-- **Backend**: OpenAI Whisper (whisper-1 model)
-- **Limits**: 10MB max audio size
-- **Formats**: wav, mp3, m4a, webm, ogg, flac
-- **No Storage**: Audio is session-only, never persisted
-
-#### Tests Added
-- `tests/chat-attachments.test.ts` - 18 tests for multi-photo validation
-- `tests/stt-transcribe.test.ts` - 14 tests for STT endpoint
-- `tests/photo-attach.test.ts` - 15 tests for frontend attachment logic
-
-## Prioritized Backlog
-
-### P0 (Critical) - DONE
-- ✅ Organization model and CRUD
-- ✅ Seat-based Stripe checkout
-- ✅ Webhook handling
-- ✅ Access gating with proper reason codes
-- ✅ Invite-only enforcement (not_a_member reason)
-- ✅ Admin Dashboard for member management
-
-### P1 (Important) - DONE
-- ✅ Member invitation emails (transactional, MVP)
-
-### P1 (Important) - Remaining
-- [ ] Configure production Resend API key for pilot environment
-- [ ] Add CSV export feature for member activity data
-- [ ] Add date range filters to member activity dashboard
-- [ ] (Optional) Switch frontend voice to MediaRecorder + STT API for cross-browser consistency
-
-### P2 (Nice to Have)
-- [ ] Real-time UI updates (replace manual "Refresh" with Firestore onSnapshot/WebSockets)
-- [ ] Multi-org support (user in multiple orgs)
-- [ ] Organization settings page
-- [ ] Usage analytics per org
-
-## Next Tasks
-1. Configure production Resend API key for pilot environment
-2. Add CSV export for member activity data
-3. Add date range filters to activity dashboard
-4. Test multi-photo + vision with real RV diagnostic images
-
-## Environment Variables
-See `.env.example` for required configuration:
-- `FIREBASE_ADMIN_KEY_PATH` - Firebase Admin SDK key
-- `STRIPE_SECRET_KEY` - Stripe API key
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signature secret
-- `STRIPE_PRICE_SEAT_MONTHLY` - Price ID for seat subscription
-- `REQUIRE_SUBSCRIPTION` - Feature flag (true/false)
-
-## Branch
-`feat/org-setup-admin-dashboard` - Created from main
+## Backlog
+- P0: None (all acceptance criteria met)
+- P1: Consider adding integration tests with mocked OpenAI responses to verify end-to-end behavior
+- P2: Add language policy admin UI for dynamic mode configuration
+- P2: Improve AUTO mode language detection (consider using LLM-based detection for ambiguous inputs)

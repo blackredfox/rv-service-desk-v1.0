@@ -2,10 +2,12 @@ import {
   normalizeLanguageMode, 
   detectInputLanguageV2, 
   computeOutputPolicy,
+  resolveLanguagePolicy,
   type LanguageMode, 
   type Language,
   type InputLanguageV2,
   type OutputLanguagePolicyV2,
+  type LanguagePolicy,
 } from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
@@ -25,6 +27,21 @@ import {
 } from "@/lib/mode-validators";
 
 export const runtime = "nodejs";
+
+// Translation separator (must match mode-validators / output-validator)
+const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
+
+/**
+ * Output-layer enforcement: strip translation block when policy says none.
+ * This is the final safety net — even if the LLM produces a translation,
+ * it will be removed before the user sees it.
+ */
+function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
+  if (!policy.includeTranslation && text.includes(TRANSLATION_SEPARATOR)) {
+    return text.split(TRANSLATION_SEPARATOR)[0].trim();
+  }
+  return text;
+}
 
 // Attachment validation constants
 const MAX_ATTACHMENTS = 10;
@@ -292,7 +309,10 @@ export async function POST(req: Request) {
   // 3. Compute effective output language
   const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, inputLanguage.detected);
   
-  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}`);
+  // 4. Resolve declarative language policy (single source of truth for translation behavior)
+  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, inputLanguage.detected);
+  
+  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}`);
 
   // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
@@ -329,11 +349,14 @@ export async function POST(req: Request) {
   // Compose system prompt using v2 semantics:
   // - inputDetected: what language user wrote in
   // - outputEffective: what language assistant must respond in
+  // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
   const baseSystemPrompt = composePromptV2({
     mode: currentMode,
     inputDetected: inputLanguage.detected,
     outputEffective: outputPolicy.effective,
+    includeTranslation: langPolicy.includeTranslation,
+    translationLanguage: langPolicy.translationLanguage,
   });
   
   const visionInstruction = buildVisionInstruction(attachmentCount);
@@ -396,8 +419,8 @@ export async function POST(req: Request) {
           return;
         }
 
-        // Validate output
-        let validation = validateOutput(result.response, currentMode);
+        // Validate output (pass language policy for translation enforcement)
+        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
         // If validation fails, retry once with correction
@@ -420,7 +443,7 @@ export async function POST(req: Request) {
           result = await callOpenAI(apiKey, retryBody, ac.signal);
 
           if (!result.error) {
-            validation = validateOutput(result.response, currentMode);
+            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
@@ -484,13 +507,19 @@ export async function POST(req: Request) {
             mode: currentMode,
             inputDetected: inputLanguage.detected,
             outputEffective: outputPolicy.effective,
+            includeTranslation: langPolicy.includeTranslation,
+            translationLanguage: langPolicy.translationLanguage,
           });
           
           // Get updated history (including the transition message)
           const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
           
           // Build a detailed context message that summarizes findings
-          // This helps the LLM generate a proper Portal-Cause report
+          // Translation instructions are driven by LanguagePolicy (declarative)
+          const translationInstruction = langPolicy.includeTranslation && langPolicy.translationLanguage
+            ? `\n3. Then "--- TRANSLATION ---"\n4. Complete translation of the above into ${langPolicy.translationLanguage === "RU" ? "Russian" : langPolicy.translationLanguage === "ES" ? "Spanish" : langPolicy.translationLanguage}`
+            : "";
+
           const finalReportRequest = `Based on the completed diagnostic isolation in the conversation above, generate the Portal-Cause authorization text now.
 
 DIAGNOSTIC SUMMARY FROM CONVERSATION:
@@ -500,9 +529,7 @@ DIAGNOSTIC SUMMARY FROM CONVERSATION:
 
 REQUIRED OUTPUT FORMAT:
 1. English paragraph describing: observed symptoms, diagnostic checks, verified condition, required repair
-2. Labor justification with hours (e.g., "Total labor 1.0 hr")
-3. Then "--- TRANSLATION ---"
-4. Complete translation of the above into ${inputLanguage.detected === "RU" ? "Russian" : inputLanguage.detected === "ES" ? "Spanish" : "the technician's language"}
+2. Labor justification with hours (e.g., "Total labor 1.0 hr")${translationInstruction}
 
 Generate the complete Portal-Cause report now.`;
           
@@ -521,16 +548,23 @@ Generate the complete Portal-Cause report now.`;
           const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
           
           if (!finalResult.error && finalResult.response.trim()) {
-            // Validate the final report
-            const finalValidation = validateOutput(finalResult.response, currentMode);
+            // Validate the final report (with language policy)
+            const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation);
             logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
             
             let finalContent = finalResult.response;
             
-            // If validation fails, use fallback
+            // Output-layer enforcement: strip translation for EN mode
+            finalContent = enforceLanguagePolicy(finalContent, langPolicy);
+            
+            // If validation fails after enforcement, use fallback
             if (!finalValidation.valid) {
-              console.log(`[Chat API v2] Final report validation failed, using fallback`);
-              finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+              // Re-validate after enforcement (translation-related violation may now be resolved)
+              const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation);
+              if (!postEnforcementValidation.valid) {
+                console.log(`[Chat API v2] Final report validation failed, using fallback`);
+                finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+              }
             }
             
             // Stream the final report
@@ -553,7 +587,10 @@ Generate the complete Portal-Cause report now.`;
             console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
           }
         } else {
-          // No transition - stream the response normally
+          // No transition - apply output-layer enforcement before streaming
+          full = enforceLanguagePolicy(full, langPolicy);
+
+          // Stream the response normally
           for (const char of full) {
             if (aborted) break;
             controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));

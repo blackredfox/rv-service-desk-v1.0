@@ -189,13 +189,28 @@ export function validateAuthorizationOutput(text: string): ValidationResult {
 
 /**
  * Validate final report mode output
+ *
+ * Translation enforcement is driven by LanguagePolicy:
+ *   includeTranslation=true  → must contain '--- TRANSLATION ---'
+ *   includeTranslation=false → must NOT contain '--- TRANSLATION ---'
+ *
+ * @param text  - LLM output to validate
+ * @param includeTranslation - Whether a translation block is expected (from LanguagePolicy).
+ *                             Defaults to true for backward compatibility.
  */
-export function validateFinalReportOutput(text: string): ValidationResult {
+export function validateFinalReportOutput(text: string, includeTranslation: boolean = true): ValidationResult {
   const violations: string[] = [];
 
-  // Must contain translation separator
-  if (!text.includes(TRANSLATION_SEPARATOR)) {
-    violations.push("FINAL_REPORT_FORMAT: Missing '--- TRANSLATION ---' separator");
+  if (includeTranslation) {
+    // RU / ES / AUTO-non-EN: Must contain translation separator
+    if (!text.includes(TRANSLATION_SEPARATOR)) {
+      violations.push("FINAL_REPORT_FORMAT: Missing '--- TRANSLATION ---' separator");
+    }
+  } else {
+    // EN mode: Must NOT contain translation separator
+    if (text.includes(TRANSLATION_SEPARATOR)) {
+      violations.push("FINAL_REPORT_LANG_POLICY: EN mode must not include '--- TRANSLATION ---' block");
+    }
   }
 
   // Must have labor information
@@ -233,8 +248,11 @@ export function validateFinalReportOutput(text: string): ValidationResult {
 
 /**
  * Main validator dispatcher based on mode
+ *
+ * @param includeTranslation  Forwarded to final-report validator.
+ *                            Defaults to true for backward compatibility.
  */
-export function validateOutput(text: string, mode: CaseMode): ValidationResult {
+export function validateOutput(text: string, mode: CaseMode, includeTranslation?: boolean): ValidationResult {
   if (!text || !text.trim()) {
     return { valid: false, violations: ["EMPTY_OUTPUT: Response is empty"] };
   }
@@ -245,7 +263,7 @@ export function validateOutput(text: string, mode: CaseMode): ValidationResult {
     case "authorization":
       return validateAuthorizationOutput(text);
     case "final_report":
-      return validateFinalReportOutput(text);
+      return validateFinalReportOutput(text, includeTranslation);
     default:
       return validateDiagnosticOutput(text);
   }
