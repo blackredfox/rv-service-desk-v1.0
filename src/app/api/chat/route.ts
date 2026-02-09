@@ -25,6 +25,15 @@ import {
   buildCorrectionInstruction,
   logValidation,
 } from "@/lib/mode-validators";
+import {
+  setLaborEstimate,
+  confirmLabor,
+  getLaborEntry,
+  getConfirmedHours,
+  extractLaborEstimate,
+  parseLaborConfirmation,
+  validateLaborSum,
+} from "@/lib/labor-store";
 
 export const runtime = "nodejs";
 
