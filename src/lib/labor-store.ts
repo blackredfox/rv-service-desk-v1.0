@@ -81,11 +81,11 @@ export function parseLaborConfirmation(
 ): number | null {
   const msg = userMessage.trim();
 
-  // Try to extract a number with unit
-  const withUnit = msg.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|ч|час)/i);
+  // Try to extract a number with unit (handles: "2.5 hours", "2.5h", "2.5hr", "2.5hrs")
+  const withUnit = msg.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h\b|ч|час)/i);
   if (withUnit) return parseFloat(withUnit[1]);
 
-  // Try just a standalone number (e.g. "2.0" or "1.5")
+  // Try just a standalone number (e.g. "2.5" or "1.5" or "2")
   const standalone = msg.match(/^[\s]*(\d+(?:\.\d+)?)[\s]*$/);
   if (standalone) return parseFloat(standalone[1]);
 
