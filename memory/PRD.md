@@ -1,44 +1,79 @@
 # RV Service Desk — PRD & Implementation Memory
 
 ## Original Problem Statement
-Fix bilingual output bug: EN mode sometimes appends an additional translated section (ES/RU) to the final report. This behavior is correct for RU/ES/AUTO modes but incorrect for EN mode. Root cause: implicit/mixed responsibility between prompt composition, output validation, and language logic. Goal: make translation behavior fully declarative, not prompt-driven.
+Diagnostic behavior feels mechanical and template-driven. Five targeted fixes:
+1. Agent repeatedly asks same diagnostic questions after technician answered
+2. No diagnostic pivoting when key findings are discovered
+3. Unverified facts (invented symptoms) in final reports
+4. Over-polite/unnatural tone ("Thank you" after every reply)
+5. Labor confirmation input bug (rejects "2.5", "2.5h")
 
 ## Architecture
 - **Stack**: Next.js (App Router), TypeScript, Vitest, OpenAI API
-- **Key flow**: `lang.ts` (policy) → `prompt-composer.ts` (directives) → `mode-validators.ts` (enforcement) → `route.ts` (wiring + output-layer enforcement)
+- **Key flow**: `diagnostic` → `labor_confirmation` → `final_report`
+- **Language policy**: `lang.ts` → `prompt-composer.ts` → `mode-validators.ts` → `route.ts`
+- **Diagnostic state**: `diagnostic-registry.ts` (per-case in-memory)
+- **Fact extraction**: `fact-pack.ts` (conversation scanning)
 
-## What's Been Implemented (Jan 2026)
+## What's Been Implemented
 
-### Declarative Language Policy Architecture
-1. **`src/lib/lang.ts`** — Added `LanguagePolicy` type and `resolveLanguagePolicy()` as single source of truth
-   - EN → `includeTranslation: false`
-   - RU → `includeTranslation: true, translationLanguage: "RU"`
-   - ES → `includeTranslation: true, translationLanguage: "ES"`
-   - AUTO → depends on detected input language
+### Session 1 (Jan 2026) — Language Policy
+- Declarative `LanguagePolicy` in `lang.ts`
+- Output-layer enforcement for EN/RU/ES/AUTO modes
 
-2. **`src/lib/prompt-composer.ts`** — `buildLanguageDirectiveV2` and `composePromptV2` now accept `includeTranslation` / `translationLanguage` from policy. EN mode directive says "English only" (no translation mention).
+### Session 2 (Jan 2026) — Labor Confirmation + Copy UX
+- `labor_confirmation` mode between diagnostic and final_report
+- Labor sum validation in `labor-store.ts`
+- Copy button visual feedback with auto-reset
 
-3. **`src/lib/mode-validators.ts`** — `validateFinalReportOutput(text, includeTranslation)` enforces:
-   - `includeTranslation=true` → must contain `--- TRANSLATION ---`
-   - `includeTranslation=false` → must NOT contain `--- TRANSLATION ---`
+### Session 3 (Jan 2026) — Diagnostic Behavior Fix (MVP)
 
-4. **`src/lib/output-validator.ts`** — Updated `validateResponse` and `isCauseFormatCorrect` to accept `includeTranslation` param.
+#### A. Diagnostic Question Registry (`diagnostic-registry.ts`)
+- Per-case in-memory tracking: `answeredKeys`, `unableToVerifyKeys`, `keyFindings`
+- Detects "already checked/answered/told you" → marks topic as answered
+- Detects "don't know/can't see/unable to verify" → closes topic permanently
+- `buildRegistryContext()` injects closed topics into diagnostic prompt
+- Multi-language support (EN, RU, ES patterns)
 
-5. **`src/app/api/chat/route.ts`** — Wired `LanguagePolicy` through entire pipeline. Added `enforceLanguagePolicy()` output-layer enforcement that strips translation blocks for EN mode as final safety net.
+#### B. Diagnostic Pivot Rules
+- `detectKeyFinding()` — 17 key finding patterns (missing blade, seized motor, cracked housing, zero current, etc.)
+- `shouldPivot()` — when key finding detected, forces immediate transition to labor_confirmation
+- Implemented in `route.ts` — if LLM doesn't self-transition, pivot forces it
 
-6. **Prompt files** — Removed hardcoded translation rules from `SYSTEM_PROMPT_BASE.txt` and `MODE_PROMPT_FINAL_REPORT.txt`. Translation is now controlled by dynamic directives based on policy.
+#### C. Fact-Locked Final Report (`fact-pack.ts`)
+- `buildFactPack()` — scans ONLY user messages for symptoms, observations, test results
+- `buildFactLockConstraint()` — generates prohibition string injected into final report prompt
+- Rules: "Do NOT add, infer, or assume any symptoms not listed", "not verified" for unconfirmed
 
-7. **Tests** — Added `tests/language-policy.test.ts` (28 new tests). Updated `tests/payload-v2.test.ts` for policy-driven API. All 353 tests pass.
+#### D. Tone Adjustment
+- `SYSTEM_PROMPT_BASE.txt`: "Do NOT say Thank you", "Prefer silence over politeness", "Never use filler phrases"
+- `MODE_PROMPT_DIAGNOSTIC.txt`: Professional communication style, one-word acknowledgments only ("Noted.", "Understood.", "Copy.")
+- Diagnostic Registry Rules and Pivot Rules embedded in diagnostic prompt
+
+#### E. Labor Confirmation Input Parsing (Bug Fix)
+- `parseLaborConfirmation()` now accepts: `2.5`, `2.5h`, `2.5 hours`, `2.5hr`, `2.5hrs`
+- Regex updated: `h\b` as standalone unit match
+
+#### Tests Added
+- `tests/diagnostic-registry.test.ts` — 26 tests
+- `tests/fact-pack.test.ts` — 10 tests
+- `tests/tone-adjustment.test.ts` — 9 tests
+- Updated `tests/labor-confirmation.test.ts` — +2 tests
+- Total: 447 tests passing (53 new), 33 test files
 
 ## Ownership Model
 | Concern | Owner |
 |---------|-------|
 | Content & format | Prompt files (`prompts/`) |
 | Language rules | Config (`LanguagePolicy` in `lang.ts`) |
+| Labor rules | Config (`labor-store.ts`) + validator |
+| Diagnostic state | Registry (`diagnostic-registry.ts`) |
+| Fact extraction | `fact-pack.ts` |
 | Enforcement | Validator (`mode-validators.ts`) + output layer (`route.ts`) |
 
 ## Backlog
 - P0: None (all acceptance criteria met)
-- P1: Consider adding integration tests with mocked OpenAI responses to verify end-to-end behavior
-- P2: Add language policy admin UI for dynamic mode configuration
-- P2: Improve AUTO mode language detection (consider using LLM-based detection for ambiguous inputs)
+- P1: Integration test with mocked OpenAI — full diagnostic → pivot → labor → report flow
+- P1: Expand key finding patterns based on customer field testing
+- P2: Persist diagnostic registry to DB for cross-session continuity
+- P2: Confidence scoring for fact extraction (high/medium/low)
