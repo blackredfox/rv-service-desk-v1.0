@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 import { trackEvent } from "@/lib/analytics";
+import { computeExpiresAt, computeTimeLeftSeconds } from "@/lib/retention";
 import type { CaseMode } from "./prompt-composer";
 
 
@@ -17,6 +18,9 @@ export type CaseSummary = {
   mode: CaseMode;
   createdAt: string;
   updatedAt: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  timeLeftSeconds: number;
 };
 
 export type ChatMessage = {
