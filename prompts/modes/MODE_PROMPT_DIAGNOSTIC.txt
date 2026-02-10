@@ -176,8 +176,8 @@ THIS IS A COMPLEX SYSTEM - REQUIRES THOROUGH DIAGNOSIS
 → Only when SPECIFIC component is identified as faulty → TRANSITION
 
 HANDLING "NO INFORMATION" OR "UNKNOWN":
-- If technician says "don't know" or "can't check" — accept it.
-- Mark that path as closed and move to the next verifiable step.
+- If technician says "don't know", "can't check", or has no information — accept it.
+- Mark that path as closed and move to the next diagnostic step.
 - Do NOT repeat the same question.
 - Do NOT suggest how to obtain the information unless critical.
 
