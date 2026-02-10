@@ -146,16 +146,19 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
   const store = getMemoryStore();
   const c = store.cases.get(caseId);
   if (!c || c.deletedAt) return null;
+  const ts = nowIso();
+  const retention = withRetention({ createdAt: c.createdAt, updatedAt: ts, lastActivityAt: ts });
   const updated = {
     ...c,
     title: input.title ? clampTitle(input.title) : c.title,
     inputLanguage: input.inputLanguage ?? c.inputLanguage,
     languageSource: input.languageSource ?? c.languageSource,
     mode: input.mode ?? c.mode,
-    updatedAt: nowIso(),
+    updatedAt: ts,
+    ...retention,
   };
   store.cases.set(caseId, updated);
-  const { ...summary } = updated;
+  const { deletedAt: _d, ...summary } = updated;
   return summary;
 }
 
