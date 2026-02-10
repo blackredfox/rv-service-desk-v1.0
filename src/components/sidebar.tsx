@@ -157,7 +157,8 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled }: Props) {
                   }
                 >
                   <span className="line-clamp-1 pr-2">{c.title}</span>
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <ExpiryBadge timeLeftSeconds={c.timeLeftSeconds} />
                     <span className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
                       {c.inputLanguage}
                     </span>
