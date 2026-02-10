@@ -138,7 +138,7 @@ async function getCaseMemory(caseId: string): Promise<{ case: CaseSummary | null
     .filter((m) => m.caseId === caseId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const { ...summary } = c;
+  const { deletedAt: _d, ...summary } = c;
   return { case: summary, messages };
 }
 
