@@ -214,10 +214,11 @@ async function appendMessageMemory(args: {
     createdAt: ts,
   };
   store.messages.set(id, msg);
-  // Touch case
+  // Touch case: update lastActivityAt and recalculate retention
   const c = store.cases.get(args.caseId);
   if (c && !c.deletedAt) {
-    store.cases.set(args.caseId, { ...c, updatedAt: ts });
+    const retention = withRetention({ createdAt: c.createdAt, updatedAt: ts, lastActivityAt: ts });
+    store.cases.set(args.caseId, { ...c, updatedAt: ts, ...retention });
   }
   return msg;
 }
