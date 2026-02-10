@@ -103,15 +103,15 @@ describe("buildFactLockConstraint", () => {
     const constraint = buildFactLockConstraint(history);
     
     expect(constraint).toContain("FACT LOCK");
-    expect(constraint).toContain("MUST use ONLY these facts");
-    expect(constraint).toContain("MUST NOT add");
+    expect(constraint).toContain("ONLY these facts");
+    expect(constraint).toContain("Do NOT add");
   });
 
   it("includes technician-stated facts", async () => {
     const { buildFactLockConstraint } = await import("@/lib/fact-pack");
     const history = [
       { role: "user", content: "I see burn marks on the wiring." },
-      { role: "user", content: "Resistance measured at 0.3 ohms." },
+      { role: "user", content: "Resistance measured at 0.3 ohms on the terminals." },
     ];
     const constraint = buildFactLockConstraint(history);
     
@@ -123,7 +123,7 @@ describe("buildFactLockConstraint", () => {
     const { buildFactLockConstraint } = await import("@/lib/fact-pack");
     const constraint = buildFactLockConstraint([]);
     
-    expect(constraint).toContain("MUST NOT add");
+    expect(constraint).toContain("Do NOT add");
     expect(constraint).toContain("intermittent operation");
     expect(constraint).toContain("not verified");
   });
