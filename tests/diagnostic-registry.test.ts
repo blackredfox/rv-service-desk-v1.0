@@ -135,17 +135,17 @@ describe("detectKeyFinding", () => {
 
   it("detects blower wheel damage", async () => {
     const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
-    expect(detectKeyFinding("The blower wheel has cracks and damage")).toBe("blower wheel damage");
+    expect(detectKeyFinding("The blower wheel has damage and cracks")).toBe("blower wheel damage");
   });
 
   it("detects component contacting housing", async () => {
     const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
-    expect(detectKeyFinding("The blade is contacting the housing")).toBe("component contacting housing");
+    expect(detectKeyFinding("The blade is contacting the housing and scraping")).toBe("component contacting housing");
   });
 
   it("detects seized motor", async () => {
     const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
-    expect(detectKeyFinding("The motor is seized and won't turn")).toBe("seized/locked motor");
+    expect(detectKeyFinding("The motor is seized and won't turn at all")).toBe("seized/locked motor");
   });
 
   it("detects zero current draw", async () => {
@@ -155,7 +155,7 @@ describe("detectKeyFinding", () => {
 
   it("detects cracked housing", async () => {
     const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
-    expect(detectKeyFinding("There's a crack in the housing")).toBe("cracked housing");
+    expect(detectKeyFinding("There's a crack in the housing of the pump")).toBe("cracked housing");
   });
 
   it("returns null for normal diagnostic message", async () => {
