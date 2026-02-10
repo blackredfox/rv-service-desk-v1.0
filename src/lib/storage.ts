@@ -199,7 +199,11 @@ async function searchCasesMemory(q: string): Promise<CaseSummary[]> {
   return results
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 25)
-    .map(({ deletedAt: _d, ...summary }) => summary);
+    .map(({ deletedAt: _d, ...rest }) => {
+      const retention = withRetention({ createdAt: rest.createdAt, updatedAt: rest.updatedAt, lastActivityAt: rest.lastActivityAt });
+      return { ...rest, ...retention };
+    })
+    .filter((c) => c.timeLeftSeconds > 0);
 }
 
 async function appendMessageMemory(args: {
