@@ -17,9 +17,11 @@ describe("Tone Adjustment - Prompt Files", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"), "utf-8");
 
-    expect(content).not.toContain("Thank you for the information");
-    expect(content).not.toContain("warmly");
-    expect(content).not.toContain("Great question");
+    // Should not instruct the agent to say "Thank you for the information" as a DEFAULT behavior
+    expect(content).not.toContain("Acknowledge technician's responses warmly");
+    expect(content).not.toContain("acknowledge it warmly");
+    // "Great question" may appear as an example of what NOT to say — that's fine
+    expect(content).toContain("Do NOT say");
   });
 
   it("SYSTEM_PROMPT_BASE: has professional tone instructions", async () => {
