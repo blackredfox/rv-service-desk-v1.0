@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CaseSummary } from "@/lib/storage";
 import { apiCreateCase, apiDeleteCase, apiListCases, apiSearch } from "@/lib/api";
 import { analytics } from "@/lib/client-analytics";
+import { formatTimeLeft, getUrgencyTier } from "@/lib/retention";
 
 type Props = {
   activeCaseId: string | null;
@@ -156,7 +157,8 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled }: Props) {
                   }
                 >
                   <span className="line-clamp-1 pr-2">{c.title}</span>
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <ExpiryBadge timeLeftSeconds={c.timeLeftSeconds} />
                     <span className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
                       {c.inputLanguage}
                     </span>
@@ -180,5 +182,28 @@ export function Sidebar({ activeCaseId, onSelectCase, disabled }: Props) {
         {!loading && filtered.length === 0 && <div className="px-2 py-2 text-sm text-zinc-500">No cases</div>}
       </div>
     </aside>
+  );
+}
+
+/** Compact expiration badge. */
+function ExpiryBadge({ timeLeftSeconds }: { timeLeftSeconds: number }) {
+  const label = formatTimeLeft(timeLeftSeconds);
+  const tier = getUrgencyTier(timeLeftSeconds);
+
+  const tierStyles: Record<string, string> = {
+    normal:  "border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400",
+    warning: "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400",
+    urgent:  "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
+    expired: "border-red-400 bg-red-100 text-red-800 dark:border-red-700 dark:bg-red-950/60 dark:text-red-300",
+  };
+
+  return (
+    <span
+      data-testid="expiry-badge"
+      className={`rounded border px-1 py-0.5 text-[10px] font-medium leading-none tabular-nums ${tierStyles[tier]}`}
+      title={tier === "expired" ? "Case expired" : `Expires in ${label}`}
+    >
+      {label}
+    </span>
   );
 }

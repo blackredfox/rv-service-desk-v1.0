@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { detectLanguage, type Language } from "@/lib/lang";
 import { trackEvent } from "@/lib/analytics";
+import { computeExpiresAt, computeTimeLeftSeconds } from "@/lib/retention";
 import type { CaseMode } from "./prompt-composer";
 
 
@@ -17,6 +18,9 @@ export type CaseSummary = {
   mode: CaseMode;
   createdAt: string;
   updatedAt: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  timeLeftSeconds: number;
 };
 
 export type ChatMessage = {
@@ -59,6 +63,19 @@ function clampTitleSeed(seed: string) {
   return (s.slice(0, 60) || "New Case").trim();
 }
 
+/** Enrich a raw case object with computed retention fields. */
+function withRetention(c: {
+  createdAt: string;
+  updatedAt: string;
+  lastActivityAt?: string;
+  [key: string]: unknown;
+}): { lastActivityAt: string; expiresAt: string; timeLeftSeconds: number } {
+  const lastActivityAt = c.lastActivityAt || c.updatedAt;
+  const expiresAt = computeExpiresAt(lastActivityAt).toISOString();
+  const timeLeftSeconds = computeTimeLeftSeconds(expiresAt);
+  return { lastActivityAt, expiresAt, timeLeftSeconds };
+}
+
 function uuid() {
   return globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
@@ -85,15 +102,17 @@ async function listCasesMemory(): Promise<CaseSummary[]> {
   const store = getMemoryStore();
   return [...store.cases.values()]
     .filter((c) => !c.deletedAt)
+    .filter((c) => c.timeLeftSeconds > 0) // hide expired
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 50)
-    .map(({ ...rest }) => rest);
+    .map(({ deletedAt: _d, ...rest }) => rest);
 }
 
 async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
   const store = getMemoryStore();
   const id = uuid();
   const ts = nowIso();
+  const retention = withRetention({ createdAt: ts, updatedAt: ts, lastActivityAt: ts });
   const c = {
     id,
     title: clampTitle(input.title ?? "New Case"),
@@ -102,10 +121,11 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
+    ...retention,
     deletedAt: null,
   };
   store.cases.set(id, c);
-  const { ...summary } = c;
+  const { deletedAt: _d, ...summary } = c;
   return summary;
 }
 
@@ -118,7 +138,7 @@ async function getCaseMemory(caseId: string): Promise<{ case: CaseSummary | null
     .filter((m) => m.caseId === caseId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const { ...summary } = c;
+  const { deletedAt: _d, ...summary } = c;
   return { case: summary, messages };
 }
 
@@ -126,16 +146,19 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
   const store = getMemoryStore();
   const c = store.cases.get(caseId);
   if (!c || c.deletedAt) return null;
+  const ts = nowIso();
+  const retention = withRetention({ createdAt: c.createdAt, updatedAt: ts, lastActivityAt: ts });
   const updated = {
     ...c,
     title: input.title ? clampTitle(input.title) : c.title,
     inputLanguage: input.inputLanguage ?? c.inputLanguage,
     languageSource: input.languageSource ?? c.languageSource,
     mode: input.mode ?? c.mode,
-    updatedAt: nowIso(),
+    updatedAt: ts,
+    ...retention,
   };
   store.cases.set(caseId, updated);
-  const { ...summary } = updated;
+  const { deletedAt: _d, ...summary } = updated;
   return summary;
 }
 
@@ -165,12 +188,12 @@ async function searchCasesMemory(q: string): Promise<CaseSummary[]> {
   const results = [...matchedCaseIds]
     .map((id) => store.cases.get(id))
     .filter(Boolean)
-    .filter((c) => c && !c.deletedAt) as (CaseSummary & { deletedAt: string | null })[];
+    .filter((c) => c && !c.deletedAt && c.timeLeftSeconds > 0) as (CaseSummary & { deletedAt: string | null })[];
 
   return results
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 25)
-    .map(({ ...summary }) => summary);
+    .map(({ deletedAt: _d, ...summary }) => summary);
 }
 
 async function appendMessageMemory(args: {
@@ -191,10 +214,11 @@ async function appendMessageMemory(args: {
     createdAt: ts,
   };
   store.messages.set(id, msg);
-  // Touch case
+  // Touch case: update lastActivityAt and recalculate retention
   const c = store.cases.get(args.caseId);
   if (c && !c.deletedAt) {
-    store.cases.set(args.caseId, { ...c, updatedAt: ts });
+    const retention = withRetention({ createdAt: c.createdAt, updatedAt: ts, lastActivityAt: ts });
+    store.cases.set(args.caseId, { ...c, updatedAt: ts, ...retention });
   }
   return msg;
 }
@@ -204,20 +228,24 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
   const existing = input.caseId ? store.cases.get(input.caseId) : undefined;
 
   if (existing && !existing.deletedAt) {
+    const ts = nowIso();
+    const retention = withRetention({ createdAt: existing.createdAt, updatedAt: ts, lastActivityAt: ts });
     const updated = {
       ...existing,
       inputLanguage: input.inputLanguage,
       languageSource: input.languageSource,
       title: existing.title === "New Case" ? clampTitleSeed(input.titleSeed) : existing.title,
-      updatedAt: nowIso(),
+      updatedAt: ts,
+      ...retention,
     };
     store.cases.set(existing.id, updated);
-    const { ...summary } = updated;
+    const { deletedAt: _d, ...summary } = updated;
     return summary;
   }
 
   const id = uuid();
   const ts = nowIso();
+  const retention = withRetention({ createdAt: ts, updatedAt: ts, lastActivityAt: ts });
   const created = {
     id,
     title: clampTitleSeed(input.titleSeed),
@@ -226,10 +254,11 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
+    ...retention,
     deletedAt: null,
   };
   store.cases.set(id, created);
-  const { ...summary } = created;
+  const { deletedAt: _d, ...summary } = created;
   return summary;
 }
 
@@ -263,11 +292,14 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       updatedAt: true,
     },
   });
-  return rows.map((r: AnyObj) => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  }));
+  return rows
+    .map((r: AnyObj) => {
+      const createdAt = r.createdAt.toISOString();
+      const updatedAt = r.updatedAt.toISOString();
+      const retention = withRetention({ createdAt, updatedAt });
+      return { ...r, createdAt, updatedAt, ...retention };
+    })
+    .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
 }
 
 async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
@@ -295,10 +327,15 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
     await trackEvent("case.created", input.userId, { caseId: created.id });
   }
 
+  const createdAtStr = created.createdAt.toISOString();
+  const updatedAtStr = created.updatedAt.toISOString();
+  const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr, lastActivityAt: createdAtStr });
+
   return {
     ...created,
-    createdAt: created.createdAt.toISOString(),
-    updatedAt: created.updatedAt.toISOString(),
+    createdAt: createdAtStr,
+    updatedAt: updatedAtStr,
+    ...retention,
   };
 }
 
@@ -336,6 +373,10 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
 
   if (!c) return { case: null, messages: [] };
 
+  const createdAtStr = c.createdAt.toISOString();
+  const updatedAtStr = c.updatedAt.toISOString();
+  const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+
   return {
     case: {
       id: c.id,
@@ -344,8 +385,9 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       inputLanguage: c.inputLanguage as Language,
       languageSource: c.languageSource as "AUTO" | "MANUAL",
       mode: c.mode as CaseMode,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
+      createdAt: createdAtStr,
+      updatedAt: updatedAtStr,
+      ...retention,
     },
     messages: c.messages
       .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
@@ -392,10 +434,15 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
       },
     });
 
+    const createdAtStr = updated.createdAt.toISOString();
+    const updatedAtStr = updated.updatedAt.toISOString();
+    const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+
     return {
       ...updated,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      createdAt: createdAtStr,
+      updatedAt: updatedAtStr,
+      ...retention,
     };
   } catch {
     return null;
@@ -450,11 +497,14 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
     },
   });
 
-  return rows.map((r: AnyObj) => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  }));
+  return rows
+    .map((r: AnyObj) => {
+      const createdAt = r.createdAt.toISOString();
+      const updatedAt = r.updatedAt.toISOString();
+      const retention = withRetention({ createdAt, updatedAt });
+      return { ...r, createdAt, updatedAt, ...retention };
+    })
+    .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
 }
 
 async function appendMessageDb(args: {
@@ -539,6 +589,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
         ...updated,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
+        ...withRetention({ createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() }),
       };
     }
   }
@@ -571,6 +622,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
     ...created,
     createdAt: created.createdAt.toISOString(),
     updatedAt: created.updatedAt.toISOString(),
+    ...withRetention({ createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() }),
   };
 }
 
