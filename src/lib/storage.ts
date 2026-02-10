@@ -292,11 +292,14 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       updatedAt: true,
     },
   });
-  return rows.map((r: AnyObj) => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  }));
+  return rows
+    .map((r: AnyObj) => {
+      const createdAt = r.createdAt.toISOString();
+      const updatedAt = r.updatedAt.toISOString();
+      const retention = withRetention({ createdAt, updatedAt });
+      return { ...r, createdAt, updatedAt, ...retention };
+    })
+    .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
 }
 
 async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
