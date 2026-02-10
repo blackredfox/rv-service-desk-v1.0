@@ -243,7 +243,7 @@ describe("shouldPivot", () => {
     const { processUserMessage, shouldPivot, clearRegistry } = await import("@/lib/diagnostic-registry");
     clearRegistry("pivot-2");
 
-    processUserMessage("pivot-2", "The motor is seized and won't turn");
+    processUserMessage("pivot-2", "The motor is seized and won't turn at all");
     const result = shouldPivot("pivot-2");
     expect(result.pivot).toBe(true);
     expect(result.finding).toContain("seized");
