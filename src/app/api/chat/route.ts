@@ -34,6 +34,12 @@ import {
   parseLaborConfirmation,
   validateLaborSum,
 } from "@/lib/labor-store";
+import {
+  processUserMessage,
+  buildRegistryContext,
+  shouldPivot,
+} from "@/lib/diagnostic-registry";
+import { buildFactLockConstraint } from "@/lib/fact-pack";
 
 export const runtime = "nodejs";
 
