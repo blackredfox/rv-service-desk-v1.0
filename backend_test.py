@@ -71,566 +71,273 @@ class RVServiceDeskBackendTester:
         except Exception as e:
             return False, "", str(e)
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, cookies=None):
-        """Run a single API test"""
-        url = f"{self.base_url}/{endpoint}"
-        default_headers = {'Content-Type': 'application/json'}
-        if headers:
-            default_headers.update(headers)
-
-        self.tests_run += 1
-        print(f"\n🔍 Testing {name}...")
-        print(f"   URL: {method} {url}")
+    def test_project_structure(self):
+        """Test 1: Verify all required files exist"""
+        required_files = [
+            "/app/src/lib/diagnostic-registry.ts",
+            "/app/src/lib/fact-pack.ts", 
+            "/app/src/lib/labor-store.ts",
+            "/app/src/lib/prompt-composer.ts",
+            "/app/src/lib/mode-validators.ts",
+            "/app/src/app/api/chat/route.ts",
+            "/app/prompts/system/SYSTEM_PROMPT_BASE.txt",
+            "/app/prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt",
+            "/app/tests/diagnostic-registry.test.ts",
+            "/app/tests/fact-pack.test.ts",
+            "/app/tests/tone-adjustment.test.ts",
+            "/app/tests/labor-confirmation.test.ts",
+            "/app/vitest.config.ts"
+        ]
         
-        try:
-            kwargs = {'headers': default_headers}
-            if cookies:
-                kwargs['cookies'] = cookies
-            elif self.session_cookies:
-                kwargs['cookies'] = self.session_cookies
+        missing = []
+        for file_path in required_files:
+            if not self.check_file_exists(file_path):
+                missing.append(file_path)
                 
-            if method == 'GET':
-                response = requests.get(url, **kwargs)
-            elif method == 'POST':
-                response = requests.post(url, json=data, **kwargs)
-            elif method == 'DELETE':
-                response = requests.delete(url, **kwargs)
-            elif method == 'PATCH':
-                response = requests.patch(url, json=data, **kwargs)
+        if missing:
+            self.log(f"Missing files: {missing}")
+            return False
+        return True
 
-            success = response.status_code == expected_status
-            if success:
-                self.tests_passed += 1
-                print(f"✅ Passed - Status: {response.status_code}")
-                try:
-                    response_data = response.json()
-                    print(f"   Response: {json.dumps(response_data, indent=2)[:200]}...")
-                    return True, response_data, response.cookies
-                except:
-                    return True, {}, response.cookies
-            else:
-                print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
-                try:
-                    error_data = response.json()
-                    print(f"   Error: {error_data}")
-                except:
-                    print(f"   Error text: {response.text[:200]}")
-                return False, {}, None
-
-        except Exception as e:
-            print(f"❌ Failed - Error: {str(e)}")
-            return False, {}, None
-
-    # === ORG SETUP & ADMIN DASHBOARD API TESTS ===
-    
-    def test_auth_me_not_a_member(self):
-        """Test GET /api/auth/me returns not_a_member when org exists but user not added"""
-        # This test simulates a user from a corporate domain where org exists but they're not a member
-        success, response, cookies = self.run_test(
-            "Auth Me - Not A Member (org exists, user not member)",
-            "GET",
-            "api/auth/me",
-            200,
-            cookies={}  # No session cookie, will return 401 but that's expected for unauthenticated
-        )
-        # Note: This test needs proper authentication setup to test the actual scenario
-        return success
-
-    def test_auth_me_no_organization(self):
-        """Test GET /api/auth/me returns no_organization with canCreateOrg=true when no org exists"""
-        success, response, cookies = self.run_test(
-            "Auth Me - No Organization (can create org)",
-            "GET", 
-            "api/auth/me",
-            200,
-            cookies={}
-        )
-        return success
-
-    def test_auth_me_blocked_domain(self):
-        """Test GET /api/auth/me returns blocked_domain for personal email domains"""
-        success, response, cookies = self.run_test(
-            "Auth Me - Blocked Domain (personal email)",
-            "GET",
-            "api/auth/me", 
-            200,
-            cookies={}
-        )
-        return success
-
-    def test_org_members_get_non_admin(self):
-        """Test GET /api/org/members returns 403 for non-admin users"""
-        success, response, cookies = self.run_test(
-            "Org Members GET - Non-admin user (should return 403)",
-            "GET",
-            "api/org/members",
-            401,  # Will be 401 without auth, but in real scenario would be 403 for non-admin
-            cookies={}
-        )
-        return success
-
-    def test_org_members_post_create_active(self):
-        """Test POST /api/org/members creates member with status='active'"""
-        success, response, cookies = self.run_test(
-            "Org Members POST - Create member with active status",
-            "POST",
-            "api/org/members",
-            401,  # Will be 401 without auth
-            data={"email": "newmember@company.com", "role": "member"},
-            cookies={}
-        )
-        return success
-
-    def test_org_members_post_subscription_inactive(self):
-        """Test POST /api/org/members rejects if subscription inactive"""
-        success, response, cookies = self.run_test(
-            "Org Members POST - Reject if subscription inactive",
-            "POST", 
-            "api/org/members",
-            401,  # Will be 401 without auth
-            data={"email": "newmember@company.com", "role": "member"},
-            cookies={}
-        )
-        return success
-
-    def test_org_members_post_seat_limit_reached(self):
-        """Test POST /api/org/members rejects if seat limit reached"""
-        success, response, cookies = self.run_test(
-            "Org Members POST - Reject if seat limit reached",
-            "POST",
-            "api/org/members", 
-            401,  # Will be 401 without auth
-            data={"email": "newmember@company.com", "role": "member"},
-            cookies={}
-        )
-        return success
-
-    def test_org_members_post_wrong_domain(self):
-        """Test POST /api/org/members rejects email from wrong domain"""
-        success, response, cookies = self.run_test(
-            "Org Members POST - Reject wrong domain email",
-            "POST",
-            "api/org/members",
-            401,  # Will be 401 without auth
-            data={"email": "user@wrongdomain.com", "role": "member"},
-            cookies={}
-        )
-        return success
-
-    def test_org_members_patch_prevent_last_admin_demotion(self):
-        """Test PATCH /api/org/members prevents demoting/deactivating last admin"""
-        success, response, cookies = self.run_test(
-            "Org Members PATCH - Prevent last admin demotion",
-            "PATCH",
-            "api/org/members",
-            401,  # Will be 401 without auth
-            data={"memberId": "admin123", "role": "member"},
-            cookies={}
-        )
-        return success
-
-    def test_org_members_patch_deactivate_non_admin(self):
-        """Test PATCH /api/org/members allows deactivating non-admin member"""
-        success, response, cookies = self.run_test(
-            "Org Members PATCH - Deactivate non-admin member",
-            "PATCH",
-            "api/org/members",
-            401,  # Will be 401 without auth
-            data={"memberId": "member123", "status": "inactive"},
-            cookies={}
-        )
-        return success
-    
-    def test_auth_me_unauthenticated(self):
-        """Test GET /api/auth/me when not authenticated - should return 401"""
-        success, response, cookies = self.run_test(
-            "Auth Me - Unauthenticated",
-            "GET",
-            "api/auth/me",
-            401,
-            cookies={}  # No cookies
-        )
-        return success
-
-    def test_billing_checkout_unauthenticated(self):
-        """Test POST /api/billing/checkout-session without auth - should return 401"""
-        success, response, cookies = self.run_test(
-            "Billing Checkout - Unauthenticated",
-            "POST",
-            "api/billing/checkout-session",
-            401,
-            data={"orgId": "test-org", "seatCount": 5, "origin": "http://localhost:3000"},
-            cookies={}
-        )
-        return success
-
-    def test_billing_checkout_missing_orgid(self):
-        """Test POST /api/billing/checkout-session without orgId - should return 400"""
-        success, response, cookies = self.run_test(
-            "Billing Checkout - Missing orgId",
-            "POST",
-            "api/billing/checkout-session",
-            400,
-            data={"seatCount": 5, "origin": "http://localhost:3000"},
-            cookies={}
-        )
-        return success
-
-    def test_billing_webhook_no_signature(self):
-        """Test POST /api/billing/webhook without stripe-signature header - should return 400"""
-        success, response, cookies = self.run_test(
-            "Billing Webhook - No Signature",
-            "POST",
-            "api/billing/webhook",
-            400,
-            data={"type": "test"},
-            cookies={}
-        )
-        return success
-
-    def test_org_unauthenticated(self):
-        """Test GET /api/org without auth - should return 401"""
-        success, response, cookies = self.run_test(
-            "Organization API - Unauthenticated",
-            "GET",
-            "api/org",
-            401,
-            cookies={}
-        )
-        return success
-
-    def test_unit_tests_pass(self):
-        """Test that all unit tests still pass"""
-        print(f"\n🔍 Testing Unit Tests Pass...")
-        try:
-            result = subprocess.run(
-                ["yarn", "test"], 
-                cwd="/app",
-                capture_output=True, 
-                text=True, 
-                timeout=120
-            )
-            
-            self.tests_run += 1
-            if result.returncode == 0:
-                self.tests_passed += 1
-                print(f"✅ Passed - All unit tests pass")
-                # Extract test count from output
-                if "Tests" in result.stdout:
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if "Tests" in line and "passed" in line:
-                            print(f"   {line.strip()}")
-                            break
-                
-                # Check for specific features
-                test_results = {
-                    "labor confirmation": "labor-confirmation" in result.stdout.lower(),
-                    "copy button ux": "copy-button-ux" in result.stdout.lower(),
-                    "mode validators": "mode-validators" in result.stdout.lower(),
-                }
-                
-                for feature, found in test_results.items():
-                    status = "✅" if found else "⚠️ "
-                    print(f"   {status} {feature} tests {'found' if found else 'not found'}")
-                
-                return True
-            else:
-                print(f"❌ Failed - Unit tests failed")
-                print(f"   Error: {result.stderr[:200]}")
-                return False
-        except Exception as e:
-            self.tests_run += 1
-            print(f"❌ Failed - Error: {str(e)}")
+    def test_diagnostic_registry_tests(self):
+        """Test 2: Run diagnostic registry specific tests"""
+        success, stdout, stderr = self.run_vitest_command("diagnostic-registry")
+        if success:
+            self.log("Diagnostic registry tests passed")
+            return True
+        else:
+            self.log(f"Diagnostic registry tests failed: {stderr}")
             return False
 
-    def test_frontend_loading(self):
-        """Test if frontend loads without errors"""
-        success, response, cookies = self.run_test(
-            "Frontend Loading",
-            "GET",
-            "",  # Root path
-            200,
-            cookies={}
-        )
-        return success
-
-    def test_uat_fixes_basic_endpoints(self):
-        """Test basic endpoints are accessible for UAT fixes"""
-        print("\n🔍 Testing UAT Fixes - Basic Endpoints...")
-        
-        # Test main page loads
-        success, response, cookies = self.run_test(
-            "Main page loads",
-            "GET",
-            "",
-            200,
-            cookies={}
-        )
-        
-        # Test admin members page loads (will redirect to login but should not 404)
-        success2, response2, cookies2 = self.run_test(
-            "Admin members page accessible",
-            "GET", 
-            "admin/members",
-            200,  # Should load the page (will show login/redirect but not 404)
-            cookies={}
-        )
-        
-        return success and success2
-
-    def test_billing_portal_endpoint(self):
-        """Test billing portal endpoint exists for upgrade functionality"""
-        success, response, cookies = self.run_test(
-            "Billing portal endpoint exists",
-            "POST",
-            "api/billing/portal",
-            401,  # Should return 401 (unauthorized) not 404 (not found)
-            data={"returnUrl": "http://localhost:3000"},
-            cookies={}
-        )
-        return success
-
-    # === LABOR CONFIRMATION FEATURE TESTS ===
-    
-    def test_labor_confirmation_unit_tests(self):
-        """Test labor confirmation feature through unit tests"""
-        print(f"\n🔍 Testing Labor Confirmation Features...")
-        try:
-            # Run the labor confirmation tests
-            result = subprocess.run(
-                ["yarn", "test", "tests/labor-confirmation.test.ts"], 
-                cwd="/app",
-                capture_output=True, 
-                text=True, 
-                timeout=60
-            )
-            
-            self.tests_run += 1
-            if result.returncode == 0:
-                self.tests_passed += 1
-                print(f"✅ Passed - Labor confirmation tests pass")
-                
-                # Extract test count
-                if "Tests" in result.stdout and "passed" in result.stdout:
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if "Tests" in line and "passed" in line:
-                            print(f"   {line.strip()}")
-                return True
-            else:
-                print(f"❌ Failed - Labor confirmation tests failed")
-                print(f"   Error: {result.stderr[:300]}")
-                return False
-        except Exception as e:
-            self.tests_run += 1
-            print(f"❌ Failed - Error: {str(e)}")
+    def test_fact_pack_tests(self):
+        """Test 3: Run fact pack specific tests"""  
+        success, stdout, stderr = self.run_vitest_command("fact-pack")
+        if success:
+            self.log("Fact pack tests passed")
+            return True
+        else:
+            self.log(f"Fact pack tests failed: {stderr}")
             return False
 
-    def test_copy_button_ux_unit_tests(self):
-        """Test copy button UX feature through unit tests"""
-        print(f"\n🔍 Testing Copy Button UX Features...")
-        try:
-            # Run the copy button UX tests
-            result = subprocess.run(
-                ["yarn", "test", "tests/copy-button-ux.test.ts"], 
-                cwd="/app",
-                capture_output=True, 
-                text=True, 
-                timeout=60
-            )
-            
-            self.tests_run += 1
-            if result.returncode == 0:
-                self.tests_passed += 1
-                print(f"✅ Passed - Copy button UX tests pass")
-                
-                # Extract test count
-                if "Tests" in result.stdout and "passed" in result.stdout:
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if "Tests" in line and "passed" in line:
-                            print(f"   {line.strip()}")
-                return True
-            else:
-                print(f"❌ Failed - Copy button UX tests failed")
-                print(f"   Error: {result.stderr[:300]}")
-                return False
-        except Exception as e:
-            self.tests_run += 1
-            print(f"❌ Failed - Error: {str(e)}")
-            return False
-            
-    def test_mode_validators_include_labor_confirmation(self):
-        """Test that mode validators handle labor_confirmation mode"""
-        print(f"\n🔍 Testing Mode Validators include labor_confirmation...")
-        try:
-            # Run the mode validator tests
-            result = subprocess.run(
-                ["yarn", "test", "tests/mode-validators.test.ts"], 
-                cwd="/app",
-                capture_output=True, 
-                text=True, 
-                timeout=60
-            )
-            
-            self.tests_run += 1
-            if result.returncode == 0:
-                self.tests_passed += 1
-                print(f"✅ Passed - Mode validator tests pass")
-                
-                # Check for specific functionality
-                if "labor_confirmation" in result.stdout.lower():
-                    print(f"   ✅ labor_confirmation mode found in test output")
-                
-                return True
-            else:
-                print(f"❌ Failed - Mode validator tests failed")
-                print(f"   Error: {result.stderr[:300]}")
-                return False
-        except Exception as e:
-            self.tests_run += 1
-            print(f"❌ Failed - Error: {str(e)}")
+    def test_tone_adjustment_tests(self):
+        """Test 4: Run tone adjustment specific tests"""
+        success, stdout, stderr = self.run_vitest_command("tone-adjustment")
+        if success:
+            self.log("Tone adjustment tests passed")
+            return True
+        else:
+            self.log(f"Tone adjustment tests failed: {stderr}")
             return False
 
-    def test_member_claim_functionality(self):
-        """Test member claim functionality through unit tests"""
-        print(f"\n🔍 Testing Member Claim Functionality...")
-        try:
-            # Run only the member claim tests
-            result = subprocess.run(
-                ["yarn", "test", "tests/member-claim.test.ts"], 
-                cwd="/app",
-                capture_output=True, 
-                text=True, 
-                timeout=60
-            )
-            
-            self.tests_run += 1
-            if result.returncode == 0:
-                self.tests_passed += 1
-                print(f"✅ Passed - Member claim tests pass")
-                
-                # Check for specific log messages that indicate the fixes are working
-                if "[API /api/auth/me] Claiming membership" in result.stdout:
-                    print(f"   ✅ Found expected log: '[API /api/auth/me] Claiming membership'")
-                else:
-                    print(f"   ⚠️  Expected log '[API /api/auth/me] Claiming membership' not found")
-                
-                # Extract test details from output
-                if "✓" in result.stdout:
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if "✓" in line and "member-claim" in line:
-                            print(f"   {line.strip()}")
-                return True
-            else:
-                print(f"❌ Failed - Member claim tests failed")
-                print(f"   Error: {result.stderr[:300]}")
-                return False
-        except Exception as e:
-            self.tests_run += 1
-            print(f"❌ Failed - Error: {str(e)}")
+    def test_labor_confirmation_tests(self):
+        """Test 5: Run labor confirmation specific tests"""
+        success, stdout, stderr = self.run_vitest_command("labor-confirmation")
+        if success:
+            self.log("Labor confirmation tests passed")
+            return True
+        else:
+            self.log(f"Labor confirmation tests failed: {stderr}")
             return False
 
-    def test_stripe_webhook_functionality(self):
-        """Test Stripe webhook functionality through unit tests"""
-        print(f"\n🔍 Testing Stripe Webhook Functionality...")
-        try:
-            # Run the billing portal upgrade tests
-            result = subprocess.run(
-                ["yarn", "test", "tests/billing-portal-upgrades.test.ts"], 
-                cwd="/app",
-                capture_output=True, 
-                text=True, 
-                timeout=60
-            )
-            
-            self.tests_run += 1
-            if result.returncode == 0:
-                self.tests_passed += 1
-                print(f"✅ Passed - Stripe webhook tests pass")
-                
-                # Extract test count
-                if "Tests" in result.stdout and "passed" in result.stdout:
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if "Tests" in line and "passed" in line:
-                            print(f"   {line.strip()}")
-                return True
-            else:
-                print(f"❌ Failed - Stripe webhook tests failed")
-                print(f"   Error: {result.stderr[:300]}")
-                return False
-        except Exception as e:
-            self.tests_run += 1
-            print(f"❌ Failed - Error: {str(e)}")
+    def test_all_vitest_suite(self):
+        """Test 6: Run complete vitest suite to ensure all 447 tests pass"""
+        success, stdout, stderr = self.run_vitest_command("")
+        if success and "447 passed" in (stdout + stderr):
+            self.log("All 447 vitest tests passed")
+            return True
+        else:
+            self.log(f"Vitest suite failed or doesn't have 447 passing tests: {stderr}")
             return False
 
-    def test_webhook_endpoint_exists(self):
-        """Test that webhook endpoint exists and handles missing signature correctly"""
-        success, response, cookies = self.run_test(
-            "Webhook endpoint - Missing signature",
-            "POST",
-            "api/billing/webhook",
-            400,  # Should return 400 for missing signature
-            data={"type": "test"},
-            cookies={}
-        )
+    def test_prompt_files_content(self):
+        """Test 7: Verify prompt files contain required content for tone adjustment"""
+        try:
+            # Check SYSTEM_PROMPT_BASE.txt
+            with open("/app/prompts/system/SYSTEM_PROMPT_BASE.txt", "r") as f:
+                base_content = f.read()
+                
+            # Should contain tone adjustment directives
+            required_base = [
+                "Do NOT say \"Thank you\"",
+                "Prefer silence over politeness",
+                "Professional and concise",
+                "Never repeat what the technician just said"
+            ]
+            
+            for req in required_base:
+                if req not in base_content:
+                    self.log(f"Missing in SYSTEM_PROMPT_BASE.txt: {req}")
+                    return False
+                    
+            # Check MODE_PROMPT_DIAGNOSTIC.txt
+            with open("/app/prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt", "r") as f:
+                diag_content = f.read()
+                
+            # Should contain registry and pivot rules
+            required_diag = [
+                "DIAGNOSTIC REGISTRY RULES",
+                "ALREADY ANSWERED",
+                "UNABLE TO VERIFY", 
+                "PIVOT RULES",
+                "KEY FINDING",
+                "ONE short acknowledgment"
+            ]
+            
+            for req in required_diag:
+                if req not in diag_content:
+                    self.log(f"Missing in MODE_PROMPT_DIAGNOSTIC.txt: {req}")
+                    return False
+                    
+            self.log("Prompt files contain required content")
+            return True
+            
+        except Exception as e:
+            self.log(f"Error checking prompt files: {e}")
+            return False
+
+    def test_typescript_compilation(self):
+        """Test 8: Verify TypeScript compilation works"""
+        os.chdir(self.app_dir)
+        try:
+            result = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True, timeout=60)
+            if result.returncode == 0:
+                self.log("TypeScript compilation successful")
+                return True
+            else:
+                self.log(f"TypeScript compilation errors: {result.stderr}")
+                return False
+        except Exception as e:
+            self.log(f"TypeScript compilation error: {e}")
+            return False
+
+    def test_module_imports(self):
+        """Test 9: Verify all main modules can be imported (via vitest)"""
+        # This tests that the modules have correct syntax and dependencies
+        test_script = """
+        import { describe, it, expect } from 'vitest';
         
-        # Check if the response mentions missing signature
-        if success and "signature" in str(response).lower():
-            print(f"   ✅ Webhook correctly rejects missing signature")
+        describe('Module Import Test', () => {
+          it('should import diagnostic-registry', async () => {
+            const mod = await import('/app/src/lib/diagnostic-registry.ts');
+            expect(mod.detectAlreadyAnswered).toBeDefined();
+            expect(mod.extractTopics).toBeDefined();
+            expect(mod.detectKeyFinding).toBeDefined();
+          });
+          
+          it('should import fact-pack', async () => {
+            const mod = await import('/app/src/lib/fact-pack.ts');
+            expect(mod.buildFactPack).toBeDefined();
+            expect(mod.buildFactLockConstraint).toBeDefined();
+          });
+          
+          it('should import labor-store', async () => {
+            const mod = await import('/app/src/lib/labor-store.ts');
+            expect(mod.parseLaborConfirmation).toBeDefined();
+            expect(mod.extractLaborEstimate).toBeDefined();
+          });
+        });
+        """
         
-        return success
+        # Write temp test file
+        temp_test = "/app/temp-import-test.ts"
+        try:
+            with open(temp_test, "w") as f:
+                f.write(test_script)
+                
+            os.chdir(self.app_dir)
+            result = subprocess.run(["npx", "vitest", "run", temp_test], capture_output=True, text=True, timeout=30)
+            
+            # Clean up
+            if os.path.exists(temp_test):
+                os.remove(temp_test)
+                
+            if result.returncode == 0:
+                self.log("Module imports successful")
+                return True
+            else:
+                self.log(f"Module import errors: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            # Clean up on error
+            if os.path.exists(temp_test):
+                os.remove(temp_test)
+            self.log(f"Module import test error: {e}")
+            return False
+
+    def test_package_json_dependencies(self):
+        """Test 10: Verify package.json has required dependencies"""
+        try:
+            with open("/app/package.json", "r") as f:
+                package_data = json.load(f)
+                
+            dependencies = {**package_data.get("dependencies", {}), **package_data.get("devDependencies", {})}
+            
+            required_deps = [
+                "vitest",
+                "typescript",
+                "@types/node",
+                "next"
+            ]
+            
+            missing = []
+            for dep in required_deps:
+                if dep not in dependencies:
+                    missing.append(dep)
+                    
+            if missing:
+                self.log(f"Missing dependencies: {missing}")
+                return False
+                
+            self.log("All required dependencies present")
+            return True
+            
+        except Exception as e:
+            self.log(f"Error checking package.json: {e}")
+            return False
 
     def run_all_tests(self):
-        """Run all RV Service Desk API tests"""
-        print("🚀 Starting RV Service Desk Labor Confirmation Feature Testing")
-        print("=" * 80)
-
-        # Test the three main features requested
-        print("\n" + "=" * 25 + " LABOR CONFIRMATION FEATURES " + "=" * 25)
-        self.test_labor_confirmation_unit_tests()
-        self.test_copy_button_ux_unit_tests()
-        self.test_mode_validators_include_labor_confirmation()
+        """Run all backend tests"""
+        self.log("=" * 60)
+        self.log("RV Service Desk Backend Test Suite")
+        self.log("Testing Five Behavioral Fixes Implementation")
+        self.log("=" * 60)
         
-        # Test frontend loading
-        print("\n" + "=" * 30 + " FRONTEND TESTS " + "=" * 30)
-        self.test_frontend_loading()
+        # Define all tests
+        tests = [
+            ("Project Structure", self.test_project_structure),
+            ("TypeScript Compilation", self.test_typescript_compilation),
+            ("Package Dependencies", self.test_package_json_dependencies),
+            ("Module Imports", self.test_module_imports),
+            ("Prompt Files Content", self.test_prompt_files_content),
+            ("Diagnostic Registry Tests", self.test_diagnostic_registry_tests),
+            ("Fact Pack Tests", self.test_fact_pack_tests),
+            ("Tone Adjustment Tests", self.test_tone_adjustment_tests), 
+            ("Labor Confirmation Tests", self.test_labor_confirmation_tests),
+            ("Complete Vitest Suite (447 tests)", self.test_all_vitest_suite),
+        ]
         
-        # Test member claim functionality specifically  
-        print("\n" + "=" * 30 + " MEMBER CLAIM TESTS " + "=" * 30)
-        self.test_member_claim_functionality()
-        
-        # Test Stripe webhook functionality
-        print("\n" + "=" * 30 + " STRIPE WEBHOOK TESTS " + "=" * 30)
-        self.test_stripe_webhook_functionality()
-        self.test_webhook_endpoint_exists()
-        
-        # Test UAT fixes basic endpoints
-        print("\n" + "=" * 30 + " API ENDPOINT TESTS " + "=" * 30)
-        self.test_uat_fixes_basic_endpoints()
-        self.test_billing_portal_endpoint()
-        
-        # Test unit tests still pass
-        print("\n" + "=" * 30 + " COMPREHENSIVE UNIT TESTS " + "=" * 30)
-        self.test_unit_tests_pass()
-
-        # Print results
-        print("\n" + "=" * 80)
-        print(f"📊 RV Service Desk Feature Tests Results: {self.tests_passed}/{self.tests_run} passed")
+        # Run each test
+        for test_name, test_func in tests:
+            self.run_test(test_name, test_func)
+            
+        self.log("=" * 60)
+        self.log(f"TEST SUMMARY: {self.tests_passed}/{self.tests_run} passed")
         
         if self.tests_passed == self.tests_run:
-            print("🎉 All RV Service Desk feature tests passed!")
-            return 0
+            self.log("🎉 ALL TESTS PASSED - Five behavioral fixes implementation verified!")
+            return True
         else:
-            print("⚠️  Some RV Service Desk feature tests failed")
-            return 1
+            self.log("⚠️  SOME TESTS FAILED")
+            for result in self.results:
+                if result["status"] != "PASS":
+                    self.log(f"   {result['status']}: {result['test']} - {result['message']}")
+            return False
 
 def main():
-    tester = RVServiceDeskAPITester()
-    return tester.run_all_tests()
+    tester = RVServiceDeskBackendTester()
+    success = tester.run_all_tests()
+    return 0 if success else 1
 
 if __name__ == "__main__":
     sys.exit(main())
