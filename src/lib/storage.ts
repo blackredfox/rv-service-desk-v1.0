@@ -327,10 +327,15 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
     await trackEvent("case.created", input.userId, { caseId: created.id });
   }
 
+  const createdAtStr = created.createdAt.toISOString();
+  const updatedAtStr = created.updatedAt.toISOString();
+  const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr, lastActivityAt: createdAtStr });
+
   return {
     ...created,
-    createdAt: created.createdAt.toISOString(),
-    updatedAt: created.updatedAt.toISOString(),
+    createdAt: createdAtStr,
+    updatedAt: updatedAtStr,
+    ...retention,
   };
 }
 
