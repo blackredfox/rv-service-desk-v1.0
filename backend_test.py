@@ -1,19 +1,75 @@
 #!/usr/bin/env python3
+"""
+Backend Test Suite for RV Service Desk Diagnostic Agent
+Five Behavioral Fixes Testing
 
-import requests
-import json
-import sys
-from datetime import datetime
+Tests the five behavioral fixes:
+1. Diagnostic Question Registry - track answered/unable-to-verify topics per case
+2. Diagnostic Pivot Rules - key findings trigger immediate isolation completion
+3. Fact-Locked Final Report - build fact pack from only technician-stated facts
+4. Tone Adjustment - remove over-polite 'Thank you' defaults, one-word acknowledgments only
+5. Labor Confirmation Input Parsing - accept '2.5', '2.5h' formats
+
+This is a Next.js TypeScript application with Vitest testing framework.
+Since there's no traditional REST API server, we test the underlying modules directly.
+"""
+
 import subprocess
+import sys
+import json
+import os
+from pathlib import Path
+from datetime import datetime
 
-class RVServiceDeskAPITester:
-    def __init__(self, base_url="http://localhost:3000"):
-        self.base_url = base_url
+class RVServiceDeskBackendTester:
+    def __init__(self):
+        self.app_dir = "/app"
         self.tests_run = 0
         self.tests_passed = 0
-        self.session_cookies = None
-        self.test_user_email = f"test_{datetime.now().strftime('%H%M%S')}@corporate.com"
-        self.test_user_password = "TestPassword123!"
+        self.results = []
+        
+    def log(self, message, level="INFO"):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] [{level}] {message}")
+        
+    def run_test(self, test_name, test_func):
+        """Run a single test and track results"""
+        self.tests_run += 1
+        self.log(f"Running test: {test_name}")
+        
+        try:
+            result = test_func()
+            if result:
+                self.tests_passed += 1
+                self.results.append({"test": test_name, "status": "PASS", "message": "✅"})
+                self.log(f"✅ PASS - {test_name}")
+            else:
+                self.results.append({"test": test_name, "status": "FAIL", "message": "❌"})
+                self.log(f"❌ FAIL - {test_name}")
+        except Exception as e:
+            self.results.append({"test": test_name, "status": "ERROR", "message": str(e)})
+            self.log(f"❌ ERROR - {test_name}: {str(e)}")
+            
+        return result
+    
+    def check_file_exists(self, filepath):
+        """Check if a file exists"""
+        return os.path.exists(filepath)
+    
+    def run_vitest_command(self, pattern=""):
+        """Run vitest with optional pattern filter"""
+        os.chdir(self.app_dir)
+        cmd = ["npx", "vitest", "run", "--reporter=json"]
+        if pattern:
+            cmd.extend(["--testNamePattern", pattern])
+            
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            return result.returncode == 0, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            return False, "", "Test timeout"
+        except Exception as e:
+            return False, "", str(e)
 
     def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, cookies=None):
         """Run a single API test"""
