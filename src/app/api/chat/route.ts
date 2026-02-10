@@ -523,6 +523,90 @@ export async function POST(req: Request) {
         full = result.response;
 
         // ========================================
+        // PIVOT CHECK: key finding forces early transition
+        // ========================================
+        if (pivotTriggered && currentMode === "diagnostic" && !aborted) {
+          // If the LLM didn't already transition, force it
+          const existingTransition = detectTransitionSignal(full);
+          if (!existingTransition) {
+            console.log(`[Chat API v2] Forcing pivot transition due to key finding`);
+            // Stream what the LLM said
+            for (const char of full) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            if (full.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: full,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+
+            // Now force transition to labor_confirmation
+            currentMode = "labor_confirmation";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
+
+            const separator = "\n\n";
+            for (const char of separator) {
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            // Generate labor confirmation
+            const laborPrompt = composePromptV2({
+              mode: "labor_confirmation",
+              inputDetected: inputLanguage.detected,
+              outputEffective: outputPolicy.effective,
+              includeTranslation: false,
+            });
+            const updatedHistoryPivot = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+            const laborBody = {
+              model: "gpt-4o-mini",
+              stream: false,
+              temperature: 0.2,
+              messages: buildOpenAiMessages({
+                system: laborPrompt,
+                history: updatedHistoryPivot,
+                userMessage: "Key finding confirmed during diagnostics. Generate a labor estimate and ask for confirmation.",
+                attachments: undefined,
+              }),
+            };
+            const laborResult = await callOpenAI(apiKey, laborBody, ac.signal);
+            if (!laborResult.error && laborResult.response.trim()) {
+              const estimatedHours = extractLaborEstimate(laborResult.response);
+              if (estimatedHours) setLaborEstimate(ensuredCase.id, estimatedHours);
+              for (const char of laborResult.response) {
+                if (aborted) break;
+                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              }
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: laborResult.response,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+              full = full + separator + laborResult.response;
+            } else {
+              const fallback = getSafeFallback("labor_confirmation", outputPolicy.effective);
+              for (const char of fallback) {
+                if (aborted) break;
+                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              }
+              setLaborEstimate(ensuredCase.id, 1.0);
+              full = full + separator + fallback;
+            }
+
+            controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+            controller.close();
+            return; // Early return — pivot handled
+          }
+        }
+
+        // ========================================
         // AUTOMATIC MODE TRANSITION
         // ========================================
         // Check if LLM signaled a transition (e.g., isolation complete)
