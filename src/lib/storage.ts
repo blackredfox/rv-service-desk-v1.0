@@ -373,6 +373,10 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
 
   if (!c) return { case: null, messages: [] };
 
+  const createdAtStr = c.createdAt.toISOString();
+  const updatedAtStr = c.updatedAt.toISOString();
+  const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+
   return {
     case: {
       id: c.id,
@@ -381,8 +385,9 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       inputLanguage: c.inputLanguage as Language,
       languageSource: c.languageSource as "AUTO" | "MANUAL",
       mode: c.mode as CaseMode,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
+      createdAt: createdAtStr,
+      updatedAt: updatedAtStr,
+      ...retention,
     },
     messages: c.messages
       .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
