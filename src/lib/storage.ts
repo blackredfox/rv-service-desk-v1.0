@@ -188,12 +188,12 @@ async function searchCasesMemory(q: string): Promise<CaseSummary[]> {
   const results = [...matchedCaseIds]
     .map((id) => store.cases.get(id))
     .filter(Boolean)
-    .filter((c) => c && !c.deletedAt) as (CaseSummary & { deletedAt: string | null })[];
+    .filter((c) => c && !c.deletedAt && c.timeLeftSeconds > 0) as (CaseSummary & { deletedAt: string | null })[];
 
   return results
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 25)
-    .map(({ ...summary }) => summary);
+    .map(({ deletedAt: _d, ...summary }) => summary);
 }
 
 async function appendMessageMemory(args: {
