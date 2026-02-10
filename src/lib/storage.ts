@@ -434,10 +434,15 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
       },
     });
 
+    const createdAtStr = updated.createdAt.toISOString();
+    const updatedAtStr = updated.updatedAt.toISOString();
+    const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+
     return {
       ...updated,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      createdAt: createdAtStr,
+      updatedAt: updatedAtStr,
+      ...retention,
     };
   } catch {
     return null;
