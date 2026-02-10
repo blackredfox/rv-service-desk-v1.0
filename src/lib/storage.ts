@@ -63,6 +63,19 @@ function clampTitleSeed(seed: string) {
   return (s.slice(0, 60) || "New Case").trim();
 }
 
+/** Enrich a raw case object with computed retention fields. */
+function withRetention(c: {
+  createdAt: string;
+  updatedAt: string;
+  lastActivityAt?: string;
+  [key: string]: unknown;
+}): { lastActivityAt: string; expiresAt: string; timeLeftSeconds: number } {
+  const lastActivityAt = c.lastActivityAt || c.updatedAt;
+  const expiresAt = computeExpiresAt(lastActivityAt).toISOString();
+  const timeLeftSeconds = computeTimeLeftSeconds(expiresAt);
+  return { lastActivityAt, expiresAt, timeLeftSeconds };
+}
+
 function uuid() {
   return globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
