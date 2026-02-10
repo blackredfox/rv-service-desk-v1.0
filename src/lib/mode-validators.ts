@@ -47,6 +47,12 @@ export const FALLBACK_FINAL_REPORT: Record<"EN" | "RU" | "ES", string> = {
   ES: "No se puede generar un informe compatible. Proporcione información de diagnóstico completa.",
 } as const;
 
+export const FALLBACK_LABOR_CONFIRMATION: Record<"EN" | "RU" | "ES", string> = {
+  EN: "Estimated total labor: 1.0 hours\nPlease confirm this estimate, or enter a different total (e.g., '2.0 hours').",
+  RU: "Ориентировочное общее время работы: 1.0 час\nПожалуйста, подтвердите эту оценку или введите другое значение (например, '2.0 часа').",
+  ES: "Tiempo total estimado de mano de obra: 1.0 horas\nPor favor confirme esta estimación, o ingrese un total diferente (por ejemplo, '2.0 horas').",
+} as const;
+
 /**
  * Check if text contains prohibited denial-trigger words
  */
@@ -247,6 +253,44 @@ export function validateFinalReportOutput(text: string, includeTranslation: bool
 }
 
 /**
+ * Validate labor confirmation mode output
+ * 
+ * Must contain an estimated labor total and a prompt for confirmation.
+ */
+export function validateLaborConfirmationOutput(text: string): ValidationResult {
+  const violations: string[] = [];
+
+  // Must contain labor estimate pattern
+  if (!/(?:estimated\s+total\s+labor|total\s+labor)[:\s]+\d+(?:\.\d+)?\s*(?:hours?|hrs?|hr)/i.test(text)) {
+    violations.push("LABOR_CONFIRMATION: Missing 'Estimated total labor: X.X hours' pattern");
+  }
+
+  // Must ask for confirmation
+  if (!/confirm|adjust|different/i.test(text)) {
+    violations.push("LABOR_CONFIRMATION: Missing confirmation prompt");
+  }
+
+  // Must not contain prohibited words
+  const prohibited = containsProhibitedWords(text);
+  if (prohibited.length > 0) {
+    violations.push(`PROHIBITED_WORDS: Contains denial-trigger words: ${prohibited.join(", ")}`);
+  }
+
+  // Must not look like a full final report
+  if (looksLikeFinalReport(text)) {
+    violations.push("LABOR_CONFIRMATION_DRIFT: Output looks like a final report (should only show estimate)");
+  }
+
+  return {
+    valid: violations.length === 0,
+    violations,
+    suggestion: violations.length > 0
+      ? "Output an estimated total labor with confirmation prompt. Do NOT generate the full report."
+      : undefined,
+  };
+}
+
+/**
  * Main validator dispatcher based on mode
  *
  * @param includeTranslation  Forwarded to final-report validator.
@@ -264,6 +308,8 @@ export function validateOutput(text: string, mode: CaseMode, includeTranslation?
       return validateAuthorizationOutput(text);
     case "final_report":
       return validateFinalReportOutput(text, includeTranslation);
+    case "labor_confirmation":
+      return validateLaborConfirmationOutput(text);
     default:
       return validateDiagnosticOutput(text);
   }
@@ -299,6 +345,8 @@ export function getSafeFallback(mode: CaseMode, language?: string): string {
       return FALLBACK_AUTHORIZATION[lang];
     case "final_report":
       return FALLBACK_FINAL_REPORT[lang];
+    case "labor_confirmation":
+      return FALLBACK_LABOR_CONFIRMATION[lang];
     default:
       return FALLBACK_QUESTIONS[lang];
   }
