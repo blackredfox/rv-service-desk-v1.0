@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CaseSummary } from "@/lib/storage";
 import { apiCreateCase, apiDeleteCase, apiListCases, apiSearch } from "@/lib/api";
 import { analytics } from "@/lib/client-analytics";
+import { formatTimeLeft, getUrgencyTier } from "@/lib/retention";
 
 type Props = {
   activeCaseId: string | null;
