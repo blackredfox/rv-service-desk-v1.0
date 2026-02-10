@@ -53,7 +53,8 @@ const SYMPTOM_PATTERNS = [
  */
 function extractFacts(message: string): Fact[] {
   const facts: Fact[] = [];
-  const sentences = message.split(/[.!?]+/).filter((s) => s.trim().length > 5);
+  // Split on sentence boundaries, but avoid splitting on decimals (e.g., "12.4V")
+  const sentences = message.split(/(?<!\d)[.!?]+(?!\d)/).filter((s) => s.trim().length > 5);
 
   for (const sentence of sentences) {
     const trimmed = sentence.trim();
