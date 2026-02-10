@@ -404,12 +404,18 @@ export async function POST(req: Request) {
   // - outputEffective: what language assistant must respond in
   // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
+  // Compose system prompt: combine registry context + fact lock as additionalConstraints
+  const additionalConstraints = [registryConstraint, factLockConstraint]
+    .filter(Boolean)
+    .join("\n\n") || undefined;
+
   const baseSystemPrompt = composePromptV2({
     mode: currentMode,
     inputDetected: inputLanguage.detected,
     outputEffective: outputPolicy.effective,
     includeTranslation: langPolicy.includeTranslation,
     translationLanguage: langPolicy.translationLanguage,
+    additionalConstraints,
   });
   
   const visionInstruction = buildVisionInstruction(attachmentCount);
