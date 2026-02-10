@@ -228,20 +228,24 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
   const existing = input.caseId ? store.cases.get(input.caseId) : undefined;
 
   if (existing && !existing.deletedAt) {
+    const ts = nowIso();
+    const retention = withRetention({ createdAt: existing.createdAt, updatedAt: ts, lastActivityAt: ts });
     const updated = {
       ...existing,
       inputLanguage: input.inputLanguage,
       languageSource: input.languageSource,
       title: existing.title === "New Case" ? clampTitleSeed(input.titleSeed) : existing.title,
-      updatedAt: nowIso(),
+      updatedAt: ts,
+      ...retention,
     };
     store.cases.set(existing.id, updated);
-    const { ...summary } = updated;
+    const { deletedAt: _d, ...summary } = updated;
     return summary;
   }
 
   const id = uuid();
   const ts = nowIso();
+  const retention = withRetention({ createdAt: ts, updatedAt: ts, lastActivityAt: ts });
   const created = {
     id,
     title: clampTitleSeed(input.titleSeed),
@@ -250,10 +254,11 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
+    ...retention,
     deletedAt: null,
   };
   store.cases.set(id, created);
-  const { ...summary } = created;
+  const { deletedAt: _d, ...summary } = created;
   return summary;
 }
 
