@@ -361,6 +361,44 @@ export async function POST(req: Request) {
   // Load conversation history (memory window)
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
+  // ========================================
+  // DIAGNOSTIC REGISTRY: track answered topics + detect key findings
+  // ========================================
+  let registryConstraint = "";
+  let pivotTriggered = false;
+
+  if (currentMode === "diagnostic") {
+    const regResult = processUserMessage(ensuredCase.id, message);
+    
+    if (regResult.keyFinding) {
+      console.log(`[Chat API v2] Key finding detected: "${regResult.keyFinding}" — will pivot`);
+    }
+    if (regResult.alreadyAnswered) {
+      console.log(`[Chat API v2] Technician indicated already-answered`);
+    }
+    if (regResult.newUnable.length > 0) {
+      console.log(`[Chat API v2] Unable-to-verify topics: ${regResult.newUnable.join(", ")}`);
+    }
+    
+    // Check if we should pivot immediately
+    const pivotCheck = shouldPivot(ensuredCase.id);
+    if (pivotCheck.pivot) {
+      pivotTriggered = true;
+      console.log(`[Chat API v2] Pivot triggered by: "${pivotCheck.finding}"`);
+    }
+    
+    // Build registry context for injection into prompt
+    registryConstraint = buildRegistryContext(ensuredCase.id);
+  }
+
+  // ========================================
+  // FACT LOCK: build constraint for final report
+  // ========================================
+  let factLockConstraint = "";
+  if (currentMode === "final_report" || currentMode === "labor_confirmation") {
+    factLockConstraint = buildFactLockConstraint(history);
+  }
+
   // Compose system prompt using v2 semantics:
   // - inputDetected: what language user wrote in
   // - outputEffective: what language assistant must respond in
