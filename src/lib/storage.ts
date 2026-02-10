@@ -112,6 +112,7 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
   const store = getMemoryStore();
   const id = uuid();
   const ts = nowIso();
+  const retention = withRetention({ createdAt: ts, updatedAt: ts, lastActivityAt: ts });
   const c = {
     id,
     title: clampTitle(input.title ?? "New Case"),
@@ -120,10 +121,11 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     mode: "diagnostic" as CaseMode,
     createdAt: ts,
     updatedAt: ts,
+    ...retention,
     deletedAt: null,
   };
   store.cases.set(id, c);
-  const { ...summary } = c;
+  const { deletedAt: _d, ...summary } = c;
   return summary;
 }
 
