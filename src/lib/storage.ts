@@ -102,10 +102,14 @@ async function listCasesMemory(): Promise<CaseSummary[]> {
   const store = getMemoryStore();
   return [...store.cases.values()]
     .filter((c) => !c.deletedAt)
+    .map(({ deletedAt: _d, ...rest }) => {
+      // Recompute retention at read time (timeLeftSeconds is always fresh)
+      const retention = withRetention({ createdAt: rest.createdAt, updatedAt: rest.updatedAt, lastActivityAt: rest.lastActivityAt });
+      return { ...rest, ...retention };
+    })
     .filter((c) => c.timeLeftSeconds > 0) // hide expired
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 50)
-    .map(({ deletedAt: _d, ...rest }) => rest);
+    .slice(0, 50);
 }
 
 async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
@@ -138,8 +142,10 @@ async function getCaseMemory(caseId: string): Promise<{ case: CaseSummary | null
     .filter((m) => m.caseId === caseId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const { deletedAt: _d, ...summary } = c;
-  return { case: summary, messages };
+  const { deletedAt: _d, ...rest } = c;
+  // Recompute retention at read time
+  const retention = withRetention({ createdAt: rest.createdAt, updatedAt: rest.updatedAt, lastActivityAt: rest.lastActivityAt });
+  return { case: { ...rest, ...retention }, messages };
 }
 
 async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise<CaseSummary | null> {
@@ -193,7 +199,11 @@ async function searchCasesMemory(q: string): Promise<CaseSummary[]> {
   return results
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 25)
-    .map(({ deletedAt: _d, ...summary }) => summary);
+    .map(({ deletedAt: _d, ...rest }) => {
+      const retention = withRetention({ createdAt: rest.createdAt, updatedAt: rest.updatedAt, lastActivityAt: rest.lastActivityAt });
+      return { ...rest, ...retention };
+    })
+    .filter((c) => c.timeLeftSeconds > 0);
 }
 
 async function appendMessageMemory(args: {
