@@ -62,9 +62,14 @@ describe("parseLaborConfirmation", () => {
     expect(parseLaborConfirmation("3 hr", 1.5)).toBe(3.0);
   });
 
-  it("parses standalone '1.5' as override", async () => {
+  it("parses '2.5h' (no space) as override", async () => {
     const { parseLaborConfirmation } = await import("@/lib/labor-store");
-    expect(parseLaborConfirmation("1.5", 1.0)).toBe(1.5);
+    expect(parseLaborConfirmation("2.5h", 1.5)).toBe(2.5);
+  });
+
+  it("parses standalone '2.5' as override", async () => {
+    const { parseLaborConfirmation } = await import("@/lib/labor-store");
+    expect(parseLaborConfirmation("2.5", 1.0)).toBe(2.5);
   });
 
   it("parses 'make it 2 hours' as override", async () => {
