@@ -142,8 +142,10 @@ async function getCaseMemory(caseId: string): Promise<{ case: CaseSummary | null
     .filter((m) => m.caseId === caseId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const { deletedAt: _d, ...summary } = c;
-  return { case: summary, messages };
+  const { deletedAt: _d, ...rest } = c;
+  // Recompute retention at read time
+  const retention = withRetention({ createdAt: rest.createdAt, updatedAt: rest.updatedAt, lastActivityAt: rest.lastActivityAt });
+  return { case: { ...rest, ...retention }, messages };
 }
 
 async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise<CaseSummary | null> {
