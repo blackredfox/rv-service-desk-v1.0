@@ -733,7 +733,10 @@ export async function POST(req: Request) {
             
             controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
             
-            // Generate final report with confirmed labor as a hard constraint
+            // Generate final report with confirmed labor as a hard constraint + fact lock
+            const updatedHistoryForReport = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+            const factLock = buildFactLockConstraint(updatedHistoryForReport);
+            
             const finalReportPrompt = composePromptV2({
               mode: currentMode,
               inputDetected: inputLanguage.detected,
@@ -745,7 +748,9 @@ The technician has confirmed a total labor budget of exactly ${confirmedHours} h
 Your labor breakdown MUST sum to exactly ${confirmedHours} hours.
 Do NOT exceed or reduce this total under any circumstances.
 Distribute the ${confirmedHours} hours across the repair steps.
-State "Total labor: ${confirmedHours} hr" at the end of the labor section.`,
+State "Total labor: ${confirmedHours} hr" at the end of the labor section.
+
+${factLock}`,
             });
             
             const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
