@@ -589,6 +589,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
         ...updated,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
+        ...withRetention({ createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() }),
       };
     }
   }
@@ -621,6 +622,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
     ...created,
     createdAt: created.createdAt.toISOString(),
     updatedAt: created.updatedAt.toISOString(),
+    ...withRetention({ createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() }),
   };
 }
 
