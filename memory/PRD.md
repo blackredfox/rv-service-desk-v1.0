@@ -1,51 +1,65 @@
 # RV Service Desk — PRD & Implementation Memory
 
 ## Original Problem Statement
-1. **Labor Time Consistency Bug**: When user asks to break down labor, the sum increases beyond the originally estimated total. Operation-level breakdown must sum exactly to the confirmed total.
-2. **Missing Technician Confirmation Step**: Agent estimates time and proceeds directly to detailed report. Technician must be able to confirm/override total labor before breakdown.
-3. **Copy Button UX Issue**: Copy button works but gives no visual feedback.
-
-Previous session: Declarative language policy architecture fix (EN mode bilingual output bug).
+Diagnostic behavior feels mechanical and template-driven. Five targeted fixes:
+1. Agent repeatedly asks same diagnostic questions after technician answered
+2. No diagnostic pivoting when key findings are discovered
+3. Unverified facts (invented symptoms) in final reports
+4. Over-polite/unnatural tone ("Thank you" after every reply)
+5. Labor confirmation input bug (rejects "2.5", "2.5h")
 
 ## Architecture
 - **Stack**: Next.js (App Router), TypeScript, Vitest, OpenAI API
 - **Key flow**: `diagnostic` → `labor_confirmation` → `final_report`
 - **Language policy**: `lang.ts` → `prompt-composer.ts` → `mode-validators.ts` → `route.ts`
+- **Diagnostic state**: `diagnostic-registry.ts` (per-case in-memory)
+- **Fact extraction**: `fact-pack.ts` (conversation scanning)
 
 ## What's Been Implemented
 
 ### Session 1 (Jan 2026) — Language Policy
-- Declarative `LanguagePolicy` in `lang.ts` (EN=no translation, RU/ES/AUTO=bilingual)
-- Output-layer enforcement in `route.ts` strips translations for EN mode
+- Declarative `LanguagePolicy` in `lang.ts`
+- Output-layer enforcement for EN/RU/ES/AUTO modes
 
 ### Session 2 (Jan 2026) — Labor Confirmation + Copy UX
+- `labor_confirmation` mode between diagnostic and final_report
+- Labor sum validation in `labor-store.ts`
+- Copy button visual feedback with auto-reset
 
-#### A. Labor Confirmation Phase
-- New `CaseMode: "labor_confirmation"` between diagnostic and final_report
-- `prompts/modes/MODE_PROMPT_LABOR_CONFIRMATION.txt` — LLM generates labor estimate and asks for confirmation
-- `src/lib/labor-store.ts`:
-  - `setLaborEstimate()` / `confirmLabor()` / `getConfirmedHours()` — in-memory labor store
-  - `extractLaborEstimate()` — parses LLM estimate response
-  - `parseLaborConfirmation()` — parses technician confirmation/override (supports EN, RU, ES)
-  - `validateLaborSum()` — validates breakdown sums to confirmed total
-- `route.ts` flow: diagnostic → transition → labor_confirmation → technician confirms → final_report with labor budget constraint
+### Session 3 (Jan 2026) — Diagnostic Behavior Fix (MVP)
 
-#### B. Labor Sum Validation
-- `validateLaborSum()` checks:
-  - Stated total matches confirmed total
-  - Sum of individual steps matches confirmed total
-- Applied in route.ts after final report generation
+#### A. Diagnostic Question Registry (`diagnostic-registry.ts`)
+- Per-case in-memory tracking: `answeredKeys`, `unableToVerifyKeys`, `keyFindings`
+- Detects "already checked/answered/told you" → marks topic as answered
+- Detects "don't know/can't see/unable to verify" → closes topic permanently
+- `buildRegistryContext()` injects closed topics into diagnostic prompt
+- Multi-language support (EN, RU, ES patterns)
 
-#### C. Copy Button UX
-- Per-message `copiedMessageId` state tracking in `chat-panel.tsx`
-- Visual feedback: green border + checkmark + "Copied!" text
-- Auto-reset after 1.5 seconds
-- Independent from Report Copy button state
+#### B. Diagnostic Pivot Rules
+- `detectKeyFinding()` — 17 key finding patterns (missing blade, seized motor, cracked housing, zero current, etc.)
+- `shouldPivot()` — when key finding detected, forces immediate transition to labor_confirmation
+- Implemented in `route.ts` — if LLM doesn't self-transition, pivot forces it
 
-#### D. Tests Added
-- `tests/labor-confirmation.test.ts` — 32 tests covering labor store, parsing, validation
-- `tests/copy-button-ux.test.ts` — 9 tests covering copy feedback behavior
-- Total: 394 tests passing (41 new)
+#### C. Fact-Locked Final Report (`fact-pack.ts`)
+- `buildFactPack()` — scans ONLY user messages for symptoms, observations, test results
+- `buildFactLockConstraint()` — generates prohibition string injected into final report prompt
+- Rules: "Do NOT add, infer, or assume any symptoms not listed", "not verified" for unconfirmed
+
+#### D. Tone Adjustment
+- `SYSTEM_PROMPT_BASE.txt`: "Do NOT say Thank you", "Prefer silence over politeness", "Never use filler phrases"
+- `MODE_PROMPT_DIAGNOSTIC.txt`: Professional communication style, one-word acknowledgments only ("Noted.", "Understood.", "Copy.")
+- Diagnostic Registry Rules and Pivot Rules embedded in diagnostic prompt
+
+#### E. Labor Confirmation Input Parsing (Bug Fix)
+- `parseLaborConfirmation()` now accepts: `2.5`, `2.5h`, `2.5 hours`, `2.5hr`, `2.5hrs`
+- Regex updated: `h\b` as standalone unit match
+
+#### Tests Added
+- `tests/diagnostic-registry.test.ts` — 26 tests
+- `tests/fact-pack.test.ts` — 10 tests
+- `tests/tone-adjustment.test.ts` — 9 tests
+- Updated `tests/labor-confirmation.test.ts` — +2 tests
+- Total: 447 tests passing (53 new), 33 test files
 
 ## Ownership Model
 | Concern | Owner |
@@ -53,11 +67,13 @@ Previous session: Declarative language policy architecture fix (EN mode bilingua
 | Content & format | Prompt files (`prompts/`) |
 | Language rules | Config (`LanguagePolicy` in `lang.ts`) |
 | Labor rules | Config (`labor-store.ts`) + validator |
+| Diagnostic state | Registry (`diagnostic-registry.ts`) |
+| Fact extraction | `fact-pack.ts` |
 | Enforcement | Validator (`mode-validators.ts`) + output layer (`route.ts`) |
 
 ## Backlog
 - P0: None (all acceptance criteria met)
-- P1: Add Prisma schema migration for `labor_confirmation` CaseMode + `confirmedLaborHours` field (currently in-memory only)
-- P1: Integration test with mocked OpenAI to verify full labor confirmation flow end-to-end
-- P2: Allow technician to re-confirm labor after report is generated (currently immutable)
-- P2: Add labor estimation heuristics based on system type (water pump vs AC unit)
+- P1: Integration test with mocked OpenAI — full diagnostic → pivot → labor → report flow
+- P1: Expand key finding patterns based on customer field testing
+- P2: Persist diagnostic registry to DB for cross-session continuity
+- P2: Confidence scoring for fact extraction (high/medium/low)
