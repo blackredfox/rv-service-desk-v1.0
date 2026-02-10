@@ -1,79 +1,68 @@
 # RV Service Desk — PRD & Implementation Memory
 
 ## Original Problem Statement
-Diagnostic behavior feels mechanical and template-driven. Five targeted fixes:
-1. Agent repeatedly asks same diagnostic questions after technician answered
-2. No diagnostic pivoting when key findings are discovered
-3. Unverified facts (invented symptoms) in final reports
-4. Over-polite/unnatural tone ("Thank you" after every reply)
-5. Labor confirmation input bug (rejects "2.5", "2.5h")
+Cases and messages are not persisted and disappear after session end. Implement minimal, safe persistence with 30-day retention and visible expiration indicator per case.
 
 ## Architecture
 - **Stack**: Next.js (App Router), TypeScript, Vitest, OpenAI API
 - **Key flow**: `diagnostic` → `labor_confirmation` → `final_report`
-- **Language policy**: `lang.ts` → `prompt-composer.ts` → `mode-validators.ts` → `route.ts`
-- **Diagnostic state**: `diagnostic-registry.ts` (per-case in-memory)
-- **Fact extraction**: `fact-pack.ts` (conversation scanning)
+- **Persistence**: In-memory store (no DB required) with retention fields
+- **Retention**: Single source of truth in `retention.ts` (30 days from lastActivityAt)
 
 ## What's Been Implemented
 
-### Session 1 (Jan 2026) — Language Policy
+### Session 1 — Language Policy
 - Declarative `LanguagePolicy` in `lang.ts`
-- Output-layer enforcement for EN/RU/ES/AUTO modes
 
-### Session 2 (Jan 2026) — Labor Confirmation + Copy UX
-- `labor_confirmation` mode between diagnostic and final_report
-- Labor sum validation in `labor-store.ts`
-- Copy button visual feedback with auto-reset
+### Session 2 — Labor Confirmation + Copy UX
+- `labor_confirmation` mode, labor sum validation, copy button feedback
 
-### Session 3 (Jan 2026) — Diagnostic Behavior Fix (MVP)
+### Session 3 — Diagnostic Behavior Fix
+- Diagnostic question registry, pivot rules, fact-locked reports, tone adjustment, labor input fix
 
-#### A. Diagnostic Question Registry (`diagnostic-registry.ts`)
-- Per-case in-memory tracking: `answeredKeys`, `unableToVerifyKeys`, `keyFindings`
-- Detects "already checked/answered/told you" → marks topic as answered
-- Detects "don't know/can't see/unable to verify" → closes topic permanently
-- `buildRegistryContext()` injects closed topics into diagnostic prompt
-- Multi-language support (EN, RU, ES patterns)
+### Session 4 (Jan 2026) — Case Persistence + Retention
 
-#### B. Diagnostic Pivot Rules
-- `detectKeyFinding()` — 17 key finding patterns (missing blade, seized motor, cracked housing, zero current, etc.)
-- `shouldPivot()` — when key finding detected, forces immediate transition to labor_confirmation
-- Implemented in `route.ts` — if LLM doesn't self-transition, pivot forces it
+#### A. Retention Logic (`src/lib/retention.ts`)
+- `RETENTION_DAYS = 30` — single constant
+- `computeExpiresAt(lastActivityAt)` — adds 30 days
+- `computeTimeLeftSeconds(expiresAt)` — seconds until expiry
+- `formatTimeLeft(seconds)` — compact display (Xd/Xh/Xm/Expired)
+- `getUrgencyTier(seconds)` — normal/warning/urgent/expired
+- `isExpired(lastActivityAt)` — boolean check
 
-#### C. Fact-Locked Final Report (`fact-pack.ts`)
-- `buildFactPack()` — scans ONLY user messages for symptoms, observations, test results
-- `buildFactLockConstraint()` — generates prohibition string injected into final report prompt
-- Rules: "Do NOT add, infer, or assume any symptoms not listed", "not verified" for unconfirmed
+#### B. Storage Layer (`src/lib/storage.ts`)
+- `CaseSummary` extended with `lastActivityAt`, `expiresAt`, `timeLeftSeconds`
+- `withRetention()` helper enriches any case object
+- All create/update/ensure/append operations compute retention fields
+- `appendMessage` touches `lastActivityAt` (extending retention)
+- `listCases` and `searchCases` filter expired cases
+- Both in-memory and DB paths updated
 
-#### D. Tone Adjustment
-- `SYSTEM_PROMPT_BASE.txt`: "Do NOT say Thank you", "Prefer silence over politeness", "Never use filler phrases"
-- `MODE_PROMPT_DIAGNOSTIC.txt`: Professional communication style, one-word acknowledgments only ("Noted.", "Understood.", "Copy.")
-- Diagnostic Registry Rules and Pivot Rules embedded in diagnostic prompt
+#### C. API (`src/app/api/cases/route.ts`)
+- `GET /api/cases` returns `lastActivityAt`, `expiresAt`, `timeLeftSeconds` per case
+- Frontend uses `timeLeftSeconds` directly (no recomputation)
 
-#### E. Labor Confirmation Input Parsing (Bug Fix)
-- `parseLaborConfirmation()` now accepts: `2.5`, `2.5h`, `2.5 hours`, `2.5hr`, `2.5hrs`
-- Regex updated: `h\b` as standalone unit match
+#### D. Sidebar Expiration Badge (`src/components/sidebar.tsx`)
+- `ExpiryBadge` component per case
+- Color-coded by urgency tier:
+  - Normal (>= 7d): subtle zinc
+  - Warning (1-6d): amber
+  - Urgent (< 24h): red
+  - Expired: deep red
+- Tooltip shows context
 
-#### Tests Added
-- `tests/diagnostic-registry.test.ts` — 26 tests
-- `tests/fact-pack.test.ts` — 10 tests
-- `tests/tone-adjustment.test.ts` — 9 tests
-- Updated `tests/labor-confirmation.test.ts` — +2 tests
-- Total: 447 tests passing (53 new), 33 test files
+#### E. Cleanup Script (`scripts/cleanup-retention.ts`)
+- Deletes expired cases + messages from Prisma DB
+- Supports `--dry-run` flag
+- Logs count of deleted cases/messages
 
-## Ownership Model
-| Concern | Owner |
-|---------|-------|
-| Content & format | Prompt files (`prompts/`) |
-| Language rules | Config (`LanguagePolicy` in `lang.ts`) |
-| Labor rules | Config (`labor-store.ts`) + validator |
-| Diagnostic state | Registry (`diagnostic-registry.ts`) |
-| Fact extraction | `fact-pack.ts` |
-| Enforcement | Validator (`mode-validators.ts`) + output layer (`route.ts`) |
+#### Tests
+- `tests/retention.test.ts` — 25 tests
+- Total: 472 tests passing, 34 test files
 
 ## Backlog
-- P0: None (all acceptance criteria met)
-- P1: Integration test with mocked OpenAI — full diagnostic → pivot → labor → report flow
-- P1: Expand key finding patterns based on customer field testing
-- P2: Persist diagnostic registry to DB for cross-session continuity
-- P2: Confidence scoring for fact extraction (high/medium/low)
+- P0: None
+- P1: Add GitHub Actions cron workflow for daily cleanup
+- P1: Add toast notification when case is about to expire (< 24h)
+- P2: Configurable retention window per organization
+- P2: Export case data before expiration
