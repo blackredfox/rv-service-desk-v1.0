@@ -37,6 +37,10 @@ jobs:
 
       - name: Generate Prisma Client
         run: yarn prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run retention cleanup
         run: yarn retention:cleanup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

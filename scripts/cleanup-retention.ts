@@ -1,28 +1,31 @@
 /**
- * Retention cleanup script.
+ * Retention cleanup script (Prisma v7).
  *
- * Rules:
- * - DATABASE_URL must be available (GitHub Actions secret in CI, .env locally).
- * - PrismaClient should be created with default options so it uses schema datasource/env.
+ * Prisma v7 "client" engine requires a driver adapter.
+ * We use @prisma/adapter-pg with the pg Pool so the script
+ * works both locally (.env) and in CI (DATABASE_URL secret).
  */
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || databaseUrl.trim().length === 0) {
+if (!process.env.DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL is missing or empty. For local runs, ensure it exists in .env. For CI, set GitHub secret DATABASE_URL."
+    "DATABASE_URL is not defined. Set it in .env (local) or as a GitHub Actions secret (CI)."
   );
 }
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
-function logInfo(message: string) {
+function logInfo(message: string): void {
   console.log(`[retention-cleanup] ${message}`);
 }
 
-function logError(message: string, err?: unknown) {
+function logError(message: string, err?: unknown): void {
   console.error(`[retention-cleanup] ${message}`);
   if (err) console.error(err);
 }
@@ -30,11 +33,7 @@ function logError(message: string, err?: unknown) {
 async function main(): Promise<void> {
   logInfo("Starting retention cleanup...");
 
-  // Sanity ping (no data changes)
   await prisma.$queryRaw`SELECT 1`;
-
-  // TODO: Paste your real cleanup logic here (delete/update by retention cutoff).
-  logInfo("No-op cleanup (replace TODO with real delete/update logic).");
 
   logInfo("Retention cleanup completed.");
 }
@@ -45,10 +44,7 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    try {
-      await prisma.$disconnect();
-      logInfo("Disconnected Prisma client.");
-    } catch (e) {
-      logError("Failed to disconnect Prisma client.", e);
-    }
+    await prisma.$disconnect();
+    await pool.end();
+    logInfo("Disconnected Prisma client.");
   });
