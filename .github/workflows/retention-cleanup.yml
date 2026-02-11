@@ -2,6 +2,7 @@ name: retention-cleanup
 
 on:
   schedule:
+    # Runs daily at 06:15 UTC
     - cron: "15 6 * * *"
   workflow_dispatch: {}
 
@@ -14,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Make env available to ALL steps (Prisma generate needs it)
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       NODE_ENV: production
@@ -31,14 +33,14 @@ jobs:
       - name: Enable Corepack (Yarn 4)
         run: |
           corepack enable
+          corepack prepare yarn@4.12.0 --activate
           yarn --version
 
       - name: Install dependencies (immutable)
         run: yarn install --immutable
-        
+
       - name: Generate Prisma Client
         run: yarn prisma generate
 
       - name: Run retention cleanup
-        run: npx tsx scripts/cleanup-retention.ts
-
+        run: yarn retention:cleanup
