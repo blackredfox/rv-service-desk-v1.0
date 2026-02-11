@@ -38,6 +38,7 @@ import {
   processUserMessage,
   buildRegistryContext,
   shouldPivot,
+  initializeCase,
 } from "@/lib/diagnostic-registry";
 import { buildFactLockConstraint } from "@/lib/fact-pack";
 
