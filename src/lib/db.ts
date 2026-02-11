@@ -15,38 +15,12 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-/*
- * Structural return type for getPrisma().
- *
- * storage.ts references Prisma model fields (inputLanguage, languageSource)
- * not yet present in schema.prisma.  Until that schema migration lands the
- * model delegates must stay loosely typed so existing call-sites compile.
- *
- * TODO: Replace PrismaClientType with PrismaClient once schema includes all
- *       fields currently used in storage.ts / auth.ts / analytics.ts.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- required for backward-compat with consumers using unmigrated schema fields; see TODO above
-type ModelDelegate = Record<string, (...args: any[]) => any>;
-
-export type PrismaClientType = {
-  case: ModelDelegate;
-  message: ModelDelegate;
-  user: ModelDelegate;
-  subscription: ModelDelegate;
-  event: ModelDelegate;
-  analyticsEvent: ModelDelegate;
-  paymentTransaction: ModelDelegate;
-  $disconnect: () => Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- passthrough to PrismaClient.$queryRaw
-  $queryRaw: (...args: any[]) => Promise<unknown>;
-};
-
 declare global {
-  var __prismaClient: PrismaClientType | undefined;
+  var __prismaClient: PrismaClient | undefined;
   var __prismaPool: Pool | undefined;
 }
 
-function buildClient(): PrismaClientType {
+function buildClient(): PrismaClient {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("DATABASE_URL is not set");
@@ -57,8 +31,8 @@ function buildClient(): PrismaClientType {
   const client = new PrismaClient({ adapter });
 
   globalThis.__prismaPool = pool;
-  globalThis.__prismaClient = client as unknown as PrismaClientType;
-  return client as unknown as PrismaClientType;
+  globalThis.__prismaClient = client;
+  return client;
 }
 
 /**
@@ -69,7 +43,7 @@ function buildClient(): PrismaClientType {
  *
  * Throws immediately when DATABASE_URL is not configured.
  */
-export async function getPrisma(): Promise<PrismaClientType> {
+export async function getPrisma(): Promise<PrismaClient> {
   if (globalThis.__prismaClient) {
     return globalThis.__prismaClient;
   }
