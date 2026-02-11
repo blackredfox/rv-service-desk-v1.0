@@ -563,6 +563,7 @@ async function appendMessageDb(args: {
 }
 
 async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
+  if (!input.userId) return ensureCaseMemory(input);
   const prisma = await getPrisma();
   if (!prisma) return ensureCaseMemory(input);
 
@@ -610,7 +611,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
       title: clampTitleSeed(input.titleSeed),
       inputLanguage: input.inputLanguage,
       languageSource: input.languageSource,
-      userId: input.userId!,
+      userId: input.userId,
     },
     select: {
       id: true,
