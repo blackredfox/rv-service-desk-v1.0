@@ -318,7 +318,7 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
   const created = await prisma.case.create({
     data: { 
       title: clampTitle(input.title ?? "New Case"),
-      userId: input.userId,
+      userId: input.userId ?? "",
     },
     select: {
       id: true,
@@ -609,7 +609,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
       title: clampTitleSeed(input.titleSeed),
       inputLanguage: input.inputLanguage,
       languageSource: input.languageSource,
-      userId: input.userId,
+      userId: input.userId ?? "",
     },
     select: {
       id: true,
