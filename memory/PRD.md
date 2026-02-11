@@ -10,16 +10,18 @@ Fix Prisma v7 initialization in `scripts/cleanup-retention.ts` and CI workflow `
 - **Prisma Config**: `prisma.config.ts` with `env("DATABASE_URL")` — Prisma v7 standard (no `url` in schema.prisma datasource)
 
 ## Root Cause Analysis
-Prisma v7 `prisma-client-js` generator defaults to "client" engine (WASM-based), which **requires** either:
-- `adapter` (e.g., `@prisma/adapter-pg`) for direct DB connections
-- `accelerateUrl` for Prisma Accelerate
+Prisma v7.3.0 with `prisma-client-js` generator defaults to the TypeScript/WASM query compiler ("client" engine), **not** the legacy Rust binary engine. This is a v7 breaking change — `engineType` is deprecated and ignored. The generated PrismaClient requires either a **driver adapter** (`@prisma/adapter-pg`) or `accelerateUrl`. Plain `new PrismaClient()` always fails.
 
-The old pattern `new PrismaClient()` without arguments throws `PrismaClientInitializationError` in v7.
+Verified locally:
+- `new PrismaClient()` → PrismaClientInitializationError
+- `new PrismaClient({})` → "engine type client requires adapter or accelerateUrl"
+- `new PrismaClient({ errorFormat: 'minimal' })` → same
+- No way to force binary engine in v7
 
 ## What's Been Implemented (Jan 2026)
 
 ### Fix: Prisma v7 Adapter-Based Initialization
-- **`scripts/cleanup-retention.ts`**: Rewritten to use `@prisma/adapter-pg` + `pg` Pool
+- **`scripts/cleanup-retention.ts`**: Uses `@prisma/adapter-pg` + `pg` Pool (standard v7 pattern)
 - **`package.json`**: Added `@prisma/adapter-pg`, `pg`, `@types/pg` dependencies
 - **`.github/workflows/retention-cleanup.yml`**: Explicit `DATABASE_URL` env on `prisma generate` and `retention:cleanup` steps
 - **Schema**: `prisma/schema.prisma` unchanged (correct for v7 — provider only, no url)
