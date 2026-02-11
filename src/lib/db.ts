@@ -1,56 +1,53 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// NOTE: Prisma client types are generated ("prisma generate").
-// In this environment, DATABASE_URL may be intentionally unset, so generated client
-// may not exist. To keep typecheck + runtime working without generated artifacts,
-// we use a minimal structural type.
-export type PrismaClientType = {
-  case: any;
-  message: any;
-  user: any;
-  subscription: any;
-  event: any;
-  analyticsEvent: any;
-  paymentTransaction: any;
-  $disconnect: () => Promise<void>;
-};
+/**
+ * Shared Prisma client for the main app (Prisma v7).
+ *
+ * Prisma 7 uses a TypeScript/WASM query compiler and requires a driver
+ * adapter for direct database connections.  We use @prisma/adapter-pg
+ * with a pg Pool — the standard v7 instantiation pattern.
+ *
+ * The client is cached on globalThis so Next.js dev hot-reload does not
+ * create new connections on every module re-evaluation.
+ *
+ * @see https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7
+ */
 
-// NOTE: Prisma client types may be unavailable in local dev if `prisma generate`
-// hasn't been run (e.g., DATABASE_URL missing). We keep runtime imports guarded
-// and typecheck-friendly by loosening the constructor import below.
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 declare global {
-  // Cached instance for dev hot-reload.
-  var __prisma: PrismaClientType | null | undefined;
+  // eslint-disable-next-line no-var -- globalThis caching requires var
+  var __prismaClient: PrismaClient | undefined;
+  // eslint-disable-next-line no-var
+  var __prismaPool: Pool | undefined;
+}
+
+function buildClient(): PrismaClient {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL is not set");
+  }
+
+  const pool = new Pool({ connectionString: url });
+  const adapter = new PrismaPg(pool);
+  const client = new PrismaClient({ adapter });
+
+  globalThis.__prismaPool = pool;
+  globalThis.__prismaClient = client;
+  return client;
 }
 
 /**
- * Returns a PrismaClient instance when DATABASE_URL is set and Prisma client is generated.
- * DATABASE_URL is REQUIRED for Release 1 - throws if not configured.
+ * Returns a singleton PrismaClient.
+ *
+ * - Production: one client per server process.
+ * - Dev: reuses the same instance across hot-reloads via globalThis.
+ *
+ * Throws immediately when DATABASE_URL is not configured.
  */
-export async function getPrisma(): Promise<PrismaClientType | null> {
-  if (!process.env.DATABASE_URL) {
-    // In Release 1, database is required for auth
-    return null;
+export async function getPrisma(): Promise<PrismaClient> {
+  if (globalThis.__prismaClient) {
+    return globalThis.__prismaClient;
   }
-
-  if (global.__prisma !== undefined) {
-    return global.__prisma;
-  }
-
-  try {
-    // Prisma's generated runtime may not exist if prisma generate wasn't run.
-    // Use a guarded dynamic import and cast to avoid hard TS dependency on generated types.
-    const mod = (await import("@prisma/client")) as unknown as { PrismaClient?: new () => PrismaClientType };
-    if (!mod.PrismaClient) {
-      global.__prisma = null;
-      return null;
-    }
-    const client = new mod.PrismaClient();
-    global.__prisma = client;
-    return client;
-  } catch {
-    // If prisma client hasn't been generated yet, this import will fail.
-    global.__prisma = null;
-    return null;
-  }
+  return buildClient();
 }
