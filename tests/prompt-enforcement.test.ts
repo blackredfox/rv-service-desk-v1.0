@@ -46,7 +46,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       });
 
       expect(prompt).toContain("DIAGNOSTIC MODE");
-      expect(prompt).toContain("ONE detailed question at a time");
+      expect(prompt).toContain("PROCEDURE IS LAW");
       expect(prompt).toContain("All dialogue MUST be in Spanish");
     });
 
