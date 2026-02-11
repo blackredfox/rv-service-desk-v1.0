@@ -16,35 +16,41 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 declare global {
-  var __prismaClient: PrismaClient | undefined;
+  var __prismaClient: PrismaClient | null | undefined;
   var __prismaPool: Pool | undefined;
 }
 
-function buildClient(): PrismaClient {
+function buildClient(): PrismaClient | null {
   const url = process.env.DATABASE_URL;
   if (!url) {
-    throw new Error("DATABASE_URL is not set");
+    console.warn("[db] DATABASE_URL is not set — running without database.");
+    return null;
   }
 
-  const pool = new Pool({ connectionString: url });
-  const adapter = new PrismaPg(pool);
-  const client = new PrismaClient({ adapter });
+  try {
+    const pool = new Pool({ connectionString: url });
+    const adapter = new PrismaPg(pool);
+    const client = new PrismaClient({ adapter });
 
-  globalThis.__prismaPool = pool;
-  globalThis.__prismaClient = client;
-  return client;
+    globalThis.__prismaPool = pool;
+    globalThis.__prismaClient = client;
+    return client;
+  } catch (err) {
+    console.error("[db] Failed to initialise Prisma client:", err);
+    globalThis.__prismaClient = null;
+    return null;
+  }
 }
 
 /**
- * Returns a singleton PrismaClient.
+ * Returns a singleton PrismaClient, or `null` when DATABASE_URL is not
+ * configured (graceful degradation — storage layer falls back to memory).
  *
  * - Production: one client per server process.
  * - Dev: reuses the same instance across hot-reloads via globalThis.
- *
- * Throws immediately when DATABASE_URL is not configured.
  */
-export async function getPrisma(): Promise<PrismaClient> {
-  if (globalThis.__prismaClient) {
+export async function getPrisma(): Promise<PrismaClient | null> {
+  if (globalThis.__prismaClient !== undefined) {
     return globalThis.__prismaClient;
   }
   return buildClient();
