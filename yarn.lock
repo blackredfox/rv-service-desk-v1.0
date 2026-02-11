@@ -3,7 +3,6 @@
 
 __metadata:
   version: 8
-
   cacheKey: 10c0
 
 "@acemir/cssom@npm:^0.9.28":
