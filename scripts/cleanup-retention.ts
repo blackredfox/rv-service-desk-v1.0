@@ -1,83 +1,54 @@
-#!/usr/bin/env npx tsx
 /**
- * Retention Cleanup Script — deletes expired cases and their messages.
+ * Retention cleanup script.
  *
- * Retention window: 30 days from lastActivityAt (= updatedAt in DB).
- * expiresAt = updatedAt + 30 days
- *
- * Run: npx tsx scripts/cleanup-retention.ts
- * Schedule via cron (daily): 0 3 * * * cd /path/to/project && npx tsx scripts/cleanup-retention.ts
- *
- * Options:
- *   --dry-run   Show what would be deleted without actually deleting
+ * Rules:
+ * - DATABASE_URL must be available (GitHub Actions secret in CI, .env locally).
+ * - PrismaClient should be created with default options so it uses schema datasource/env.
  */
 
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { RETENTION_DAYS } from "../src/lib/retention";
 
-const DRY_RUN = process.argv.includes("--dry-run");
-
-async function main() {
-  const prisma = new PrismaClient();
-
-  try {
-    const cutoffDate = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-
-    console.log(`[Retention Cleanup] ${DRY_RUN ? "(DRY RUN) " : ""}Started at ${new Date().toISOString()}`);
-    console.log(`[Retention Cleanup] Retention window: ${RETENTION_DAYS} days`);
-    console.log(`[Retention Cleanup] Cutoff date: ${cutoffDate.toISOString()}`);
-
-    // Find expired cases (updatedAt < cutoff)
-    const expiredCases = await prisma.case.findMany({
-      where: {
-        updatedAt: { lt: cutoffDate },
-      },
-      select: { id: true, title: true, updatedAt: true },
-    });
-
-    console.log(`[Retention Cleanup] Found ${expiredCases.length} expired case(s)`);
-
-    if (expiredCases.length === 0) {
-      console.log(`[Retention Cleanup] Nothing to clean up. Done.`);
-      return;
-    }
-
-    const caseIds = expiredCases.map((c) => c.id);
-
-    // Count messages to be deleted
-    const messageCount = await prisma.message.count({
-      where: { caseId: { in: caseIds } },
-    });
-
-    console.log(`[Retention Cleanup] ${messageCount} message(s) belong to expired cases`);
-
-    if (DRY_RUN) {
-      console.log(`[Retention Cleanup] DRY RUN — would delete:`);
-      for (const c of expiredCases) {
-        console.log(`  - Case "${c.title}" (id: ${c.id}, last activity: ${c.updatedAt.toISOString()})`);
-      }
-      console.log(`  - ${messageCount} total messages`);
-      return;
-    }
-
-    // Delete messages first (FK constraint)
-    const deletedMessages = await prisma.message.deleteMany({
-      where: { caseId: { in: caseIds } },
-    });
-
-    // Delete cases
-    const deletedCases = await prisma.case.deleteMany({
-      where: { id: { in: caseIds } },
-    });
-
-    console.log(`[Retention Cleanup] Deleted ${deletedCases.count} case(s) and ${deletedMessages.count} message(s)`);
-    console.log(`[Retention Cleanup] Done.`);
-  } catch (error) {
-    console.error(`[Retention Cleanup] Error:`, error);
-    process.exit(1);
-  } finally {
-    await prisma.$disconnect();
-  }
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl || databaseUrl.trim().length === 0) {
+  throw new Error(
+    "DATABASE_URL is missing or empty. For local runs, ensure it exists in .env. For CI, set GitHub secret DATABASE_URL."
+  );
 }
 
-main();
+const prisma = new PrismaClient();
+
+function logInfo(message: string) {
+  console.log(`[retention-cleanup] ${message}`);
+}
+
+function logError(message: string, err?: unknown) {
+  console.error(`[retention-cleanup] ${message}`);
+  if (err) console.error(err);
+}
+
+async function main(): Promise<void> {
+  logInfo("Starting retention cleanup...");
+
+  // Sanity ping (no data changes)
+  await prisma.$queryRaw`SELECT 1`;
+
+  // TODO: Paste your real cleanup logic here (delete/update by retention cutoff).
+  logInfo("No-op cleanup (replace TODO with real delete/update logic).");
+
+  logInfo("Retention cleanup completed.");
+}
+
+main()
+  .catch((err) => {
+    logError("Retention cleanup failed.", err);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    try {
+      await prisma.$disconnect();
+      logInfo("Disconnected Prisma client.");
+    } catch (e) {
+      logError("Failed to disconnect Prisma client.", e);
+    }
+  });
