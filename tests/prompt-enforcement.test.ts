@@ -109,8 +109,8 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_DIAGNOSTIC).toContain("Refrigerators");
     });
 
-    it("should enforce ONE question rule", () => {
-      expect(MODE_DIAGNOSTIC).toContain("ONE detailed question at a time");
+    it("should enforce step-by-step procedure rule", () => {
+      expect(MODE_DIAGNOSTIC).toContain("EXACT question from the active procedure");
     });
 
     it("should prohibit authorization in diagnostic mode", () => {
