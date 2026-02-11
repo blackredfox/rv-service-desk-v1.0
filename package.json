@@ -2,6 +2,7 @@
   "name": "rv-service-desk-v1.0",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "yarn@4.12.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +11,8 @@
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "retention:cleanup": "tsx scripts/cleanup-retention.ts"
   },
   "dependencies": {
     "@prisma/client": "^7.3.0",
