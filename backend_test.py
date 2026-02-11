@@ -74,8 +74,12 @@ class PrismaV7MigrationTester:
                 text=True
             )
             
-            error_count = len([line for line in result.stderr.split('\n') if 'error TS' in line])
+            # Count lines containing 'error TS' - errors show up in stderr
+            all_output = result.stderr + result.stdout
+            error_lines = [line for line in all_output.split('\n') if 'error TS' in line and line.strip()]
+            error_count = len(error_lines)
             print(f"Total TypeScript errors: {error_count}")
+            print(f"Sample error lines: {error_lines[:3] if error_lines else 'None'}")
             
             # Should be around 20, definitely not 41+
             return 15 <= error_count <= 25
