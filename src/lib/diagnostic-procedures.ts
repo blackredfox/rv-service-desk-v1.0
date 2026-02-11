@@ -40,14 +40,14 @@ export type DiagnosticProcedure = {
 
 const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
   { system: "water_pump", patterns: [/water\s*pump/i, /водяно[йе]\s*насос/i, /bomba\s*de\s*agua/i, /fresh\s*water\s*pump/i] },
-  { system: "furnace", patterns: [/furnace/i, /heater(?!\s*pump)/i, /печ[ьк]/i, /калориф/i, /horno/i, /calefacc/i] },
-  { system: "roof_ac", patterns: [/(?:roof\s*)?(?:ac|a\/c|air\s*condition)/i, /(?:heat\s*pump)/i, /кондицион/i, /aire\s*acondicionado/i] },
-  { system: "refrigerator", patterns: [/refrig/i, /fridge/i, /холодильник/i, /refrigerador/i, /nevera/i] },
+  { system: "lp_gas", patterns: [/lp\s*gas|propane|gas\s*(?:system|leak|line|valve|regulator)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
   { system: "slide_out", patterns: [/slide[\s-]*out/i, /слайд/i, /slide\s*room/i] },
   { system: "leveling", patterns: [/level(?:ing|er)?\s*(?:system|jack)/i, /jack\s*system/i, /выравнива/i, /nivelaci/i] },
   { system: "inverter_converter", patterns: [/inverter/i, /converter/i, /инвертер|инвертор|конвертер|конвертор/i] },
-  { system: "lp_gas", patterns: [/lp\s*gas|propane|gas\s*(?:system|leak|line|valve|regulator|furnace)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
-  { system: "electrical_ac", patterns: [/(?:120v|110v|ac)\s*(?:outlet|circuit|power|electrical)/i, /gfci/i, /outlet/i, /розетк/i] },
+  { system: "furnace", patterns: [/furnace/i, /heater(?!\s*pump)/i, /печ[ьк]/i, /калориф/i, /horno/i, /calefacc/i] },
+  { system: "roof_ac", patterns: [/(?:roof\s*)?(?:ac|a\/c)\b/i, /air\s*condition/i, /heat\s*pump/i, /кондицион/i, /aire\s*acondicionado/i] },
+  { system: "refrigerator", patterns: [/refrig/i, /fridge/i, /холодильник/i, /refrigerador/i, /nevera/i] },
+  { system: "electrical_ac", patterns: [/(?:120v|110v)\s*(?:outlet|circuit|power|electrical)/i, /gfci/i, /\boutlet\b/i, /розетк/i] },
   { system: "electrical_12v", patterns: [/12v|12\s*volt|dc\s*(?:power|circuit|system)/i, /(?:light|fan|vent)\s*(?:not|won't|doesn't|don't)/i] },
   { system: "consumer_appliance", patterns: [/(?:tv|television|microwave|stereo|radio|dvd|blu[\s-]*ray)/i, /телевизор|микроволнов/i] },
 ];
