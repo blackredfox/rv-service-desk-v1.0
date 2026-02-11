@@ -1,19 +1,40 @@
 /**
- * Diagnostic Registry — per-case state tracking for diagnostic questions.
+ * Diagnostic Registry — per-case procedure-aware step tracking.
  *
- * Tracks which diagnostic areas have been answered or marked as
+ * Tracks which diagnostic steps have been completed or marked as
  * unable-to-verify, so the agent never repeats closed questions.
  *
- * Also detects "key findings" that trigger immediate diagnostic pivoting.
+ * Also detects "key findings" that trigger immediate diagnostic pivoting,
+ * and "already answered" / "unable to verify" signals from the technician.
  */
 
+import {
+  detectSystem,
+  getProcedure,
+  getNextStep,
+  mapInitialMessageToSteps,
+  buildProcedureContext,
+  type DiagnosticProcedure,
+  type DiagnosticStep,
+} from "./diagnostic-procedures";
+
 type DiagnosticEntry = {
-  /** Topics / questions the technician has answered */
+  /** Active procedure system (e.g. "water_pump") */
+  procedureSystem: string | null;
+  /** Resolved procedure object */
+  procedure: DiagnosticProcedure | null;
+  /** Step IDs completed by the technician */
+  completedStepIds: Set<string>;
+  /** Step IDs the technician cannot verify */
+  unableStepIds: Set<string>;
+  /** Legacy topic tracking (backward compat) */
   answeredKeys: Set<string>;
-  /** Topics the technician explicitly cannot verify */
+  /** Legacy unable-to-verify topics */
   unableToVerifyKeys: Set<string>;
   /** Key findings that may trigger early isolation */
   keyFindings: string[];
+  /** Whether initial message has been processed */
+  initialized: boolean;
 };
 
 const registry = new Map<string, DiagnosticEntry>();
@@ -21,7 +42,16 @@ const registry = new Map<string, DiagnosticEntry>();
 function ensureEntry(caseId: string): DiagnosticEntry {
   let entry = registry.get(caseId);
   if (!entry) {
-    entry = { answeredKeys: new Set(), unableToVerifyKeys: new Set(), keyFindings: [] };
+    entry = {
+      procedureSystem: null,
+      procedure: null,
+      completedStepIds: new Set(),
+      unableStepIds: new Set(),
+      answeredKeys: new Set(),
+      unableToVerifyKeys: new Set(),
+      keyFindings: [],
+      initialized: false,
+    };
     registry.set(caseId, entry);
   }
   return entry;
@@ -33,14 +63,11 @@ const ALREADY_ANSWERED_PATTERNS = [
   /already\s+(?:checked|tested|verified|answered|told|said|mentioned|confirmed|reported|measured|looked)/i,
   /i\s+(?:already|just)\s+(?:checked|tested|verified|told|said|mentioned|confirmed|reported|measured)/i,
   /(?:told|said|mentioned)\s+(?:you|that)\s+(?:already|before|earlier)/i,
-  /как\s+(?:я\s+)?(?:уже\s+)?(?:сказал|говорил|проверил|упомянул)/i,   // RU
-  /уже\s+(?:проверил|проверено|сказал|ответил|делал|смотрел)/i,         // RU
-  /ya\s+(?:lo\s+)?(?:revisé|verifiqué|dije|mencioné|comprobé)/i,       // ES
+  /как\s+(?:я\s+)?(?:уже\s+)?(?:сказал|говорил|проверил|упомянул)/i,
+  /уже\s+(?:проверил|проверено|сказал|ответил|делал|смотрел)/i,
+  /ya\s+(?:lo\s+)?(?:revisé|verifiqué|dije|mencioné|comprobé)/i,
 ];
 
-/**
- * Check if a message indicates the technician already answered something.
- */
 export function detectAlreadyAnswered(message: string): boolean {
   return ALREADY_ANSWERED_PATTERNS.some((p) => p.test(message));
 }
@@ -52,18 +79,15 @@ const UNABLE_TO_VERIFY_PATTERNS = [
   /(?:no\s+(?:way|access|tool|meter|multimeter))\s+(?:to\s+)?(?:check|measure|verify|test)/i,
   /unable\s+to\s+(?:verify|check|confirm|measure|test|access)/i,
   /not\s+(?:sure|certain|able)\s+(?:about|how|if)/i,
-  /(?:не\s+(?:знаю|могу|вижу|проверить|могу\s+проверить))/i,           // RU
-  /(?:no\s+(?:sé|puedo|tengo))\s+(?:como|verificar|comprobar|medir)/i, // ES
+  /(?:не\s+(?:знаю|могу|вижу|проверить|могу\s+проверить))/i,
+  /(?:no\s+(?:sé|puedo|tengo))\s+(?:como|verificar|comprobar|medir)/i,
 ];
 
-/**
- * Check if a message indicates the technician cannot verify something.
- */
 export function detectUnableToVerify(message: string): boolean {
   return UNABLE_TO_VERIFY_PATTERNS.some((p) => p.test(message));
 }
 
-// ── Diagnostic topic extraction ─────────────────────────────────────
+// ── Legacy topic extraction (backward compat) ───────────────────────
 
 const DIAGNOSTIC_TOPICS: Array<{ key: string; patterns: RegExp[] }> = [
   { key: "voltage", patterns: [/volt(?:age|s)?/i, /напряжени/i, /voltaje/i] },
@@ -87,9 +111,6 @@ const DIAGNOSTIC_TOPICS: Array<{ key: string; patterns: RegExp[] }> = [
   { key: "wiring", patterns: [/wir(?:ing|e)\s*(?:connection|damage)/i, /провод/i] },
 ];
 
-/**
- * Extract diagnostic topics mentioned in a message.
- */
 export function extractTopics(message: string): string[] {
   const found: string[] = [];
   for (const topic of DIAGNOSTIC_TOPICS) {
@@ -122,10 +143,6 @@ const KEY_FINDING_PATTERNS: Array<{ pattern: RegExp; finding: string }> = [
   { pattern: /(?:не|нет)\s*(?:сопротивлен|непрерывност)/i, finding: "open circuit (RU)" },
 ];
 
-/**
- * Detect a key diagnostic finding that should trigger pivot/early isolation.
- * Returns the finding description or null.
- */
 export function detectKeyFinding(message: string): string | null {
   for (const { pattern, finding } of KEY_FINDING_PATTERNS) {
     if (pattern.test(message)) return finding;
@@ -133,17 +150,59 @@ export function detectKeyFinding(message: string): string | null {
   return null;
 }
 
-// ── Registry operations ─────────────────────────────────────────────
+// ── Procedure initialization ────────────────────────────────────────
 
 /**
- * Process a technician message: update the registry with answered topics,
- * unable-to-verify topics, and key findings.
+ * Initialize a case's procedure from the first message.
+ * Detects the system, selects the procedure, and maps initial message to completed steps.
+ */
+export function initializeCase(caseId: string, message: string): {
+  system: string | null;
+  procedure: DiagnosticProcedure | null;
+  preCompletedSteps: string[];
+} {
+  const entry = ensureEntry(caseId);
+
+  if (entry.initialized && entry.procedure) {
+    return {
+      system: entry.procedureSystem,
+      procedure: entry.procedure,
+      preCompletedSteps: [],
+    };
+  }
+
+  const system = detectSystem(message);
+  const procedure = system ? getProcedure(system) : null;
+
+  entry.procedureSystem = system;
+  entry.procedure = procedure;
+  entry.initialized = true;
+
+  let preCompletedSteps: string[] = [];
+
+  if (procedure) {
+    preCompletedSteps = mapInitialMessageToSteps(message, procedure);
+    for (const stepId of preCompletedSteps) {
+      entry.completedStepIds.add(stepId);
+    }
+  }
+
+  return { system, procedure, preCompletedSteps };
+}
+
+// ── Per-message processing ──────────────────────────────────────────
+
+/**
+ * Process a technician message: update the registry with step completions,
+ * unable-to-verify, key findings, and legacy topic tracking.
  */
 export function processUserMessage(caseId: string, message: string): {
   newAnswered: string[];
   newUnable: string[];
   keyFinding: string | null;
   alreadyAnswered: boolean;
+  completedStepIds: string[];
+  unableStepIds: string[];
 } {
   const entry = ensureEntry(caseId);
   const topics = extractTopics(message);
@@ -153,7 +212,27 @@ export function processUserMessage(caseId: string, message: string): {
 
   const newAnswered: string[] = [];
   const newUnable: string[] = [];
+  const completedStepIds: string[] = [];
+  const unableStepIds: string[] = [];
 
+  // Procedure-aware step tracking
+  if (entry.procedure) {
+    for (const step of entry.procedure.steps) {
+      if (entry.completedStepIds.has(step.id) || entry.unableStepIds.has(step.id)) continue;
+
+      if (step.matchPatterns.some((p) => p.test(message))) {
+        if (isUnableToVerify) {
+          entry.unableStepIds.add(step.id);
+          unableStepIds.push(step.id);
+        } else {
+          entry.completedStepIds.add(step.id);
+          completedStepIds.push(step.id);
+        }
+      }
+    }
+  }
+
+  // Legacy topic tracking
   for (const topic of topics) {
     if (isUnableToVerify) {
       if (!entry.unableToVerifyKeys.has(topic)) {
@@ -168,45 +247,47 @@ export function processUserMessage(caseId: string, message: string): {
     }
   }
 
-  // If "already answered" but no specific topic detected, mark recent topics
-  if (isAlreadyAnswered && topics.length === 0) {
-    // The technician is saying "already answered" without specifying what
-    // This is recorded but topics stay as-is
-  }
-
   if (keyFinding && !entry.keyFindings.includes(keyFinding)) {
     entry.keyFindings.push(keyFinding);
   }
 
-  return { newAnswered, newUnable, keyFinding, alreadyAnswered: isAlreadyAnswered };
+  return { newAnswered, newUnable, keyFinding, alreadyAnswered: isAlreadyAnswered, completedStepIds, unableStepIds };
 }
+
+// ── Context building ────────────────────────────────────────────────
 
 /**
  * Build a context string injected into the diagnostic system prompt.
- * Tells the LLM which topics are closed and what key findings exist.
+ *
+ * If a procedure is active, uses structured procedure context.
+ * Otherwise falls back to legacy topic-based context.
  */
 export function buildRegistryContext(caseId: string): string {
   const entry = registry.get(caseId);
   if (!entry) return "";
 
+  // Procedure-aware context
+  if (entry.procedure) {
+    return buildProcedureContext(
+      entry.procedure,
+      entry.completedStepIds,
+      entry.unableStepIds,
+    );
+  }
+
+  // Legacy fallback
   const parts: string[] = [];
 
   if (entry.answeredKeys.size > 0) {
-    parts.push(
-      `ALREADY ANSWERED (do NOT ask again): ${[...entry.answeredKeys].join(", ")}`
-    );
+    parts.push(`ALREADY ANSWERED (do NOT ask again): ${[...entry.answeredKeys].join(", ")}`);
   }
 
   if (entry.unableToVerifyKeys.size > 0) {
-    parts.push(
-      `UNABLE TO VERIFY (closed — skip these): ${[...entry.unableToVerifyKeys].join(", ")}`
-    );
+    parts.push(`UNABLE TO VERIFY (closed — skip these): ${[...entry.unableToVerifyKeys].join(", ")}`);
   }
 
   if (entry.keyFindings.length > 0) {
-    parts.push(
-      `KEY FINDINGS: ${entry.keyFindings.join("; ")}`
-    );
+    parts.push(`KEY FINDINGS: ${entry.keyFindings.join("; ")}`);
   }
 
   if (parts.length === 0) return "";
@@ -221,6 +302,16 @@ export function shouldPivot(caseId: string): { pivot: boolean; finding?: string 
   const entry = registry.get(caseId);
   if (!entry || entry.keyFindings.length === 0) return { pivot: false };
   return { pivot: true, finding: entry.keyFindings[entry.keyFindings.length - 1] };
+}
+
+/**
+ * Check if all procedure steps are done for this case.
+ */
+export function isProcedureComplete(caseId: string): boolean {
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return false;
+  const nextStep = getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
+  return nextStep === null;
 }
 
 /**
