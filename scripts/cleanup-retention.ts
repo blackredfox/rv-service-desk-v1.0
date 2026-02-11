@@ -1,13 +1,18 @@
 /**
- * Retention cleanup script.
+ * Retention cleanup script (Prisma v7).
  *
- * Rules:
- * - DATABASE_URL must be available (GitHub Actions secret in CI, .env locally).
- * - PrismaClient is created with default options so it uses schema datasource/env.
+ * Prisma 7 replaced the Rust binary engine with a TypeScript/WASM compiler.
+ * The generated PrismaClient now requires a driver adapter for direct
+ * database connections.  This is the standard v7 instantiation pattern —
+ * not a custom override.
+ *
+ * @see https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7
  */
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -15,7 +20,9 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 function logInfo(message: string): void {
   console.log(`[retention-cleanup] ${message}`);
@@ -41,5 +48,6 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
     logInfo("Disconnected Prisma client.");
   });
