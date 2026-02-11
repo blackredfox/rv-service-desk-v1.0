@@ -1,15 +1,13 @@
 /**
- * Retention cleanup script (Prisma v7).
+ * Retention cleanup script.
  *
- * Prisma v7 "client" engine requires a driver adapter.
- * We use @prisma/adapter-pg with the pg Pool so the script
- * works both locally (.env) and in CI (DATABASE_URL secret).
+ * Rules:
+ * - DATABASE_URL must be available (GitHub Actions secret in CI, .env locally).
+ * - PrismaClient is created with default options so it uses schema datasource/env.
  */
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -17,9 +15,7 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 function logInfo(message: string): void {
   console.log(`[retention-cleanup] ${message}`);
@@ -45,6 +41,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await pool.end();
     logInfo("Disconnected Prisma client.");
   });
