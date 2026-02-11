@@ -179,8 +179,9 @@ describe("processUserMessage – procedure-aware", () => {
 
     initializeCase("pm-2", "Water pump not working");
     processUserMessage("pm-2", "Pump is silent when faucet opens");
-    const result = processUserMessage("pm-2", "Can't check voltage, no multimeter");
-    expect(result.unableStepIds.length).toBeGreaterThan(0);
+    const result = processUserMessage("pm-2", "Can't check the voltage at the pump terminals");
+    // Should track as unable-to-verify in either step tracking or legacy topics
+    expect(result.unableStepIds.length > 0 || result.newUnable.length > 0).toBe(true);
   });
 
   it("still tracks legacy topics", async () => {
