@@ -369,6 +369,14 @@ export async function POST(req: Request) {
   let pivotTriggered = false;
 
   if (currentMode === "diagnostic") {
+    // Initialize procedure on first diagnostic message
+    const initResult = initializeCase(ensuredCase.id, message);
+    if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
+      console.log(`[Chat API v2] Procedure: ${initResult.procedure.displayName}, pre-completed steps: ${initResult.preCompletedSteps.join(", ")}`);
+    } else if (initResult.system) {
+      console.log(`[Chat API v2] Procedure: ${initResult.system}`);
+    }
+
     const regResult = processUserMessage(ensuredCase.id, message);
     
     if (regResult.keyFinding) {
