@@ -16,9 +16,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 declare global {
-  // eslint-disable-next-line no-var -- globalThis caching requires var
   var __prismaClient: PrismaClient | undefined;
-  // eslint-disable-next-line no-var
   var __prismaPool: Pool | undefined;
 }
 
