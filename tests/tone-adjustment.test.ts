@@ -44,14 +44,13 @@ describe("Tone Adjustment - Prompt Files", () => {
     expect(content).not.toContain("Provide encouraging feedback");
   });
 
-  it("MODE_PROMPT_DIAGNOSTIC: has registry rules", async () => {
+  it("MODE_PROMPT_DIAGNOSTIC: has procedure and registry rules", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
+    expect(content).toContain("PROCEDURE IS LAW");
     expect(content).toContain("DIAGNOSTIC REGISTRY RULES");
-    expect(content).toContain("ALREADY ANSWERED");
-    expect(content).toContain("UNABLE TO VERIFY");
     expect(content).toContain("NEVER repeat a question");
   });
 
