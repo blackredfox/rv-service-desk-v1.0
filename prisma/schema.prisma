@@ -97,8 +97,8 @@ model Case {
   id             String          @id @default(cuid())
   userId         String
   title          String
-  language       Language
-  inputLanguage  Language?
+  language       Language        @default(EN)
+  inputLanguage  Language        @default(EN)
   languageSource LanguageSource  @default(AUTO)
   mode           CaseMode        @default(diagnostic)
   createdAt      DateTime        @default(now())
