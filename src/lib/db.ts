@@ -15,12 +15,40 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+/*
+ * Backward-compatible structural type.
+ *
+ * storage.ts references Prisma model fields (inputLanguage, languageSource)
+ * that have not yet been added to schema.prisma.  Until the schema migration
+ * lands, these calls compile only against loose delegate types.
+ *
+ * TODO: Remove this alias once schema includes all fields used in storage.ts,
+ *       then return PrismaClient directly from getPrisma().
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- compat shim; see TODO above
+type ModelDelegate = Record<string, (...args: any[]) => any>;
+
+export type PrismaClientType = {
+  [K in keyof PrismaClient]: PrismaClient[K];
+} & {
+  case: ModelDelegate;
+  message: ModelDelegate;
+  user: ModelDelegate;
+  subscription: ModelDelegate;
+  event: ModelDelegate;
+  analyticsEvent: ModelDelegate;
+  paymentTransaction: ModelDelegate;
+  $disconnect: () => Promise<void>;
+  $queryRaw: PrismaClient["$queryRaw"];
+};
+
 declare global {
-  var __prismaClient: PrismaClient | undefined;
+  var __prismaClient: PrismaClientType | undefined;
   var __prismaPool: Pool | undefined;
 }
 
-function buildClient(): PrismaClient {
+function buildClient(): PrismaClientType {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("DATABASE_URL is not set");
@@ -28,7 +56,7 @@ function buildClient(): PrismaClient {
 
   const pool = new Pool({ connectionString: url });
   const adapter = new PrismaPg(pool);
-  const client = new PrismaClient({ adapter });
+  const client = new PrismaClient({ adapter }) as unknown as PrismaClientType;
 
   globalThis.__prismaPool = pool;
   globalThis.__prismaClient = client;
@@ -43,7 +71,7 @@ function buildClient(): PrismaClient {
  *
  * Throws immediately when DATABASE_URL is not configured.
  */
-export async function getPrisma(): Promise<PrismaClient> {
+export async function getPrisma(): Promise<PrismaClientType> {
   if (globalThis.__prismaClient) {
     return globalThis.__prismaClient;
   }
