@@ -25,17 +25,13 @@ jobs:
           node-version: 20
           cache: yarn
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Show Yarn version
-        run: yarn --version
-
-      - name: Install dependencies (Berry -> Classic fallback)
-        shell: bash
+      - name: Enable Corepack (Yarn 4)
         run: |
-          set -euo pipefail
-          yarn install --immutable --inline-builds || yarn install --frozen-lockfile
+          corepack enable
+          yarn --version
+
+      - name: Install dependencies (immutable)
+        run: yarn install --immutable
 
       - name: Run retention cleanup
         env:
