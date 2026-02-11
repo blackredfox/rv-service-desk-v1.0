@@ -16,22 +16,19 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 /*
- * Backward-compatible structural type.
+ * Structural return type for getPrisma().
  *
  * storage.ts references Prisma model fields (inputLanguage, languageSource)
- * that have not yet been added to schema.prisma.  Until the schema migration
- * lands, these calls compile only against loose delegate types.
+ * not yet present in schema.prisma.  Until that schema migration lands the
+ * model delegates must stay loosely typed so existing call-sites compile.
  *
- * TODO: Remove this alias once schema includes all fields used in storage.ts,
- *       then return PrismaClient directly from getPrisma().
+ * TODO: Replace PrismaClientType with PrismaClient once schema includes all
+ *       fields currently used in storage.ts / auth.ts / analytics.ts.
  */
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- compat shim; see TODO above
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- required for backward-compat with consumers using unmigrated schema fields; see TODO above
 type ModelDelegate = Record<string, (...args: any[]) => any>;
 
 export type PrismaClientType = {
-  [K in keyof PrismaClient]: PrismaClient[K];
-} & {
   case: ModelDelegate;
   message: ModelDelegate;
   user: ModelDelegate;
@@ -40,7 +37,8 @@ export type PrismaClientType = {
   analyticsEvent: ModelDelegate;
   paymentTransaction: ModelDelegate;
   $disconnect: () => Promise<void>;
-  $queryRaw: PrismaClient["$queryRaw"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- passthrough to PrismaClient.$queryRaw
+  $queryRaw: (...args: any[]) => Promise<unknown>;
 };
 
 declare global {
@@ -56,11 +54,11 @@ function buildClient(): PrismaClientType {
 
   const pool = new Pool({ connectionString: url });
   const adapter = new PrismaPg(pool);
-  const client = new PrismaClient({ adapter }) as unknown as PrismaClientType;
+  const client = new PrismaClient({ adapter });
 
   globalThis.__prismaPool = pool;
-  globalThis.__prismaClient = client;
-  return client;
+  globalThis.__prismaClient = client as unknown as PrismaClientType;
+  return client as unknown as PrismaClientType;
 }
 
 /**
