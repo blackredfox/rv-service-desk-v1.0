@@ -455,11 +455,108 @@ reg({
   complex: false,
   variant: "STANDARD",
   steps: [
-    { id: "e12_1", question: "Check the circuit breaker or fuse. Intact and properly seated? Any signs of tripping or burn marks?", prerequisites: [], matchPatterns: [/(?:breaker|fuse).*(?:intact|trip|burn|ok|blown)/i] },
-    { id: "e12_2", question: "Measure voltage at the component terminals. Is 12V DC present? Exact reading?", prerequisites: ["e12_1"], matchPatterns: [/(?:\d+(?:\.\d+)?)\s*v/i, /(?:no\s*)?(?:voltage|power)/i] },
-    { id: "e12_3", question: "Verify ground continuity. Clean and secure?", prerequisites: ["e12_1"], matchPatterns: [/ground.*(?:good|ok|clean|continu)/i, /(?:no|bad)\s*ground/i] },
-    { id: "e12_4", question: "Any visible signs of damaged wiring, loose connections, or corrosion?", prerequisites: [], matchPatterns: [/(?:wiring|connection|corrosion).*(?:damage|loose|ok|good|clean)/i] },
-    { id: "e12_5", question: "Is the switch or control functioning properly?", prerequisites: [], matchPatterns: [/switch.*(?:function|work|ok|yes|no)/i, /control.*(?:work|ok|function)/i] },
+    {
+      id: "e12_1",
+      question: "Is 12V DC supply present at the main distribution panel / battery disconnect? Measure battery voltage.",
+      prerequisites: [],
+      matchPatterns: [/(?:battery|supply|panel|disconnect).*(?:\d+|present|ok|dead|no\s*power)/i, /(?:\d+(?:\.\d+)?)\s*v/i],
+      howToCheck: "Set multimeter to DC volts (20V range). Measure across battery terminals or main 12V bus at the distribution panel. Expected: 12.4V–12.8V (resting) or 13.6V–14.4V (charging).",
+    },
+    {
+      id: "e12_2",
+      question: "Check the circuit breaker or fuse for this circuit. Intact and properly seated? Any signs of tripping or burn marks?",
+      prerequisites: [],
+      matchPatterns: [/(?:breaker|fuse).*(?:intact|trip|burn|ok|blown|good|bad)/i],
+      howToCheck: "Locate the fuse/breaker for this circuit in the 12V panel. Visually inspect for discoloration or a broken element. Use a multimeter on continuity mode across the fuse — it should beep. If a breaker, toggle off then back on.",
+    },
+    {
+      id: "e12_3",
+      question: "Is the switch or control for this circuit functioning properly? Does it click or change state?",
+      prerequisites: ["e12_2"],
+      matchPatterns: [/switch.*(?:function|work|ok|yes|no|click)/i, /control.*(?:work|ok|function)/i],
+      howToCheck: "Toggle the switch while measuring voltage on the output side. You should see 12V appear/disappear. If no change, the switch contacts may be corroded or open.",
+    },
+    {
+      id: "e12_4",
+      question: "Verify ground continuity between the component housing and chassis. Clean and secure?",
+      prerequisites: ["e12_2"],
+      matchPatterns: [/ground.*(?:good|ok|clean|continu|secure)/i, /(?:no|bad|poor)\s*ground/i, /(?:\d+(?:\.\d+)?)\s*ohm/i],
+      howToCheck: "Set multimeter to continuity/ohms. Place one probe on the component's ground terminal and the other on a known-good chassis ground point. Should read < 0.5 ohm.",
+    },
+    {
+      id: "e12_5",
+      question: "Measure voltage at the component terminals with the switch ON. Is 12V DC present? Exact reading?",
+      prerequisites: ["e12_3", "e12_4"],
+      matchPatterns: [/(?:\d+(?:\.\d+)?)\s*v(?:olts?|dc)?/i, /(?:no\s*)?(?:voltage|power)/i],
+      howToCheck: "With the switch ON, measure DC voltage directly at the component's power and ground terminals. Expected: within 0.5V of battery voltage.",
+    },
+    {
+      id: "e12_6",
+      question: "Apply 12V directly to the component (bypass switch and wiring). Does it operate?",
+      prerequisites: ["e12_5"],
+      matchPatterns: [/(?:direct|bypass|jump).*(?:operate|run|work|yes|no|nothing)/i, /(?:motor|component).*(?:run|spin|work|dead)/i],
+      howToCheck: "Disconnect the component from vehicle wiring. Using jumper wires from the battery (with an inline fuse), connect +12V and ground directly to the component terminals. If it runs, the component is good — fault is upstream.",
+    },
+    {
+      id: "e12_7",
+      question: "Any visible signs of damaged wiring, loose connections, or corrosion?",
+      prerequisites: [],
+      matchPatterns: [/(?:wiring|connection|corrosion).*(?:damage|loose|ok|good|clean)/i],
+      howToCheck: "Visually trace the wiring from the panel to the component. Look for chafed insulation, green/white corrosion on terminals, melted connectors, loose spade terminals.",
+    },
+  ],
+});
+
+// ── Awning (12V Electric) ───────────────────────────────────────────
+
+reg({
+  system: "awning",
+  displayName: "Electric Awning (12V)",
+  complex: false,
+  variant: "STANDARD",
+  steps: [
+    {
+      id: "awn_1",
+      question: "Is 12V DC supply present at the battery / main panel? Battery voltage reading?",
+      prerequisites: [],
+      matchPatterns: [/(?:battery|supply|panel|12v).*(?:\d+|present|ok|dead|no\s*power)/i, /(?:\d+(?:\.\d+)?)\s*v/i],
+      howToCheck: "Measure DC voltage across battery terminals. Expected: 12.4–12.8V resting, 13.6–14.4V charging.",
+    },
+    {
+      id: "awn_2",
+      question: "Is the awning fuse or circuit breaker intact? Any signs of tripping or burn?",
+      prerequisites: [],
+      matchPatterns: [/(?:fuse|breaker).*(?:intact|trip|burn|ok|blown|good|bad)/i],
+      howToCheck: "Locate the awning fuse in the 12V panel (typically 15–20A). Check continuity across the fuse with a multimeter — it should beep. If blown, replace with the same rated fuse.",
+    },
+    {
+      id: "awn_3",
+      question: "Does the awning switch or control respond? Click or state change when pressed?",
+      prerequisites: ["awn_2"],
+      matchPatterns: [/switch.*(?:click|work|respond|yes|no|nothing)/i, /control.*(?:work|respond|yes|no)/i, /button.*(?:press|click|nothing)/i],
+      howToCheck: "Press the extend/retract button while listening for a relay click. If using a wall switch, measure voltage on the output side while toggling. No voltage change = switch fault.",
+    },
+    {
+      id: "awn_4",
+      question: "Verify ground continuity between the awning motor housing and chassis. Clean and secure?",
+      prerequisites: ["awn_2"],
+      matchPatterns: [/ground.*(?:good|ok|clean|continu|secure)/i, /(?:no|bad|poor)\s*ground/i],
+      howToCheck: "Multimeter on continuity. One probe on the motor housing or ground wire, other on a known chassis ground. Should read < 0.5 ohm.",
+    },
+    {
+      id: "awn_5",
+      question: "Measure voltage at the awning motor terminals with the switch activated. Is 12V DC present?",
+      prerequisites: ["awn_3", "awn_4"],
+      matchPatterns: [/(?:motor\s*)?(?:terminal|voltage).*(?:\d+|present|no|yes)/i, /(?:\d+(?:\.\d+)?)\s*v/i],
+      howToCheck: "With the switch pressed (extend direction), measure DC voltage at the motor connector. Expected: battery voltage (±0.5V). 0V at motor but 12V at switch = open wiring.",
+    },
+    {
+      id: "awn_6",
+      question: "Apply 12V directly to the awning motor (bypass switch and wiring). Does the motor operate?",
+      prerequisites: ["awn_5"],
+      matchPatterns: [/(?:direct|bypass|jump).*(?:operate|run|work|yes|no|nothing)/i, /motor.*(?:run|spin|work|dead|seized)/i],
+      howToCheck: "Disconnect the motor connector. Using jumper wires from the battery (with a 20A inline fuse), connect +12V and ground directly to the motor. Reverse polarity to test both directions. Motor runs = fault is upstream. Motor dead = motor failure confirmed.",
+    },
   ],
 });
 
