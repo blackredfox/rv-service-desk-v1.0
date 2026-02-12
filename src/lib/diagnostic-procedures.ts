@@ -52,6 +52,7 @@ const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
   { system: "electrical_ac", patterns: [/(?:120v|110v)\s*(?:outlet|circuit|power|electrical)/i, /gfci/i, /\boutlet\b/i, /розетк/i] },
   { system: "electrical_12v", patterns: [/12v|12\s*volt|dc\s*(?:power|circuit|system)/i, /(?:light|fan|vent)\s*(?:not|won't|doesn't|don't)/i] },
   { system: "consumer_appliance", patterns: [/(?:tv|television|microwave|stereo|radio|dvd|blu[\s-]*ray)/i, /телевизор|микроволнов/i] },
+  { system: "awning", patterns: [/awning/i, /маркиз/i, /toldo/i] },
 ];
 
 /**
