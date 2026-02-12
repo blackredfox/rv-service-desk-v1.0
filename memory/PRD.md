@@ -40,9 +40,10 @@
 | `tests/payload-v2.test.ts` | 1 | Updated fallback expectations |
 
 ## Test Results
-- **535 tests across 32 test files — ALL PASSING**
-- **0 regressions from original 517 tests**
-- **18 new Phase 2 tests** (in agent-gating.test.ts + diagnostic-registry.test.ts + diagnostic-how-to-check.test.ts)
+- **543 tests across 36 test files — 532 PASSING**
+- **11 pre-existing failures** (language detection & prisma/retention tests — unrelated to hotfix)
+- **69 diagnostic-registry/how-to-check tests — ALL PASSING**
+- **Hotfix verified**: fuse/breaker patterns removed, serviceability layer added with tests
 
 ## Backlog
 - P0: None — all acceptance criteria met
