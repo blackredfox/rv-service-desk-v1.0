@@ -379,6 +379,9 @@ export async function POST(req: Request) {
 
     const regResult = processUserMessage(ensuredCase.id, message);
     
+    if (regResult.howToCheckRequested) {
+      console.log(`[Chat API v2] Technician asked "how to check?" — will provide guidance without advancing step`);
+    }
     if (regResult.keyFinding) {
       console.log(`[Chat API v2] Key finding detected: "${regResult.keyFinding}" — will pivot`);
     }
