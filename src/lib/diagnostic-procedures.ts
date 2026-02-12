@@ -653,6 +653,18 @@ export function mapInitialMessageToSteps(
 }
 
 /**
+ * Get the how-to-check instruction for a specific step.
+ * Returns null if the step has no instruction or the step is not found.
+ */
+export function getStepHowToCheck(
+  procedure: DiagnosticProcedure,
+  stepId: string,
+): string | null {
+  const step = procedure.steps.find((s) => s.id === stepId);
+  return step?.howToCheck ?? null;
+}
+
+/**
  * Build a procedure context string for prompt injection.
  * Shows the active procedure, completed steps, and the next step.
  */
