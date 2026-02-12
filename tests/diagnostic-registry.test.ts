@@ -157,6 +157,33 @@ describe("detectKeyFinding", () => {
     const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
     expect(detectKeyFinding("Voltage reads 12.4V at the terminals")).toBeNull();
   });
+
+  // ── Fuse/breaker patterns must NOT return a key finding ─────────────
+  it("does NOT return key finding for 'blown fuse'", async () => {
+    const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
+    expect(detectKeyFinding("The fuse is blown")).toBeNull();
+    expect(detectKeyFinding("Found a blown fuse in the circuit")).toBeNull();
+    expect(detectKeyFinding("Fuse is bad and has no continuity")).toBeNull();
+  });
+
+  it("does NOT return key finding for 'tripped breaker'", async () => {
+    const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
+    expect(detectKeyFinding("The breaker tripped")).toBeNull();
+    expect(detectKeyFinding("Circuit breaker is open")).toBeNull();
+    expect(detectKeyFinding("Breaker tripped off")).toBeNull();
+  });
+
+  it("does NOT return key finding for 'no power downstream'", async () => {
+    const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
+    expect(detectKeyFinding("No power downstream of the fuse")).toBeNull();
+    expect(detectKeyFinding("No power after breaker")).toBeNull();
+  });
+
+  it("does NOT return key finding for Russian 'blown fuse'", async () => {
+    const { detectKeyFinding } = await import("@/lib/diagnostic-registry");
+    expect(detectKeyFinding("предохранитель сгорел")).toBeNull();
+    expect(detectKeyFinding("предохранитель перегорел")).toBeNull();
+  });
 });
 
 // ── processUserMessage ──────────────────────────────────────────────
