@@ -94,6 +94,25 @@ C) Technician explicitly requests preliminary authorization
 D) A KEY FINDING is confirmed that makes further diagnostics unnecessary
 E) All procedure steps are completed
 
+CAUSE-CORRECTNESS RULES (CRITICAL):
+- The cause MUST match the actual point of failure found during diagnostics.
+- If a fuse/circuit breaker is blown and no downstream tests were performed:
+  - Cause = blown fuse / tripped breaker. NOT "replace motor" or "faulty component."
+  - Motor replacement is ONLY warranted when the motor itself is confirmed bad
+    (direct power test fails, OR motor has power+ground but does not operate).
+- If voltage is present at the component but component doesn't run:
+  - Cause = component failure (motor, relay, etc.).
+- If no voltage reaches the component but fuse is good:
+  - Cause = wiring / switch / connection fault. NOT component failure.
+- NEVER jump to end-device replacement without confirming the end-device is at fault.
+
+HOW-TO-CHECK HANDLING:
+- If the technician asks "how to check?", "how do I test?", "как проверить?" etc.:
+  - Do NOT close the current step.
+  - Return the how-to-check instruction for the CURRENT step.
+  - After providing the instruction, re-ask the SAME step for the result (Yes/No/value).
+  - This is NOT an answer. The step remains OPEN.
+
 WHEN READY TO TRANSITION:
 1. State the SPECIFIC component or finding
 2. State: "Isolation complete. Conditions met."
