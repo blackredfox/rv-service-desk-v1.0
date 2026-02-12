@@ -27,6 +27,10 @@ type DiagnosticEntry = {
   completedStepIds: Set<string>;
   /** Step IDs the technician cannot verify */
   unableStepIds: Set<string>;
+  /** Step IDs that have already been asked (de-dupe guard) */
+  askedStepIds: Set<string>;
+  /** Whether the technician just asked "how to check?" (transient flag) */
+  howToCheckRequested: boolean;
   /** Legacy topic tracking (backward compat) */
   answeredKeys: Set<string>;
   /** Legacy unable-to-verify topics */
