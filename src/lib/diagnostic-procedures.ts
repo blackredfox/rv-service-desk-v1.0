@@ -711,6 +711,17 @@ export function buildProcedureContext(
   if (nextStep) {
     lines.push(`NEXT REQUIRED STEP: ${nextStep.id}`);
     lines.push(`Ask EXACTLY: "${nextStep.question}"`);
+
+    // If technician asked "how to check?" — provide the instruction and re-ask
+    if (options?.howToCheckRequested && nextStep.howToCheck) {
+      lines.push("");
+      lines.push("HOW-TO-CHECK INSTRUCTION (technician asked for guidance):");
+      lines.push(nextStep.howToCheck);
+      lines.push("");
+      lines.push("After providing this instruction, re-ask the SAME step for the result (Yes/No/value).");
+      lines.push("Do NOT close this step. Do NOT advance to the next step.");
+    }
+
     lines.push("");
     lines.push("RULES:");
     lines.push("- Ask ONLY this question. Do NOT skip ahead.");
