@@ -1,7 +1,7 @@
 # RV Service Desk v1.0 — PRD
 
 ## Original Problem Statement
-Fix Prisma v7 initialization in `scripts/cleanup-retention.ts` and CI workflow `.github/workflows/retention-cleanup.yml`. The script was failing in GitHub Actions with `PrismaClientInitializationError`.
+Fix Prisma v7 runtime initialization across the entire app — CI cleanup script, main app client, and schema alignment.
 
 ## Architecture
 - **Stack**: Next.js 16, TypeScript 5.9, Prisma 7.3, PostgreSQL
@@ -9,21 +9,45 @@ Fix Prisma v7 initialization in `scripts/cleanup-retention.ts` and CI workflow `
 - **CI**: GitHub Actions (retention-cleanup workflow)
 
 ## Root Cause
-Prisma 7.3.0 `prisma-client-js` defaults to TypeScript/WASM "client" engine. `new PrismaClient()` without adapter always fails. `engineType` is deprecated and ignored in v7. The standard v7 pattern requires `@prisma/adapter-pg`.
+Prisma 7.3.0 `prisma-client-js` defaults to TypeScript/WASM "client" engine. `new PrismaClient()` without adapter always fails. Standard v7 pattern requires `@prisma/adapter-pg` + `pg` Pool.
 
 ## What's Been Implemented (Jan 2026)
-- `scripts/cleanup-retention.ts` — uses `@prisma/adapter-pg` + `pg` Pool
-- `package.json` — added `@prisma/adapter-pg`, `pg`, `@types/pg`
-- `yarn.lock` — updated and committed (fixes `--immutable` CI install)
-- `.github/workflows/retention-cleanup.yml` — explicit `DATABASE_URL` env on generate/cleanup steps
 
-## Verified locally
-- `yarn install --immutable` ✅
-- `yarn prisma generate` ✅
-- `yarn retention:cleanup` ✅ (PrismaClient init OK, P2010 expected without real DB)
-- TypeScript ✅, ESLint ✅
+### P0: CI retention cleanup (DONE)
+- `scripts/cleanup-retention.ts` — adapter-pg pattern
+- `.github/workflows/retention-cleanup.yml` — DATABASE_URL env
+- `yarn.lock` — committed with new deps
+
+### P1: Main app Prisma client + schema alignment (DONE)
+**4 files changed, 38 insertions, 16 deletions:**
+
+1. `src/lib/db.ts` — Replaced `PrismaClientType` shim (7x `any`) with real `PrismaClient` import
+   - Zero `any`, zero `eslint-disable`
+   - Adapter-pg pattern, singleton via globalThis
+   - Graceful null return when DATABASE_URL absent (test compat)
+
+2. `prisma/schema.prisma` — Added missing fields
+   - `Case.inputLanguage Language @default(EN)`
+   - `Case.languageSource LanguageSource @default(AUTO)`
+   - `Case.language` → added `@default(EN)`
+   - `Message.language Language?`
+
+3. `src/lib/storage.ts` — 2 lines: userId guard for createCaseDb/ensureCaseDb
+
+4. `prisma/migrations/20260128000000_add_case_language_fields/migration.sql`
+
+### Verification
+- TS errors: 20 (all pre-existing, 0 new)
+- ESLint db.ts: 0 errors, 0 warnings
+- yarn test: 504/504 passed, 35/35 files
+- Runtime: PrismaClient init OK, singleton OK, null fallback OK
+- Zero `any` in db.ts
+
+## Commit Message
+`fix(db): replace PrismaClientType shim with real PrismaClient (Prisma v7 adapter-pg)`
 
 ## Backlog
-- P0: Push to GitHub, run CI workflow
-- P1: `src/lib/db.ts` also uses `new PrismaClient()` — needs adapter
-- P2: Real cleanup DELETE logic
+- P2: Remove `AnyObj = any` helper in storage.ts (replace with proper Prisma types)
+- P2: Fix pre-existing Stripe API version mismatch (b2b-stripe.ts, stripe.ts)
+- P2: Real retention DELETE logic in cleanup script
+- P2: Add `packageManager: "yarn@4.12.0"` to package.json

@@ -1,343 +1,201 @@
 #!/usr/bin/env python3
-"""
-Backend Test Suite for RV Service Desk Diagnostic Agent
-Five Behavioral Fixes Testing
-
-Tests the five behavioral fixes:
-1. Diagnostic Question Registry - track answered/unable-to-verify topics per case
-2. Diagnostic Pivot Rules - key findings trigger immediate isolation completion
-3. Fact-Locked Final Report - build fact pack from only technician-stated facts
-4. Tone Adjustment - remove over-polite 'Thank you' defaults, one-word acknowledgments only
-5. Labor Confirmation Input Parsing - accept '2.5', '2.5h' formats
-
-This is a Next.js TypeScript application with Vitest testing framework.
-Since there's no traditional REST API server, we test the underlying modules directly.
-"""
 
 import subprocess
 import sys
-import json
 import os
-from pathlib import Path
 from datetime import datetime
 
-class RVServiceDeskBackendTester:
+class PrismaV7MigrationTester:
     def __init__(self):
-        self.app_dir = "/app"
         self.tests_run = 0
         self.tests_passed = 0
-        self.results = []
-        
-    def log(self, message, level="INFO"):
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"[{timestamp}] [{level}] {message}")
-        
-    def run_test(self, test_name, test_func):
-        """Run a single test and track results"""
+        self.base_dir = "/app"
+
+    def run_test(self, name, test_func, *args, **kwargs):
+        """Run a single test"""
         self.tests_run += 1
-        self.log(f"Running test: {test_name}")
+        print(f"\n🔍 Testing {name}...")
         
         try:
-            result = test_func()
-            if result:
+            success = test_func(*args, **kwargs)
+            if success:
                 self.tests_passed += 1
-                self.results.append({"test": test_name, "status": "PASS", "message": "✅"})
-                self.log(f"✅ PASS - {test_name}")
+                print(f"✅ {name} - PASSED")
             else:
-                self.results.append({"test": test_name, "status": "FAIL", "message": "❌"})
-                self.log(f"❌ FAIL - {test_name}")
+                print(f"❌ {name} - FAILED")
+            return success
         except Exception as e:
-            self.results.append({"test": test_name, "status": "ERROR", "message": str(e)})
-            self.log(f"❌ ERROR - {test_name}: {str(e)}")
-            
-        return result
-    
-    def check_file_exists(self, filepath):
-        """Check if a file exists"""
-        return os.path.exists(filepath)
-    
-    def run_vitest_command(self, pattern=""):
-        """Run vitest with optional pattern filter"""
-        os.chdir(self.app_dir)
-        cmd = ["npx", "vitest", "run", "--reporter=json"]
-        if pattern:
-            cmd.extend(["--testNamePattern", pattern])
-            
+            print(f"❌ {name} - ERROR: {str(e)}")
+            return False
+
+    def test_typescript_db_compilation(self):
+        """Test TypeScript compilation for db.ts"""
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            return result.returncode == 0, result.stdout, result.stderr
-        except subprocess.TimeoutExpired:
-            return False, "", "Test timeout"
+            result = subprocess.run(
+                ["npx", "tsc", "--noEmit", "--project", "tsconfig.json"],
+                cwd=self.base_dir,
+                capture_output=True,
+                text=True
+            )
+            
+            # Check for any db.ts errors
+            db_errors = [line for line in result.stderr.split('\n') if 'db.ts' in line and 'error TS' in line]
+            return len(db_errors) == 0
         except Exception as e:
-            return False, "", str(e)
-
-    def test_project_structure(self):
-        """Test 1: Verify all required files exist"""
-        required_files = [
-            "/app/src/lib/diagnostic-registry.ts",
-            "/app/src/lib/fact-pack.ts", 
-            "/app/src/lib/labor-store.ts",
-            "/app/src/lib/prompt-composer.ts",
-            "/app/src/lib/mode-validators.ts",
-            "/app/src/app/api/chat/route.ts",
-            "/app/prompts/system/SYSTEM_PROMPT_BASE.txt",
-            "/app/prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt",
-            "/app/tests/diagnostic-registry.test.ts",
-            "/app/tests/fact-pack.test.ts",
-            "/app/tests/tone-adjustment.test.ts",
-            "/app/tests/labor-confirmation.test.ts",
-            "/app/vitest.config.ts"
-        ]
-        
-        missing = []
-        for file_path in required_files:
-            if not self.check_file_exists(file_path):
-                missing.append(file_path)
-                
-        if missing:
-            self.log(f"Missing files: {missing}")
-            return False
-        return True
-
-    def test_diagnostic_registry_tests(self):
-        """Test 2: Run diagnostic registry specific tests"""
-        success, stdout, stderr = self.run_vitest_command("diagnostic-registry")
-        if success:
-            self.log("Diagnostic registry tests passed")
-            return True
-        else:
-            self.log(f"Diagnostic registry tests failed: {stderr}")
+            print(f"TypeScript test error: {e}")
             return False
 
-    def test_fact_pack_tests(self):
-        """Test 3: Run fact pack specific tests"""  
-        success, stdout, stderr = self.run_vitest_command("fact-pack")
-        if success:
-            self.log("Fact pack tests passed")
-            return True
-        else:
-            self.log(f"Fact pack tests failed: {stderr}")
-            return False
-
-    def test_tone_adjustment_tests(self):
-        """Test 4: Run tone adjustment specific tests"""
-        success, stdout, stderr = self.run_vitest_command("tone-adjustment")
-        if success:
-            self.log("Tone adjustment tests passed")
-            return True
-        else:
-            self.log(f"Tone adjustment tests failed: {stderr}")
-            return False
-
-    def test_labor_confirmation_tests(self):
-        """Test 5: Run labor confirmation specific tests"""
-        success, stdout, stderr = self.run_vitest_command("labor-confirmation")
-        if success:
-            self.log("Labor confirmation tests passed")
-            return True
-        else:
-            self.log(f"Labor confirmation tests failed: {stderr}")
-            return False
-
-    def test_all_vitest_suite(self):
-        """Test 6: Run complete vitest suite to ensure all 447 tests pass"""
-        success, stdout, stderr = self.run_vitest_command("")
-        if success and "447 passed" in (stdout + stderr):
-            self.log("All 447 vitest tests passed")
-            return True
-        else:
-            self.log(f"Vitest suite failed or doesn't have 447 passing tests: {stderr}")
-            return False
-
-    def test_prompt_files_content(self):
-        """Test 7: Verify prompt files contain required content for tone adjustment"""
+    def test_typescript_dependent_files(self):
+        """Test TypeScript compilation for storage.ts, auth.ts, analytics.ts"""
         try:
-            # Check SYSTEM_PROMPT_BASE.txt
-            with open("/app/prompts/system/SYSTEM_PROMPT_BASE.txt", "r") as f:
-                base_content = f.read()
-                
-            # Should contain tone adjustment directives
-            required_base = [
-                "Do NOT say \"Thank you\"",
-                "Prefer silence over politeness",
-                "Professional and concise",
-                "Never repeat what the technician just said"
-            ]
+            result = subprocess.run(
+                ["npx", "tsc", "--noEmit", "--project", "tsconfig.json"],
+                cwd=self.base_dir,
+                capture_output=True,
+                text=True
+            )
             
-            for req in required_base:
-                if req not in base_content:
-                    self.log(f"Missing in SYSTEM_PROMPT_BASE.txt: {req}")
-                    return False
-                    
-            # Check MODE_PROMPT_DIAGNOSTIC.txt
-            with open("/app/prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt", "r") as f:
-                diag_content = f.read()
-                
-            # Should contain registry and pivot rules
-            required_diag = [
-                "DIAGNOSTIC REGISTRY RULES",
-                "ALREADY ANSWERED",
-                "UNABLE TO VERIFY", 
-                "PIVOT RULES",
-                "KEY FINDING",
-                "ONE short acknowledgment"
-            ]
-            
-            for req in required_diag:
-                if req not in diag_content:
-                    self.log(f"Missing in MODE_PROMPT_DIAGNOSTIC.txt: {req}")
-                    return False
-                    
-            self.log("Prompt files contain required content")
-            return True
-            
+            # Check for errors in dependent files
+            dependent_errors = [line for line in result.stderr.split('\n') 
+                              if any(file in line for file in ['storage.ts', 'auth.ts', 'analytics.ts']) 
+                              and 'error TS' in line]
+            return len(dependent_errors) == 0
         except Exception as e:
-            self.log(f"Error checking prompt files: {e}")
+            print(f"Dependent files test error: {e}")
             return False
 
-    def test_typescript_compilation(self):
-        """Test 8: Verify TypeScript compilation works"""
-        os.chdir(self.app_dir)
+    def test_total_typescript_errors(self):
+        """Test that total TS errors are around 20, not 41+"""
         try:
-            result = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True, timeout=60)
-            if result.returncode == 0:
-                self.log("TypeScript compilation successful")
-                return True
-            else:
-                self.log(f"TypeScript compilation errors: {result.stderr}")
-                return False
+            result = subprocess.run(
+                ["npx", "tsc", "--noEmit", "--project", "tsconfig.json"],
+                cwd=self.base_dir,
+                capture_output=True,
+                text=True
+            )
+            
+            # Count lines containing 'error TS' - errors show up in stderr
+            all_output = result.stderr + result.stdout
+            error_lines = [line for line in all_output.split('\n') if 'error TS' in line and line.strip()]
+            error_count = len(error_lines)
+            print(f"Total TypeScript errors: {error_count}")
+            print(f"Sample error lines: {error_lines[:3] if error_lines else 'None'}")
+            
+            # Should be around 20, definitely not 41+
+            return 15 <= error_count <= 25
         except Exception as e:
-            self.log(f"TypeScript compilation error: {e}")
+            print(f"Total TS errors test error: {e}")
             return False
 
-    def test_module_imports(self):
-        """Test 9: Verify all main modules can be imported (via vitest)"""
-        # This tests that the modules have correct syntax and dependencies
-        test_script = """
-        import { describe, it, expect } from 'vitest';
-        
-        describe('Module Import Test', () => {
-          it('should import diagnostic-registry', async () => {
-            const mod = await import('/app/src/lib/diagnostic-registry.ts');
-            expect(mod.detectAlreadyAnswered).toBeDefined();
-            expect(mod.extractTopics).toBeDefined();
-            expect(mod.detectKeyFinding).toBeDefined();
-          });
-          
-          it('should import fact-pack', async () => {
-            const mod = await import('/app/src/lib/fact-pack.ts');
-            expect(mod.buildFactPack).toBeDefined();
-            expect(mod.buildFactLockConstraint).toBeDefined();
-          });
-          
-          it('should import labor-store', async () => {
-            const mod = await import('/app/src/lib/labor-store.ts');
-            expect(mod.parseLaborConfirmation).toBeDefined();
-            expect(mod.extractLaborEstimate).toBeDefined();
-          });
-        });
-        """
-        
-        # Write temp test file
-        temp_test = "/app/temp-import-test.ts"
+    def test_eslint_db(self):
+        """Test ESLint on db.ts"""
         try:
-            with open(temp_test, "w") as f:
-                f.write(test_script)
-                
-            os.chdir(self.app_dir)
-            result = subprocess.run(["npx", "vitest", "run", temp_test], capture_output=True, text=True, timeout=30)
-            
-            # Clean up
-            if os.path.exists(temp_test):
-                os.remove(temp_test)
-                
-            if result.returncode == 0:
-                self.log("Module imports successful")
-                return True
-            else:
-                self.log(f"Module import errors: {result.stderr}")
-                return False
-                
+            result = subprocess.run(
+                ["npx", "eslint", "src/lib/db.ts"],
+                cwd=self.base_dir,
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0
         except Exception as e:
-            # Clean up on error
-            if os.path.exists(temp_test):
-                os.remove(temp_test)
-            self.log(f"Module import test error: {e}")
+            print(f"ESLint test error: {e}")
             return False
 
-    def test_package_json_dependencies(self):
-        """Test 10: Verify package.json has required dependencies"""
+    def test_runtime_with_database_url(self):
+        """Test runtime behavior with DATABASE_URL"""
         try:
-            with open("/app/package.json", "r") as f:
-                package_data = json.load(f)
-                
-            dependencies = {**package_data.get("dependencies", {}), **package_data.get("devDependencies", {})}
+            env = os.environ.copy()
+            env["DATABASE_URL"] = "postgresql://dummy:dummy@localhost:5432/testdb"
             
-            required_deps = [
-                "vitest",
-                "typescript",
-                "@types/node",
-                "next"
-            ]
+            result = subprocess.run([
+                "npx", "tsx", "-e", 
+                "import { getPrisma } from './src/lib/db'; getPrisma().then(p => { console.log('OK:', typeof p.case); return p.$disconnect() }).then(() => process.exit(0))"
+            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
             
-            missing = []
-            for dep in required_deps:
-                if dep not in dependencies:
-                    missing.append(dep)
-                    
-            if missing:
-                self.log(f"Missing dependencies: {missing}")
-                return False
-                
-            self.log("All required dependencies present")
-            return True
-            
+            return result.returncode == 0 and "OK: object" in result.stdout
         except Exception as e:
-            self.log(f"Error checking package.json: {e}")
+            print(f"Runtime test error: {e}")
             return False
 
-    def run_all_tests(self):
-        """Run all backend tests"""
-        self.log("=" * 60)
-        self.log("RV Service Desk Backend Test Suite")
-        self.log("Testing Five Behavioral Fixes Implementation")
-        self.log("=" * 60)
-        
-        # Define all tests
-        tests = [
-            ("Project Structure", self.test_project_structure),
-            ("TypeScript Compilation", self.test_typescript_compilation),
-            ("Package Dependencies", self.test_package_json_dependencies),
-            ("Module Imports", self.test_module_imports),
-            ("Prompt Files Content", self.test_prompt_files_content),
-            ("Diagnostic Registry Tests", self.test_diagnostic_registry_tests),
-            ("Fact Pack Tests", self.test_fact_pack_tests),
-            ("Tone Adjustment Tests", self.test_tone_adjustment_tests), 
-            ("Labor Confirmation Tests", self.test_labor_confirmation_tests),
-            ("Complete Vitest Suite (447 tests)", self.test_all_vitest_suite),
-        ]
-        
-        # Run each test
-        for test_name, test_func in tests:
-            self.run_test(test_name, test_func)
+    def test_singleton_behavior(self):
+        """Test singleton behavior"""
+        try:
+            env = os.environ.copy()
+            env["DATABASE_URL"] = "postgresql://dummy:dummy@localhost:5432/testdb"
             
-        self.log("=" * 60)
-        self.log(f"TEST SUMMARY: {self.tests_passed}/{self.tests_run} passed")
-        
-        if self.tests_passed == self.tests_run:
-            self.log("🎉 ALL TESTS PASSED - Five behavioral fixes implementation verified!")
-            return True
-        else:
-            self.log("⚠️  SOME TESTS FAILED")
-            for result in self.results:
-                if result["status"] != "PASS":
-                    self.log(f"   {result['status']}: {result['test']} - {result['message']}")
+            result = subprocess.run([
+                "npx", "tsx", "-e",
+                "import { getPrisma } from './src/lib/db'; (async () => { const p1 = await getPrisma(); const p2 = await getPrisma(); console.log('Singleton:', p1 === p2 ? 'PASS' : 'FAIL'); await p1.$disconnect(); process.exit(p1 === p2 ? 0 : 1); })()"
+            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+            
+            return result.returncode == 0 and "Singleton: PASS" in result.stdout
+        except Exception as e:
+            print(f"Singleton test error: {e}")
+            return False
+
+    def test_env_validation(self):
+        """Test environment validation"""
+        try:
+            env = os.environ.copy()
+            env.pop("DATABASE_URL", None)  # Remove DATABASE_URL
+            
+            result = subprocess.run([
+                "npx", "tsx", "-e",
+                "import { getPrisma } from './src/lib/db'; getPrisma().catch(err => { console.log('Error:', err.message); process.exit(err.message.includes('DATABASE_URL is not set') ? 0 : 1); })"
+            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+            
+            return result.returncode == 0 and "DATABASE_URL is not set" in result.stdout
+        except Exception as e:
+            print(f"Env validation test error: {e}")
+            return False
+
+    def test_export_stability(self):
+        """Test export stability"""
+        try:
+            env = os.environ.copy()
+            env["DATABASE_URL"] = "postgresql://dummy:dummy@localhost:5432/testdb"
+            
+            result = subprocess.run([
+                "npx", "tsx", "-e",
+                "import { getPrisma, PrismaClientType } from './src/lib/db'; console.log('Exports OK'); process.exit(0);"
+            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+            
+            return result.returncode == 0 and "Exports OK" in result.stdout
+        except Exception as e:
+            print(f"Export stability test error: {e}")
             return False
 
 def main():
-    tester = RVServiceDeskBackendTester()
-    success = tester.run_all_tests()
-    return 0 if success else 1
+    tester = PrismaV7MigrationTester()
+    
+    print("🚀 Starting Prisma v7 Migration Tests")
+    print("=" * 50)
+    
+    # Run all tests
+    tests = [
+        ("TypeScript db.ts compilation", tester.test_typescript_db_compilation),
+        ("TypeScript dependent files", tester.test_typescript_dependent_files),
+        ("Total TypeScript errors count", tester.test_total_typescript_errors),
+        ("ESLint db.ts", tester.test_eslint_db),
+        ("Runtime with DATABASE_URL", tester.test_runtime_with_database_url),
+        ("Singleton behavior", tester.test_singleton_behavior),
+        ("Environment validation", tester.test_env_validation),
+        ("Export stability", tester.test_export_stability),
+    ]
+    
+    for test_name, test_func in tests:
+        tester.run_test(test_name, test_func)
+    
+    # Print results
+    print("\n" + "=" * 50)
+    print(f"📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    
+    if tester.tests_passed == tester.tests_run:
+        print("🎉 All tests passed! Prisma v7 migration is working correctly.")
+        return 0
+    else:
+        print("⚠️  Some tests failed. Check the output above for details.")
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main())

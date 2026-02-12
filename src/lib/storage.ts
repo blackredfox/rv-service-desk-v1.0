@@ -313,6 +313,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
 }
 
 async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
+  if (!input.userId) return createCaseMemory(input);
   const prisma = await getPrisma();
   if (!prisma) return createCaseMemory(input);
   const created = await prisma.case.create({
@@ -562,6 +563,7 @@ async function appendMessageDb(args: {
 }
 
 async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
+  if (!input.userId) return ensureCaseMemory(input);
   const prisma = await getPrisma();
   if (!prisma) return ensureCaseMemory(input);
 
