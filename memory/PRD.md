@@ -1,53 +1,49 @@
 # RV Service Desk v1.0 — PRD
 
 ## Original Problem Statement
-Fix Prisma v7 runtime initialization across the entire app — CI cleanup script, main app client, and schema alignment.
+Fix Diagnostic Procedure Runner for "How to check?", De-dupe Steps, Awning Electrical Order, and Portal-Cause Correctness.
 
 ## Architecture
 - **Stack**: Next.js 16, TypeScript 5.9, Prisma 7.3, PostgreSQL
 - **Package Manager**: Yarn 4.12 via Corepack
-- **CI**: GitHub Actions (retention-cleanup workflow)
-
-## Root Cause
-Prisma 7.3.0 `prisma-client-js` defaults to TypeScript/WASM "client" engine. `new PrismaClient()` without adapter always fails. Standard v7 pattern requires `@prisma/adapter-pg` + `pg` Pool.
+- **CI**: GitHub Actions
 
 ## What's Been Implemented (Jan 2026)
 
 ### P0: CI retention cleanup (DONE)
-- `scripts/cleanup-retention.ts` — adapter-pg pattern
-- `.github/workflows/retention-cleanup.yml` — DATABASE_URL env
-- `yarn.lock` — committed with new deps
+### P1: Main app Prisma client + schema (DONE)
+### P1: Vitest setup — disable DB env (DONE)
+### P1: Diagnostic procedure fixes (DONE)
 
-### P1: Main app Prisma client + schema alignment (DONE)
-**4 files changed, 38 insertions, 16 deletions:**
+**Files changed:**
+1. `src/lib/diagnostic-procedures.ts`
+   - Added `howToCheck?: string` to DiagnosticStep type
+   - Added `getStepHowToCheck()` function
+   - Updated `buildProcedureContext()` to include how-to-check instructions
+   - Rewrote `electrical_12v` order: supply → fuse/CB → switch → ground → voltage → direct power
+   - Added `awning` procedure (6 steps, 12V standard)
+   - Added `awning` to SYSTEM_PATTERNS
 
-1. `src/lib/db.ts` — Replaced `PrismaClientType` shim (7x `any`) with real `PrismaClient` import
-   - Zero `any`, zero `eslint-disable`
-   - Adapter-pg pattern, singleton via globalThis
-   - Graceful null return when DATABASE_URL absent (test compat)
+2. `src/lib/diagnostic-registry.ts`
+   - Added `detectHowToCheck()` with EN/RU/ES patterns
+   - Updated `processUserMessage()`: early return on how-to-check (no step close)
+   - Added `askedStepIds` Set + `markStepAsked()` / `isStepAlreadyAsked()` (de-dupe guard)
+   - Added blown fuse / tripped breaker key finding patterns
 
-2. `prisma/schema.prisma` — Added missing fields
-   - `Case.inputLanguage Language @default(EN)`
-   - `Case.languageSource LanguageSource @default(AUTO)`
-   - `Case.language` → added `@default(EN)`
-   - `Message.language Language?`
+3. `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt`
+   - Added CAUSE-CORRECTNESS RULES (fuse blown ≠ replace motor)
+   - Added HOW-TO-CHECK HANDLING rules
 
-3. `src/lib/storage.ts` — 2 lines: userId guard for createCaseDb/ensureCaseDb
+4. `src/app/api/chat/route.ts` — log how-to-check event
 
-4. `prisma/migrations/20260128000000_add_case_language_fields/migration.sql`
+5. `tests/diagnostic-how-to-check.test.ts` — 29 new tests
 
 ### Verification
-- TS errors: 20 (all pre-existing, 0 new)
-- ESLint db.ts: 0 errors, 0 warnings
-- yarn test: 504/504 passed, 35/35 files
-- Runtime: PrismaClient init OK, singleton OK, null fallback OK
-- Zero `any` in db.ts
-
-## Commit Message
-`fix(db): replace PrismaClientType shim with real PrismaClient (Prisma v7 adapter-pg)`
+- yarn test: 533/533 passed (36 files)
+- TypeScript: 20 errors (all pre-existing)
+- ESLint: 0 errors on changed files
+- All 4 acceptance criteria covered by tests
 
 ## Backlog
-- P2: Remove `AnyObj = any` helper in storage.ts (replace with proper Prisma types)
-- P2: Fix pre-existing Stripe API version mismatch (b2b-stripe.ts, stripe.ts)
-- P2: Real retention DELETE logic in cleanup script
-- P2: Add `packageManager: "yarn@4.12.0"` to package.json
+- P2: Manufacturer-specific procedure variants
+- P2: Fix pre-existing Stripe API version mismatch
