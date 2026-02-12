@@ -21,6 +21,8 @@ export type DiagnosticStep = {
   prerequisites: string[];
   /** Patterns in technician messages that indicate this step is answered */
   matchPatterns: RegExp[];
+  /** How-to-check instruction returned when the technician asks for guidance */
+  howToCheck?: string;
 };
 
 export type DiagnosticProcedure = {
