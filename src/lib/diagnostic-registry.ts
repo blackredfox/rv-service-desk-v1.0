@@ -159,11 +159,7 @@ const KEY_FINDING_PATTERNS: Array<{ pattern: RegExp; finding: string }> = [
   { pattern: /(?:no|zero)\s*(?:resistance|continuity)\s*(?:through|across|at)/i, finding: "open circuit confirmed" },
   { pattern: /(?:amp|current)\s*draw\s*(?:is\s+)?(?:zero|0|none)/i, finding: "zero current draw" },
   { pattern: /(?:shaft|axle|bearing)\s*(?:is\s+)?(?:broken|snapped|worn\s*out|play|wobble)/i, finding: "mechanical failure" },
-  { pattern: /(?:fuse).*(?:blown|bad|open|dead|burnt|burned|no\s*continu)/i, finding: "blown fuse" },
-  { pattern: /(?:blown|bad|open|burnt|burned)\s*(?:fuse)/i, finding: "blown fuse" },
-  { pattern: /(?:breaker).*(?:tripped|trip|open|off)/i, finding: "tripped circuit breaker" },
-  { pattern: /(?:no\s*power)\s*(?:downstream|after\s*(?:fuse|breaker))/i, finding: "no power downstream of fuse/breaker" },
-  { pattern: /предохранител.*(?:сгор|перегор|пробит)/i, finding: "blown fuse (RU)" },
+  // NOTE: Fuse/breaker findings REMOVED — they are diagnostic branches, not key findings.
   { pattern: /лопаст.*(?:отсутств|слома|повреж|нет)/i, finding: "blade missing/damaged (RU)" },
   { pattern: /(?:не|нет)\s*(?:сопротивлен|непрерывност)/i, finding: "open circuit (RU)" },
 ];
