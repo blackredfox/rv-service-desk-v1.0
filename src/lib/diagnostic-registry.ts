@@ -291,7 +291,7 @@ export function processUserMessage(caseId: string, message: string): {
     entry.keyFindings.push(keyFinding);
   }
 
-  return { newAnswered, newUnable, keyFinding, alreadyAnswered: isAlreadyAnswered, completedStepIds, unableStepIds };
+  return { newAnswered, newUnable, keyFinding, alreadyAnswered: isAlreadyAnswered, completedStepIds, unableStepIds, howToCheckRequested: false };
 }
 
 // ── Context building ────────────────────────────────────────────────
