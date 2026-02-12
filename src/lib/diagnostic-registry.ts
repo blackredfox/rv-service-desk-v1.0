@@ -15,7 +15,6 @@ import {
   mapInitialMessageToSteps,
   buildProcedureContext,
   type DiagnosticProcedure,
-  type DiagnosticStep,
 } from "./diagnostic-procedures";
 
 type DiagnosticEntry = {
@@ -27,6 +26,10 @@ type DiagnosticEntry = {
   completedStepIds: Set<string>;
   /** Step IDs the technician cannot verify */
   unableStepIds: Set<string>;
+  /** Step IDs that have already been asked (de-dupe guard) */
+  askedStepIds: Set<string>;
+  /** Whether the technician just asked "how to check?" (transient flag) */
+  howToCheckRequested: boolean;
   /** Legacy topic tracking (backward compat) */
   answeredKeys: Set<string>;
   /** Legacy unable-to-verify topics */
@@ -47,6 +50,8 @@ function ensureEntry(caseId: string): DiagnosticEntry {
       procedure: null,
       completedStepIds: new Set(),
       unableStepIds: new Set(),
+      askedStepIds: new Set(),
+      howToCheckRequested: false,
       answeredKeys: new Set(),
       unableToVerifyKeys: new Set(),
       keyFindings: [],
@@ -85,6 +90,21 @@ const UNABLE_TO_VERIFY_PATTERNS = [
 
 export function detectUnableToVerify(message: string): boolean {
   return UNABLE_TO_VERIFY_PATTERNS.some((p) => p.test(message));
+}
+
+// ── How-to-check detection ──────────────────────────────────────────
+
+const HOW_TO_CHECK_PATTERNS = [
+  /how\s+(?:do\s+I|to|can\s+I|should\s+I)\s+(?:check|test|measure|verify|inspect|diagnose)/i,
+  /how\s+(?:do\s+I|to)\s+(?:do\s+(?:that|this|it))/i,
+  /what\s+(?:should\s+I|do\s+I)\s+(?:use|need|look\s+for)/i,
+  /(?:explain|show|tell)\s+(?:me\s+)?how/i,
+  /как\s+(?:мне\s+)?(?:проверить|протестировать|измерить|проверять)/i,
+  /(?:cómo|como)\s+(?:puedo\s+)?(?:verificar|comprobar|medir|probar|revisar)/i,
+];
+
+export function detectHowToCheck(message: string): boolean {
+  return HOW_TO_CHECK_PATTERNS.some((p) => p.test(message));
 }
 
 // ── Legacy topic extraction (backward compat) ───────────────────────
@@ -139,6 +159,11 @@ const KEY_FINDING_PATTERNS: Array<{ pattern: RegExp; finding: string }> = [
   { pattern: /(?:no|zero)\s*(?:resistance|continuity)\s*(?:through|across|at)/i, finding: "open circuit confirmed" },
   { pattern: /(?:amp|current)\s*draw\s*(?:is\s+)?(?:zero|0|none)/i, finding: "zero current draw" },
   { pattern: /(?:shaft|axle|bearing)\s*(?:is\s+)?(?:broken|snapped|worn\s*out|play|wobble)/i, finding: "mechanical failure" },
+  { pattern: /(?:fuse).*(?:blown|bad|open|dead|burnt|burned|no\s*continu)/i, finding: "blown fuse" },
+  { pattern: /(?:blown|bad|open|burnt|burned)\s*(?:fuse)/i, finding: "blown fuse" },
+  { pattern: /(?:breaker).*(?:tripped|trip|open|off)/i, finding: "tripped circuit breaker" },
+  { pattern: /(?:no\s*power)\s*(?:downstream|after\s*(?:fuse|breaker))/i, finding: "no power downstream of fuse/breaker" },
+  { pattern: /предохранител.*(?:сгор|перегор|пробит)/i, finding: "blown fuse (RU)" },
   { pattern: /лопаст.*(?:отсутств|слома|повреж|нет)/i, finding: "blade missing/damaged (RU)" },
   { pattern: /(?:не|нет)\s*(?:сопротивлен|непрерывност)/i, finding: "open circuit (RU)" },
 ];
@@ -203,17 +228,36 @@ export function processUserMessage(caseId: string, message: string): {
   alreadyAnswered: boolean;
   completedStepIds: string[];
   unableStepIds: string[];
+  howToCheckRequested: boolean;
 } {
   const entry = ensureEntry(caseId);
   const topics = extractTopics(message);
   const isAlreadyAnswered = detectAlreadyAnswered(message);
   const isUnableToVerify = detectUnableToVerify(message);
+  const isHowToCheck = detectHowToCheck(message);
   const keyFinding = detectKeyFinding(message);
 
   const newAnswered: string[] = [];
   const newUnable: string[] = [];
   const completedStepIds: string[] = [];
   const unableStepIds: string[] = [];
+
+  // Reset transient flag
+  entry.howToCheckRequested = false;
+
+  // If the technician asks "how to check?" — do NOT close the step, just flag it
+  if (isHowToCheck) {
+    entry.howToCheckRequested = true;
+    return {
+      newAnswered,
+      newUnable,
+      keyFinding: null,
+      alreadyAnswered: false,
+      completedStepIds,
+      unableStepIds,
+      howToCheckRequested: true,
+    };
+  }
 
   // Procedure-aware step tracking
   if (entry.procedure) {
@@ -251,7 +295,7 @@ export function processUserMessage(caseId: string, message: string): {
     entry.keyFindings.push(keyFinding);
   }
 
-  return { newAnswered, newUnable, keyFinding, alreadyAnswered: isAlreadyAnswered, completedStepIds, unableStepIds };
+  return { newAnswered, newUnable, keyFinding, alreadyAnswered: isAlreadyAnswered, completedStepIds, unableStepIds, howToCheckRequested: false };
 }
 
 // ── Context building ────────────────────────────────────────────────
@@ -272,6 +316,7 @@ export function buildRegistryContext(caseId: string): string {
       entry.procedure,
       entry.completedStepIds,
       entry.unableStepIds,
+      { howToCheckRequested: entry.howToCheckRequested },
     );
   }
 
@@ -312,6 +357,25 @@ export function isProcedureComplete(caseId: string): boolean {
   if (!entry?.procedure) return false;
   const nextStep = getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
   return nextStep === null;
+}
+
+/**
+ * Mark a step as "asked" (de-dupe guard).
+ * Returns false if the step was already asked (duplicate).
+ */
+export function markStepAsked(caseId: string, stepId: string): boolean {
+  const entry = ensureEntry(caseId);
+  if (entry.askedStepIds.has(stepId)) return false;
+  entry.askedStepIds.add(stepId);
+  return true;
+}
+
+/**
+ * Check whether a step has already been asked.
+ */
+export function isStepAlreadyAsked(caseId: string, stepId: string): boolean {
+  const entry = registry.get(caseId);
+  return entry?.askedStepIds.has(stepId) ?? false;
 }
 
 /**
