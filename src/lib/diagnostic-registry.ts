@@ -93,6 +93,21 @@ export function detectUnableToVerify(message: string): boolean {
   return UNABLE_TO_VERIFY_PATTERNS.some((p) => p.test(message));
 }
 
+// ── How-to-check detection ──────────────────────────────────────────
+
+const HOW_TO_CHECK_PATTERNS = [
+  /how\s+(?:do\s+I|to|can\s+I|should\s+I)\s+(?:check|test|measure|verify|inspect|diagnose)/i,
+  /how\s+(?:do\s+I|to)\s+(?:do\s+(?:that|this|it))/i,
+  /what\s+(?:should\s+I|do\s+I)\s+(?:use|need|look\s+for)/i,
+  /(?:explain|show|tell)\s+(?:me\s+)?how/i,
+  /как\s+(?:мне\s+)?(?:проверить|протестировать|измерить|проверять)/i,
+  /(?:cómo|como)\s+(?:puedo\s+)?(?:verificar|comprobar|medir|probar|revisar)/i,
+];
+
+export function detectHowToCheck(message: string): boolean {
+  return HOW_TO_CHECK_PATTERNS.some((p) => p.test(message));
+}
+
 // ── Legacy topic extraction (backward compat) ───────────────────────
 
 const DIAGNOSTIC_TOPICS: Array<{ key: string; patterns: RegExp[] }> = [
