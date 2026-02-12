@@ -387,3 +387,94 @@ export function getRegistryEntry(caseId: string): DiagnosticEntry | undefined {
 export function clearRegistry(caseId: string): void {
   registry.delete(caseId);
 }
+
+// ── Serviceability metadata layer ───────────────────────────────────
+
+/**
+ * Classification of how a finding should be serviced.
+ */
+export type Serviceability =
+  | "repairable"
+  | "modular_replace"
+  | "manufacturer_service"
+  | "non_serviceable";
+
+/**
+ * Metadata for a key finding including serviceability and action hint.
+ */
+export type FindingMeta = {
+  serviceability: Serviceability;
+  actionHint: string;
+};
+
+/**
+ * Maps key findings to their serviceability classification and action hints.
+ */
+const FINDING_META: Record<string, FindingMeta> = {
+  // Fan/Blower findings
+  "missing fan blade": {
+    serviceability: "modular_replace",
+    actionHint: "Replace fan assembly or individual blade if part available",
+  },
+  "fan/blower blade damage": {
+    serviceability: "modular_replace",
+    actionHint: "Replace damaged fan/blower assembly",
+  },
+  "blower wheel damage": {
+    serviceability: "modular_replace",
+    actionHint: "Replace blower wheel assembly",
+  },
+  // Motor findings
+  "seized/locked motor": {
+    serviceability: "modular_replace",
+    actionHint: "Replace motor assembly; do not attempt to free seized motor",
+  },
+  // Electrical findings
+  "open/shorted coil": {
+    serviceability: "modular_replace",
+    actionHint: "Replace component with shorted/open coil",
+  },
+  "open circuit confirmed": {
+    serviceability: "repairable",
+    actionHint: "Trace and repair open circuit; check connections and wiring",
+  },
+  "zero current draw": {
+    serviceability: "repairable",
+    actionHint: "Verify power supply path; component may be open or disconnected",
+  },
+  // Structural findings
+  "cracked housing": {
+    serviceability: "modular_replace",
+    actionHint: "Replace housing or entire unit if housing not sold separately",
+  },
+  "component contacting housing": {
+    serviceability: "repairable",
+    actionHint: "Realign component; check mounting hardware and clearances",
+  },
+  "visibly compromised part": {
+    serviceability: "modular_replace",
+    actionHint: "Replace visibly damaged component",
+  },
+  // Mechanical findings
+  "mechanical failure": {
+    serviceability: "modular_replace",
+    actionHint: "Replace component with mechanical failure (shaft/bearing/axle)",
+  },
+  // Russian translations
+  "blade missing/damaged (RU)": {
+    serviceability: "modular_replace",
+    actionHint: "Заменить сборку вентилятора или лопасть",
+  },
+  "open circuit (RU)": {
+    serviceability: "repairable",
+    actionHint: "Проследить и устранить обрыв цепи",
+  },
+};
+
+/**
+ * Get serviceability metadata for a key finding.
+ * Returns null if the finding is not in the metadata map.
+ */
+export function getFindingMeta(finding: string): FindingMeta | null {
+  return FINDING_META[finding] ?? null;
+}
