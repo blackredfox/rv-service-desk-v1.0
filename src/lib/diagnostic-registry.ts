@@ -312,6 +312,7 @@ export function buildRegistryContext(caseId: string): string {
       entry.procedure,
       entry.completedStepIds,
       entry.unableStepIds,
+      { howToCheckRequested: entry.howToCheckRequested },
     );
   }
 
