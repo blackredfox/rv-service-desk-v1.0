@@ -255,3 +255,52 @@ describe("shouldPivot", () => {
     expect(result.finding).toContain("seized");
   });
 });
+
+// ── getFindingMeta ──────────────────────────────────────────────────
+
+describe("getFindingMeta – serviceability layer", () => {
+  beforeEach(() => { vi.resetModules(); });
+
+  it("returns metadata for known finding 'seized/locked motor'", async () => {
+    const { getFindingMeta } = await import("@/lib/diagnostic-registry");
+    const meta = getFindingMeta("seized/locked motor");
+    expect(meta).not.toBeNull();
+    expect(meta?.serviceability).toBe("modular_replace");
+    expect(meta?.actionHint).toContain("Replace motor");
+  });
+
+  it("returns metadata for known finding 'missing fan blade'", async () => {
+    const { getFindingMeta } = await import("@/lib/diagnostic-registry");
+    const meta = getFindingMeta("missing fan blade");
+    expect(meta).not.toBeNull();
+    expect(meta?.serviceability).toBe("modular_replace");
+  });
+
+  it("returns metadata for known finding 'open circuit confirmed'", async () => {
+    const { getFindingMeta } = await import("@/lib/diagnostic-registry");
+    const meta = getFindingMeta("open circuit confirmed");
+    expect(meta).not.toBeNull();
+    expect(meta?.serviceability).toBe("repairable");
+  });
+
+  it("returns metadata for Russian finding 'blade missing/damaged (RU)'", async () => {
+    const { getFindingMeta } = await import("@/lib/diagnostic-registry");
+    const meta = getFindingMeta("blade missing/damaged (RU)");
+    expect(meta).not.toBeNull();
+    expect(meta?.serviceability).toBe("modular_replace");
+  });
+
+  it("returns null for unknown finding", async () => {
+    const { getFindingMeta } = await import("@/lib/diagnostic-registry");
+    expect(getFindingMeta("some random unknown finding")).toBeNull();
+    expect(getFindingMeta("")).toBeNull();
+  });
+
+  it("returns null for removed fuse/breaker findings", async () => {
+    const { getFindingMeta } = await import("@/lib/diagnostic-registry");
+    // These were removed from KEY_FINDING_PATTERNS and should not have metadata
+    expect(getFindingMeta("blown fuse")).toBeNull();
+    expect(getFindingMeta("tripped circuit breaker")).toBeNull();
+    expect(getFindingMeta("no power downstream of fuse/breaker")).toBeNull();
+  });
+});
