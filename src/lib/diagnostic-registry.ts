@@ -356,6 +356,25 @@ export function isProcedureComplete(caseId: string): boolean {
 }
 
 /**
+ * Mark a step as "asked" (de-dupe guard).
+ * Returns false if the step was already asked (duplicate).
+ */
+export function markStepAsked(caseId: string, stepId: string): boolean {
+  const entry = ensureEntry(caseId);
+  if (entry.askedStepIds.has(stepId)) return false;
+  entry.askedStepIds.add(stepId);
+  return true;
+}
+
+/**
+ * Check whether a step has already been asked.
+ */
+export function isStepAlreadyAsked(caseId: string, stepId: string): boolean {
+  const entry = registry.get(caseId);
+  return entry?.askedStepIds.has(stepId) ?? false;
+}
+
+/**
  * Get the registry entry (for testing/debugging).
  */
 export function getRegistryEntry(caseId: string): DiagnosticEntry | undefined {
