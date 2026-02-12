@@ -1,271 +1,274 @@
 # RV Service Desk
 
-**RV Service Desk** is a diagnostic and authorization assistant for RV technicians.
-It helps technicians structure troubleshooting conversations and generate clear, professional service reports suitable for warranty claims and internal service systems.
+**Version:** 1.x\
+**Type:** Multi-Tenant B2B SaaS\
+**Domain:** RV Service Operations / Warranty Authorization\
+**Architecture:** Next.js + Prisma + Postgres + Server-Enforced AI
+Orchestration
 
-The product is designed for **speed, clarity, and real‑world shop workflows** — no exports, no clutter, just copy‑ready results.
+------------------------------------------------------------------------
 
----
+# 1. Overview
 
-## What the App Does
+**RV Service Desk** is an approval-safe, procedure-driven AI diagnostic
+and authorization engine for RV service businesses in the United States.
 
-* Guides technicians through structured diagnostics via chat
-* Asks the *right follow‑up questions* automatically
-* Produces a **ready‑to‑copy service report** inside the chat
-* Supports multiple languages (Auto / EN / RU / ES)
-* Works on desktop and mobile
+It is **not a chatbot**.\
+It is **not a mechanical decision system**.\
+It is a **controlled documentation and diagnostic orchestration
+platform** designed to:
 
-Technicians copy the final assistant response and paste it into their existing company system.
+-   standardize diagnostic workflows,
+-   prevent unsafe authorization language,
+-   reduce claim denials,
+-   enforce documentation completeness,
+-   support multi-technician service shops.
 
----
+The technician always makes the final repair decision.
 
-## Release 1 Features
+------------------------------------------------------------------------
 
-### Frontend
-* Welcome screen with Terms acceptance
-* Sidebar with case list
-* Chat interface (technician ↔ assistant)
-* Copy button on assistant response
-* Language selector (Auto / EN / RU / ES)
-* Light / Dark theme
-* Mobile‑friendly layout
+# 2. Core Capabilities
 
-### Backend
-* **User authentication** (email + password with bcrypt)
-* **Session-based auth** with httpOnly cookies
-* **Stripe integration** for subscriptions (PREMIUM, PRO plans)
-* **Case & message persistence** (Prisma + PostgreSQL)
-* **OpenAI proxy** (server-only API key)
-* **Session-only photo support** (images used for current request only, not stored)
-* **Privacy-safe analytics events**
-* Rate limiting on auth endpoints
+## 2.1 Procedure-Driven Diagnostics
 
----
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in your values:
-
-```env
-# Database (Required)
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/rv_service_desk?schema=public"
-
-# OpenAI API (Required for chat)
-OPENAI_API_KEY=""
+-   Each RV system is governed by a structured procedure.
+-   Strict ordering and prerequisites are enforced.
+-   Steps cannot be skipped unless already completed.
+-   If a technician asks *"How do I check that?"*, the assistant
+    provides safe, procedure-aligned instructions.
+-   No cross-system drift is allowed.
 
-# Stripe (Required for billing)
-STRIPE_SECRET_KEY=""
-STRIPE_WEBHOOK_SECRET=""
-STRIPE_PRICE_ID_PREMIUM=""
-STRIPE_PRICE_ID_PRO=""
+**Principle:** Procedure is law.
 
-# App Configuration
-NEXT_PUBLIC_APP_NAME="RV Service Desk"
-TERMS_VERSION="v1.0"
-APP_URL="http://localhost:3000"
-```
+------------------------------------------------------------------------
 
-### Where to Get Keys
+## 2.2 Mode-Based AI Enforcement (Server Controlled)
 
-| Key | Source |
-|-----|--------|
-| `DATABASE_URL` | Your PostgreSQL provider (Neon, Supabase, Railway, etc.) |
-| `OPENAI_API_KEY` | [OpenAI Platform](https://platform.openai.com/api-keys) |
-| `STRIPE_SECRET_KEY` | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
-| `STRIPE_WEBHOOK_SECRET` | Stripe CLI or Dashboard webhook settings |
-| `STRIPE_PRICE_ID_*` | Create products/prices in Stripe Dashboard |
+Modes are internal and cannot change implicitly.
 
----
+Mode transitions occur **only** via exact commands in technician input:
 
-## Local Development Setup
+    START AUTHORIZATION REQUEST
+    START FINAL REPORT
 
-### Prerequisites
-- Node.js 18+
-- Yarn
-- PostgreSQL (Supabase recommended)
+Modes:
 
-### Database Setup (Supabase)
+  Mode            Purpose
+  --------------- ---------------------------
+  diagnostic      Guided procedure form
+  authorization   Pre-approval request text
+  final_report    Shop-ready report output
 
-1. Create a Supabase project at [supabase.com](https://supabase.com)
-2. Go to **Settings → Database → Connection String**
-3. Copy the **Transaction Pooler** URL (recommended for serverless)
-4. Set in `.env`:
-   ```
-   DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true"
-   ```
+The server validates mode compliance and prevents unsafe transitions.
 
-### Installation
+------------------------------------------------------------------------
 
-```bash
-# Install dependencies
-yarn install
+## 2.3 Complex System Gating
 
-# Generate Prisma client
-yarn prisma:generate
+For major systems (AC, furnace, refrigerator, slide-out, leveling,
+inverter, major electrical):
 
-# Push schema to database (run locally, not in CI)
-npx prisma db push
+-   No portal cause generation until isolation is complete.
+-   No labor estimates before validation.
+-   No part replacement before rule-based confirmation.
 
-# Start development server
-yarn dev
-```
+Additional guardrails:
 
-The app will be available at `http://localhost:3000`.
+-   Post-repair fallback to diagnostics if repair fails.
+-   Mechanical guardrail (no motor replacement if direct power confirms
+    operation).
+-   Consumer appliance replacement logic (unit-level only).
 
----
+------------------------------------------------------------------------
 
-## API Routes
+## 2.4 Language Enforcement Contract
 
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login user |
-| POST | `/api/auth/logout` | Logout user |
-| GET | `/api/auth/me` | Get current user info |
+Dialogue language: - Auto / EN / RU / ES
 
-### Cases
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/cases` | List user's cases |
-| POST | `/api/cases` | Create new case |
-| GET | `/api/cases/[id]` | Get case with messages |
-| PATCH | `/api/cases/[id]` | Update case |
-| DELETE | `/api/cases/[id]` | Delete case (soft) |
+Final outputs: 1. **English block first** 2. `--- TRANSLATION ---` 3.
+Full translation into technician language
 
-### Chat
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/chat` | Send message (SSE streaming) |
+Server validates translation presence and repairs/retries if missing.
 
-### Billing
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/billing/checkout-session` | Create Stripe checkout |
-| GET | `/api/billing/checkout-status/[sessionId]` | Get payment status |
-| POST | `/api/billing/webhook` | Stripe webhook handler |
+Language metadata is persisted per case and per message.
 
-### Analytics
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/analytics/event` | Track client event |
+------------------------------------------------------------------------
 
----
+## 2.5 Multi-Tenant B2B Architecture
 
-## Testing
+The platform supports:
 
-```bash
-# Run all tests
-yarn test
+-   Organizations
+-   Members
+-   Seat limits
+-   Stripe subscription billing
+-   Seat synchronization via webhook
+-   Member invitation & claim flow
 
-# Run tests with UI
-yarn test:ui
-```
+Seat enforcement occurs at API layer.
 
-### Stripe Webhook Testing
+------------------------------------------------------------------------
 
-Use Stripe CLI to forward webhooks locally:
+## 2.6 Retention & Data Boundaries
 
-```bash
-# Install Stripe CLI
-brew install stripe/stripe-cli/stripe
+-   Text-only storage (cases + messages + outputs)
+-   Session-only image/audio (never persisted)
+-   Case retention policy + cleanup workflow
+-   Refresh TTL metadata on read
 
-# Login to Stripe
-stripe login
+No PII in logs.
 
-# Forward webhooks to local server
-stripe listen --forward-to localhost:3000/api/billing/webhook
+------------------------------------------------------------------------
 
-# Copy the webhook signing secret to .env
-# STRIPE_WEBHOOK_SECRET=whsec_...
-```
+# 3. System Architecture
 
----
+## 3.1 Frontend
 
-## Enable Upgrades in Stripe Customer Portal
+-   Next.js (App Router)
+-   Light/Dark themes
+-   Sidebar case management
+-   Chat panel
+-   Language selector
+-   Voice input (STT)
+-   Photo attach (session only)
+-   Terms gate
 
-To allow customers to upgrade their seat tier (5 → 10 → 25), configure the Stripe Customer Portal:
+------------------------------------------------------------------------
 
-### Step 1: Create Portal Configuration
+## 3.2 Backend
 
-1. Go to [Stripe Dashboard → Settings → Customer Portal](https://dashboard.stripe.com/settings/billing/portal)
-2. Enable **"Allow customers to update subscriptions"**
-3. Under "Products", add your seat-based price(s)
-4. Enable **"Allow quantity changes"** if you want flexible seat counts
-5. Save the configuration
+-   Next.js API routes
+-   Prisma ORM
+-   PostgreSQL
+-   Stripe billing integration
+-   Firebase Admin (optional support services)
+-   Structured logging
 
-### Step 2: Configure Allowed Price Changes (Optional)
+Core libraries:
 
-If using multiple price tiers (e.g., 5/10/25 seats):
+-   diagnostic-procedures
+-   diagnostic-registry
+-   mode-validators
+-   output-validator
+-   retention
+-   b2b-stripe
 
-1. Create separate Stripe Prices for each tier
-2. In Portal Settings → Products → Edit
-3. Add all tier prices to the "Allowed prices" list
-4. Enable "Proration" for mid-cycle upgrades
+------------------------------------------------------------------------
 
-### Step 3: Set Portal Configuration ID (Optional)
+## 3.3 AI Orchestration Layer
 
-If you have multiple portal configurations:
+Prompt system is modular:
 
-1. Copy the Configuration ID from Stripe Dashboard (starts with `bpc_`)
-2. Add to `.env`:
-   ```
-   STRIPE_PORTAL_CONFIGURATION_ID=bpc_xxxxx
-   ```
+-   SYSTEM_PROMPT_BASE
+-   MODE_PROMPT_DIAGNOSTIC
+-   MODE_PROMPT_AUTHORIZATION
+-   MODE_PROMPT_FINAL_REPORT
 
-### Webhook Events for Seat Updates
+The server composes prompts and validates outputs.
 
-The app handles these events for subscription changes:
-- `customer.subscription.updated` - Updates seat limit from quantity
-- `invoice.payment_succeeded` - Confirms seat count after payment
+AI cannot bypass:
 
----
+-   mode gates
+-   diagnostic completeness gates
+-   language rules
+-   output formatting rules
 
-## Database Schema
+------------------------------------------------------------------------
 
-Key models:
+# 4. API Surface (MVP)
 
-- **User** - Email + password auth
-- **Session** - Cookie-based sessions (30 day expiry)
-- **Subscription** - Plan (FREE/PREMIUM/PRO) + Stripe IDs
-- **Case** - Diagnostic cases with user ownership
-- **Message** - Chat messages (user/assistant)
-- **AnalyticsEvent** - Privacy-safe telemetry
-- **PaymentTransaction** - Stripe checkout tracking
+Core endpoint:
 
-Run `yarn prisma studio` to browse data.
+POST /api/chat
 
----
+Supporting endpoints:
 
-## Deployment
+-   /api/cases
+-   /api/stt/transcribe
+-   /api/billing/\*
+-   /api/org/\*
+-   /api/analytics/event
+-   /api/search
 
-### Vercel (Recommended)
+Mode transitions are enforced server-side only.
 
-1. Push to GitHub
-2. Import project in Vercel
-3. Add environment variables
-4. Deploy
+------------------------------------------------------------------------
 
-### Render
+# 5. Database
 
-1. Create Web Service
-2. Set build command: `yarn install && yarn prisma:generate && yarn build`
-3. Set start command: `yarn start`
-4. Add environment variables
+Prisma schema with language metadata support and migration tracking.
 
----
+------------------------------------------------------------------------
 
-## Target Users
+# 6. Testing Strategy
 
-* RV technicians
-* Service departments
-* Warranty processing teams
+## Unit & Component Tests
 
----
+    yarn test
 
-## Product Philosophy
+-   Deterministic test environment
+-   Mode validator tests
+-   Diagnostic gating tests
+-   Stripe webhook tests
+-   Seat synchronization tests
+-   Translation enforcement tests
 
-* **Fast > Fancy**
-* **Copy-ready output > PDFs**
-* **Guided thinking > free-form chat**
-* **Real shop workflows > theoretical UX**
+------------------------------------------------------------------------
+
+# 7. Environment Setup
+
+### Requirements
+
+-   Node 18+
+-   Yarn
+-   PostgreSQL
+
+### Install
+
+    yarn install
+
+### Prisma
+
+    npx prisma generate
+    npx prisma db push
+
+### Run
+
+    yarn dev
+
+### Test
+
+    yarn test
+
+------------------------------------------------------------------------
+
+# 8. Security & Compliance Boundaries
+
+-   No approval guarantees
+-   No repair decisions
+-   No stored media
+-   No secret exposure to client
+-   Rate limiting on sensitive routes
+-   Translation validation to prevent output corruption
+
+------------------------------------------------------------------------
+
+# 9. Product Philosophy
+
+-   Determinism over creativity
+-   Procedure over conversation
+-   Authorization safety over verbosity
+-   Explicit state over inference
+-   Server enforcement over model trust
+
+------------------------------------------------------------------------
+
+# 10. Project Status
+
+This project operates as:
+
+-   Multi-tenant SaaS
+-   Seat-controlled subscription system
+-   AI-validated diagnostic engine
+-   Test-covered authorization platform

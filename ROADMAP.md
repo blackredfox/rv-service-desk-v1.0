@@ -2,65 +2,74 @@
 
 ## Release 1 — MVP (Current Priority)
 
-**Goal:** Launch a paid, authenticated Service Desk with core diagnostic value.
+**Goal:** Ship an approval-safe diagnostic + documentation assistant that works reliably in a real shop workflow.
 
-### Must‑Have
+### Must‑Have (Contract)
+- Case-based chat UX (sidebar, chat, copy button)
+- Terms acceptance
+- Multi-language input (Auto / EN / RU / ES)
+- **Server-enforced modes** (explicit commands only)
+  - `START AUTHORIZATION REQUEST`
+  - `START FINAL REPORT`
+- **English-first output + guaranteed translation block**
+- **Procedure-driven diagnostics** (system procedures as code)
+  - strict ordering + prerequisites
+  - skip steps already completed
+  - answer “How do I check that?” safely and succinctly
+- **Complex system gating**
+  - diagnostic form behavior until isolation is complete
+  - no portal-cause/labor before gates satisfied
+- Guardrails
+  - post-repair fallback to diagnostics
+  - mechanical guardrail (no motor replacement when direct power proves motor works)
+  - no “approval guarantee” language
 
-* Welcome screen + Terms acceptance
-* Authentication (Stripe‑based)
-* Backend + database
-* Case persistence (~30 days)
-* Chat diagnostics
-* Copy report button
-* Voice‑to‑Text
-* Attach photo (session‑only)
-* Multi‑language support
-* Mobile usability
+### Must‑Have (Platform)
+- Authentication (email/password + sessions)
+- Case/message persistence (Prisma + Postgres)
+- Rate limiting (auth endpoints minimum)
+- Basic observability (structured logs; no PII)
 
 ### Nice‑to‑Have (if time permits)
-
-* Reset / Clear current case
-* Minor UI polish (colors, spacing)
+- Reset/clear current case
+- Small UI polish (spacing, loading/empty states)
+- Optional STT (session-only; no storage)
+- Optional image attach (session-only; no storage)
 
 ---
 
-## Release 2 — Productivity & Retention
+## Release 2 — Reliability & Retention
 
-**Goal:** Improve daily usage and reduce friction.
+**Goal:** Reduce support burden, increase repeat usage.
 
-* Optional photo storage
-* Case history management
-* Clear history button
-* Improved onboarding text
-* UI theming polish
-* Usage analytics
-* Admin dashboard (internal)
+- Translation repair policy hardening + telemetry for “missing translation” defects
+- Procedure coverage expansion (more systems + more edge cases)
+- Case retention policy (TTL) + cleanup job
+- Search cases + refresh retention metadata on reads
+- Internal admin/debug tools (safe: text-only)
 
 ---
 
 ## Release 3 — Advanced Workflow
 
-**Goal:** Deeper integration with service operations.
+**Goal:** Shop-scale operations.
 
-* Structured report templates
-* Diagnostic modes (HVAC, Electrical, Plumbing, etc.)
-* Fleet / shop accounts
-* Role-based access
-* Advanced analytics
+- Role-based access (tech / writer / manager)
+- Fleet / shop accounts
+- Structured report templates per payer type (warranty/insurance/customer-pay)
+- Advanced analytics (privacy-safe)
+- Optional exports (PDF/DOCX) **only if** it increases adoption (separate spec)
 
 ---
 
 ## Parking Lot / Ideas
 
-* Emergency safety guidance (contextual)
-* Offline-first mode
-* Technician presets
-* Company branding
-
-(Items here are intentionally **not committed** to a release.)
+- Offline-first (local-only) mode
+- Technician presets / shop-specific phrasing profiles
+- Company branding / white-label
 
 ---
 
 ## Guiding Rule
 
-If a feature does not **directly help a technician finish a diagnostic faster**, it does not belong in Release 1.
+If a feature does not **directly help a technician finish a diagnostic faster or produce safer authorization text**, it does not belong in the next release.
