@@ -15,7 +15,6 @@ import {
   mapInitialMessageToSteps,
   buildProcedureContext,
   type DiagnosticProcedure,
-  type DiagnosticStep,
 } from "./diagnostic-procedures";
 
 type DiagnosticEntry = {
