@@ -16,6 +16,11 @@ vi.stubEnv("RESEND_API_KEY", process.env.RESEND_API_KEY || "re_test_dummy");
 vi.stubEnv("STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY || "sk_test_dummy");
 vi.stubEnv("STRIPE_API_KEY", process.env.STRIPE_API_KEY || "sk_test_dummy");
 
+// Force memory-mode storage in tests: clear DB env vars so getPrisma() returns null.
+// Use a dedicated TEST_DATABASE_URL to opt-in to real DB in integration tests.
+vi.stubEnv("DATABASE_URL", process.env.TEST_DATABASE_URL || "");
+vi.stubEnv("DIRECT_URL", "");
+
 // Mock Resend globally to prevent initialization errors in tests.
 // Support BOTH `import Resend from "resend"` and `import { Resend } from "resend"`.
 vi.mock("resend", () => {
