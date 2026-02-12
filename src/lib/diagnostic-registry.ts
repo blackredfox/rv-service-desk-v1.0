@@ -224,17 +224,36 @@ export function processUserMessage(caseId: string, message: string): {
   alreadyAnswered: boolean;
   completedStepIds: string[];
   unableStepIds: string[];
+  howToCheckRequested: boolean;
 } {
   const entry = ensureEntry(caseId);
   const topics = extractTopics(message);
   const isAlreadyAnswered = detectAlreadyAnswered(message);
   const isUnableToVerify = detectUnableToVerify(message);
+  const isHowToCheck = detectHowToCheck(message);
   const keyFinding = detectKeyFinding(message);
 
   const newAnswered: string[] = [];
   const newUnable: string[] = [];
   const completedStepIds: string[] = [];
   const unableStepIds: string[] = [];
+
+  // Reset transient flag
+  entry.howToCheckRequested = false;
+
+  // If the technician asks "how to check?" — do NOT close the step, just flag it
+  if (isHowToCheck) {
+    entry.howToCheckRequested = true;
+    return {
+      newAnswered,
+      newUnable,
+      keyFinding: null,
+      alreadyAnswered: false,
+      completedStepIds,
+      unableStepIds,
+      howToCheckRequested: true,
+    };
+  }
 
   // Procedure-aware step tracking
   if (entry.procedure) {
