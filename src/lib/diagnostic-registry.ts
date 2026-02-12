@@ -51,6 +51,8 @@ function ensureEntry(caseId: string): DiagnosticEntry {
       procedure: null,
       completedStepIds: new Set(),
       unableStepIds: new Set(),
+      askedStepIds: new Set(),
+      howToCheckRequested: false,
       answeredKeys: new Set(),
       unableToVerifyKeys: new Set(),
       keyFindings: [],
