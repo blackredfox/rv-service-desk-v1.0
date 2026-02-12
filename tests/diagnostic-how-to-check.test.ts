@@ -203,11 +203,12 @@ describe("portal-cause correctness", () => {
     expect(ctx).not.toContain("NEXT REQUIRED STEP: awn_6");
   });
 
-  it("key finding 'blown fuse' triggers pivot (immediate isolation)", () => {
+  it("'blown fuse' does NOT trigger pivot (it is a diagnostic branch, not a key finding)", () => {
     initializeCase("cause-case", "awning won't extend");
     const result = processUserMessage("cause-case", "fuse is blown, no power downstream");
 
-    // Key finding should be detected
-    expect(result.keyFinding).toBeTruthy();
+    // Fuse findings were removed from KEY_FINDING_PATTERNS
+    // They are diagnostic branches, not immediate isolation triggers
+    expect(result.keyFinding).toBeNull();
   });
 });
