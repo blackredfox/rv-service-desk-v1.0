@@ -672,6 +672,7 @@ export function buildProcedureContext(
   procedure: DiagnosticProcedure,
   completedIds: Set<string>,
   unableIds: Set<string>,
+  options?: { howToCheckRequested?: boolean },
 ): string {
   const nextStep = getNextStep(procedure, completedIds, unableIds);
   const totalSteps = procedure.steps.length;
