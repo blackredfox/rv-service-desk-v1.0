@@ -264,26 +264,20 @@ describe("Ceiling Fan Flow — End to End", () => {
     expect(result.procedure?.displayName).toContain("12V Electrical");
   });
 
-  it("ceiling fan flow requires direct power test before isolation", async () => {
-    const { 
-      initializeCase, 
-      areMechanicalChecksComplete,
-      clearRegistry,
-    } = await import("@/lib/diagnostic-registry");
+  it("electrical_12v procedure has all required mechanical check steps", async () => {
+    const { getProcedure } = await import("@/lib/diagnostic-procedures");
     
-    const caseId = "ceiling-fan-mech-required-test";
-    clearRegistry(caseId);
-    
-    const initResult = initializeCase(caseId, "ceiling fan motor not spinning");
-    
-    // Get the registry and manually manipulate completedStepIds
-    // Since markStepCompleted is internal, we use the returned structure
-    const procedure = initResult.procedure;
+    const procedure = getProcedure("electrical_12v");
     expect(procedure).toBeDefined();
     
-    // Just check that e12_6 exists and is marked as mechanicalCheck
+    // Verify e12_6 (direct power test) exists and is mechanical
     const e12_6 = procedure?.steps.find(s => s.id === "e12_6");
     expect(e12_6).toBeDefined();
     expect(e12_6?.mechanicalCheck).toBe(true);
+    
+    // Verify e12_7 (wiring inspection) exists and is mechanical
+    const e12_7 = procedure?.steps.find(s => s.id === "e12_7");
+    expect(e12_7).toBeDefined();
+    expect(e12_7?.mechanicalCheck).toBe(true);
   });
 });
