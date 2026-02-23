@@ -507,6 +507,7 @@ reg({
       prerequisites: [],
       matchPatterns: [/(?:wiring|connection|corrosion).*(?:damage|loose|ok|good|clean)/i],
       howToCheck: "Visually trace the wiring from the panel to the component. Look for chafed insulation, green/white corrosion on terminals, melted connectors, loose spade terminals.",
+      mechanicalCheck: true,
     },
   ],
 });
