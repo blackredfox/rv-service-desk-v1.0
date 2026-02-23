@@ -166,11 +166,7 @@ export function detectIntent(message: string): Intent {
   // Check for confirmation (labor context)
   // First check for a number (override) - but be more careful about context
   // Numbers embedded in technical descriptions should not be treated as confirmations
-  const technicalContextPatterns = [
-    /(?:motor|pump|fan|voltage|volts?|v\b|dc|ac|power|battery|runs?|works?|operates?|apply)/i,
-  ];
-  
-  const looksLikeTechnicalContext = technicalContextPatterns.some(p => p.test(trimmed));
+  const looksLikeTechnicalContext = TECHNICAL_CONTEXT_PATTERNS.some(p => p.test(trimmed));
   
   if (!looksLikeTechnicalContext) {
     const numberMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h\b|ч|час)?/i);
@@ -191,10 +187,12 @@ export function detectIntent(message: string): Intent {
     }
   }
   
-  // Then check for confirmation keywords
-  for (const pattern of CONFIRMATION_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return { type: "CONFIRMATION", value: "accept" };
+  // Then check for confirmation keywords (only if not in technical context)
+  if (!looksLikeTechnicalContext) {
+    for (const pattern of CONFIRMATION_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        return { type: "CONFIRMATION", value: "accept" };
+      }
     }
   }
   
