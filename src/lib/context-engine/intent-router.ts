@@ -98,7 +98,14 @@ const UNABLE_TO_VERIFY_PATTERNS = [
 
 // Confirmation patterns (for labor)
 const CONFIRMATION_PATTERNS = [
-  /\b(?:confirm|ok|okay|yes|да|подтвер|s[ií]|confirmo|good|agree|accept|fine|correct|right|approve|looks?\s+good)\b/i,
+  /\b(?:confirm|ok|okay|yes|да|подтвер|s[ií]|confirmo|good|agree|accept|correct|right|approve|looks?\s+good)\b/i,
+];
+
+// Patterns that indicate technical context (NOT labor confirmation)
+const TECHNICAL_CONTEXT_PATTERNS = [
+  /(?:motor|pump|fan|compressor|voltage|volts?|v\b|dc|ac|power|battery|runs?|works?|operates?|apply|bypass|jump|direct)/i,
+  /(?:check|test|measure|verify|inspect|read|reading)/i,
+  /(?:when|if|after|before|with|without)\s+(?:I|you|we)/i,
 ];
 
 // ── Intent Detection ────────────────────────────────────────────────
