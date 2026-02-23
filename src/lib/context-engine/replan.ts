@@ -235,7 +235,7 @@ function findContradiction(message: string, facts: Fact[]): string | null {
 /**
  * Determine which diagnostic branch to explore based on new evidence
  */
-function determineBranch(message: string, evidenceType: EvidenceType): string | null {
+function determineBranch(message: string, evidenceType: EvidenceType): string | undefined {
   const msgLower = message.toLowerCase();
   
   // Physical damage patterns
@@ -256,7 +256,7 @@ function determineBranch(message: string, evidenceType: EvidenceType): string | 
     }
   }
   
-  return null;
+  return undefined;
 }
 
 /**
