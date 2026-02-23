@@ -57,6 +57,7 @@
 | `src/lib/context-engine/topic-stack.ts` | 3 | Clarification subflow management |
 | `src/lib/context-engine/context-engine.ts` | 3 | Main orchestrator |
 | `tests/context-engine.test.ts` | 3 | 26 tests for context engine |
+| `tests/context-engine-integration.test.ts` | 3 | 9 integration tests for route.ts wiring |
 
 ## Test Results
 - **568 tests across 38 test files**
