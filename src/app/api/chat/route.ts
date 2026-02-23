@@ -799,13 +799,51 @@ export async function POST(req: Request) {
           }
         } else if (currentMode === "labor_confirmation" && !aborted) {
           // ========================================
-          // LABOR CONFIRMATION → FINAL REPORT
+          // LABOR CONFIRMATION → FINAL REPORT (NON-BLOCKING)
           // ========================================
           // Parse technician's response for labor confirmation/override
           const laborEntry = getLaborEntry(ensuredCase.id);
           const confirmedHours = parseLaborConfirmation(message, laborEntry?.estimatedHours);
           
-          if (confirmedHours) {
+          // Check if technician wants to continue diagnostics (non-blocking labor)
+          const continuePatterns = [
+            /(?:continue|back\s+to|return\s+to)\s+diagnostic/i,
+            /(?:more\s+)?(?:check|test|verify|diagnose)/i,
+            /(?:wait|hold|not\s+ready|skip)/i,
+            /(?:продолж|вернуться|проверить|подожд)/i,
+            /(?:continuar|volver|verificar|espera)/i,
+          ];
+          const wantsContinueDiagnostics = continuePatterns.some(p => p.test(message));
+          
+          if (wantsContinueDiagnostics) {
+            // NON-BLOCKING: Allow return to diagnostics
+            console.log(`[Chat API v2] Labor confirmation: technician wants to continue diagnostics (non-blocking)`);
+            currentMode = "diagnostic";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+            
+            // Stream acknowledgment and return to diagnostic flow
+            const acknowledgment = outputPolicy.effective === "RU" 
+              ? "Понял. Продолжаем диагностику."
+              : outputPolicy.effective === "ES"
+              ? "Entendido. Continuamos con el diagnóstico."
+              : "Understood. Returning to diagnostics.";
+            
+            for (const char of acknowledgment) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: acknowledgment,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+            
+            full = acknowledgment;
+          } else if (confirmedHours) {
             confirmLabor(ensuredCase.id, confirmedHours);
             console.log(`[Chat API v2] Labor confirmed: ${confirmedHours} hr (estimate was ${laborEntry?.estimatedHours ?? "unknown"})`);
             
