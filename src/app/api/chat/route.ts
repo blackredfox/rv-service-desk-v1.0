@@ -454,8 +454,8 @@ export async function POST(req: Request) {
   // - outputEffective: what language assistant must respond in
   // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
-  // Compose system prompt: combine registry context + fact lock as additionalConstraints
-  const additionalConstraints = [registryConstraint, factLockConstraint]
+  // Compose system prompt: combine registry context + fact lock + context engine directives
+  const additionalConstraints = [registryConstraint, factLockConstraint, contextEngineDirectives]
     .filter(Boolean)
     .join("\n\n") || undefined;
 
