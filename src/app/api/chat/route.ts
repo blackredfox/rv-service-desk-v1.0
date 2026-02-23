@@ -780,8 +780,9 @@ export async function POST(req: Request) {
               });
             }
 
-            // Now force transition to labor_confirmation
-            currentMode = "labor_confirmation";
+            // Now force transition DIRECTLY to final_report (skip labor_confirmation)
+            // Labor estimate is included in the final report, no interactive confirmation
+            currentMode = "final_report";
             await storage.updateCase(ensuredCase.id, { mode: currentMode });
             controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
 
@@ -790,48 +791,60 @@ export async function POST(req: Request) {
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
             }
 
-            // Generate labor confirmation
-            const laborPrompt = composePromptV2({
-              mode: "labor_confirmation",
+            // Check for any explicit labor override in message history
+            const laborEntry = getLaborEntry(ensuredCase.id);
+            const laborOverride = laborEntry?.confirmedHours ?? laborEntry?.estimatedHours;
+            const laborConstraint = laborOverride 
+              ? `LABOR CONSTRAINT: Use exactly ${laborOverride} hours as the total labor estimate.`
+              : `LABOR ESTIMATE: Include a best-effort labor estimate based on the repair complexity. Format: "Estimated total labor: X.X hours"`;
+
+            // Generate final report directly (no labor confirmation step)
+            const finalPrompt = composePromptV2({
+              mode: "final_report",
               inputDetected: inputLanguage.detected,
               outputEffective: outputPolicy.effective,
-              includeTranslation: false,
+              includeTranslation: langPolicy.includeTranslation,
+              translationLanguage: langPolicy.translationLanguage,
+              additionalConstraints: laborConstraint,
             });
             const updatedHistoryPivot = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
-            const laborBody = {
+            const factLock = buildFactLockConstraint(updatedHistoryPivot);
+            
+            const finalBody = {
               model: "gpt-4o-mini",
               stream: false,
               temperature: 0.2,
               messages: buildOpenAiMessages({
-                system: laborPrompt,
+                system: finalPrompt + (factLock ? `\n\n${factLock}` : ""),
                 history: updatedHistoryPivot,
-                userMessage: "Key finding confirmed during diagnostics. Generate a labor estimate and ask for confirmation.",
+                userMessage: "Key finding confirmed. Generate the Portal/Cause output with labor estimate.",
                 attachments: undefined,
               }),
             };
-            const laborResult = await callOpenAI(apiKey, laborBody, ac.signal);
-            if (!laborResult.error && laborResult.response.trim()) {
-              const estimatedHours = extractLaborEstimate(laborResult.response);
+            const finalResult = await callOpenAI(apiKey, finalBody, ac.signal);
+            if (!finalResult.error && finalResult.response.trim()) {
+              // Extract labor estimate from final report (for records)
+              const estimatedHours = extractLaborEstimate(finalResult.response);
               if (estimatedHours) setLaborEstimate(ensuredCase.id, estimatedHours);
-              for (const char of laborResult.response) {
+              
+              for (const char of finalResult.response) {
                 if (aborted) break;
                 controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
               }
               await storage.appendMessage({
                 caseId: ensuredCase.id,
                 role: "assistant",
-                content: laborResult.response,
+                content: finalResult.response,
                 language: outputPolicy.effective,
                 userId: user?.id,
               });
-              full = full + separator + laborResult.response;
+              full = full + separator + finalResult.response;
             } else {
-              const fallback = getSafeFallback("labor_confirmation", outputPolicy.effective);
+              const fallback = getSafeFallback("final_report", outputPolicy.effective);
               for (const char of fallback) {
                 if (aborted) break;
                 controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
               }
-              setLaborEstimate(ensuredCase.id, 1.0);
               full = full + separator + fallback;
             }
 
