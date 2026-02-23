@@ -861,107 +861,145 @@ export async function POST(req: Request) {
         const transitionResult = detectTransitionSignal(full);
         
         if (transitionResult && currentMode === "diagnostic" && !aborted) {
-          // Transition: diagnostic → labor_confirmation (NOT directly to final_report)
-          console.log(`[Chat API v2] Auto-transition detected: diagnostic → labor_confirmation`);
+          // Check mechanical steps before allowing transition
+          const mechanicalCheck = areMechanicalChecksComplete(ensuredCase.id);
           
-          // Stream the transition message first
-          for (const char of transitionResult.cleanedResponse) {
-            if (aborted) break;
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
-          
-          // Save the transition message
-          if (transitionResult.cleanedResponse.trim()) {
-            await storage.appendMessage({
-              caseId: ensuredCase.id,
-              role: "assistant",
-              content: transitionResult.cleanedResponse,
-              language: outputPolicy.effective,
-              userId: user?.id,
-            });
-          }
-          
-          // Update mode to labor_confirmation
-          currentMode = "labor_confirmation";
-          await storage.updateCase(ensuredCase.id, { mode: currentMode });
-          
-          // Emit mode change event
-          controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
-          
-          // Add a visual separator
-          const separator = "\n\n";
-          for (const char of separator) {
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
-          
-          // Generate labor confirmation prompt
-          const laborPrompt = composePromptV2({
-            mode: "labor_confirmation",
-            inputDetected: inputLanguage.detected,
-            outputEffective: outputPolicy.effective,
-            includeTranslation: false, // No translation in labor confirmation
-          });
-          
-          const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
-          
-          const laborBody = {
-            model: "gpt-4o-mini",
-            stream: false,
-            temperature: 0.2,
-            messages: buildOpenAiMessages({
-              system: laborPrompt,
-              history: updatedHistory,
-              userMessage: "Generate a labor estimate for the repair identified during diagnostics. Present the total and ask for confirmation.",
-              attachments: undefined,
-            }),
-          };
-          
-          const laborResult = await callOpenAI(apiKey, laborBody, ac.signal);
-          
-          if (!laborResult.error && laborResult.response.trim()) {
-            const laborContent = laborResult.response;
-            
-            // Extract and store the estimated hours
-            const estimatedHours = extractLaborEstimate(laborContent);
-            if (estimatedHours) {
-              setLaborEstimate(ensuredCase.id, estimatedHours);
-              console.log(`[Chat API v2] Labor estimate extracted: ${estimatedHours} hr`);
-            }
-            
-            // Stream the labor confirmation prompt
-            for (const char of laborContent) {
+          if (!mechanicalCheck.complete && mechanicalCheck.pendingStep) {
+            // Mechanical check pending — DO NOT transition yet
+            console.log(`[Chat API v2] Auto-transition BLOCKED — mechanical check pending: ${mechanicalCheck.pendingStep.id}`);
+            // Stream the response but stay in diagnostic mode
+            for (const char of transitionResult.cleanedResponse) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
             }
             
-            // Save the labor confirmation message
+            // Append a reminder to ask the mechanical step
+            const mechanicalReminder = `\n\nBefore we proceed, I need to verify one more thing: ${mechanicalCheck.pendingStep.question}`;
+            for (const char of mechanicalReminder) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
             await storage.appendMessage({
               caseId: ensuredCase.id,
               role: "assistant",
-              content: laborContent,
+              content: transitionResult.cleanedResponse + mechanicalReminder,
               language: outputPolicy.effective,
               userId: user?.id,
             });
             
-            full = transitionResult.cleanedResponse + separator + laborContent;
-          } else if (laborResult.error) {
-            console.error(`[Chat API v2] Labor confirmation generation error: ${laborResult.error}`);
-            // Use fallback
-            const fallback = getSafeFallback("labor_confirmation", outputPolicy.effective);
-            for (const char of fallback) {
+            full = transitionResult.cleanedResponse + mechanicalReminder;
+          } else {
+            // Mechanical checks complete — transition DIRECTLY to final_report (skip labor_confirmation)
+            console.log(`[Chat API v2] Auto-transition detected: diagnostic → final_report (skip labor_confirmation)`);
+            
+            // Stream the transition message first
+            for (const char of transitionResult.cleanedResponse) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
             }
-            await storage.appendMessage({
-              caseId: ensuredCase.id,
-              role: "assistant",
-              content: fallback,
-              language: outputPolicy.effective,
-              userId: user?.id,
+            
+            // Save the transition message
+            if (transitionResult.cleanedResponse.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: transitionResult.cleanedResponse,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+            
+            // Update mode DIRECTLY to final_report (skip labor_confirmation)
+            currentMode = "final_report";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            
+            // Emit mode change event
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
+            
+            // Add a visual separator
+            const separator = "\n\n";
+            for (const char of separator) {
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            // Check for any explicit labor override in message history
+            const laborEntry = getLaborEntry(ensuredCase.id);
+            const laborOverride = laborEntry?.confirmedHours ?? laborEntry?.estimatedHours;
+            const laborConstraint = laborOverride 
+              ? `LABOR CONSTRAINT: Use exactly ${laborOverride} hours as the total labor estimate.`
+              : `LABOR ESTIMATE: Include a best-effort labor estimate based on the repair complexity. Format: "Estimated total labor: X.X hours"`;
+            
+            // Generate final report directly (no labor confirmation step)
+            const finalPrompt = composePromptV2({
+              mode: "final_report",
+              inputDetected: inputLanguage.detected,
+              outputEffective: outputPolicy.effective,
+              includeTranslation: langPolicy.includeTranslation,
+              translationLanguage: langPolicy.translationLanguage,
+              additionalConstraints: laborConstraint,
             });
-            // Set fallback estimate
-            setLaborEstimate(ensuredCase.id, 1.0);
-            full = transitionResult.cleanedResponse + separator + fallback;
+            
+            const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+            const factLock = buildFactLockConstraint(updatedHistory);
+            
+            const finalBody = {
+              model: "gpt-4o-mini",
+              stream: false,
+              temperature: 0.2,
+              messages: buildOpenAiMessages({
+                system: finalPrompt + (factLock ? `\n\n${factLock}` : ""),
+                history: updatedHistory,
+                userMessage: "Generate the Portal/Cause output with labor estimate based on the diagnostic findings.",
+                attachments: undefined,
+              }),
+            };
+            
+            const finalResult = await callOpenAI(apiKey, finalBody, ac.signal);
+            
+            if (!finalResult.error && finalResult.response.trim()) {
+              const finalContent = finalResult.response;
+              
+              // Extract and store the estimated hours (for records)
+              const estimatedHours = extractLaborEstimate(finalContent);
+              if (estimatedHours) {
+                setLaborEstimate(ensuredCase.id, estimatedHours);
+                console.log(`[Chat API v2] Labor estimate extracted: ${estimatedHours} hr`);
+              }
+              
+              // Stream the final report
+              for (const char of finalContent) {
+                if (aborted) break;
+                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              }
+              
+              // Save the final report message
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: finalContent,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+              
+              full = transitionResult.cleanedResponse + separator + finalContent;
+            } else if (finalResult.error) {
+              console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
+              // Use fallback
+              const fallback = getSafeFallback("final_report", outputPolicy.effective);
+              for (const char of fallback) {
+                if (aborted) break;
+                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              }
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: fallback,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+              full = transitionResult.cleanedResponse + separator + fallback;
+            }
           }
         } else if (currentMode === "labor_confirmation" && !aborted) {
           // ========================================
