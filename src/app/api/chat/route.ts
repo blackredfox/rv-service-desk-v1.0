@@ -953,7 +953,8 @@ Generate the complete Portal-Cause report now.`;
               full = fallback;
             }
           } else {
-            // Could not parse confirmation — ask again
+            // Could not parse confirmation — NON-BLOCKING: allow technician to respond or continue
+            // Instead of blocking, let the LLM handle the response naturally
             full = enforceLanguagePolicy(full, langPolicy);
             for (const char of full) {
               if (aborted) break;
@@ -969,6 +970,14 @@ Generate the complete Portal-Cause report now.`;
                 userId: user?.id,
               });
             }
+            
+            // Emit non-blocking labor hint
+            controller.enqueue(encoder.encode(sseEncode({ 
+              type: "labor_status", 
+              status: "draft",
+              estimatedHours: laborEntry?.estimatedHours,
+              message: "Labor estimate is a draft. Confirm, adjust, or continue diagnostics."
+            })));
           }
         } else {
           // No transition - apply output-layer enforcement before streaming
