@@ -136,12 +136,11 @@ describe("Mechanical Step Check — Required Before Isolation", () => {
     expect(result.complete).toBe(true);
   });
 
-  it("getNextMechanicalStep returns the pending mechanical step when prerequisites met", async () => {
+  it("getNextMechanicalStep returns mechanical step with no prerequisites first", async () => {
     const { 
       initializeCase, 
       getNextMechanicalStep, 
       clearRegistry,
-      markStepCompleted,
     } = await import("@/lib/diagnostic-registry");
     
     const caseId = "next-mech-step-test";
@@ -149,16 +148,12 @@ describe("Mechanical Step Check — Required Before Isolation", () => {
     
     initializeCase(caseId, "ceiling fan motor not running");
     
-    // Complete prerequisites for e12_6 (e12_5)
-    markStepCompleted(caseId, "e12_1");
-    markStepCompleted(caseId, "e12_5");
-    
-    // Now e12_6 should be available
+    // Don't complete anything - e12_7 has no prerequisites
     const nextMech = getNextMechanicalStep(caseId);
     
-    // Note: e12_7 has no prerequisites, so it might come first
-    // Let's just check that we get a mechanical step
+    // e12_7 has no prerequisites, so it should be available
     expect(nextMech).not.toBeNull();
+    expect(nextMech?.id).toBe("e12_7");
     expect(nextMech?.mechanicalCheck).toBe(true);
   });
 
