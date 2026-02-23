@@ -383,13 +383,15 @@ export async function POST(req: Request) {
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
   // ========================================
-  // DIAGNOSTIC REGISTRY: track answered topics + detect key findings
+  // CONTEXT ENGINE: single source of diagnostic flow control
   // ========================================
   let registryConstraint = "";
   let pivotTriggered = false;
+  let engineResult: ContextEngineResult | null = null;
+  let contextEngineDirectives = "";
 
   if (currentMode === "diagnostic") {
-    // Initialize procedure on first diagnostic message
+    // Initialize procedure on first diagnostic message (legacy, keep for procedure tracking)
     const initResult = initializeCase(ensuredCase.id, message);
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
       console.log(`[Chat API v2] Procedure: ${initResult.procedure.displayName}, pre-completed steps: ${initResult.preCompletedSteps.join(", ")}`);
@@ -397,29 +399,45 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Procedure: ${initResult.system}`);
     }
 
-    const regResult = processUserMessage(ensuredCase.id, message);
+    // Process message through Context Engine (BEFORE LLM invocation)
+    engineResult = processContextMessage(ensuredCase.id, message, DEFAULT_CONFIG);
     
-    if (regResult.howToCheckRequested) {
-      console.log(`[Chat API v2] Technician asked "how to check?" — will provide guidance without advancing step`);
+    // Log context engine decision
+    console.log(`[Chat API v2] Context Engine: intent=${engineResult.intent.type}, submode=${engineResult.context.submode}, stateChanged=${engineResult.stateChanged}`);
+    
+    if (engineResult.notices.length > 0) {
+      console.log(`[Chat API v2] Context Engine notices: ${engineResult.notices.join(", ")}`);
     }
-    if (regResult.keyFinding) {
-      console.log(`[Chat API v2] Key finding detected: "${regResult.keyFinding}" — will pivot`);
-    }
-    if (regResult.alreadyAnswered) {
-      console.log(`[Chat API v2] Technician indicated already-answered`);
-    }
-    if (regResult.newUnable.length > 0) {
-      console.log(`[Chat API v2] Unable-to-verify topics: ${regResult.newUnable.join(", ")}`);
+
+    // Handle replan state
+    if (isInReplanState(engineResult.context)) {
+      console.log(`[Chat API v2] REPLAN triggered: ${engineResult.context.replanReason}`);
+      pivotTriggered = false; // Reset pivot if we're replanning
     }
     
-    // Check if we should pivot immediately
-    const pivotCheck = shouldPivot(ensuredCase.id);
-    if (pivotCheck.pivot) {
+    // Handle clarification subflows
+    if (isInClarificationSubflow(engineResult.context)) {
+      console.log(`[Chat API v2] Clarification subflow: ${engineResult.context.submode}`);
+    }
+    
+    // Check for key finding pivot (from context engine)
+    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
       pivotTriggered = true;
-      console.log(`[Chat API v2] Pivot triggered by: "${pivotCheck.finding}"`);
+      console.log(`[Chat API v2] Pivot triggered by isolation: "${engineResult.context.isolationFinding}"`);
     }
     
-    // Build registry context for injection into prompt
+    // Build context engine directives for prompt injection
+    const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
+    const replanNotice = buildReplanNotice(engineResult.context);
+    const clarificationInstruction = buildReturnToMainInstruction(engineResult.context);
+    
+    contextEngineDirectives = [
+      ...antiLoopDirectives,
+      replanNotice,
+      clarificationInstruction,
+    ].filter(Boolean).join("\n\n");
+    
+    // Build legacy registry context (for backward compat - to be phased out)
     registryConstraint = buildRegistryContext(ensuredCase.id);
   }
 
