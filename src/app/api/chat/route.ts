@@ -35,11 +35,31 @@ import {
   validateLaborSum,
 } from "@/lib/labor-store";
 import {
-  processUserMessage,
+  // Legacy diagnostic-registry (keeping for backward compat during transition)
   buildRegistryContext,
-  shouldPivot,
   initializeCase,
 } from "@/lib/diagnostic-registry";
+import {
+  // Context Engine - single source of diagnostic flow control
+  processMessage as processContextMessage,
+  recordAgentAction,
+  getOrCreateContext,
+  getContext,
+  markIsolationComplete,
+  isInReplanState,
+  clearReplanState,
+  generateAntiLoopDirectives,
+  buildReplanNotice,
+  isInClarificationSubflow,
+  buildReturnToMainInstruction,
+  buildClarificationContext,
+  popTopic,
+  updateContext,
+  isFallbackResponse,
+  type ContextEngineResult,
+  type DiagnosticContext,
+  DEFAULT_CONFIG,
+} from "@/lib/context-engine";
 import { buildFactLockConstraint } from "@/lib/fact-pack";
 
 export const runtime = "nodejs";
@@ -363,13 +383,15 @@ export async function POST(req: Request) {
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
   // ========================================
-  // DIAGNOSTIC REGISTRY: track answered topics + detect key findings
+  // CONTEXT ENGINE: single source of diagnostic flow control
   // ========================================
   let registryConstraint = "";
   let pivotTriggered = false;
+  let engineResult: ContextEngineResult | null = null;
+  let contextEngineDirectives = "";
 
   if (currentMode === "diagnostic") {
-    // Initialize procedure on first diagnostic message
+    // Initialize procedure on first diagnostic message (legacy, keep for procedure tracking)
     const initResult = initializeCase(ensuredCase.id, message);
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
       console.log(`[Chat API v2] Procedure: ${initResult.procedure.displayName}, pre-completed steps: ${initResult.preCompletedSteps.join(", ")}`);
@@ -377,29 +399,45 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Procedure: ${initResult.system}`);
     }
 
-    const regResult = processUserMessage(ensuredCase.id, message);
+    // Process message through Context Engine (BEFORE LLM invocation)
+    engineResult = processContextMessage(ensuredCase.id, message, DEFAULT_CONFIG);
     
-    if (regResult.howToCheckRequested) {
-      console.log(`[Chat API v2] Technician asked "how to check?" — will provide guidance without advancing step`);
+    // Log context engine decision
+    console.log(`[Chat API v2] Context Engine: intent=${engineResult.intent.type}, submode=${engineResult.context.submode}, stateChanged=${engineResult.stateChanged}`);
+    
+    if (engineResult.notices.length > 0) {
+      console.log(`[Chat API v2] Context Engine notices: ${engineResult.notices.join(", ")}`);
     }
-    if (regResult.keyFinding) {
-      console.log(`[Chat API v2] Key finding detected: "${regResult.keyFinding}" — will pivot`);
-    }
-    if (regResult.alreadyAnswered) {
-      console.log(`[Chat API v2] Technician indicated already-answered`);
-    }
-    if (regResult.newUnable.length > 0) {
-      console.log(`[Chat API v2] Unable-to-verify topics: ${regResult.newUnable.join(", ")}`);
+
+    // Handle replan state
+    if (isInReplanState(engineResult.context)) {
+      console.log(`[Chat API v2] REPLAN triggered: ${engineResult.context.replanReason}`);
+      pivotTriggered = false; // Reset pivot if we're replanning
     }
     
-    // Check if we should pivot immediately
-    const pivotCheck = shouldPivot(ensuredCase.id);
-    if (pivotCheck.pivot) {
+    // Handle clarification subflows
+    if (isInClarificationSubflow(engineResult.context)) {
+      console.log(`[Chat API v2] Clarification subflow: ${engineResult.context.submode}`);
+    }
+    
+    // Check for key finding pivot (from context engine)
+    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
       pivotTriggered = true;
-      console.log(`[Chat API v2] Pivot triggered by: "${pivotCheck.finding}"`);
+      console.log(`[Chat API v2] Pivot triggered by isolation: "${engineResult.context.isolationFinding}"`);
     }
     
-    // Build registry context for injection into prompt
+    // Build context engine directives for prompt injection
+    const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
+    const replanNotice = buildReplanNotice(engineResult.context);
+    const clarificationInstruction = buildReturnToMainInstruction(engineResult.context);
+    
+    contextEngineDirectives = [
+      ...antiLoopDirectives,
+      replanNotice,
+      clarificationInstruction,
+    ].filter(Boolean).join("\n\n");
+    
+    // Build legacy registry context (for backward compat - to be phased out)
     registryConstraint = buildRegistryContext(ensuredCase.id);
   }
 
@@ -416,8 +454,8 @@ export async function POST(req: Request) {
   // - outputEffective: what language assistant must respond in
   // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
-  // Compose system prompt: combine registry context + fact lock as additionalConstraints
-  const additionalConstraints = [registryConstraint, factLockConstraint]
+  // Compose system prompt: combine registry context + fact lock + context engine directives
+  const additionalConstraints = [registryConstraint, factLockConstraint, contextEngineDirectives]
     .filter(Boolean)
     .join("\n\n") || undefined;
 
@@ -533,6 +571,38 @@ export async function POST(req: Request) {
         }
 
         full = result.response;
+
+        // ========================================
+        // CONTEXT ENGINE: Record agent action (AFTER LLM response)
+        // ========================================
+        if (currentMode === "diagnostic" && engineResult) {
+          // Determine action type based on response content
+          const actionType = isFallbackResponse(full) ? "fallback" : 
+                            engineResult.context.submode !== "main" ? "clarification" : "question";
+          
+          recordAgentAction(ensuredCase.id, {
+            type: actionType,
+            content: full.slice(0, 200), // Truncate for storage
+            stepId: engineResult.context.activeStepId || undefined,
+            submode: engineResult.context.submode,
+          }, DEFAULT_CONFIG);
+          
+          console.log(`[Chat API v2] Context Engine: recorded action type=${actionType}`);
+          
+          // Clear replan state after acknowledgment
+          if (isInReplanState(engineResult.context)) {
+            const updatedCtx = clearReplanState(engineResult.context);
+            updateContext(updatedCtx);
+            console.log(`[Chat API v2] Context Engine: cleared replan state`);
+          }
+          
+          // Pop clarification topic if agent provided the clarification
+          if (isInClarificationSubflow(engineResult.context)) {
+            const updatedCtx = popTopic(engineResult.context);
+            updateContext(updatedCtx);
+            console.log(`[Chat API v2] Context Engine: popped clarification topic, returning to main`);
+          }
+        }
 
         // ========================================
         // PIVOT CHECK: key finding forces early transition
@@ -729,13 +799,51 @@ export async function POST(req: Request) {
           }
         } else if (currentMode === "labor_confirmation" && !aborted) {
           // ========================================
-          // LABOR CONFIRMATION → FINAL REPORT
+          // LABOR CONFIRMATION → FINAL REPORT (NON-BLOCKING)
           // ========================================
           // Parse technician's response for labor confirmation/override
           const laborEntry = getLaborEntry(ensuredCase.id);
           const confirmedHours = parseLaborConfirmation(message, laborEntry?.estimatedHours);
           
-          if (confirmedHours) {
+          // Check if technician wants to continue diagnostics (non-blocking labor)
+          const continuePatterns = [
+            /(?:continue|back\s+to|return\s+to)\s+diagnostic/i,
+            /(?:more\s+)?(?:check|test|verify|diagnose)/i,
+            /(?:wait|hold|not\s+ready|skip)/i,
+            /(?:продолж|вернуться|проверить|подожд)/i,
+            /(?:continuar|volver|verificar|espera)/i,
+          ];
+          const wantsContinueDiagnostics = continuePatterns.some(p => p.test(message));
+          
+          if (wantsContinueDiagnostics) {
+            // NON-BLOCKING: Allow return to diagnostics
+            console.log(`[Chat API v2] Labor confirmation: technician wants to continue diagnostics (non-blocking)`);
+            currentMode = "diagnostic";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+            
+            // Stream acknowledgment and return to diagnostic flow
+            const acknowledgment = outputPolicy.effective === "RU" 
+              ? "Понял. Продолжаем диагностику."
+              : outputPolicy.effective === "ES"
+              ? "Entendido. Continuamos con el diagnóstico."
+              : "Understood. Returning to diagnostics.";
+            
+            for (const char of acknowledgment) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: acknowledgment,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+            
+            full = acknowledgment;
+          } else if (confirmedHours) {
             confirmLabor(ensuredCase.id, confirmedHours);
             console.log(`[Chat API v2] Labor confirmed: ${confirmedHours} hr (estimate was ${laborEntry?.estimatedHours ?? "unknown"})`);
             
@@ -845,7 +953,8 @@ Generate the complete Portal-Cause report now.`;
               full = fallback;
             }
           } else {
-            // Could not parse confirmation — ask again
+            // Could not parse confirmation — NON-BLOCKING: allow technician to respond or continue
+            // Instead of blocking, let the LLM handle the response naturally
             full = enforceLanguagePolicy(full, langPolicy);
             for (const char of full) {
               if (aborted) break;
@@ -861,6 +970,14 @@ Generate the complete Portal-Cause report now.`;
                 userId: user?.id,
               });
             }
+            
+            // Emit non-blocking labor hint
+            controller.enqueue(encoder.encode(sseEncode({ 
+              type: "labor_status", 
+              status: "draft",
+              estimatedHours: laborEntry?.estimatedHours,
+              message: "Labor estimate is a draft. Confirm, adjust, or continue diagnostics."
+            })));
           }
         } else {
           // No transition - apply output-layer enforcement before streaming

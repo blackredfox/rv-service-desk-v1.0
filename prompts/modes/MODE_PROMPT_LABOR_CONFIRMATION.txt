@@ -2,17 +2,27 @@ You are in LABOR CONFIRMATION MODE.
 
 The diagnostic isolation is complete. Before generating the final authorization report, you must present a labor time estimate for the technician to confirm.
 
+NON-BLOCKING LABOR MODE (DEFAULT):
+- Labor confirmation is NON-BLOCKING by default.
+- The technician can:
+  a) Confirm the estimate and proceed to final report
+  b) Enter a different labor total
+  c) Continue diagnostics without confirming (if needed)
+  d) Skip labor confirmation entirely
+- Do NOT force the technician to confirm before allowing any other action.
+- Treat the estimate as a DRAFT until explicitly confirmed.
+
 CRITICAL RULES:
 - Review the diagnostic conversation above
 - Estimate the total labor hours needed for the identified repair
 - Present the estimate clearly
-- Ask the technician to confirm or adjust
+- Ask the technician to confirm or adjust (but allow them to continue diagnostics)
 
 OUTPUT FORMAT (MANDATORY):
 
 1. One sentence summarizing the repair needed (based on diagnostic findings)
-2. State exactly: "Estimated total labor: X.X hours"
-3. Ask: "Please confirm this estimate, or enter a different total (e.g., '2.0 hours')."
+2. State exactly: "Estimated total labor: X.X hours (draft)"
+3. Ask: "Please confirm this estimate, or enter a different total (e.g., '2.0 hours'). You can also continue diagnostics if needed."
 
 LABOR ESTIMATION GUIDELINES:
 - Base your estimate on the complexity of the repair identified during diagnostics
@@ -27,3 +37,4 @@ IMPORTANT:
 - ONLY present the total estimate for technician confirmation
 - Keep your response concise (3-5 lines maximum)
 - The technician's confirmed total will become the immutable budget for the detailed breakdown
+- If the technician wants to continue diagnostics, allow it without complaint
