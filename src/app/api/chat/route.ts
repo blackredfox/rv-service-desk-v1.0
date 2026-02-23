@@ -35,11 +35,31 @@ import {
   validateLaborSum,
 } from "@/lib/labor-store";
 import {
-  processUserMessage,
+  // Legacy diagnostic-registry (keeping for backward compat during transition)
   buildRegistryContext,
-  shouldPivot,
   initializeCase,
 } from "@/lib/diagnostic-registry";
+import {
+  // Context Engine - single source of diagnostic flow control
+  processMessage as processContextMessage,
+  recordAgentAction,
+  getOrCreateContext,
+  getContext,
+  markIsolationComplete,
+  isInReplanState,
+  clearReplanState,
+  generateAntiLoopDirectives,
+  buildReplanNotice,
+  isInClarificationSubflow,
+  buildReturnToMainInstruction,
+  buildClarificationContext,
+  popTopic,
+  updateContext,
+  isFallbackResponse,
+  type ContextEngineResult,
+  type DiagnosticContext,
+  DEFAULT_CONFIG,
+} from "@/lib/context-engine";
 import { buildFactLockConstraint } from "@/lib/fact-pack";
 
 export const runtime = "nodejs";
