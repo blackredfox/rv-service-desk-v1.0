@@ -399,7 +399,7 @@ reg({
   steps: [
     { id: "so_1", question: "When slide-out is activated, motor running? Any noise?", prerequisites: [], matchPatterns: [/(?:slide|motor).*(?:run|noise|nothing|dead|hum)/i] },
     { id: "so_2", question: "If motor runs, does slide move at all? In or out?", prerequisites: ["so_1"], matchPatterns: [/slide.*(?:move|stuck|partial|in|out|no)/i] },
-    { id: "so_3", question: "Apply 12V directly to motor terminals — motor operates when powered directly?", prerequisites: ["so_1"], matchPatterns: [/(?:direct|12v|motor).*(?:operate|run|work|no|yes)/i] },
+    { id: "so_3", question: "Apply 12V directly to motor terminals — motor operates when powered directly?", prerequisites: ["so_1"], matchPatterns: [/(?:direct|12v|motor).*(?:operate|run|work|no|yes)/i], mechanicalCheck: true },
     { id: "so_4", question: "Gear mechanism engaged properly? Stripped or missing teeth?", prerequisites: ["so_2"], matchPatterns: [/gear.*(?:engaged|stripped|teeth|ok|miss)/i] },
     { id: "so_5", question: "Controller sending signal? Voltage at motor connector when activated?", prerequisites: ["so_1"], matchPatterns: [/controller.*(?:signal|voltage|\d+|yes|no)/i] },
     { id: "so_6", question: "Obstructions in slide track? Debris or bent rails?", prerequisites: [], matchPatterns: [/(?:obstruct|debris|bent|track|rail).*(?:yes|no|clear)/i] },
