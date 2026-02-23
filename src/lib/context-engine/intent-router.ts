@@ -54,11 +54,16 @@ const HOWTO_PATTERNS = [
 ];
 
 // New evidence patterns - triggers replan
+// NOTE: Order matters - more specific patterns first
 const NEW_EVIDENCE_PATTERNS: Array<{ pattern: RegExp; type: EvidenceType }> = [
-  // Physical damage (English)
+  // Specific physical damage patterns (check first)
+  { pattern: /refrigerant\s+leak/i, type: "physical_damage" },
+  { pattern: /leak\s+(?:on|at|in)\s+(?:the\s+)?(?:coil|evaporator|condenser|line)/i, type: "physical_damage" },
+  { pattern: /(?:capacitor|cap)\s+(?:looks?|is|appears?)\s+(?:bulged|bulging|swollen|leaking|burnt|damaged)/i, type: "physical_damage" },
+  
+  // Physical damage (English) - general patterns
   { pattern: /(?:found|discovered|noticed|see|saw|there'?s)\s+(?:a|the)?\s*(?:hole|leak|crack|burn|damage|corrosion|loose|broken|melted|burnt)/i, type: "physical_damage" },
   { pattern: /(?:it'?s|looks?|is)\s+(?:cracked|burnt|melted|corroded|damaged|broken|leaking|bulged|bulging|swollen)/i, type: "physical_damage" },
-  { pattern: /(?:capacitor|cap)\s+(?:looks?|is|appears?)\s+(?:bulged|bulging|swollen|leaking|burnt|damaged)/i, type: "physical_damage" },
   // Physical damage (Russian)
   { pattern: /(?:нашёл|нашел|обнаружил|заметил|вижу)\s+(?:дыр|утечк|трещин|повреж|корроз)/i, type: "physical_damage" },
   // Physical damage (Spanish)
@@ -72,7 +77,7 @@ const NEW_EVIDENCE_PATTERNS: Array<{ pattern: RegExp; type: EvidenceType }> = [
   { pattern: /(?:that'?s\s+not|can'?t\s+be|doesn'?t\s+make\s+sense|are\s+you\s+sure|that'?s\s+wrong)/i, type: "technician_dispute" },
   { pattern: /(?:I\s+don'?t\s+(?:think|agree)|no\s+way|impossible)/i, type: "technician_dispute" },
   
-  // New observation
+  // New observation (check last - least specific)
   { pattern: /(?:I\s+also|also\s+noticed|another\s+thing|by\s+the\s+way|oh\s+and)/i, type: "new_observation" },
   { pattern: /(?:wait|hold\s+on|actually)\s*[,.]?\s*(?:I|there)/i, type: "new_observation" },
 ];
