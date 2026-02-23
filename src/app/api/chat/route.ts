@@ -548,9 +548,28 @@ export async function POST(req: Request) {
     
     // ── FLOW DECISION: Pivot ──
     // Isolation/pivot is controlled ONLY by Context Engine
+    // BUT we MUST check mechanical steps are complete first
     if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
-      pivotTriggered = true;
-      console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
+      // Check if mechanical checks are done
+      const mechanicalCheck = areMechanicalChecksComplete(ensuredCase.id);
+      
+      if (!mechanicalCheck.complete && mechanicalCheck.pendingStep) {
+        // Mechanical check pending — DO NOT pivot yet
+        console.log(`[Chat API v2] Pivot BLOCKED — mechanical check pending: ${mechanicalCheck.pendingStep.id}`);
+        pivotTriggered = false;
+        
+        // Add directive to ask the mechanical step
+        contextEngineDirectives = [
+          `MECHANICAL CHECK REQUIRED (MUST ASK BEFORE PORTAL):`,
+          `The following step MUST be completed before isolation can be confirmed:`,
+          `- Step ${mechanicalCheck.pendingStep.id}: "${mechanicalCheck.pendingStep.question}"`,
+          `Ask this question NOW. Do not proceed to Portal/Final Report until this is answered.`,
+          contextEngineDirectives,
+        ].filter(Boolean).join("\n\n");
+      } else {
+        pivotTriggered = true;
+        console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
+      }
     }
     
     // ── BUILD DIRECTIVES: Anti-loop, replan, clarification ──
