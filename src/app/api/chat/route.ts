@@ -393,50 +393,84 @@ export async function POST(req: Request) {
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
   // ========================================
-  // CONTEXT ENGINE: single source of diagnostic flow control
+  // CONTEXT ENGINE: SINGLE FLOW AUTHORITY
   // ========================================
-  let registryConstraint = "";
+  // All diagnostic flow decisions come from Context Engine.
+  // Legacy registry is used ONLY as a data provider for step metadata.
+  
+  let procedureContext = "";  // Step metadata from registry (data only)
   let pivotTriggered = false;
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
 
   if (currentMode === "diagnostic") {
-    // Initialize procedure on first diagnostic message (legacy, keep for procedure tracking)
+    // ── STRICT MODE GUARD ──
+    if (!STRICT_CONTEXT_ENGINE) {
+      console.error("[Chat API v2] STRICT_CONTEXT_ENGINE is disabled — this is not supported in production");
+    }
+    
+    // ── DATA PROVIDER: Initialize procedure catalog ──
+    // This ONLY provides step metadata; it does NOT control flow
     const initResult = initializeCase(ensuredCase.id, message);
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
-      console.log(`[Chat API v2] Procedure: ${initResult.procedure.displayName}, pre-completed steps: ${initResult.preCompletedSteps.join(", ")}`);
+      console.log(`[Chat API v2] Procedure catalog: ${initResult.procedure.displayName}, initial steps: ${initResult.preCompletedSteps.join(", ")}`);
+      // Sync pre-completed steps to Context Engine
+      for (const stepId of initResult.preCompletedSteps) {
+        markContextStepCompleted(ensuredCase.id, stepId);
+      }
     } else if (initResult.system) {
-      console.log(`[Chat API v2] Procedure: ${initResult.system}`);
+      console.log(`[Chat API v2] Procedure catalog: ${initResult.system}`);
     }
 
+    // ── FLOW AUTHORITY: Context Engine ──
     // Process message through Context Engine (BEFORE LLM invocation)
     engineResult = processContextMessage(ensuredCase.id, message, DEFAULT_CONFIG);
     
-    // Log context engine decision
+    // Validate engine result (strict guard)
+    if (!engineResult || !engineResult.context) {
+      console.error("[Chat API v2] CRITICAL: Context Engine returned invalid result — using safe fallback");
+      // Safe controlled response instead of legacy fallback
+      engineResult = {
+        context: getOrCreateContext(ensuredCase.id) as DiagnosticContext,
+        intent: { type: "UNCLEAR" },
+        responseInstructions: {
+          action: "ask_step",
+          constraints: ["Context Engine error — ask a safe diagnostic question"],
+          antiLoopDirectives: ["FORWARD PROGRESS: Move to next available step"],
+        },
+        stateChanged: false,
+        notices: ["Context Engine error — safe fallback activated"],
+      };
+    }
+    
+    // Log context engine decision (SINGLE SOURCE OF TRUTH)
     console.log(`[Chat API v2] Context Engine: intent=${engineResult.intent.type}, submode=${engineResult.context.submode}, stateChanged=${engineResult.stateChanged}`);
     
     if (engineResult.notices.length > 0) {
       console.log(`[Chat API v2] Context Engine notices: ${engineResult.notices.join(", ")}`);
     }
 
-    // Handle replan state
+    // ── FLOW DECISION: Replan ──
+    // Replan is controlled ONLY by Context Engine
     if (isInReplanState(engineResult.context)) {
-      console.log(`[Chat API v2] REPLAN triggered: ${engineResult.context.replanReason}`);
-      pivotTriggered = false; // Reset pivot if we're replanning
+      console.log(`[Chat API v2] REPLAN triggered (Context Engine): ${engineResult.context.replanReason}`);
+      pivotTriggered = false; // Reset pivot — we're replanning
     }
     
-    // Handle clarification subflows
+    // ── FLOW DECISION: Clarification ──
+    // Clarification subflows are controlled ONLY by Context Engine
     if (isInClarificationSubflow(engineResult.context)) {
-      console.log(`[Chat API v2] Clarification subflow: ${engineResult.context.submode}`);
+      console.log(`[Chat API v2] Clarification subflow (Context Engine): ${engineResult.context.submode}`);
     }
     
-    // Check for key finding pivot (from context engine)
+    // ── FLOW DECISION: Pivot ──
+    // Isolation/pivot is controlled ONLY by Context Engine
     if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
       pivotTriggered = true;
-      console.log(`[Chat API v2] Pivot triggered by isolation: "${engineResult.context.isolationFinding}"`);
+      console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
     }
     
-    // Build context engine directives for prompt injection
+    // ── BUILD DIRECTIVES: Anti-loop, replan, clarification ──
     const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
     const replanNotice = buildReplanNotice(engineResult.context);
     const clarificationInstruction = buildReturnToMainInstruction(engineResult.context);
@@ -447,8 +481,9 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
     
-    // Build legacy registry context (for backward compat - to be phased out)
-    registryConstraint = buildRegistryContext(ensuredCase.id);
+    // ── DATA PROVIDER: Step metadata context ──
+    // This provides step text/questions to the LLM; it does NOT control flow
+    procedureContext = buildRegistryContext(ensuredCase.id);
   }
 
   // ========================================
