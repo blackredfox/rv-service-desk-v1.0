@@ -58,22 +58,24 @@
 | `src/lib/context-engine/context-engine.ts` | 3 | Main orchestrator |
 | `tests/context-engine.test.ts` | 3 | 26 tests for context engine |
 | `tests/context-engine-integration.test.ts` | 3 | 9 integration tests for route.ts wiring |
+| `tests/route-strictness.test.ts` | 3 | 13 tests ensuring strict context engine mode |
 
 ## Test Results
-- **568 tests across 38 test files**
-- **557 PASSING** (35 context-engine tests: 26 unit + 9 integration)
+- **581 tests across 39 test files**
+- **570 PASSING** (48 context-engine tests: 26 unit + 9 integration + 13 strictness)
 - **11 pre-existing failures** (language-detection + prisma-retention — out of scope)
 
 ## Backlog
-- P0: None — Context Engine is now production-active
-- P1: Phase out legacy diagnostic-registry direct calls (currently kept for backward compat)
+- P0: None — Context Engine is single flow authority (STRICT_CONTEXT_ENGINE=true)
+- P1: Persist context to database (Prisma) for serverless cold starts
 - P1: Add `labor_confirmation` to Prisma CaseMode enum for full DB persistence
 - P1: Integrate FINDING_META into route.ts for actionHint injection into prompts
 - P2: Fix pre-existing jsdom environment issue for DOM tests (5 test files)
 - P2: Expand action-first refactor to other procedures (furnace, roof_ac, etc.)
+- P2: Remove deprecated legacy functions from diagnostic-registry (cleanup)
 - P3: Add procedure-variant support (ADVANCED procedures for complex systems)
 
 ## Next Tasks
 - Live integration testing with actual OpenAI calls to verify end-to-end behavior
-- Phase out legacy processUserMessage() calls in favor of context-engine
+- Context persistence to database for serverless environments
 - Expand serviceability classification to cover all procedures
