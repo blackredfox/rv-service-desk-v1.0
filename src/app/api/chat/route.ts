@@ -30,7 +30,6 @@ import {
   getLaborEntry,
   extractLaborEstimate,
   parseLaborConfirmation,
-  validateLaborSum,
 } from "@/lib/labor-store";
 import {
   // Diagnostic Registry — DATA PROVIDER ONLY (not flow authority)
@@ -39,7 +38,6 @@ import {
   initializeCase,
   buildRegistryContext,
   areMechanicalChecksComplete,
-  getNextMechanicalStep,
 } from "@/lib/diagnostic-registry";
 import {
   // Context Engine — SINGLE FLOW AUTHORITY
@@ -1075,7 +1073,7 @@ export async function POST(req: Request) {
           const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
           
           if (!finalResult.error && finalResult.response.trim()) {
-            let finalContent = enforceLanguagePolicy(finalResult.response, langPolicy);
+            const finalContent = enforceLanguagePolicy(finalResult.response, langPolicy);
             
             for (const char of finalContent) {
               if (aborted) break;
