@@ -1003,37 +1003,81 @@ export async function POST(req: Request) {
           }
         } else if (currentMode === "labor_confirmation" && !aborted) {
           // ========================================
-          // LABOR CONFIRMATION → FINAL REPORT (NON-BLOCKING)
+          // LEGACY LABOR_CONFIRMATION HANDLER
           // ========================================
-          // Parse technician's response for labor confirmation/override
+          // This mode should no longer be entered (we skip directly to final_report).
+          // However, if a case is stuck in this mode, handle it gracefully.
+          
           const laborEntry = getLaborEntry(ensuredCase.id);
-          const confirmedHours = parseLaborConfirmation(message, laborEntry?.estimatedHours);
           
-          // Check if technician wants to continue diagnostics (non-blocking labor)
-          const continuePatterns = [
-            /(?:continue|back\s+to|return\s+to)\s+diagnostic/i,
-            /(?:more\s+)?(?:check|test|verify|diagnose)/i,
-            /(?:wait|hold|not\s+ready|skip)/i,
-            /(?:продолж|вернуться|проверить|подожд)/i,
-            /(?:continuar|volver|verificar|espera)/i,
+          // Check for explicit labor override in message
+          const laborOverridePatterns = [
+            /(?:set\s+)?labor\s+(?:to\s+)?(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h)?/i,
+            /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h)\s*(?:total|labor)/i,
+            /change\s+labor\s+to\s+(\d+(?:\.\d+)?)/i,
           ];
-          const wantsContinueDiagnostics = continuePatterns.some(p => p.test(message));
           
-          if (wantsContinueDiagnostics) {
-            // NON-BLOCKING: Allow return to diagnostics
-            console.log(`[Chat API v2] Labor confirmation: technician wants to continue diagnostics (non-blocking)`);
-            currentMode = "diagnostic";
-            await storage.updateCase(ensuredCase.id, { mode: currentMode });
-            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+          let laborOverride: number | null = null;
+          for (const pattern of laborOverridePatterns) {
+            const match = message.match(pattern);
+            if (match) {
+              laborOverride = parseFloat(match[1]);
+              if (laborOverride > 0 && laborOverride <= 20) break;
+              laborOverride = null;
+            }
+          }
+          
+          // Also try the standard parser
+          if (!laborOverride) {
+            laborOverride = parseLaborConfirmation(message, laborEntry?.estimatedHours);
+          }
+          
+          // Store override if found
+          if (laborOverride) {
+            confirmLabor(ensuredCase.id, laborOverride);
+            console.log(`[Chat API v2] Labor override stored: ${laborOverride} hr`);
+          }
+          
+          // Transition directly to final_report (no more confirmation loop)
+          console.log(`[Chat API v2] Legacy labor_confirmation → final_report (no confirmation loop)`);
+          currentMode = "final_report";
+          await storage.updateCase(ensuredCase.id, { mode: currentMode });
+          controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+          
+          // Generate final report
+          const effectiveLaborHours = laborOverride ?? laborEntry?.confirmedHours ?? laborEntry?.estimatedHours ?? 1.0;
+          const laborConstraint = `LABOR CONSTRAINT: Use exactly ${effectiveLaborHours} hours as the total labor estimate.`;
+          
+          const updatedHistoryForReport = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+          const factLock = buildFactLockConstraint(updatedHistoryForReport);
+          
+          const finalReportPrompt = composePromptV2({
+            mode: currentMode,
+            inputDetected: inputLanguage.detected,
+            outputEffective: outputPolicy.effective,
+            includeTranslation: langPolicy.includeTranslation,
+            translationLanguage: langPolicy.translationLanguage,
+            additionalConstraints: `${laborConstraint}\n\n${factLock}`,
+          });
+          
+          const finalReportBody = {
+            model: "gpt-4o-mini",
+            stream: false,
+            temperature: 0.2,
+            messages: buildOpenAiMessages({
+              system: finalReportPrompt,
+              history: updatedHistoryForReport,
+              userMessage: "Generate the Portal/Cause output with labor estimate.",
+              attachments: undefined,
+            }),
+          };
+          
+          const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
+          
+          if (!finalResult.error && finalResult.response.trim()) {
+            let finalContent = enforceLanguagePolicy(finalResult.response, langPolicy);
             
-            // Stream acknowledgment and return to diagnostic flow
-            const acknowledgment = outputPolicy.effective === "RU" 
-              ? "Понял. Продолжаем диагностику."
-              : outputPolicy.effective === "ES"
-              ? "Entendido. Continuamos con el diagnóstico."
-              : "Understood. Returning to diagnostics.";
-            
-            for (const char of acknowledgment) {
+            for (const char of finalContent) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
             }
@@ -1041,147 +1085,19 @@ export async function POST(req: Request) {
             await storage.appendMessage({
               caseId: ensuredCase.id,
               role: "assistant",
-              content: acknowledgment,
+              content: finalContent,
               language: outputPolicy.effective,
               userId: user?.id,
             });
             
-            full = acknowledgment;
-          } else if (confirmedHours) {
-            confirmLabor(ensuredCase.id, confirmedHours);
-            console.log(`[Chat API v2] Labor confirmed: ${confirmedHours} hr (estimate was ${laborEntry?.estimatedHours ?? "unknown"})`);
-            
-            // Transition to final_report
-            currentMode = "final_report";
-            await storage.updateCase(ensuredCase.id, { mode: currentMode });
-            
-            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
-            
-            // Generate final report with confirmed labor as a hard constraint + fact lock
-            const updatedHistoryForReport = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
-            const factLock = buildFactLockConstraint(updatedHistoryForReport);
-            
-            const finalReportPrompt = composePromptV2({
-              mode: currentMode,
-              inputDetected: inputLanguage.detected,
-              outputEffective: outputPolicy.effective,
-              includeTranslation: langPolicy.includeTranslation,
-              translationLanguage: langPolicy.translationLanguage,
-              additionalConstraints: `LABOR BUDGET CONSTRAINT (MANDATORY - DO NOT VIOLATE):
-The technician has confirmed a total labor budget of exactly ${confirmedHours} hours.
-Your labor breakdown MUST sum to exactly ${confirmedHours} hours.
-Do NOT exceed or reduce this total under any circumstances.
-Distribute the ${confirmedHours} hours across the repair steps.
-State "Total labor: ${confirmedHours} hr" at the end of the labor section.
-
-${factLock}`,
-            });
-            
-            const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
-            
-            const translationInstruction = langPolicy.includeTranslation && langPolicy.translationLanguage
-              ? `\n4. Then "--- TRANSLATION ---"\n5. Complete translation of the above into ${langPolicy.translationLanguage === "RU" ? "Russian" : langPolicy.translationLanguage === "ES" ? "Spanish" : langPolicy.translationLanguage}`
-              : "";
-
-            const finalReportRequest = `The technician has confirmed a total labor budget of ${confirmedHours} hours. Generate the Portal-Cause authorization text now.
-
-REQUIRED OUTPUT FORMAT:
-1. English paragraphs describing: observed symptoms, diagnostic checks, verified condition, required repair, parts required
-2. Labor breakdown by task (individual times MUST sum to exactly ${confirmedHours} hr)
-3. "Total labor: ${confirmedHours} hr"${translationInstruction}
-
-Generate the complete Portal-Cause report now.`;
-            
-            const finalReportBody = {
-              model: "gpt-4o-mini",
-              stream: false,
-              temperature: 0.2,
-              messages: buildOpenAiMessages({
-                system: finalReportPrompt,
-                history: updatedHistory,
-                userMessage: finalReportRequest,
-                attachments: undefined,
-              }),
-            };
-            
-            const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
-            
-            if (!finalResult.error && finalResult.response.trim()) {
-              const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation);
-              logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
-              
-              let finalContent = finalResult.response;
-              
-              // Output-layer enforcement: strip translation for EN mode
-              finalContent = enforceLanguagePolicy(finalContent, langPolicy);
-              
-              // Validate labor sum consistency
-              const laborValidation = validateLaborSum(finalContent, confirmedHours);
-              if (!laborValidation.valid) {
-                console.warn(`[Chat API v2] Labor sum validation failed:`, laborValidation.violations);
-                // Don't reject — the constraint was injected, just log the drift
-              }
-              
-              // If mode validation fails, try enforcement-based recovery
-              if (!finalValidation.valid) {
-                const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation);
-                if (!postEnforcementValidation.valid) {
-                  console.log(`[Chat API v2] Final report validation failed, using fallback`);
-                  finalContent = getSafeFallback(currentMode, outputPolicy.effective);
-                }
-              }
-              
-              // Stream the final report
-              for (const char of finalContent) {
-                if (aborted) break;
-                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-              }
-              
-              // Save the final report
-              await storage.appendMessage({
-                caseId: ensuredCase.id,
-                role: "assistant",
-                content: finalContent,
-                language: outputPolicy.effective,
-                userId: user?.id,
-              });
-              
-              full = finalContent;
-            } else if (finalResult.error) {
-              console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
-              const fallback = getSafeFallback(currentMode, outputPolicy.effective);
-              for (const char of fallback) {
-                if (aborted) break;
-                controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-              }
-              full = fallback;
-            }
+            full = finalContent;
           } else {
-            // Could not parse confirmation — NON-BLOCKING: allow technician to respond or continue
-            // Instead of blocking, let the LLM handle the response naturally
-            full = enforceLanguagePolicy(full, langPolicy);
-            for (const char of full) {
+            const fallback = getSafeFallback(currentMode, outputPolicy.effective);
+            for (const char of fallback) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
             }
-            
-            if (!aborted && full.trim()) {
-              await storage.appendMessage({
-                caseId: ensuredCase.id,
-                role: "assistant",
-                content: full,
-                language: outputPolicy.effective,
-                userId: user?.id,
-              });
-            }
-            
-            // Emit non-blocking labor hint
-            controller.enqueue(encoder.encode(sseEncode({ 
-              type: "labor_status", 
-              status: "draft",
-              estimatedHours: laborEntry?.estimatedHours,
-              message: "Labor estimate is a draft. Confirm, adjust, or continue diagnostics."
-            })));
+            full = fallback;
           }
         } else {
           // No transition - apply output-layer enforcement before streaming
