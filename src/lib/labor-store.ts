@@ -37,6 +37,10 @@ export function getLaborEntry(caseId: string): LaborEntry | undefined {
   return store.get(caseId);
 }
 
+export function clearLaborStore(caseId: string): void {
+  store.delete(caseId);
+}
+
 export function getConfirmedHours(caseId: string): number | undefined {
   return store.get(caseId)?.confirmedHours || undefined;
 }
