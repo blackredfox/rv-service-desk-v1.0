@@ -499,6 +499,7 @@ reg({
       prerequisites: ["e12_5"],
       matchPatterns: [/(?:direct|bypass|jump).*(?:operate|run|work|yes|no|nothing)/i, /(?:motor|component).*(?:run|spin|work|dead)/i],
       howToCheck: "Disconnect the component from vehicle wiring. Using jumper wires from the battery (with an inline fuse), connect +12V and ground directly to the component terminals. If it runs, the component is good — fault is upstream.",
+      mechanicalCheck: true,
     },
     {
       id: "e12_7",
