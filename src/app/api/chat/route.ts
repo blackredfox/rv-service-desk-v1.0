@@ -573,6 +573,38 @@ export async function POST(req: Request) {
         full = result.response;
 
         // ========================================
+        // CONTEXT ENGINE: Record agent action (AFTER LLM response)
+        // ========================================
+        if (currentMode === "diagnostic" && engineResult) {
+          // Determine action type based on response content
+          const actionType = isFallbackResponse(full) ? "fallback" : 
+                            engineResult.context.submode !== "main" ? "clarification" : "question";
+          
+          recordAgentAction(ensuredCase.id, {
+            type: actionType,
+            content: full.slice(0, 200), // Truncate for storage
+            stepId: engineResult.context.activeStepId || undefined,
+            submode: engineResult.context.submode,
+          }, DEFAULT_CONFIG);
+          
+          console.log(`[Chat API v2] Context Engine: recorded action type=${actionType}`);
+          
+          // Clear replan state after acknowledgment
+          if (isInReplanState(engineResult.context)) {
+            const updatedCtx = clearReplanState(engineResult.context);
+            updateContext(updatedCtx);
+            console.log(`[Chat API v2] Context Engine: cleared replan state`);
+          }
+          
+          // Pop clarification topic if agent provided the clarification
+          if (isInClarificationSubflow(engineResult.context)) {
+            const updatedCtx = popTopic(engineResult.context);
+            updateContext(updatedCtx);
+            console.log(`[Chat API v2] Context Engine: popped clarification topic, returning to main`);
+          }
+        }
+
+        // ========================================
         // PIVOT CHECK: key finding forces early transition
         // ========================================
         if (pivotTriggered && currentMode === "diagnostic" && !aborted) {
