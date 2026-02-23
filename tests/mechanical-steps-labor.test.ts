@@ -177,13 +177,37 @@ describe("Mechanical Step Check — Required Before Isolation", () => {
     
     // Complete all steps including mechanical checks
     markStepCompleted(caseId, "e12_1");
+    markStepCompleted(caseId, "e12_2");
+    markStepCompleted(caseId, "e12_3");
+    markStepCompleted(caseId, "e12_4");
     markStepCompleted(caseId, "e12_5");
-    markStepCompleted(caseId, "e12_6");
-    markStepCompleted(caseId, "e12_7");
+    markStepCompleted(caseId, "e12_6"); // Mechanical check
+    markStepCompleted(caseId, "e12_7"); // Mechanical check
     
     const nextMech = getNextMechanicalStep(caseId);
     
     expect(nextMech).toBeNull();
+  });
+
+  it("mechanical step with no prerequisites is immediately available", async () => {
+    const { 
+      initializeCase, 
+      areMechanicalChecksComplete, 
+      clearRegistry,
+    } = await import("@/lib/diagnostic-registry");
+    
+    const caseId = "mech-no-prereq-test";
+    clearRegistry(caseId);
+    
+    // Initialize - e12_7 has no prerequisites
+    initializeCase(caseId, "ceiling fan not working");
+    
+    // Don't complete any steps - e12_7 should still be pending (no prereqs)
+    const result = areMechanicalChecksComplete(caseId);
+    
+    // Should be incomplete because e12_7 (and e12_6 after prereqs) are pending
+    expect(result.complete).toBe(false);
+    expect(result.pendingStep?.id).toBe("e12_7"); // e12_7 has no prereqs
   });
 });
 
