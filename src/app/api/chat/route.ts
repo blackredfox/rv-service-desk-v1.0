@@ -499,8 +499,12 @@ export async function POST(req: Request) {
   // - outputEffective: what language assistant must respond in
   // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
-  // Compose system prompt: combine registry context + fact lock + context engine directives
-  const additionalConstraints = [registryConstraint, factLockConstraint, contextEngineDirectives]
+  //
+  // Constraints hierarchy (Context Engine is authority):
+  // 1. contextEngineDirectives: anti-loop, replan, clarification (FLOW AUTHORITY)
+  // 2. procedureContext: step metadata, questions (DATA PROVIDER)
+  // 3. factLockConstraint: fact lock for final report
+  const additionalConstraints = [contextEngineDirectives, procedureContext, factLockConstraint]
     .filter(Boolean)
     .join("\n\n") || undefined;
 
