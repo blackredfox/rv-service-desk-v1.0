@@ -157,10 +157,28 @@ export function detectIntent(message: string): Intent {
   }
   
   // Check for confirmation (labor context)
-  // First check for a number (override)
-  const numberMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h\b|ч|час)?/i);
-  if (numberMatch) {
-    const value = parseFloat(numberMatch[1]);
+  // First check for a number (override) - but be more careful about context
+  // Numbers embedded in technical descriptions should not be treated as confirmations
+  const technicalContextPatterns = [
+    /(?:motor|pump|fan|voltage|volts?|v\b|dc|ac|power|battery|runs?|works?|operates?|apply)/i,
+  ];
+  
+  const looksLikeTechnicalContext = technicalContextPatterns.some(p => p.test(trimmed));
+  
+  if (!looksLikeTechnicalContext) {
+    const numberMatch = trimmed.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h\b|ч|час)?/i);
+    if (numberMatch) {
+      const value = parseFloat(numberMatch[1]);
+      if (value >= 0.5 && value <= 20) {
+        return { type: "CONFIRMATION", value };
+      }
+    }
+  }
+  
+  // Also check for standalone numbers (e.g., just "2.5" or "1.5 hours")
+  const standaloneNumber = trimmed.match(/^[\s]*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h\b|ч|час)?[\s]*$/i);
+  if (standaloneNumber) {
+    const value = parseFloat(standaloneNumber[1]);
     if (value >= 0.5 && value <= 20) {
       return { type: "CONFIRMATION", value };
     }
