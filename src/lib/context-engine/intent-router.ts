@@ -57,7 +57,8 @@ const HOWTO_PATTERNS = [
 const NEW_EVIDENCE_PATTERNS: Array<{ pattern: RegExp; type: EvidenceType }> = [
   // Physical damage (English)
   { pattern: /(?:found|discovered|noticed|see|saw|there'?s)\s+(?:a|the)?\s*(?:hole|leak|crack|burn|damage|corrosion|loose|broken|melted|burnt)/i, type: "physical_damage" },
-  { pattern: /(?:it'?s|looks?)\s+(?:cracked|burnt|melted|corroded|damaged|broken|leaking)/i, type: "physical_damage" },
+  { pattern: /(?:it'?s|looks?|is)\s+(?:cracked|burnt|melted|corroded|damaged|broken|leaking|bulged|bulging|swollen)/i, type: "physical_damage" },
+  { pattern: /(?:capacitor|cap)\s+(?:looks?|is|appears?)\s+(?:bulged|bulging|swollen|leaking|burnt|damaged)/i, type: "physical_damage" },
   // Physical damage (Russian)
   { pattern: /(?:нашёл|нашел|обнаружил|заметил|вижу)\s+(?:дыр|утечк|трещин|повреж|корроз)/i, type: "physical_damage" },
   // Physical damage (Spanish)
