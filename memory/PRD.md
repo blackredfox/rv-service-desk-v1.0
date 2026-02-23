@@ -58,6 +58,7 @@
 | `src/lib/context-engine/context-engine.ts` | 3 | Main orchestrator |
 | `tests/context-engine.test.ts` | 3 | 26 tests for context engine |
 | `tests/context-engine-integration.test.ts` | 3 | 9 integration tests for route.ts wiring |
+| `tests/route-strictness.test.ts` | 3 | 13 tests ensuring strict context engine mode |
 
 ## Test Results
 - **581 tests across 39 test files**
