@@ -23,6 +23,8 @@ export type DiagnosticStep = {
   matchPatterns: RegExp[];
   /** How-to-check instruction returned when the technician asks for guidance */
   howToCheck?: string;
+  /** If true, this step is a mechanical/physical inspection that MUST be completed before isolation */
+  mechanicalCheck?: boolean;
 };
 
 export type DiagnosticProcedure = {
