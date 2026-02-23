@@ -35,12 +35,15 @@ import {
   validateLaborSum,
 } from "@/lib/labor-store";
 import {
-  // Legacy diagnostic-registry (keeping for backward compat during transition)
-  buildRegistryContext,
+  // Diagnostic Registry — DATA PROVIDER ONLY (not flow authority)
+  // Used for: procedure catalog, step definitions, static metadata
+  // NOT used for: flow decisions, step selection, pivot logic
   initializeCase,
+  buildRegistryContext,
 } from "@/lib/diagnostic-registry";
 import {
-  // Context Engine - single source of diagnostic flow control
+  // Context Engine — SINGLE FLOW AUTHORITY
+  // All flow decisions, submode selection, replan, loop guard come from here
   processMessage as processContextMessage,
   recordAgentAction,
   getOrCreateContext,
@@ -56,11 +59,18 @@ import {
   popTopic,
   updateContext,
   isFallbackResponse,
+  setActiveStep,
+  markStepCompleted as markContextStepCompleted,
   type ContextEngineResult,
   type DiagnosticContext,
   DEFAULT_CONFIG,
 } from "@/lib/context-engine";
 import { buildFactLockConstraint } from "@/lib/fact-pack";
+
+// ── Strict Context Engine Mode ──────────────────────────────────────
+// When true (default), all diagnostic flow decisions come from Context Engine.
+// Legacy diagnostic-registry is used ONLY as a data provider.
+const STRICT_CONTEXT_ENGINE = true;
 
 export const runtime = "nodejs";
 
