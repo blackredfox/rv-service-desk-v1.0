@@ -434,6 +434,24 @@ export function markStepAsked(caseId: string, stepId: string): boolean {
 }
 
 /**
+ * Mark a step as completed.
+ */
+export function markStepCompleted(caseId: string, stepId: string): boolean {
+  const entry = ensureEntry(caseId);
+  entry.completedStepIds.add(stepId);
+  return true;
+}
+
+/**
+ * Mark a step as unable to verify.
+ */
+export function markStepUnable(caseId: string, stepId: string): boolean {
+  const entry = ensureEntry(caseId);
+  entry.unableStepIds.add(stepId);
+  return true;
+}
+
+/**
  * Check whether a step has already been asked.
  */
 export function isStepAlreadyAsked(caseId: string, stepId: string): boolean {
