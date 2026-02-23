@@ -119,10 +119,15 @@ describe("Mechanical Step Check — Required Before Isolation", () => {
     // Initialize with a ceiling fan message
     initializeCase(caseId, "ceiling fan not working");
     
-    // Complete some steps and mark e12_6 as unable
+    // Complete prerequisites for e12_6
     markStepCompleted(caseId, "e12_1");
     markStepCompleted(caseId, "e12_5");
-    markStepUnable(caseId, "e12_6"); // Can't access motor directly
+    // Also complete prerequisites for e12_7 (has no prerequisites)
+    
+    // Mark e12_6 as unable
+    markStepUnable(caseId, "e12_6");
+    // Mark e12_7 as complete (or unable)
+    markStepCompleted(caseId, "e12_7");
     
     const result = areMechanicalChecksComplete(caseId);
     
