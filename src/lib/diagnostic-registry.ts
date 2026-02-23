@@ -360,6 +360,69 @@ export function isProcedureComplete(caseId: string): boolean {
 }
 
 /**
+ * Check if all required mechanical/physical inspection steps are complete.
+ * Returns { complete: false, pendingStep } if a mechanical check is pending.
+ */
+export function areMechanicalChecksComplete(caseId: string): { 
+  complete: boolean; 
+  pendingStep?: { id: string; question: string };
+} {
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return { complete: true };
+  
+  for (const step of entry.procedure.steps) {
+    if (step.mechanicalCheck) {
+      const isCompleted = entry.completedStepIds.has(step.id);
+      const isUnable = entry.unableStepIds.has(step.id);
+      
+      if (!isCompleted && !isUnable) {
+        // Check if prerequisites are met
+        const prereqsMet = step.prerequisites.every(
+          prereq => entry.completedStepIds.has(prereq) || entry.unableStepIds.has(prereq)
+        );
+        
+        if (prereqsMet) {
+          return { 
+            complete: false, 
+            pendingStep: { id: step.id, question: step.question } 
+          };
+        }
+      }
+    }
+  }
+  
+  return { complete: true };
+}
+
+/**
+ * Get the next required mechanical check step (if any).
+ */
+export function getNextMechanicalStep(caseId: string): DiagnosticStep | null {
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return null;
+  
+  for (const step of entry.procedure.steps) {
+    if (step.mechanicalCheck) {
+      const isCompleted = entry.completedStepIds.has(step.id);
+      const isUnable = entry.unableStepIds.has(step.id);
+      
+      if (!isCompleted && !isUnable) {
+        // Check if prerequisites are met
+        const prereqsMet = step.prerequisites.every(
+          prereq => entry.completedStepIds.has(prereq) || entry.unableStepIds.has(prereq)
+        );
+        
+        if (prereqsMet) {
+          return step;
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Mark a step as "asked" (de-dupe guard).
  * Returns false if the step was already asked (duplicate).
  */
