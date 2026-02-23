@@ -16,8 +16,8 @@ import type {
   Submode,
   Mode,
   LaborState,
-  DEFAULT_CONFIG,
 } from "./types";
+import { DEFAULT_CONFIG } from "./types";
 import { detectIntent, describeIntent, isClarificationRequest } from "./intent-router";
 import { checkLoopViolation, generateAntiLoopDirectives, updateLoopState, isFallbackResponse } from "./loop-guard";
 import { shouldReplan, executeReplan, buildReplanNotice, isInReplanState, clearReplanState } from "./replan";
