@@ -76,7 +76,7 @@ describe("Mechanical Step Check — Required Before Isolation", () => {
     expect(result.pendingStep?.question).toContain("directly");
   });
 
-  it("areMechanicalChecksComplete returns true when e12_6 is completed", async () => {
+  it("areMechanicalChecksComplete returns true when all mechanical steps are done", async () => {
     const { 
       initializeCase, 
       areMechanicalChecksComplete, 
@@ -90,13 +90,15 @@ describe("Mechanical Step Check — Required Before Isolation", () => {
     // Initialize with a ceiling fan message
     initializeCase(caseId, "ceiling fan not working");
     
-    // Complete all steps including e12_6
+    // Complete ALL steps including mechanical checks
+    // This ensures the full procedure is complete
     markStepCompleted(caseId, "e12_1");
     markStepCompleted(caseId, "e12_2");
     markStepCompleted(caseId, "e12_3");
     markStepCompleted(caseId, "e12_4");
     markStepCompleted(caseId, "e12_5");
-    markStepCompleted(caseId, "e12_6");
+    markStepCompleted(caseId, "e12_6"); // Mechanical check
+    markStepCompleted(caseId, "e12_7"); // Mechanical check
     
     const result = areMechanicalChecksComplete(caseId);
     
