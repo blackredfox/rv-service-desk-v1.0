@@ -38,6 +38,8 @@ import {
   // NOT used for: flow decisions, step selection, pivot logic
   initializeCase,
   buildRegistryContext,
+  areMechanicalChecksComplete,
+  getNextMechanicalStep,
 } from "@/lib/diagnostic-registry";
 import {
   // Context Engine — SINGLE FLOW AUTHORITY
