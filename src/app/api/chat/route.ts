@@ -15,7 +15,6 @@ import {
   composePromptV2, 
   detectModeCommand,
   detectTransitionSignal,
-  buildMessagesWithMemory,
   type CaseMode,
   DEFAULT_MEMORY_WINDOW,
 } from "@/lib/prompt-composer";
@@ -29,23 +28,78 @@ import {
   setLaborEstimate,
   confirmLabor,
   getLaborEntry,
-  getConfirmedHours,
   extractLaborEstimate,
   parseLaborConfirmation,
   validateLaborSum,
 } from "@/lib/labor-store";
 import {
-  processUserMessage,
-  buildRegistryContext,
-  shouldPivot,
+  // Diagnostic Registry — DATA PROVIDER ONLY (not flow authority)
+  // Used for: procedure catalog, step definitions, static metadata
+  // NOT used for: flow decisions, step selection, pivot logic
   initializeCase,
+  buildRegistryContext,
 } from "@/lib/diagnostic-registry";
+import {
+  // Context Engine — SINGLE FLOW AUTHORITY
+  // All flow decisions, submode selection, replan, loop guard come from here
+  processMessage as processContextMessage,
+  recordAgentAction,
+  getOrCreateContext,
+  isInReplanState,
+  clearReplanState,
+  generateAntiLoopDirectives,
+  buildReplanNotice,
+  isInClarificationSubflow,
+  buildReturnToMainInstruction,
+  popTopic,
+  updateContext,
+  isFallbackResponse,
+  markStepCompleted as markContextStepCompleted,
+  type ContextEngineResult,
+  type DiagnosticContext,
+  DEFAULT_CONFIG,
+} from "@/lib/context-engine";
 import { buildFactLockConstraint } from "@/lib/fact-pack";
+
+// ── Strict Context Engine Mode ──────────────────────────────────────
+// When true (default), all diagnostic flow decisions come from Context Engine.
+// Legacy diagnostic-registry is used ONLY as a data provider.
+const STRICT_CONTEXT_ENGINE = true;
 
 export const runtime = "nodejs";
 
 // Translation separator (must match mode-validators / output-validator)
 const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
+
+// Debug flag for Context Engine state tracing (local/dev only).
+// Enable with: DEBUG_CONTEXT_ENGINE=1
+const DEBUG_CONTEXT_ENGINE = process.env.DEBUG_CONTEXT_ENGINE === "1";
+
+function debugContextEngineState(label: string, ctx: DiagnosticContext) {
+  if (!DEBUG_CONTEXT_ENGINE) return;
+
+  // Use a safe "any" view to avoid tight coupling to internal context shape.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c: any = ctx;
+
+  const completedSteps: string[] | undefined = Array.isArray(c.completedSteps) ? c.completedSteps : undefined;
+  const lastCompletedStepId = completedSteps && completedSteps.length > 0 ? completedSteps[completedSteps.length - 1] : undefined;
+
+  const topicStackDepth = Array.isArray(c.topicStack) ? c.topicStack.length : undefined;
+
+  console.log("[Chat API v2][DEBUG][ContextEngine]", label, {
+    activeProcedureId: c.activeProcedureId ?? undefined,
+    activeStepId: c.activeStepId ?? undefined,
+    submode: c.submode ?? undefined,
+    isolationComplete: c.isolationComplete ?? undefined,
+    isolationFinding: c.isolationFinding ?? undefined,
+    replanReason: c.replanReason ?? undefined,
+    completedStepsCount: completedSteps?.length ?? undefined,
+    lastCompletedStepId,
+    topicStackDepth,
+  });
+}
+
 
 /**
  * Output-layer enforcement: strip translation block when policy says none.
@@ -363,44 +417,154 @@ export async function POST(req: Request) {
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
 
   // ========================================
-  // DIAGNOSTIC REGISTRY: track answered topics + detect key findings
+  // CONTEXT ENGINE: SINGLE FLOW AUTHORITY
   // ========================================
-  let registryConstraint = "";
+  // All diagnostic flow decisions come from Context Engine.
+  // Legacy registry is used ONLY as a data provider for step metadata.
+  
+  let procedureContext = "";  // Step metadata from registry (data only)
   let pivotTriggered = false;
+  let engineResult: ContextEngineResult | null = null;
+  let contextEngineDirectives = "";
 
   if (currentMode === "diagnostic") {
-    // Initialize procedure on first diagnostic message
+    // ── STRICT MODE GUARD ──
+    if (!STRICT_CONTEXT_ENGINE) {
+      console.error("[Chat API v2] STRICT_CONTEXT_ENGINE is disabled — this is not supported in production");
+    }
+    
+    // ── DATA PROVIDER: Initialize procedure catalog ──
+    // This ONLY provides step metadata; it does NOT control flow
     const initResult = initializeCase(ensuredCase.id, message);
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
-      console.log(`[Chat API v2] Procedure: ${initResult.procedure.displayName}, pre-completed steps: ${initResult.preCompletedSteps.join(", ")}`);
+      console.log(`[Chat API v2] Procedure catalog: ${initResult.procedure.displayName}, initial steps: ${initResult.preCompletedSteps.join(", ")}`);
+      // Sync pre-completed steps to Context Engine
+      for (const stepId of initResult.preCompletedSteps) {
+        markContextStepCompleted(ensuredCase.id, stepId);
+      }
     } else if (initResult.system) {
-      console.log(`[Chat API v2] Procedure: ${initResult.system}`);
+      console.log(`[Chat API v2] Procedure catalog: ${initResult.system}`);
     }
 
-    const regResult = processUserMessage(ensuredCase.id, message);
+
+    // ── CONTEXT ENGINE SYNC (production-safe) ─────────────────────────────
+    // Registry is a DATA PROVIDER. Context Engine is the SINGLE flow authority.
+    // However, the Context Engine still needs the active procedure/step IDs so that
+    // clarification requests like “How do I check that?” remain anchored to the
+    // correct step instead of drifting.
+    if (initResult.procedure) {
+      const ctx = getOrCreateContext(ensuredCase.id) as DiagnosticContext;
+
+      const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+      const getString = (obj: unknown, key: string): string | null => {
+        if (!isRecord(obj)) return null;
+        const val = obj[key];
+        return typeof val === "string" && val.trim().length > 0 ? val : null;
+      };
+      const getSteps = (obj: unknown): Array<Record<string, unknown>> => {
+        if (!isRecord(obj)) return [];
+        const candidate = obj["steps"];
+        return Array.isArray(candidate) ? candidate.filter(isRecord) : [];
+      };
+
+      const procUnknown: unknown = initResult.procedure;
+      const procedureId = getString(procUnknown, "id") ?? getString(procUnknown, "procedureId") ?? getString(procUnknown, "key");
+      const steps = getSteps(procUnknown);
+
+      const completedStepsRaw = (ctx as unknown as { completedSteps?: unknown }).completedSteps;
+      const completedSteps: string[] = Array.isArray(completedStepsRaw)
+        ? completedStepsRaw.filter((x): x is string => typeof x === "string")
+        : [];
+
+      const firstRemainingStepId =
+        steps
+          .map((s) => getString(s, "id"))
+          .find((id): id is string => typeof id === "string" && !completedSteps.includes(id)) ?? undefined;
+
+      const nextCtx: DiagnosticContext = {
+        ...ctx,
+        activeProcedureId: (ctx as unknown as { activeProcedureId?: unknown }).activeProcedureId ?? procedureId ?? undefined,
+        activeStepId: (ctx as unknown as { activeStepId?: unknown }).activeStepId ?? firstRemainingStepId,
+      } as DiagnosticContext;
+
+      const beforeProc = (ctx as unknown as { activeProcedureId?: unknown }).activeProcedureId;
+      const beforeStep = (ctx as unknown as { activeStepId?: unknown }).activeStepId;
+      const afterProc = (nextCtx as unknown as { activeProcedureId?: unknown }).activeProcedureId;
+      const afterStep = (nextCtx as unknown as { activeStepId?: unknown }).activeStepId;
+
+      if (beforeProc !== afterProc || beforeStep !== afterStep) {
+        updateContext(nextCtx);
+        console.log(
+          `[Chat API v2] Context synced: activeProcedureId=${typeof afterProc === "string" ? afterProc : "n/a"}, ` +
+          `activeStepId=${typeof afterStep === "string" ? afterStep : "n/a"}`
+        );
+      }
+    }
+
+    // ── FLOW AUTHORITY: Context Engine ──
+    // Process message through Context Engine (BEFORE LLM invocation)
+    engineResult = processContextMessage(ensuredCase.id, message, DEFAULT_CONFIG);
     
-    if (regResult.howToCheckRequested) {
-      console.log(`[Chat API v2] Technician asked "how to check?" — will provide guidance without advancing step`);
-    }
-    if (regResult.keyFinding) {
-      console.log(`[Chat API v2] Key finding detected: "${regResult.keyFinding}" — will pivot`);
-    }
-    if (regResult.alreadyAnswered) {
-      console.log(`[Chat API v2] Technician indicated already-answered`);
-    }
-    if (regResult.newUnable.length > 0) {
-      console.log(`[Chat API v2] Unable-to-verify topics: ${regResult.newUnable.join(", ")}`);
+    // Validate engine result (strict guard)
+    if (!engineResult || !engineResult.context) {
+      console.error("[Chat API v2] CRITICAL: Context Engine returned invalid result — using safe fallback");
+      // Safe controlled response instead of legacy fallback
+      engineResult = {
+        context: getOrCreateContext(ensuredCase.id) as DiagnosticContext,
+        intent: { type: "UNCLEAR" },
+        responseInstructions: {
+          action: "ask_step",
+          constraints: ["Context Engine error — ask a safe diagnostic question"],
+          antiLoopDirectives: ["FORWARD PROGRESS: Move to next available step"],
+        },
+        stateChanged: false,
+        notices: ["Context Engine error — safe fallback activated"],
+      };
     }
     
-    // Check if we should pivot immediately
-    const pivotCheck = shouldPivot(ensuredCase.id);
-    if (pivotCheck.pivot) {
+    // Log context engine decision (SINGLE SOURCE OF TRUTH)
+    console.log(`[Chat API v2] Context Engine: intent=${engineResult.intent.type}, submode=${engineResult.context.submode}, stateChanged=${engineResult.stateChanged}`);
+    debugContextEngineState("after_processMessage", engineResult.context);
+
+    
+    if (engineResult.notices.length > 0) {
+      console.log(`[Chat API v2] Context Engine notices: ${engineResult.notices.join(", ")}`);
+    }
+
+    // ── FLOW DECISION: Replan ──
+    // Replan is controlled ONLY by Context Engine
+    if (isInReplanState(engineResult.context)) {
+      console.log(`[Chat API v2] REPLAN triggered (Context Engine): ${engineResult.context.replanReason}`);
+      pivotTriggered = false; // Reset pivot — we're replanning
+    }
+    
+    // ── FLOW DECISION: Clarification ──
+    // Clarification subflows are controlled ONLY by Context Engine
+    if (isInClarificationSubflow(engineResult.context)) {
+      console.log(`[Chat API v2] Clarification subflow (Context Engine): ${engineResult.context.submode}`);
+    }
+    
+    // ── FLOW DECISION: Pivot ──
+    // Isolation/pivot is controlled ONLY by Context Engine
+    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
       pivotTriggered = true;
-      console.log(`[Chat API v2] Pivot triggered by: "${pivotCheck.finding}"`);
+      console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
     }
     
-    // Build registry context for injection into prompt
-    registryConstraint = buildRegistryContext(ensuredCase.id);
+    // ── BUILD DIRECTIVES: Anti-loop, replan, clarification ──
+    const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
+    const replanNotice = buildReplanNotice(engineResult.context);
+    const clarificationInstruction = buildReturnToMainInstruction(engineResult.context);
+    
+    contextEngineDirectives = [
+      ...antiLoopDirectives,
+      replanNotice,
+      clarificationInstruction,
+    ].filter(Boolean).join("\n\n");
+    
+    // ── DATA PROVIDER: Step metadata context ──
+    // This provides step text/questions to the LLM; it does NOT control flow
+    procedureContext = buildRegistryContext(ensuredCase.id);
   }
 
   // ========================================
@@ -416,8 +580,12 @@ export async function POST(req: Request) {
   // - outputEffective: what language assistant must respond in
   // - includeTranslation / translationLanguage: from LanguagePolicy (declarative)
   // - Add vision instruction if images are attached
-  // Compose system prompt: combine registry context + fact lock as additionalConstraints
-  const additionalConstraints = [registryConstraint, factLockConstraint]
+  //
+  // Constraints hierarchy (Context Engine is authority):
+  // 1. contextEngineDirectives: anti-loop, replan, clarification (FLOW AUTHORITY)
+  // 2. procedureContext: step metadata, questions (DATA PROVIDER)
+  // 3. factLockConstraint: fact lock for final report
+  const additionalConstraints = [contextEngineDirectives, procedureContext, factLockConstraint]
     .filter(Boolean)
     .join("\n\n") || undefined;
 
@@ -533,6 +701,40 @@ export async function POST(req: Request) {
         }
 
         full = result.response;
+
+        // ========================================
+        // CONTEXT ENGINE: Record agent action (AFTER LLM response)
+        // ========================================
+        if (currentMode === "diagnostic" && engineResult) {
+          // Determine action type based on response content
+          const actionType = isFallbackResponse(full) ? "fallback" : 
+                            engineResult.context.submode !== "main" ? "clarification" : "question";
+
+          debugContextEngineState("before_recordAgentAction", engineResult.context);
+          
+          recordAgentAction(ensuredCase.id, {
+            type: actionType,
+            content: full.slice(0, 200), // Truncate for storage
+            stepId: engineResult.context.activeStepId || undefined,
+            submode: engineResult.context.submode,
+          }, DEFAULT_CONFIG);
+          
+          console.log(`[Chat API v2] Context Engine: recorded action type=${actionType}`);
+          
+          // Clear replan state after acknowledgment
+          if (isInReplanState(engineResult.context)) {
+            const updatedCtx = clearReplanState(engineResult.context);
+            updateContext(updatedCtx);
+            console.log(`[Chat API v2] Context Engine: cleared replan state`);
+          }
+          
+          // Pop clarification topic if agent provided the clarification
+          if (isInClarificationSubflow(engineResult.context)) {
+            const updatedCtx = popTopic(engineResult.context);
+            updateContext(updatedCtx);
+            console.log(`[Chat API v2] Context Engine: popped clarification topic, returning to main`);
+          }
+        }
 
         // ========================================
         // PIVOT CHECK: key finding forces early transition
@@ -683,7 +885,7 @@ export async function POST(req: Request) {
           const laborResult = await callOpenAI(apiKey, laborBody, ac.signal);
           
           if (!laborResult.error && laborResult.response.trim()) {
-            let laborContent = laborResult.response;
+            const laborContent = laborResult.response;
             
             // Extract and store the estimated hours
             const estimatedHours = extractLaborEstimate(laborContent);
@@ -729,13 +931,51 @@ export async function POST(req: Request) {
           }
         } else if (currentMode === "labor_confirmation" && !aborted) {
           // ========================================
-          // LABOR CONFIRMATION → FINAL REPORT
+          // LABOR CONFIRMATION → FINAL REPORT (NON-BLOCKING)
           // ========================================
           // Parse technician's response for labor confirmation/override
           const laborEntry = getLaborEntry(ensuredCase.id);
           const confirmedHours = parseLaborConfirmation(message, laborEntry?.estimatedHours);
           
-          if (confirmedHours) {
+          // Check if technician wants to continue diagnostics (non-blocking labor)
+          const continuePatterns = [
+            /(?:continue|back\s+to|return\s+to)\s+diagnostic/i,
+            /(?:more\s+)?(?:check|test|verify|diagnose)/i,
+            /(?:wait|hold|not\s+ready|skip)/i,
+            /(?:продолж|вернуться|проверить|подожд)/i,
+            /(?:continuar|volver|verificar|espera)/i,
+          ];
+          const wantsContinueDiagnostics = continuePatterns.some(p => p.test(message));
+          
+          if (wantsContinueDiagnostics) {
+            // NON-BLOCKING: Allow return to diagnostics
+            console.log(`[Chat API v2] Labor confirmation: technician wants to continue diagnostics (non-blocking)`);
+            currentMode = "diagnostic";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+            
+            // Stream acknowledgment and return to diagnostic flow
+            const acknowledgment = outputPolicy.effective === "RU" 
+              ? "Понял. Продолжаем диагностику."
+              : outputPolicy.effective === "ES"
+              ? "Entendido. Continuamos con el diagnóstico."
+              : "Understood. Returning to diagnostics.";
+            
+            for (const char of acknowledgment) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+            
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: acknowledgment,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+            
+            full = acknowledgment;
+          } else if (confirmedHours) {
             confirmLabor(ensuredCase.id, confirmedHours);
             console.log(`[Chat API v2] Labor confirmed: ${confirmedHours} hr (estimate was ${laborEntry?.estimatedHours ?? "unknown"})`);
             
@@ -845,7 +1085,8 @@ Generate the complete Portal-Cause report now.`;
               full = fallback;
             }
           } else {
-            // Could not parse confirmation — ask again
+            // Could not parse confirmation — NON-BLOCKING: allow technician to respond or continue
+            // Instead of blocking, let the LLM handle the response naturally
             full = enforceLanguagePolicy(full, langPolicy);
             for (const char of full) {
               if (aborted) break;
@@ -861,6 +1102,14 @@ Generate the complete Portal-Cause report now.`;
                 userId: user?.id,
               });
             }
+            
+            // Emit non-blocking labor hint
+            controller.enqueue(encoder.encode(sseEncode({ 
+              type: "labor_status", 
+              status: "draft",
+              estimatedHours: laborEntry?.estimatedHours,
+              message: "Labor estimate is a draft. Confirm, adjust, or continue diagnostics."
+            })));
           }
         } else {
           // No transition - apply output-layer enforcement before streaming
