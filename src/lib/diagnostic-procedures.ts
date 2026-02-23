@@ -561,6 +561,7 @@ reg({
       prerequisites: ["awn_5"],
       matchPatterns: [/(?:direct|bypass|jump).*(?:operate|run|work|yes|no|nothing)/i, /motor.*(?:run|spin|work|dead|seized)/i],
       howToCheck: "Disconnect the motor connector. Using jumper wires from the battery (with a 20A inline fuse), connect +12V and ground directly to the motor. Reverse polarity to test both directions. Motor runs = fault is upstream. Motor dead = motor failure confirmed.",
+      mechanicalCheck: true,
     },
   ],
 });
