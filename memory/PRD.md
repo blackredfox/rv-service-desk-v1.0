@@ -59,13 +59,13 @@
 | `tests/context-engine.test.ts` | 3 | 26 tests for context engine |
 
 ## Test Results
-- **559 tests across 37 test files**
-- **548 PASSING** (26 new context-engine tests)
+- **568 tests across 38 test files**
+- **557 PASSING** (35 context-engine tests: 26 unit + 9 integration)
 - **11 pre-existing failures** (language-detection + prisma-retention — out of scope)
 
 ## Backlog
-- P0: None — all acceptance criteria met for Phase 3
-- P1: Wire context-engine into route.ts for full integration
+- P0: None — Context Engine is now production-active
+- P1: Phase out legacy diagnostic-registry direct calls (currently kept for backward compat)
 - P1: Add `labor_confirmation` to Prisma CaseMode enum for full DB persistence
 - P1: Integrate FINDING_META into route.ts for actionHint injection into prompts
 - P2: Fix pre-existing jsdom environment issue for DOM tests (5 test files)
@@ -73,6 +73,6 @@
 - P3: Add procedure-variant support (ADVANCED procedures for complex systems)
 
 ## Next Tasks
-- Wire context-engine into route.ts (replace direct diagnostic-registry calls)
-- Live integration testing with actual OpenAI calls to verify prompt behavior
+- Live integration testing with actual OpenAI calls to verify end-to-end behavior
+- Phase out legacy processUserMessage() calls in favor of context-engine
 - Expand serviceability classification to cover all procedures
