@@ -3,21 +3,74 @@
 ## Original Problem Statement
 **Phase 1:** Fix agent mode/gating regressions — premature labor pivot after fuse replacement, toxic generic fallback, mode regression, language mixing.
 **Phase 2:** Harden diagnostic engine architecture — fuse/breaker must NOT be treated as root cause, action-first procedures, mechanical check before motor replacement, serviceability classification.
-**Phase 3 (Current):** Production stability fixes — dynamic language switching, final output stability with edit mode, consistent labor format, report-only mode, unit-level replacement policy.
+**Phase 3:** Production stability fixes — dynamic language switching, final output stability with edit mode, consistent labor format, report-only mode, unit-level replacement policy.
+**Phase 4 (Current):** Diagnostic loop fix — robust Yes/No parsing, deterministic next-step guarantee, step-specific clarification.
 
 ## Architecture
 - **Stack**: Next.js + TypeScript, Vitest for testing, Prisma + PostgreSQL for storage, OpenAI for LLM
 - **Key modules**: 
   - `diagnostic-registry.ts` (procedure state + findings + serviceability)
   - `diagnostic-procedures.ts` (structured step sequences)
-  - `route.ts` (chat API handler + mode gating + language switching + output lock)
+  - `route.ts` (chat API handler + mode gating + language switching + output lock + Yes/No parsing)
   - `context-engine/` (conversation flow state machine)
   - `mode-validators.ts` (output validation)
   - `labor-store.ts` (labor confirmation)
   - `labor-formatter.ts` (canonical labor output format)
   - `replacement-policy.ts` (unit vs component replacement)
   - `report-only-mode.ts` (direct report generation)
+  - `yesno.ts` (NEW: robust multilingual Yes/No answer parsing)
   - `prompt-composer.ts` (prompt building)
+
+## What's Been Implemented
+
+### Phase 4 (Diagnostic Loop Fix — Dec 2025)
+- **A) Robust Yes/No Parser (`yesno.ts`)**: Multilingual answer parsing for RU/EN/ES with confidence scoring
+  - RU: есть, да есть, нет тету, не вижу, отсутствует
+  - EN: yes, no, present, absent, dead
+  - ES: sí, no, hay, no hay, ausente
+  - Cross-language detection (Russian answer in English context, etc.)
+- **B) Step-Specific Clarification**: When answer is ambiguous, repeat step question with "Да/Нет" request (no generic "provide more info")
+- **C) Deterministic Next-Step Guarantee**: Max 1 LLM retry, then server appends next step question deterministically
+- **D) Step Progression Fix**: `getNextStepQuestion()` and `getStepQuestionById()` for reliable progression
+
+### Phase 3 (Production Stability — Dec 2025)
+- Dynamic Language Switching, Final Output Lock, Labor Format, Report-Only Mode, Unit Replacement Policy
+
+### Phase 2 (Diagnostic Hardening — Jan 2026)
+- Fuse/breaker not key findings, action-first procedures, mechanical check step, serviceability layer
+
+### Phase 1 (Mode Gating — Jan 2026)
+- `canTransitionToLabor()` gates, `detectRepairNotRestored()`, mode persistence, fallback improvements
+
+## Files Modified/Created in Phase 4
+| File | Change |
+|------|--------|
+| `src/lib/yesno.ts` | NEW: Robust Yes/No parser with RU/EN/ES support |
+| `src/lib/diagnostic-registry.ts` | Added `getNextStepQuestion()`, `getStepQuestionById()` |
+| `src/app/api/chat/route.ts` | Integrated Yes/No parsing, deterministic next-step logic |
+| `tests/yesno-parser.test.ts` | NEW: 45 tests for Yes/No parsing |
+| `tests/diagnostic-confirm-loop.test.ts` | NEW: 8 tests for step progression and clarification |
+
+## Test Results
+- **53 new Phase 4 tests — ALL PASSING**
+- **701 total tests passing** across the test suite
+- **45 pre-existing failures** in jsdom/localStorage/API key tests (out of scope)
+
+## Key Fixes
+1. **No more "Подтверждено." without next question** — deterministic append
+2. **No more generic "provide more info"** — step-specific clarification
+3. **No more repeated same step** — proper step completion tracking
+4. **Robust RU answer parsing** — "нет тету", "не вижу", "да есть" all work
+
+## Backlog
+- P0: None — all Phase 4 acceptance criteria met
+- P1: Persist Context Engine state to Prisma DB
+- P2: Fix pre-existing jsdom/localStorage test failures
+- P3: Add procedure-variant support for complex systems
+
+## Next Tasks
+- Live testing with water_pump scenario in RU
+- Verify step progression: Step 1 → Step 2 → Step 3 without loops
 
 ## What's Been Implemented
 
