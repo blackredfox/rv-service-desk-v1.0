@@ -29,9 +29,13 @@
   - EN: yes, no, present, absent, dead
   - ES: sí, no, hay, no hay, ausente
   - Cross-language detection (Russian answer in English context, etc.)
-- **B) Step-Specific Clarification**: When answer is ambiguous, repeat step question with "Да/Нет" request (no generic "provide more info")
-- **C) Deterministic Next-Step Guarantee**: Max 1 LLM retry, then server appends next step question deterministically
-- **D) Step Progression Fix**: `getNextStepQuestion()` and `getStepQuestionById()` for reliable progression
+- **B) Clarification Detection**: NEW - `detectClarificationRequest()` detects "какого?", "не понимаю", "как проверить?" BEFORE Yes/No parsing
+  - Types: `how_to_check`, `which_one`, `not_understand`, `question`
+  - Prevents incorrectly closing steps when technician asks questions
+- **C) Step-Specific Clarification**: When answer is ambiguous, repeat step question with "Да/Нет" request (no generic "provide more info")
+- **D) `buildClarificationResponse()`**: Builds contextual responses for clarification requests
+- **E) Deterministic Next-Step Guarantee**: Max 1 LLM retry, then server appends next step question deterministically
+- **F) Labor Format Fix**: Stronger constraints - "NEVER ask for confirmation", "NEVER include 'Пожалуйста, подтвердите'"
 
 ### Phase 3 (Production Stability — Dec 2025)
 - Dynamic Language Switching, Final Output Lock, Labor Format, Report-Only Mode, Unit Replacement Policy
