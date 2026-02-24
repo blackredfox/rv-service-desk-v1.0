@@ -56,18 +56,18 @@
 | `tests/diagnostic-confirm-loop.test.ts` | NEW: 8 tests for step progression and clarification |
 
 ## Test Results
-- **53 new Phase 4 tests — ALL PASSING**
-- **701 total tests passing** across the test suite
-- **45 pre-existing failures** in jsdom/localStorage/API key tests (out of scope)
+- **63 new Phase 4 tests — ALL PASSING** (clarification + yesno + diagnostic-confirm-loop)
+- **709 total tests passing** across the test suite
+- **47 pre-existing failures** in jsdom/localStorage/API key tests (out of scope)
 
-## Key Fixes
-1. **No more "Подтверждено." without next question** — deterministic append
-2. **No more generic "provide more info"** — step-specific clarification
-3. **No more repeated same step** — proper step completion tracking
-4. **Robust RU answer parsing** — "нет тету", "не вижу", "да есть" all work
+## Key Fixes from Customer Testing
+1. **"какого зарядного устройства?"** → Detected as `which_one` clarification → Explains and repeats question
+2. **"я не понимаю вопроса"** → Detected as `not_understand` → Clarifies question (NOT "Закрываю шаг")
+3. **Labor confirmation loop** → Strengthened constraints to NEVER ask for confirmation
+4. **"нет тету", "не вижу"** → Proper NO detection with high confidence
 
 ## Backlog
-- P0: None — all Phase 4 acceptance criteria met
+- P0: Context gathering (travel trailer vs motorhome, engine vs house battery)
 - P1: Persist Context Engine state to Prisma DB
 - P2: Fix pre-existing jsdom/localStorage test failures
 - P3: Add procedure-variant support for complex systems
