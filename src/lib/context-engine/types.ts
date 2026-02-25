@@ -143,6 +143,7 @@ export type DiagnosticContext = {
   // Isolation state
   isolationComplete: boolean;
   isolationFinding: string | null;
+  causeAllowed: boolean;
   isolationInvalidated: boolean;
   replanReason: string | null;
   
