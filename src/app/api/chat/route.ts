@@ -1095,7 +1095,11 @@ Generate the complete final report now.`;
               full = finalContent;
             } else if (finalResult.error) {
               console.error(`[Chat API v2] Final report generation error: ${finalResult.error}`);
-              const fallback = getSafeFallback(currentMode, outputPolicy.effective);
+              const fallback = applyLangPolicy(
+                getSafeFallback(currentMode, outputPolicy.effective),
+                currentMode,
+                langPolicy
+              );
               for (const char of fallback) {
                 if (aborted) break;
                 controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
