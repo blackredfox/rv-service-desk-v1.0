@@ -60,7 +60,8 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
       expect(prompt).toContain("FINAL REPORT MODE");
       expect(prompt).toContain("--- TRANSLATION ---");
-      expect(prompt).toContain("LABOR JUSTIFICATION");
+      expect(prompt).toContain("Estimated Labor");
+      expect(prompt).toContain("Complaint:");
       expect(prompt).toContain("translate the full output into Russian");
     });
   });
@@ -135,6 +136,17 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_DIAGNOSTIC).toContain("TVs, microwaves, stereos");
       expect(MODE_DIAGNOSTIC).toContain("non-repairable");
     });
+
+    it("should enforce RV terminology and battery-type question", () => {
+      expect(MODE_DIAGNOSTIC).toContain("converter/charger");
+      expect(MODE_DIAGNOSTIC).toContain("battery type/bank");
+      expect(MODE_DIAGNOSTIC).toContain("lead-acid vs lithium");
+    });
+
+    it("should limit non-complex unit teardown", () => {
+      expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX UNIT REPAIR LIMITS");
+      expect(MODE_DIAGNOSTIC).toContain("unit-level replacement");
+    });
   });
 
   describe("MODE_PROMPT_FINAL_REPORT.txt content", () => {
@@ -142,24 +154,24 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_FINAL_REPORT).toContain("--- TRANSLATION ---");
     });
 
-    it("should specify output format and paragraphs", () => {
+    it("should specify required section headers", () => {
       expect(MODE_FINAL_REPORT).toContain("OUTPUT FORMAT");
-      expect(MODE_FINAL_REPORT).toContain("OBSERVED SYMPTOMS");
-      expect(MODE_FINAL_REPORT).toContain("DIAGNOSTIC CHECKS");
-      expect(MODE_FINAL_REPORT).toContain("VERIFIED CONDITION");
-      expect(MODE_FINAL_REPORT).toContain("REQUIRED REPAIR");
-      expect(MODE_FINAL_REPORT).toContain("Labor");
+      expect(MODE_FINAL_REPORT).toContain("Complaint:");
+      expect(MODE_FINAL_REPORT).toContain("Diagnostic Procedure:");
+      expect(MODE_FINAL_REPORT).toContain("Verified Condition:");
+      expect(MODE_FINAL_REPORT).toContain("Recommended Corrective Action:");
+      expect(MODE_FINAL_REPORT).toContain("Estimated Labor:");
+      expect(MODE_FINAL_REPORT).toContain("Required Parts:");
     });
 
     it("should require labor breakdown", () => {
-      expect(MODE_FINAL_REPORT).toContain("Labor");
-      expect(MODE_FINAL_REPORT).toContain("hours");
+      expect(MODE_FINAL_REPORT).toContain("ESTIMATED LABOR RULES");
       expect(MODE_FINAL_REPORT).toContain("Total labor");
     });
 
     it("should enforce plain format", () => {
-      expect(MODE_FINAL_REPORT).toContain("no headers");
-      expect(MODE_FINAL_REPORT).toContain("no numbers");
+      expect(MODE_FINAL_REPORT).toContain("no numbering");
+      expect(MODE_FINAL_REPORT).toContain("no tables");
     });
   });
 });

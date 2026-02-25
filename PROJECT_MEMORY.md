@@ -96,9 +96,24 @@ Modes are **internal** and not shown in UI as “workflow statuses”.
 
 ### 5.2 Mode transitions (Hard Rule)
 Mode changes are **explicit only** and must never be inferred from meaning.
-- Server switches mode only on exact technician commands:
-  - `START AUTHORIZATION REQUEST`
-  - `START FINAL REPORT`
+- Server switches mode only on explicit allow-listed commands (exact/near-exact match after case/whitespace normalization only).
+
+**Final Report aliases:**
+- `START FINAL REPORT`
+- `FINAL REPORT`
+- `GENERATE FINAL REPORT`
+- `REPORT`
+- `GIVE ME THE REPORT`
+- RU: `ВЫДАЙ РЕПОРТ`, `РЕПОРТ`, `ФИНАЛЬНЫЙ РЕПОРТ`, `СДЕЛАЙ РЕПОРТ`
+- ES: `REPORTE FINAL`, `GENERAR REPORTE`, `REPORTE`
+
+**Authorization aliases:**
+- `START AUTHORIZATION REQUEST`
+- `AUTHORIZATION REQUEST`
+- `REQUEST AUTHORIZATION`
+- `PRE-AUTHORIZATION`
+- RU: `ЗАПРОС АВТОРИЗАЦИИ`, `АВТОРИЗАЦИЯ`, `ПРЕАВТОРИЗАЦИЯ`
+- ES: `SOLICITAR AUTORIZACIÓN`, `AUTORIZACIÓN`, `PREAUTORIZACIÓN`
 
 This rule exists to prevent web-agent drift and “helpful assistant” shortcuts.
 

@@ -28,11 +28,11 @@ describe("Mode Validators", () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const finalReportLike = `
-        Observed symptoms indicate pump malfunction.
-        Diagnostic checks performed verified no output.
-        Verified condition shows motor not operating per spec.
-        Recommended replacement of water pump.
-        Labor: Remove and replace pump - 2.0 hours. Total labor: 2.0 hours.
+        Complaint: Observed symptoms indicate pump malfunction.
+        Diagnostic Procedure: Checked voltage and verified no output.
+        Verified Condition: Pump not operating per spec.
+        Estimated Labor: Total labor: 2.0 hr.
+        Required Parts: Water pump assembly.
       `;
 
       const result = validateDiagnosticOutput(finalReportLike);
@@ -118,29 +118,23 @@ describe("Mode Validators", () => {
     it("should pass valid final report", async () => {
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
-      const validReport = `Water pump not operating per spec when activated. System was energized and verified no water pressure at outlet.
-
-Diagnostic checks performed included voltage verification at pump motor terminals, pressure gauge reading at outlet, and physical inspection of pump assembly.
-
-Verified condition: pump motor energizes but produces no water flow, indicating internal pump failure.
-
-Recommend replacement of water pump assembly. Part number to be determined based on unit specifications.
-
-Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation - 0.5 hours. Total labor: 2.0 hours.
+      const validReport = `Complaint: Water pump not providing flow when faucets open.
+Diagnostic Procedure: Verified 12V DC at pump terminals under demand. Confirmed ground continuity and no response under load.
+Verified Condition: Pump receives proper power and ground but does not operate; unit-level malfunction confirmed.
+Recommended Corrective Action: Replace water pump assembly.
+Estimated Labor: Remove and replace pump - 1.0 hr. System prime and leak check - 0.5 hr. Total labor: 1.5 hr.
+Required Parts: Water pump assembly, inlet/outlet hose clamps.
 
 --- TRANSLATION ---
 
-Водяной насос не работает согласно спецификации при активации. Система была под напряжением, подтверждено отсутствие давления воды на выходе.
+Жалоба: Водяной насос не даёт поток воды при открытии крана.
+Диагностическая процедура: Подтверждено 12 В DC на клеммах насоса под нагрузкой. Проверена масса, реакции под нагрузкой нет.
+Подтверждённое состояние: Насос получает питание и массу, но не работает; подтверждена неисправность узла.
+Рекомендованное корректирующее действие: Заменить узел водяного насоса.
+Оценка трудоёмкости: Снятие и замена насоса — 1.0 ч. Прокачка системы и проверка на утечки — 0.5 ч. Общее время: 1.5 ч.
+Требуемые детали: Узел водяного насоса, хомуты на вход/выход.`;
 
-Диагностические проверки включали проверку напряжения на клеммах двигателя насоса, показания манометра на выходе и физический осмотр узла насоса.
-
-Подтверждённое состояние: двигатель насоса включается, но не создаёт поток воды, что указывает на внутреннюю неисправность насоса.
-
-Рекомендуется замена узла водяного насоса. Номер детали будет определён на основе спецификаций установки.
-
-Работа: Снятие и замена узла водяного насоса - 1.5 часа. Проверка работы системы - 0.5 часа. Общее время работы: 2.0 часа.`;
-
-      const result = validateFinalReportOutput(validReport);
+      const result = validateFinalReportOutput(validReport, true, "RU");
 
       expect(result.valid).toBe(true);
     });
@@ -149,29 +143,29 @@ Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "Water pump not operating. Labor: 2 hours."
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding under load.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly."
       );
 
       expect(result.valid).toBe(false);
       expect(result.violations.some(v => v.includes("Missing '--- TRANSLATION ---'"))).toBe(true);
     });
 
-    it("should detect missing labor section", async () => {
+    it("should detect missing section header", async () => {
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "Water pump not operating.\n\n--- TRANSLATION ---\n\nНасос не работает."
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 1.0 hr.\n\n--- TRANSLATION ---\n\nЖалоба: Насос не работает."
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("Missing labor justification"))).toBe(true);
+      expect(result.violations.some(v => v.includes("Missing section header"))).toBe(true);
     });
 
     it("should detect prohibited words in English section", async () => {
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "The water pump has failed and is broken. Labor: 2 hours.\n\n--- TRANSLATION ---\n\nНасос вышел из строя."
+        "Complaint: Water pump has failed and is broken.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit does not respond under load.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly.\n\n--- TRANSLATION ---\n\nЖалоба: Насос не работает."
       );
 
       expect(result.valid).toBe(false);
@@ -182,7 +176,7 @@ Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "1. Water pump issue\n2. Checked voltage\nLabor: 2 hours.\n\n--- TRANSLATION ---\n\n1. Проблема"
+        "Complaint: 1. Water pump issue\nDiagnostic Procedure: 2. Checked voltage\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly.\n\n--- TRANSLATION ---\n\n1. Проблема"
       );
 
       expect(result.valid).toBe(false);
@@ -203,7 +197,10 @@ Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation
       expect(authResult.valid).toBe(true);
 
       // Final report mode (missing translation)
-      const reportResult = validateOutput("Water pump issue. Labor: 2 hours.", "final_report");
+      const reportResult = validateOutput(
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly.",
+        "final_report"
+      );
       expect(reportResult.valid).toBe(false);
     });
 
@@ -299,25 +296,28 @@ Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation
 
 describe("Mode Transition Tests", () => {
   describe("Explicit command transitions", () => {
-    it("should only transition on explicit commands", async () => {
+    it("should only transition on explicit alias matches", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
 
       // These should NOT trigger transitions
       expect(detectModeCommand("I think we should finalize the report")).toBeNull();
       expect(detectModeCommand("Please authorize the repair")).toBeNull();
       expect(detectModeCommand("Generate the final cause text")).toBeNull();
+      expect(detectModeCommand("reporting voltage at converter")).toBeNull();
 
-      // Only explicit commands should work
-      expect(detectModeCommand("START FINAL REPORT")).toBe("final_report");
-      expect(detectModeCommand("START AUTHORIZATION REQUEST")).toBe("authorization");
+      // Explicit aliases should work
+      expect(detectModeCommand("FINAL REPORT")).toBe("final_report");
+      expect(detectModeCommand("GIVE ME THE REPORT")).toBe("final_report");
+      expect(detectModeCommand("ВЫДАЙ РЕПОРТ")).toBe("final_report");
+      expect(detectModeCommand("AUTHORIZATION REQUEST")).toBe("authorization");
+      expect(detectModeCommand("SOLICITAR AUTORIZACIÓN")).toBe("authorization");
     });
 
-    it("should be case-insensitive for commands", async () => {
+    it("should be case-insensitive for aliases", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
 
       expect(detectModeCommand("start final report")).toBe("final_report");
-      expect(detectModeCommand("START FINAL REPORT")).toBe("final_report");
-      expect(detectModeCommand("Start Final Report")).toBe("final_report");
+      expect(detectModeCommand("preautorización")).toBe("authorization");
     });
   });
 
@@ -326,11 +326,12 @@ describe("Mode Transition Tests", () => {
       const { validateOutput } = await import("@/lib/mode-validators");
 
       const finalReportContent = `
-        Water pump not operating per spec.
-        Diagnostic checks verified no output.
-        Verified condition: pump not working.
-        Recommend replacement.
-        Labor: 2 hours. Total labor: 2 hours.
+        Complaint: Water pump not operating per spec.
+        Diagnostic Procedure: Diagnostic checks verified no output.
+        Verified Condition: Pump not working under load.
+        Recommended Corrective Action: Replace water pump assembly.
+        Estimated Labor: Total labor: 2.0 hr.
+        Required Parts: Water pump assembly.
       `;
 
       const result = validateOutput(finalReportContent, "diagnostic");

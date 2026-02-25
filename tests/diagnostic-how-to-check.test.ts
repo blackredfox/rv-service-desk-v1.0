@@ -179,7 +179,7 @@ describe("electrical_12v procedure order", () => {
   });
 });
 
-// ── Portal-Cause correctness (fuse blown ≠ replace motor) ───────────
+// ── Final report correctness (fuse blown ≠ replace motor) ───────────
 
 describe("portal-cause correctness", () => {
   beforeEach(() => clearRegistry("cause-case"));

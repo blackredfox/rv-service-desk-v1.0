@@ -20,6 +20,39 @@ export const MODE_COMMANDS = {
   AUTHORIZATION: "START AUTHORIZATION REQUEST",
 } as const;
 
+// Explicit command alias allow-lists (exact/near-exact matches only)
+const FINAL_REPORT_COMMAND_ALIASES = [
+  "START FINAL REPORT",
+  "FINAL REPORT",
+  "GENERATE FINAL REPORT",
+  "REPORT",
+  "GIVE ME THE REPORT",
+  // RU
+  "ВЫДАЙ РЕПОРТ",
+  "РЕПОРТ",
+  "ФИНАЛЬНЫЙ РЕПОРТ",
+  "СДЕЛАЙ РЕПОРТ",
+  // ES
+  "REPORTE FINAL",
+  "GENERAR REPORTE",
+  "REPORTE",
+];
+
+const AUTHORIZATION_COMMAND_ALIASES = [
+  "START AUTHORIZATION REQUEST",
+  "AUTHORIZATION REQUEST",
+  "REQUEST AUTHORIZATION",
+  "PRE-AUTHORIZATION",
+  // RU
+  "ЗАПРОС АВТОРИЗАЦИИ",
+  "АВТОРИЗАЦИЯ",
+  "ПРЕАВТОРИЗАЦИЯ",
+  // ES
+  "SOLICITAR AUTORIZACIÓN",
+  "AUTORIZACIÓN",
+  "PREAUTORIZACIÓN",
+];
+
 // Transition signal that LLM outputs when ready to change mode
 export const TRANSITION_SIGNAL = "[TRANSITION: FINAL_REPORT]";
 
@@ -78,21 +111,39 @@ function getModePrompt(mode: CaseMode): string {
 }
 
 /**
- * Check if a message contains an explicit mode command
+ * Normalize a command candidate for strict alias matching
+ */
+function normalizeCommandAlias(text: string): string {
+  return (text ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[-–—]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
+const FINAL_REPORT_ALIAS_SET = new Set(FINAL_REPORT_COMMAND_ALIASES.map(normalizeCommandAlias));
+const AUTHORIZATION_ALIAS_SET = new Set(AUTHORIZATION_COMMAND_ALIASES.map(normalizeCommandAlias));
+
+/**
+ * Detect explicit command aliases from a fixed allow-list
+ */
+export function detectExplicitCommandAlias(message: string): CaseMode | null {
+  const normalized = normalizeCommandAlias(message);
+  if (!normalized) return null;
+
+  if (FINAL_REPORT_ALIAS_SET.has(normalized)) return "final_report";
+  if (AUTHORIZATION_ALIAS_SET.has(normalized)) return "authorization";
+
+  return null;
+}
+
+/**
+ * Check if a message contains an explicit mode command (alias allow-list)
  * Returns the new mode, or null if no command found
  */
 export function detectModeCommand(message: string): CaseMode | null {
-  const upperMessage = message.toUpperCase();
-
-  // Check for explicit commands (order matters - more specific first)
-  if (upperMessage.includes(MODE_COMMANDS.FINAL_REPORT)) {
-    return "final_report";
-  }
-  if (upperMessage.includes(MODE_COMMANDS.AUTHORIZATION)) {
-    return "authorization";
-  }
-
-  return null;
+  return detectExplicitCommandAlias(message);
 }
 
 /**

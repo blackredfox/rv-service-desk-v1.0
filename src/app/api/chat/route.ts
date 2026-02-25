@@ -345,26 +345,43 @@ export async function POST(req: Request) {
   // ========================================
   
   // 1. ALWAYS detect input language from message text (source of truth)
-  const inputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
-  
+  const detectedInputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
+
+  // 1b. Respect tracked dialogue language from case metadata (update on explicit switch)
+  let trackedInputLanguage: Language = detectedInputLanguage.detected;
+  if (body?.caseId) {
+    const existing = await storage.getCase(body.caseId, user?.id);
+    const previousLanguage = existing.case?.inputLanguage;
+    if (previousLanguage) {
+      trackedInputLanguage = previousLanguage;
+      if (previousLanguage !== detectedInputLanguage.detected) {
+        trackedInputLanguage = detectedInputLanguage.detected;
+        console.log(`[Chat API v2] Language switch detected: ${previousLanguage} → ${detectedInputLanguage.detected}`);
+      }
+    }
+  }
+
   // 2. Get output mode from request (v2 or legacy v1)
   const outputMode: LanguageMode = normalizeLanguageMode(
     body?.output?.mode ?? body?.languageMode
   );
-  
+
   // 3. Compute effective output language
-  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, inputLanguage.detected);
-  
+  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, trackedInputLanguage);
+
   // 4. Resolve declarative language policy (single source of truth for translation behavior)
-  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, inputLanguage.detected);
-  
-  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}`);
+  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, trackedInputLanguage);
+
+  // Translation language must follow tracked dialogue language (case metadata)
+  const translationLanguage = langPolicy.includeTranslation ? trackedInputLanguage : undefined;
+
+  console.log(`[Chat API v2] Input: detected=${detectedInputLanguage.detected} (${detectedInputLanguage.reason}), dialogue=${trackedInputLanguage}, Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}, translationLanguage=${translationLanguage ?? "none"}`);
 
   // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
-    inputLanguage: inputLanguage.detected,
+    inputLanguage: trackedInputLanguage,
     languageSource: outputPolicy.strategy === "auto" ? "AUTO" : "MANUAL",
     userId: user?.id,
   });
@@ -385,7 +402,7 @@ export async function POST(req: Request) {
     caseId: ensuredCase.id,
     role: "user",
     content: message,
-    language: inputLanguage.detected,
+    language: detectedInputLanguage.detected,
     userId: user?.id,
   });
 
@@ -510,10 +527,10 @@ export async function POST(req: Request) {
 
   const baseSystemPrompt = composePromptV2({
     mode: currentMode,
-    inputDetected: inputLanguage.detected,
+    inputDetected: trackedInputLanguage,
     outputEffective: outputPolicy.effective,
     includeTranslation: langPolicy.includeTranslation,
-    translationLanguage: langPolicy.translationLanguage,
+    translationLanguage,
     additionalConstraints,
   });
   
@@ -542,11 +559,11 @@ export async function POST(req: Request) {
         // Emit v2 language event (new!)
         controller.enqueue(encoder.encode(sseEncode({
           type: "language",
-          inputDetected: inputLanguage.detected,
+          inputDetected: trackedInputLanguage,
           outputMode: outputPolicy.mode,
           outputEffective: outputPolicy.effective,
-          detector: inputLanguage.source,
-          confidence: inputLanguage.confidence,
+          detector: detectedInputLanguage.source,
+          confidence: detectedInputLanguage.confidence,
         })));
         
         // Emit mode
@@ -578,7 +595,7 @@ export async function POST(req: Request) {
         }
 
         // Validate output (pass language policy for translation enforcement)
-        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
+        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
         // If validation fails, retry once with correction
@@ -601,7 +618,7 @@ export async function POST(req: Request) {
           result = await callOpenAI(apiKey, retryBody, ac.signal);
 
           if (!result.error) {
-            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
+            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
@@ -689,7 +706,7 @@ export async function POST(req: Request) {
             // Generate labor confirmation
             const laborPrompt = composePromptV2({
               mode: "labor_confirmation",
-              inputDetected: inputLanguage.detected,
+              inputDetected: trackedInputLanguage,
               outputEffective: outputPolicy.effective,
               includeTranslation: false,
             });
@@ -780,7 +797,7 @@ export async function POST(req: Request) {
           // Generate labor confirmation prompt
           const laborPrompt = composePromptV2({
             mode: "labor_confirmation",
-            inputDetected: inputLanguage.detected,
+            inputDetected: trackedInputLanguage,
             outputEffective: outputPolicy.effective,
             includeTranslation: false, // No translation in labor confirmation
           });
@@ -908,10 +925,10 @@ export async function POST(req: Request) {
             
             const finalReportPrompt = composePromptV2({
               mode: currentMode,
-              inputDetected: inputLanguage.detected,
+              inputDetected: trackedInputLanguage,
               outputEffective: outputPolicy.effective,
               includeTranslation: langPolicy.includeTranslation,
-              translationLanguage: langPolicy.translationLanguage,
+              translationLanguage,
               additionalConstraints: `LABOR BUDGET CONSTRAINT (MANDATORY - DO NOT VIOLATE):
 The technician has confirmed a total labor budget of exactly ${confirmedHours} hours.
 Your labor breakdown MUST sum to exactly ${confirmedHours} hours.
@@ -924,18 +941,23 @@ ${factLock}`,
             
             const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
             
-            const translationInstruction = langPolicy.includeTranslation && langPolicy.translationLanguage
-              ? `\n4. Then "--- TRANSLATION ---"\n5. Complete translation of the above into ${langPolicy.translationLanguage === "RU" ? "Russian" : langPolicy.translationLanguage === "ES" ? "Spanish" : langPolicy.translationLanguage}`
+            const translationInstruction = langPolicy.includeTranslation && translationLanguage
+              ? `\n\nAfter the English report, output "--- TRANSLATION ---" and provide a complete translation into ${translationLanguage === "RU" ? "Russian" : translationLanguage === "ES" ? "Spanish" : "English"}.`
               : "";
 
-            const finalReportRequest = `The technician has confirmed a total labor budget of ${confirmedHours} hours. Generate the Portal-Cause authorization text now.
+            const finalReportRequest = `The technician has confirmed a total labor budget of ${confirmedHours} hours. Generate the FINAL SHOP REPORT now.
 
-REQUIRED OUTPUT FORMAT:
-1. English paragraphs describing: observed symptoms, diagnostic checks, verified condition, required repair, parts required
-2. Labor breakdown by task (individual times MUST sum to exactly ${confirmedHours} hr)
-3. "Total labor: ${confirmedHours} hr"${translationInstruction}
+REQUIRED OUTPUT FORMAT (plain text, no numbering, no tables):
+Complaint:
+Diagnostic Procedure:
+Verified Condition:
+Recommended Corrective Action:
+Estimated Labor:
+Required Parts:
 
-Generate the complete Portal-Cause report now.`;
+Estimated Labor must include task breakdowns that sum to exactly ${confirmedHours} hr and end with "Total labor: ${confirmedHours} hr".${translationInstruction}
+
+Generate the complete final report now.`;
             
             const finalReportBody = {
               model: "gpt-4o-mini",
@@ -952,7 +974,7 @@ Generate the complete Portal-Cause report now.`;
             const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
             
             if (!finalResult.error && finalResult.response.trim()) {
-              const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation);
+              const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation, translationLanguage);
               logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
               
               let finalContent = finalResult.response;
@@ -969,7 +991,7 @@ Generate the complete Portal-Cause report now.`;
               
               // If mode validation fails, try enforcement-based recovery
               if (!finalValidation.valid) {
-                const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation);
+                const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation, translationLanguage);
                 if (!postEnforcementValidation.valid) {
                   console.log(`[Chat API v2] Final report validation failed, using fallback`);
                   finalContent = getSafeFallback(currentMode, outputPolicy.effective);

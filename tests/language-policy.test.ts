@@ -87,20 +87,24 @@ describe("validateFinalReportOutput – policy enforcement", () => {
   beforeEach(() => { vi.resetModules(); });
 
   const ENGLISH_ONLY_REPORT = [
-    "Water pump not operating per spec when activated.",
-    "Diagnostic checks performed included voltage verification.",
-    "Verified condition: pump motor energizes but produces no water flow.",
-    "Recommend replacement of water pump assembly.",
-    "Labor: Remove and replace water pump assembly - 1.5 hours. Total labor: 1.5 hours.",
-  ].join("\n\n");
+    "Complaint: Water pump not operating per spec when activated.",
+    "Diagnostic Procedure: Diagnostic checks included voltage verification at pump terminals.",
+    "Verified Condition: Pump receives power but produces no flow.",
+    "Recommended Corrective Action: Replace water pump assembly.",
+    "Estimated Labor: Remove and replace pump - 1.5 hr. Total labor: 1.5 hr.",
+    "Required Parts: Water pump assembly.",
+  ].join("\n");
 
   const BILINGUAL_REPORT = [
     ENGLISH_ONLY_REPORT,
     "--- TRANSLATION ---",
-    "Водяной насос не работает согласно спецификации.",
-    "Диагностические проверки включали проверку напряжения.",
-    "Работа: Снятие и замена - 1.5 часа. Общее время работы: 1.5 часа.",
-  ].join("\n\n");
+    "Жалоба: Водяной насос не работает при активации.",
+    "Диагностическая процедура: Проверено напряжение на клеммах насоса.",
+    "Подтверждённое состояние: Насос получает питание, но нет потока.",
+    "Рекомендованное корректирующее действие: Заменить узел водяного насоса.",
+    "Оценка трудоёмкости: Снятие и замена — 1.5 ч. Общее время: 1.5 ч.",
+    "Требуемые детали: Узел водяного насоса.",
+  ].join("\n");
 
   it("EN mode (includeTranslation=false) → English-only report is valid", async () => {
     const { validateFinalReportOutput } = await import("@/lib/mode-validators");
@@ -120,7 +124,7 @@ describe("validateFinalReportOutput – policy enforcement", () => {
 
   it("RU mode (includeTranslation=true) → bilingual report is valid", async () => {
     const { validateFinalReportOutput } = await import("@/lib/mode-validators");
-    const result = validateFinalReportOutput(BILINGUAL_REPORT, true);
+    const result = validateFinalReportOutput(BILINGUAL_REPORT, true, "RU");
 
     expect(result.valid).toBe(true);
   });
@@ -147,7 +151,12 @@ describe("validateOutput dispatcher – forwards includeTranslation", () => {
 
   it("final_report + includeTranslation=false → allows English-only", async () => {
     const { validateOutput } = await import("@/lib/mode-validators");
-    const englishOnly = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr. Total labor: 1.0 hr.";
+    const englishOnly = `Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
 
     const result = validateOutput(englishOnly, "final_report", false);
     expect(result.valid).toBe(true);
@@ -155,7 +164,12 @@ describe("validateOutput dispatcher – forwards includeTranslation", () => {
 
   it("final_report + includeTranslation=true → rejects English-only", async () => {
     const { validateOutput } = await import("@/lib/mode-validators");
-    const englishOnly = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr. Total labor: 1.0 hr.";
+    const englishOnly = `Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
 
     const result = validateOutput(englishOnly, "final_report", true);
     expect(result.valid).toBe(false);
@@ -290,7 +304,12 @@ describe("End-to-end: mode → policy → directive → validation", () => {
     expect(directive).not.toContain("--- TRANSLATION ---");
 
     // English-only report should pass validation
-    const report = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr. Total labor: 1.0 hr.";
+    const report = `Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
     const validation = validateFinalReportOutput(report, policy.includeTranslation);
     expect(validation.valid).toBe(true);
   });
@@ -317,13 +336,18 @@ describe("End-to-end: mode → policy → directive → validation", () => {
     expect(directive).toContain("translate the full output into Russian");
 
     // English-only report should FAIL validation
-    const englishOnly = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr.";
+    const englishOnly = `Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
     const v1 = validateFinalReportOutput(englishOnly, policy.includeTranslation);
     expect(v1.valid).toBe(false);
 
     // Bilingual report should pass
     const bilingual = englishOnly + "\n\n--- TRANSLATION ---\n\nНасос не работает. Работа: 1.0 час.";
-    const v2 = validateFinalReportOutput(bilingual, policy.includeTranslation);
+    const v2 = validateFinalReportOutput(bilingual, policy.includeTranslation, policy.translationLanguage);
     expect(v2.valid).toBe(true);
   });
 
@@ -337,7 +361,12 @@ describe("End-to-end: mode → policy → directive → validation", () => {
     expect(input.detected).toBe("EN");
     expect(policy.includeTranslation).toBe(false);
 
-    const report = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr.";
+    const report = `Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
     const validation = validateFinalReportOutput(report, policy.includeTranslation);
     expect(validation.valid).toBe(true);
   });
@@ -353,7 +382,12 @@ describe("End-to-end: mode → policy → directive → validation", () => {
     expect(policy.includeTranslation).toBe(true);
     expect(policy.translationLanguage).toBe("RU");
 
-    const englishOnly = "Water pump not operating. Recommend replacement. Labor: 1.0 hr.";
+    const englishOnly = `Complaint: Water pump not operating.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
     const v = validateFinalReportOutput(englishOnly, policy.includeTranslation);
     expect(v.valid).toBe(false);
   });
@@ -368,8 +402,22 @@ describe("End-to-end: mode → policy → directive → validation", () => {
     expect(policy.includeTranslation).toBe(true);
     expect(policy.translationLanguage).toBe("ES");
 
-    const bilingual = "Water pump not operating. Labor: 1.0 hr.\n\n--- TRANSLATION ---\n\nLa bomba de agua no funciona. Trabajo: 1.0 hora.";
-    const v = validateFinalReportOutput(bilingual, policy.includeTranslation);
+    const bilingual = `Complaint: Water pump not operating.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.
+
+--- TRANSLATION ---
+
+Queja: La bomba de agua no funciona.
+Procedimiento de diagnóstico: Se verificó el voltaje en los terminales de la bomba.
+Condición verificada: La unidad no responde bajo carga.
+Acción correctiva recomendada: Reemplazar la bomba.
+Mano de obra estimada: Total mano de obra: 1.0 hr.
+Piezas requeridas: Bomba de agua.`;
+    const v = validateFinalReportOutput(bilingual, policy.includeTranslation, policy.translationLanguage);
     expect(v.valid).toBe(true);
   });
 });

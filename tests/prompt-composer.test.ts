@@ -54,9 +54,10 @@ describe("Prompt Files", () => {
     
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("FINAL REPORT MODE");
-    expect(content).toContain("Portal-Cause");
+    expect(content).toContain("Shop-Style");
     expect(content).toContain("OUTPUT FORMAT");
-    expect(content).toContain("Labor");
+    expect(content).toContain("Complaint:");
+    expect(content).toContain("Estimated Labor:");
     expect(content).toContain("--- TRANSLATION ---");
   });
 });
@@ -126,33 +127,42 @@ describe("Prompt Composer", () => {
   });
 
   describe("detectModeCommand", () => {
-    it("should detect START FINAL REPORT command", async () => {
+    it("should detect final report aliases (exact match)", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
       
       expect(detectModeCommand("START FINAL REPORT")).toBe("final_report");
-      expect(detectModeCommand("Please START FINAL REPORT now")).toBe("final_report");
-      expect(detectModeCommand("start final report")).toBe("final_report");
+      expect(detectModeCommand("final report")).toBe("final_report");
+      expect(detectModeCommand("GENERATE FINAL REPORT")).toBe("final_report");
+      expect(detectModeCommand("REPORT")).toBe("final_report");
+      expect(detectModeCommand("GIVE ME THE REPORT")).toBe("final_report");
+      expect(detectModeCommand("ВЫДАЙ РЕПОРТ")).toBe("final_report");
+      expect(detectModeCommand("REPORTE FINAL")).toBe("final_report");
     });
 
-    it("should detect START AUTHORIZATION REQUEST command", async () => {
+    it("should detect authorization aliases (exact match)", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
       
       expect(detectModeCommand("START AUTHORIZATION REQUEST")).toBe("authorization");
-      expect(detectModeCommand("I need to START AUTHORIZATION REQUEST")).toBe("authorization");
+      expect(detectModeCommand("AUTHORIZATION REQUEST")).toBe("authorization");
+      expect(detectModeCommand("REQUEST AUTHORIZATION")).toBe("authorization");
+      expect(detectModeCommand("PRE-AUTHORIZATION")).toBe("authorization");
+      expect(detectModeCommand("ЗАПРОС АВТОРИЗАЦИИ")).toBe("authorization");
+      expect(detectModeCommand("AUTORIZACIÓN")).toBe("authorization");
     });
 
-    it("should return null for no command", async () => {
+    it("should be case-insensitive and whitespace tolerant", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
-      
-      expect(detectModeCommand("The water pump is not working")).toBeNull();
-      expect(detectModeCommand("What should I check?")).toBeNull();
+
+      expect(detectModeCommand("  start final report ")).toBe("final_report");
+      expect(detectModeCommand("PREAUTORIZACIÓN")).toBe("authorization");
     });
 
-    it("should prioritize FINAL REPORT over AUTHORIZATION", async () => {
+    it("should return null for non-exact matches", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
       
-      // If both are present, final_report takes priority
-      expect(detectModeCommand("START FINAL REPORT and START AUTHORIZATION REQUEST")).toBe("final_report");
+      expect(detectModeCommand("Please START FINAL REPORT now")).toBeNull();
+      expect(detectModeCommand("reporting voltage at converter")).toBeNull();
+      expect(detectModeCommand("We need authorization")).toBeNull();
     });
   });
 

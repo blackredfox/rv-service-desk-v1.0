@@ -256,7 +256,7 @@ describe("Automatic Mode Transition", () => {
 
       const response = `Зафиксировано: масса проверена, целостность подтверждена.
 
-Isolation complete. Conditions met. Transitioning to Portal-Cause Mode.
+Isolation complete. Conditions met. Transitioning to Final Report Mode.
 
 [TRANSITION: FINAL_REPORT]`;
 
@@ -299,7 +299,7 @@ Step 2: Is 12V DC present at the pump motor terminals?`;
 
       const transitionOutput = `Зафиксировано: масса проверена, целостность подтверждена.
 
-Isolation complete. Conditions met. Transitioning to Portal-Cause Mode.
+Isolation complete. Conditions met. Transitioning to Final Report Mode.
 
 [TRANSITION: FINAL_REPORT]`;
 
