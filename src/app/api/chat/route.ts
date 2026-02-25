@@ -63,6 +63,7 @@ import {
   isFallbackResponse,
   setActiveStep,
   markStepCompleted as markContextStepCompleted,
+  markStepUnable as markContextStepUnable,
   type ContextEngineResult,
   type DiagnosticContext,
   DEFAULT_CONFIG,
