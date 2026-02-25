@@ -474,6 +474,35 @@ export async function POST(req: Request) {
         notices: ["Context Engine error — safe fallback activated"],
       };
     }
+
+    // ── DATA PROVIDER: Sync registry step tracking to Context Engine (data only) ──
+    const registryUpdate = processUserMessage(ensuredCase.id, message);
+    if (registryUpdate.completedStepIds.length > 0) {
+      for (const stepId of registryUpdate.completedStepIds) {
+        markContextStepCompleted(ensuredCase.id, stepId);
+      }
+    }
+    if (registryUpdate.unableStepIds.length > 0) {
+      for (const stepId of registryUpdate.unableStepIds) {
+        markContextStepUnable(ensuredCase.id, stepId);
+      }
+    }
+
+    const contextBeforeIsolation = getContext(ensuredCase.id) ?? engineResult.context;
+    const replanActive = isInReplanState(contextBeforeIsolation);
+
+    if (!replanActive) {
+      if (registryUpdate.keyFinding) {
+        markIsolationComplete(ensuredCase.id, registryUpdate.keyFinding);
+      } else if (isProcedureComplete(ensuredCase.id)) {
+        markIsolationComplete(ensuredCase.id, "Diagnostic procedure complete");
+      }
+    }
+
+    const syncedContext = getContext(ensuredCase.id);
+    if (syncedContext) {
+      engineResult.context = syncedContext;
+    }
     
     // Log context engine decision (SINGLE SOURCE OF TRUTH)
     console.log(`[Chat API v2] Context Engine: intent=${engineResult.intent.type}, submode=${engineResult.context.submode}, stateChanged=${engineResult.stateChanged}`);
