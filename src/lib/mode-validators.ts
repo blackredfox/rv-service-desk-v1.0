@@ -20,13 +20,13 @@ const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
 
 // Final report section indicators (heuristics)
 const FINAL_REPORT_INDICATORS = [
-  /labor[:\s]/i,
-  /hours?\s*[:.]/i,
+  /complaint\s*:/i,
+  /diagnostic\s+procedure\s*:/i,
+  /verified\s+condition\s*:/i,
+  /recommended\s+corrective\s+action\s*:/i,
+  /estimated\s+labor\s*:/i,
+  /required\s+parts\s*:/i,
   /total\s+labor/i,
-  /recommend(ed)?\s+(replacement|repair)/i,
-  /verified\s+(condition|failure|that)/i,
-  /observed\s+symptom/i,
-  /diagnostic\s+check/i,
 ];
 
 // Safe fallback responses - LOCALIZED by language
