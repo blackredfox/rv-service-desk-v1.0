@@ -151,12 +151,12 @@ describe("validateOutput dispatcher – forwards includeTranslation", () => {
 
   it("final_report + includeTranslation=false → allows English-only", async () => {
     const { validateOutput } = await import("@/lib/mode-validators");
-    const englishOnly = "Complaint: Water pump not operating per spec.
+    const englishOnly = `Complaint: Water pump not operating per spec.
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
 Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.";
+Required Parts: Water pump assembly.`;
 
     const result = validateOutput(englishOnly, "final_report", false);
     expect(result.valid).toBe(true);
@@ -164,12 +164,12 @@ Required Parts: Water pump assembly.";
 
   it("final_report + includeTranslation=true → rejects English-only", async () => {
     const { validateOutput } = await import("@/lib/mode-validators");
-    const englishOnly = "Complaint: Water pump not operating per spec.
+    const englishOnly = `Complaint: Water pump not operating per spec.
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
 Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.";
+Required Parts: Water pump assembly.`;
 
     const result = validateOutput(englishOnly, "final_report", true);
     expect(result.valid).toBe(false);
@@ -304,12 +304,12 @@ describe("End-to-end: mode → policy → directive → validation", () => {
     expect(directive).not.toContain("--- TRANSLATION ---");
 
     // English-only report should pass validation
-    const report = "Complaint: Water pump not operating per spec.
+    const report = `Complaint: Water pump not operating per spec.
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
 Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.";
+Required Parts: Water pump assembly.`;
     const validation = validateFinalReportOutput(report, policy.includeTranslation);
     expect(validation.valid).toBe(true);
   });
@@ -336,12 +336,12 @@ Required Parts: Water pump assembly.";
     expect(directive).toContain("translate the full output into Russian");
 
     // English-only report should FAIL validation
-    const englishOnly = "Complaint: Water pump not operating per spec.
+    const englishOnly = `Complaint: Water pump not operating per spec.
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
 Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.";
+Required Parts: Water pump assembly.`;
     const v1 = validateFinalReportOutput(englishOnly, policy.includeTranslation);
     expect(v1.valid).toBe(false);
 
@@ -361,12 +361,12 @@ Required Parts: Water pump assembly.";
     expect(input.detected).toBe("EN");
     expect(policy.includeTranslation).toBe(false);
 
-    const report = "Complaint: Water pump not operating per spec.
+    const report = `Complaint: Water pump not operating per spec.
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
 Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.";
+Required Parts: Water pump assembly.`;
     const validation = validateFinalReportOutput(report, policy.includeTranslation);
     expect(validation.valid).toBe(true);
   });
@@ -382,12 +382,12 @@ Required Parts: Water pump assembly.";
     expect(policy.includeTranslation).toBe(true);
     expect(policy.translationLanguage).toBe("RU");
 
-    const englishOnly = "Complaint: Water pump not operating.
+    const englishOnly = `Complaint: Water pump not operating.
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
 Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.";
+Required Parts: Water pump assembly.`;
     const v = validateFinalReportOutput(englishOnly, policy.includeTranslation);
     expect(v.valid).toBe(false);
   });
