@@ -125,11 +125,12 @@ function looksLikeFinalReport(text: string): boolean {
 
   const shopMatches = countMatches(shopHeaderPatterns);
   const legacyMatches = countMatches(legacyMarkerPatterns);
+  const totalMarkers = shopMatches + legacyMatches;
+  const hasTranslation = sample.includes(TRANSLATION_SEPARATOR);
 
-  if (shopMatches >= 2) return true;
-  if (legacyMatches >= 2) return true;
+  if (shopMatches >= 2 || legacyMatches >= 2) return true;
 
-  if (sample.includes(TRANSLATION_SEPARATOR) && shopMatches + legacyMatches >= 1) {
+  if (hasTranslation && totalMarkers >= 1) {
     return true;
   }
 
