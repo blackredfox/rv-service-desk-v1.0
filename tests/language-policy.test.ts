@@ -382,7 +382,12 @@ Required Parts: Water pump assembly.";
     expect(policy.includeTranslation).toBe(true);
     expect(policy.translationLanguage).toBe("RU");
 
-    const englishOnly = "Water pump not operating. Recommend replacement. Labor: 1.0 hr.";
+    const englishOnly = "Complaint: Water pump not operating.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.";
     const v = validateFinalReportOutput(englishOnly, policy.includeTranslation);
     expect(v.valid).toBe(false);
   });
