@@ -168,8 +168,8 @@ Estimated Labor: Total labor: 1.0 hr.`;
 Diagnostic Procedure: Verified voltage at pump terminals.
 Verified Condition: Unit not responding under load.
 Recommended Corrective Action: Replace pump.
-Estimated Labor: Total labor: 1.0 hr.
-Required Parts: Water pump assembly.`;
+Required Parts: Water pump assembly.
+Estimated Labor: Total labor: 1.0 hr.`;
 
     const result = validateOutput(englishOnly, "final_report", true);
     expect(result.valid).toBe(false);
