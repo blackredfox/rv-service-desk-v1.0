@@ -457,7 +457,7 @@ describe("Context Engine — Clarification Handling (P0c)", () => {
     const result = processMessage(caseId, "how do I check the capacitor?");
     
     expect(result.intent.type).toBe("HOWTO");
-    expect(result.context.submode).toBe("howto");
+    expect(result.context.submode).toBe("clarification");
     expect(result.responseInstructions.action).toBe("provide_clarification");
     expect(result.responseInstructions.clarificationType).toBe("howto");
     expect(result.responseInstructions.returnToStep).toBe("ac_5");
