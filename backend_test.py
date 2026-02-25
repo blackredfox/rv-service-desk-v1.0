@@ -33,141 +33,219 @@ class PromptOrchestrationTester:
             print(f"❌ {name} - ERROR: {str(e)}")
             return False
 
-    def test_typescript_db_compilation(self):
-        """Test TypeScript compilation for db.ts"""
+    def test_alias_detection_unit_tests(self):
+        """Test alias detection via unit tests"""
         try:
-            result = subprocess.run(
-                ["npx", "tsc", "--noEmit", "--project", "tsconfig.json"],
-                cwd=self.base_dir,
-                capture_output=True,
-                text=True
-            )
-            
-            # Check for any db.ts errors
-            db_errors = [line for line in result.stderr.split('\n') if 'db.ts' in line and 'error TS' in line]
-            return len(db_errors) == 0
-        except Exception as e:
-            print(f"TypeScript test error: {e}")
-            return False
-
-    def test_typescript_dependent_files(self):
-        """Test TypeScript compilation for storage.ts, auth.ts, analytics.ts"""
-        try:
-            result = subprocess.run(
-                ["npx", "tsc", "--noEmit", "--project", "tsconfig.json"],
-                cwd=self.base_dir,
-                capture_output=True,
-                text=True
-            )
-            
-            # Check for errors in dependent files
-            dependent_errors = [line for line in result.stderr.split('\n') 
-                              if any(file in line for file in ['storage.ts', 'auth.ts', 'analytics.ts']) 
-                              and 'error TS' in line]
-            return len(dependent_errors) == 0
-        except Exception as e:
-            print(f"Dependent files test error: {e}")
-            return False
-
-    def test_total_typescript_errors(self):
-        """Test that total TS errors are around 20, not 41+"""
-        try:
-            result = subprocess.run(
-                ["npx", "tsc", "--noEmit", "--project", "tsconfig.json"],
-                cwd=self.base_dir,
-                capture_output=True,
-                text=True
-            )
-            
-            # Count lines containing 'error TS' - errors show up in stderr
-            all_output = result.stderr + result.stdout
-            error_lines = [line for line in all_output.split('\n') if 'error TS' in line and line.strip()]
-            error_count = len(error_lines)
-            print(f"Total TypeScript errors: {error_count}")
-            print(f"Sample error lines: {error_lines[:3] if error_lines else 'None'}")
-            
-            # Should be around 20, definitely not 41+
-            return 15 <= error_count <= 25
-        except Exception as e:
-            print(f"Total TS errors test error: {e}")
-            return False
-
-    def test_eslint_db(self):
-        """Test ESLint on db.ts"""
-        try:
-            result = subprocess.run(
-                ["npx", "eslint", "src/lib/db.ts"],
-                cwd=self.base_dir,
-                capture_output=True,
-                text=True
-            )
-            return result.returncode == 0
-        except Exception as e:
-            print(f"ESLint test error: {e}")
-            return False
-
-    def test_runtime_with_database_url(self):
-        """Test runtime behavior with DATABASE_URL"""
-        try:
-            env = os.environ.copy()
-            env["DATABASE_URL"] = "postgresql://dummy:dummy@localhost:5432/testdb"
-            
             result = subprocess.run([
-                "npx", "tsx", "-e", 
-                "import { getPrisma } from './src/lib/db'; getPrisma().then(p => { console.log('OK:', typeof p.case); return p.$disconnect() }).then(() => process.exit(0))"
-            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+                "yarn", "test", "tests/prompt-composer.test.ts", 
+                "--reporter=verbose"
+            ], cwd=self.base_dir, capture_output=True, text=True)
             
-            return result.returncode == 0 and "OK: object" in result.stdout
+            # Check if alias detection tests pass
+            output = result.stdout + result.stderr
+            
+            # Look for specific test results
+            alias_tests_passed = all([
+                "should detect final report aliases (exact match)" in output,
+                "should detect authorization aliases (exact match)" in output,
+                "should return null for non-exact matches" in output
+            ])
+            
+            if alias_tests_passed and result.returncode == 0:
+                print("  ✓ All alias detection tests passed")
+                return True
+            else:
+                print(f"  ❌ Unit tests failed or missing. Return code: {result.returncode}")
+                return False
+                
         except Exception as e:
-            print(f"Runtime test error: {e}")
+            print(f"Alias detection test error: {e}")
             return False
 
-    def test_singleton_behavior(self):
-        """Test singleton behavior"""
+    def test_mode_validators_unit_tests(self):
+        """Test mode validators via unit tests"""
         try:
-            env = os.environ.copy()
-            env["DATABASE_URL"] = "postgresql://dummy:dummy@localhost:5432/testdb"
-            
             result = subprocess.run([
-                "npx", "tsx", "-e",
-                "import { getPrisma } from './src/lib/db'; (async () => { const p1 = await getPrisma(); const p2 = await getPrisma(); console.log('Singleton:', p1 === p2 ? 'PASS' : 'FAIL'); await p1.$disconnect(); process.exit(p1 === p2 ? 0 : 1); })()"
-            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+                "yarn", "test", "tests/mode-validators.test.ts",
+                "--reporter=verbose"
+            ], cwd=self.base_dir, capture_output=True, text=True)
             
-            return result.returncode == 0 and "Singleton: PASS" in result.stdout
+            output = result.stdout + result.stderr
+            
+            # Check for final report validation tests
+            validation_tests_passed = all([
+                "should detect missing translation separator" in output,
+                "should detect missing section header" in output,
+                "should detect prohibited words" in output
+            ])
+            
+            if validation_tests_passed and result.returncode == 0:
+                print("  ✓ All mode validator tests passed")
+                return True
+            else:
+                print(f"  ❌ Mode validator tests failed. Return code: {result.returncode}")
+                return False
+                
         except Exception as e:
-            print(f"Singleton test error: {e}")
+            print(f"Mode validators test error: {e}")
             return False
 
-    def test_env_validation(self):
-        """Test environment validation"""
+    def test_prompt_enforcement_unit_tests(self):
+        """Test prompt enforcement via unit tests"""
         try:
-            env = os.environ.copy()
-            env.pop("DATABASE_URL", None)  # Remove DATABASE_URL
-            
             result = subprocess.run([
-                "npx", "tsx", "-e",
-                "import { getPrisma } from './src/lib/db'; getPrisma().catch(err => { console.log('Error:', err.message); process.exit(err.message.includes('DATABASE_URL is not set') ? 0 : 1); })"
-            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+                "yarn", "test", "tests/prompt-enforcement.test.ts",
+                "--reporter=verbose"
+            ], cwd=self.base_dir, capture_output=True, text=True)
             
-            return result.returncode == 0 and "DATABASE_URL is not set" in result.stdout
+            output = result.stdout + result.stderr
+            
+            # Check for RV terminology enforcement tests
+            enforcement_tests_passed = all([
+                "should enforce RV terminology and battery-type question" in output,
+                "should limit non-complex unit teardown" in output,
+                "should list all complex equipment types" in output
+            ])
+            
+            if enforcement_tests_passed and result.returncode == 0:
+                print("  ✓ All prompt enforcement tests passed")
+                return True
+            else:
+                print(f"  ❌ Prompt enforcement tests failed. Return code: {result.returncode}")
+                return False
+                
         except Exception as e:
-            print(f"Env validation test error: {e}")
+            print(f"Prompt enforcement test error: {e}")
             return False
 
-    def test_export_stability(self):
-        """Test export stability"""
+    def test_language_policy_unit_tests(self):
+        """Test language policy via unit tests"""
         try:
-            env = os.environ.copy()
-            env["DATABASE_URL"] = "postgresql://dummy:dummy@localhost:5432/testdb"
-            
             result = subprocess.run([
-                "npx", "tsx", "-e",
-                "import { getPrisma, PrismaClientType } from './src/lib/db'; console.log('Exports OK'); process.exit(0);"
-            ], cwd=self.base_dir, capture_output=True, text=True, env=env)
+                "yarn", "test", "tests/language-policy.test.ts",
+                "--reporter=verbose" 
+            ], cwd=self.base_dir, capture_output=True, text=True)
             
-            return result.returncode == 0 and "Exports OK" in result.stdout
+            output = result.stdout + result.stderr
+            
+            # Check for language policy tests
+            policy_tests_passed = all([
+                "EN mode → no translation" in output,
+                "RU mode → translation into Russian" in output,
+                "ES mode → translation into Spanish" in output
+            ])
+            
+            if policy_tests_passed and result.returncode == 0:
+                print("  ✓ All language policy tests passed")
+                return True
+            else:
+                print(f"  ❌ Language policy tests failed. Return code: {result.returncode}")
+                return False
+                
         except Exception as e:
-            print(f"Export stability test error: {e}")
+            print(f"Language policy test error: {e}")
+            return False
+
+    def test_overall_unit_test_suite(self):
+        """Test overall unit test suite"""
+        try:
+            result = subprocess.run([
+                "yarn", "test", "--run"
+            ], cwd=self.base_dir, capture_output=True, text=True)
+            
+            output = result.stdout + result.stderr
+            
+            # Check pass rate
+            if "passed" in output and result.returncode == 0:
+                print(f"  ✓ Overall test suite passed")
+                return True
+            else:
+                print(f"  ❌ Overall test suite failed. Return code: {result.returncode}")
+                print(f"  Output snippet: {output[-500:]}")  # Last 500 chars for debugging
+                return False
+                
+        except Exception as e:
+            print(f"Overall test suite error: {e}")
+            return False
+
+    def test_prompt_file_integrity(self):
+        """Test that prompt files exist and contain required content"""
+        try:
+            # Test diagnostic prompt contains RV terminology
+            diagnostic_path = os.path.join(self.base_dir, "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt")
+            if not os.path.exists(diagnostic_path):
+                print("  ❌ Diagnostic prompt file missing")
+                return False
+                
+            with open(diagnostic_path, 'r') as f:
+                diagnostic_content = f.read()
+                
+            rv_terms_present = all([
+                "converter/charger" in diagnostic_content,
+                "inverter" in diagnostic_content,
+                "battery type/bank" in diagnostic_content,
+                "NON-COMPLEX UNIT REPAIR LIMITS" in diagnostic_content
+            ])
+            
+            if not rv_terms_present:
+                print("  ❌ Required RV terminology missing from diagnostic prompt")
+                return False
+                
+            # Test final report prompt
+            final_report_path = os.path.join(self.base_dir, "prompts/modes/MODE_PROMPT_FINAL_REPORT.txt") 
+            if not os.path.exists(final_report_path):
+                print("  ❌ Final report prompt file missing")
+                return False
+                
+            with open(final_report_path, 'r') as f:
+                final_report_content = f.read()
+                
+            final_report_structure = all([
+                "Complaint:" in final_report_content,
+                "Diagnostic Procedure:" in final_report_content,
+                "Verified Condition:" in final_report_content,
+                "--- TRANSLATION ---" in final_report_content
+            ])
+            
+            if not final_report_structure:
+                print("  ❌ Required structure missing from final report prompt")
+                return False
+                
+            print("  ✓ All prompt files contain required content")
+            return True
+            
+        except Exception as e:
+            print(f"Prompt file integrity test error: {e}")
+            return False
+
+    def test_typescript_compilation_clean(self):
+        """Test TypeScript compilation is clean"""
+        try:
+            result = subprocess.run([
+                "npx", "tsc", "--noEmit", "--project", "tsconfig.json"
+            ], cwd=self.base_dir, capture_output=True, text=True)
+            
+            # Count critical errors in key files
+            key_files = ["prompt-composer.ts", "mode-validators.ts", "chat/route.ts"]
+            critical_errors = []
+            
+            for line in result.stderr.split('\n'):
+                if 'error TS' in line:
+                    for file in key_files:
+                        if file in line:
+                            critical_errors.append(line.strip())
+            
+            if len(critical_errors) == 0:
+                print("  ✓ No critical TypeScript errors in prompt orchestration files")
+                return True
+            else:
+                print(f"  ❌ Found {len(critical_errors)} critical errors:")
+                for error in critical_errors[:3]:  # Show first 3
+                    print(f"    {error}")
+                return False
+                
+        except Exception as e:
+            print(f"TypeScript compilation test error: {e}")
             return False
 
 def main():
