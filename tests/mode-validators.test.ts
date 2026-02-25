@@ -326,11 +326,12 @@ describe("Mode Transition Tests", () => {
       const { validateOutput } = await import("@/lib/mode-validators");
 
       const finalReportContent = `
-        Water pump not operating per spec.
-        Diagnostic checks verified no output.
-        Verified condition: pump not working.
-        Recommend replacement.
-        Labor: 2 hours. Total labor: 2 hours.
+        Complaint: Water pump not operating per spec.
+        Diagnostic Procedure: Diagnostic checks verified no output.
+        Verified Condition: Pump not working under load.
+        Recommended Corrective Action: Replace water pump assembly.
+        Estimated Labor: Total labor: 2.0 hr.
+        Required Parts: Water pump assembly.
       `;
 
       const result = validateOutput(finalReportContent, "diagnostic");
