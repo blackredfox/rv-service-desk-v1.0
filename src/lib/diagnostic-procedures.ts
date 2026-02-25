@@ -42,7 +42,7 @@ export type DiagnosticProcedure = {
 
 const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
   { system: "water_pump", patterns: [/water\s*pump/i, /водяно[йе]\s*насос/i, /bomba\s*de\s*agua/i, /fresh\s*water\s*pump/i] },
-  { system: "lp_gas", patterns: [/lp\s*gas|propane|gas\s*(?:system|leak|line|valve|regulator)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
+  { system: "lp_gas", patterns: [/lp\s*gas|lpg\b|liquid\s*propane|propane|gas\s*(?:system|leak|line|valve|regulator)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
   { system: "slide_out", patterns: [/slide[\s-]*out/i, /слайд/i, /slide\s*room/i] },
   { system: "leveling", patterns: [/level(?:ing|er)?\s*(?:system|jack)/i, /jack\s*system/i, /выравнива/i, /nivelaci/i] },
   { system: "inverter_converter", patterns: [/inverter/i, /converter/i, /инвертер|инвертор|конвертер|конвертор/i] },
