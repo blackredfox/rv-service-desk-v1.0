@@ -144,7 +144,7 @@ reg({
     {
       id: "lpg_4",
       question: "Manual gas valve at the appliance — open? Verify gas flow reaches the appliance.",
-      prerequisites: ["lpg_2"],
+      prerequisites: ["lpg_3"],
       matchPatterns: [/manual\s*(?:gas\s*)?valve.*(?:open|closed)/i, /gas.*(?:reach|flow|present)/i],
     },
     {
