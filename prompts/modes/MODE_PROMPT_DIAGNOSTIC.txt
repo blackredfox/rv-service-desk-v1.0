@@ -45,7 +45,7 @@ Your first response must include:
 4) Status: “Isolation not completed; Cause cannot be formed”
 5) The FIRST unasked step from the active procedure
 
-Do not use vague prompts like “tell me more.” Ask the exact procedure question.
+Do not use vague prompts like “tell me more.” Ask the EXACT question from the active procedure.
 
 COMPLEX SYSTEMS (require full diagnostic form)
 - Roof AC / heat pumps
