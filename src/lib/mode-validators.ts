@@ -104,8 +104,9 @@ function containsProhibitedWords(text: string): string[] {
  * Check if text looks like a final report (shop-style or legacy markers)
  */
 function looksLikeFinalReport(text: string): boolean {
-  const sample = text ?? "";
-  if (!sample.trim()) return false;
+  const sample = (text ?? "");
+  const trimmed = sample.trim();
+  if (!trimmed) return false;
 
   const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const countMatches = (patterns: RegExp[]): number =>
