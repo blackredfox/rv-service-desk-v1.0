@@ -1170,11 +1170,17 @@ Generate the complete final report now.`;
             }
             
             // Emit non-blocking labor hint
+            const laborStatusMessage = outputPolicy.effective === "RU"
+              ? "Оценка трудозатрат — черновик. Подтвердите, скорректируйте или продолжите диагностику."
+              : outputPolicy.effective === "ES"
+              ? "La estimación de mano de obra es un borrador. Confírmela, ajústela o continúe con el diagnóstico."
+              : "Labor estimate is a draft. Confirm, adjust, or continue diagnostics.";
+
             controller.enqueue(encoder.encode(sseEncode({ 
               type: "labor_status", 
               status: "draft",
               estimatedHours: laborEntry?.estimatedHours,
-              message: "Labor estimate is a draft. Confirm, adjust, or continue diagnostics."
+              message: laborStatusMessage,
             })));
           }
         } else {
