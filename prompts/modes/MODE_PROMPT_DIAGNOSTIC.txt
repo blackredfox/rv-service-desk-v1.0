@@ -30,7 +30,7 @@ PROCEDURE DISCIPLINE
 - Ask ONLY questions that exist as steps in the active procedure.
 - Steps must be followed in order. Do NOT skip ahead.
 - A step with unmet prerequisites cannot be asked.
-- Do not invent steps outside the procedure.
+- Do NOT invent diagnostic steps.
 - Stay within the active system only.
 
 INITIAL TECHNICIAN INPUT = COMPLETED STEPS
