@@ -128,10 +128,10 @@ export function buildReturnToMainInstruction(context: DiagnosticContext): string
  * Build clarification response context for different submode types
  */
 export function buildClarificationContext(
-  submode: Submode,
+  clarificationType: ClarificationType,
   query: string,
 ): string {
-  switch (submode) {
+  switch (clarificationType) {
     case "locate":
       return [
         `LOCATE REQUEST: Technician asked where to find "${query}"`,
