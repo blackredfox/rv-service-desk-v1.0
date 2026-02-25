@@ -134,7 +134,7 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
 Оценка трудоёмкости: Снятие и замена насоса — 1.0 ч. Прокачка системы и проверка на утечки — 0.5 ч. Общее время: 1.5 ч.
 Требуемые детали: Узел водяного насоса, хомуты на вход/выход.`;
 
-      const result = validateFinalReportOutput(validReport);
+      const result = validateFinalReportOutput(validReport, true, "RU");
 
       expect(result.valid).toBe(true);
     });
