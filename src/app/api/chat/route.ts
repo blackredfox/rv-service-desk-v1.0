@@ -889,7 +889,7 @@ export async function POST(req: Request) {
           const laborResult = await callOpenAI(apiKey, laborBody, ac.signal);
           
           if (!laborResult.error && laborResult.response.trim()) {
-            let laborContent = laborResult.response;
+            let laborContent = applyLangPolicy(laborResult.response, currentMode, langPolicy);
             
             // Extract and store the estimated hours
             const estimatedHours = extractLaborEstimate(laborContent);
@@ -913,11 +913,15 @@ export async function POST(req: Request) {
               userId: user?.id,
             });
             
-            full = transitionResult.cleanedResponse + separator + laborContent;
+            full = transitionResponse + separator + laborContent;
           } else if (laborResult.error) {
             console.error(`[Chat API v2] Labor confirmation generation error: ${laborResult.error}`);
             // Use fallback
-            const fallback = getSafeFallback("labor_confirmation", outputPolicy.effective);
+            const fallback = applyLangPolicy(
+              getSafeFallback("labor_confirmation", outputPolicy.effective),
+              currentMode,
+              langPolicy
+            );
             for (const char of fallback) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
@@ -931,7 +935,7 @@ export async function POST(req: Request) {
             });
             // Set fallback estimate
             setLaborEstimate(ensuredCase.id, 1.0);
-            full = transitionResult.cleanedResponse + separator + fallback;
+            full = transitionResponse + separator + fallback;
           }
         } else if (currentMode === "labor_confirmation" && !aborted) {
           // ========================================
