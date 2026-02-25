@@ -103,6 +103,7 @@ export function executeReplan(
   const updatedContext: DiagnosticContext = {
     ...context,
     isolationComplete: false,
+    causeAllowed: false,
     isolationInvalidated: true,
     replanReason: replanResult.reason || "New evidence invalidated prior conclusion",
     updatedAt: now,
