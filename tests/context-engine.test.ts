@@ -373,7 +373,7 @@ describe("Context Engine — Clarification Handling (P0c)", () => {
     
     const topic = getCurrentClarificationTopic(context);
     expect(topic?.topic).toBe("capacitor");
-    expect(topic?.submode).toBe("locate");
+    expect(topic?.clarificationType).toBe("locate");
     
     // Pop back to main
     context = popTopic(context);
