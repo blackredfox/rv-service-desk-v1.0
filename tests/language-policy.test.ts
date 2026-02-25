@@ -402,7 +402,21 @@ Required Parts: Water pump assembly.`;
     expect(policy.includeTranslation).toBe(true);
     expect(policy.translationLanguage).toBe("ES");
 
-    const bilingual = "Water pump not operating. Labor: 1.0 hr.\n\n--- TRANSLATION ---\n\nLa bomba de agua no funciona. Trabajo: 1.0 hora.";
+    const bilingual = `Complaint: Water pump not operating.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.
+
+--- TRANSLATION ---
+
+Queja: La bomba de agua no funciona.
+Procedimiento de diagnóstico: Se verificó el voltaje en los terminales de la bomba.
+Condición verificada: La unidad no responde bajo carga.
+Acción correctiva recomendada: Reemplazar la bomba.
+Mano de obra estimada: Total mano de obra: 1.0 hr.
+Piezas requeridas: Bomba de agua.`;
     const v = validateFinalReportOutput(bilingual, policy.includeTranslation);
     expect(v.valid).toBe(true);
   });
