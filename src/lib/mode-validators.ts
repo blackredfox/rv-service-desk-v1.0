@@ -132,9 +132,11 @@ function looksLikeFinalReport(text: string): boolean {
   const legacyMatches = countMatches(legacyMarkerPatterns);
   if (legacyMatches >= 2) return true;
 
+  const totalMarkers = shopMatches + legacyMatches;
+
   // Rule 3: translation reinforcement (separator + any marker)
   const hasTranslation = sample.includes(TRANSLATION_SEPARATOR);
-  if (hasTranslation && shopMatches + legacyMatches >= 1) {
+  if (hasTranslation && totalMarkers >= 1) {
     return true;
   }
 
