@@ -53,7 +53,7 @@ LANGUAGE RULES:
 - Never mix languages inside the English block.
 - Do not output translation blocks outside final report mode.
 
-WORDING SAFETY
+WORDING SAFETY:
 - Never use denial-triggering words in service authorization:
   broken, failed, defective, bad, damaged, worn, misadjusted, leaking.
 - Use neutral technical language instead.
