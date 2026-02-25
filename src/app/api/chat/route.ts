@@ -559,11 +559,11 @@ export async function POST(req: Request) {
         // Emit v2 language event (new!)
         controller.enqueue(encoder.encode(sseEncode({
           type: "language",
-          inputDetected: inputLanguage.detected,
+          inputDetected: trackedInputLanguage,
           outputMode: outputPolicy.mode,
           outputEffective: outputPolicy.effective,
-          detector: inputLanguage.source,
-          confidence: inputLanguage.confidence,
+          detector: detectedInputLanguage.source,
+          confidence: detectedInputLanguage.confidence,
         })));
         
         // Emit mode
