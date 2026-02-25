@@ -122,8 +122,8 @@ describe("Mode Validators", () => {
 Diagnostic Procedure: Verified 12V DC at pump terminals under demand. Confirmed ground continuity and no response under load.
 Verified Condition: Pump receives proper power and ground but does not operate; unit-level malfunction confirmed.
 Recommended Corrective Action: Replace water pump assembly.
-Estimated Labor: Remove and replace pump - 1.0 hr. System prime and leak check - 0.5 hr. Total labor: 1.5 hr.
 Required Parts: Water pump assembly, inlet/outlet hose clamps.
+Estimated Labor: Remove and replace pump - 1.0 hr. System prime and leak check - 0.5 hr. Total labor: 1.5 hr.
 
 --- TRANSLATION ---
 
@@ -131,8 +131,8 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
 Диагностическая процедура: Подтверждено 12 В DC на клеммах насоса под нагрузкой. Проверена масса, реакции под нагрузкой нет.
 Подтверждённое состояние: Насос получает питание и массу, но не работает; подтверждена неисправность узла.
 Рекомендованное корректирующее действие: Заменить узел водяного насоса.
-Оценка трудоёмкости: Снятие и замена насоса — 1.0 ч. Прокачка системы и проверка на утечки — 0.5 ч. Общее время: 1.5 ч.
-Требуемые детали: Узел водяного насоса, хомуты на вход/выход.`;
+Требуемые детали: Узел водяного насоса, хомуты на вход/выход.
+Оценка трудоёмкости: Снятие и замена насоса — 1.0 ч. Прокачка системы и проверка на утечки — 0.5 ч. Общее время: 1.5 ч.`;
 
       const result = validateFinalReportOutput(validReport, true, "RU");
 
