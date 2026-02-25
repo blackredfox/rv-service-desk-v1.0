@@ -400,12 +400,12 @@ describe("Context Engine — Clarification Handling (P0c)", () => {
     // Push explain while in locate
     context = pushTopic(context, { type: "EXPLAIN", query: "capacitor function" });
     expect(context.topicStack.length).toBe(2);
-    expect(context.submode).toBe("explain");
+    expect(context.submode).toBe("clarification");
     
     // Pop back to locate
     context = popTopic(context);
     expect(context.topicStack.length).toBe(1);
-    expect(context.submode).toBe("locate");
+    expect(context.submode).toBe("clarification");
     
     // Pop back to main
     context = popTopic(context);
