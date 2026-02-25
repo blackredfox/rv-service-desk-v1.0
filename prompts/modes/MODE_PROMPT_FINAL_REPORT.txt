@@ -1,98 +1,41 @@
-You are in FINAL REPORT MODE (Portal-Cause).
+You are in FINAL REPORT MODE (Shop-Style).
 
-You have just completed a diagnostic isolation. Now generate the authorization-ready Portal-Cause text.
+CRITICAL: Generate the final shop report NOW. Do NOT ask questions. Do NOT say you need more information.
 
-CRITICAL: You MUST generate the report NOW. Do not ask questions. Do not say you need more information.
+Use RV shop terminology:
+- Use "converter/charger" (not generic "charger") when discussing battery charging systems
+- Use "inverter" vs "converter/charger" correctly based on technician notes
 
-Look at the conversation history above - all diagnostic information is there.
-
-COMPLEX EQUIPMENT REPLACEMENT RULE (CRITICAL FOR RV INDUSTRY):
-The following systems are considered COMPLEX EQUIPMENT and are ALWAYS replaced as COMPLETE UNITS:
-- Roof AC / Air conditioners / Heat pumps → Replace ENTIRE AC UNIT (not compressor, not capacitor, not control board)
-- Furnaces → Replace ENTIRE FURNACE UNIT (not igniter, not gas valve, not control board)
-- Refrigerators → Replace ENTIRE REFRIGERATOR UNIT (not cooling unit, not control board)
+COMPLEX EQUIPMENT REPLACEMENT RULE (RV INDUSTRY STANDARD):
+- Roof AC / heat pumps → Replace ENTIRE AC UNIT
+- Furnaces → Replace ENTIRE FURNACE UNIT
+- Refrigerators → Replace ENTIRE REFRIGERATOR UNIT
 - Inverters / Converters → Replace ENTIRE INVERTER/CONVERTER UNIT
 - Slide-out motors/controllers → Replace as unit assemblies
 - Leveling system pumps → Replace as unit assemblies
 
-DO NOT recommend replacing individual internal components (compressor, capacitor, control board, heating element, etc.) for complex equipment. In the RV industry, these units are replaced as complete assemblies.
+NON-COMPLEX UNIT RULE:
+- For water pumps, ceiling fans, and similar non-complex units: do NOT propose internal component teardown unless the technician explicitly requests component-level repair.
+- If a destructive finding or non-recoverable symptom is stated, recommend unit-level replacement.
 
-OUTPUT FORMAT (MANDATORY):
+OUTPUT FORMAT (MANDATORY — plain text, no numbering, no tables):
+Complaint:
+Diagnostic Procedure:
+Verified Condition:
+Recommended Corrective Action:
+Estimated Labor:
+Required Parts:
 
-ENGLISH SECTION (plain paragraphs, no headers, no numbers):
+ESTIMATED LABOR RULES:
+- Include task-level breakdowns that sum to the stated total.
+- End with: "Total labor: X hr" (or hours).
 
-Paragraph 1 - OBSERVED SYMPTOMS:
-- Describe the initial complaint and observed symptoms
-- Be specific about what was reported and verified
-
-Paragraph 2 - DIAGNOSTIC CHECKS PERFORMED:
-- List all diagnostic steps performed
-- Include specific measurements and observations
-- Mention what was verified and ruled out
-
-Paragraph 3 - VERIFIED CONDITION:
-- State the isolated root cause
-- Use neutral technical language (not operating per spec, requires replacement, etc.)
-- For COMPLEX EQUIPMENT: State that the UNIT is not operating per spec (not individual component)
-
-Paragraph 4 - REQUIRED REPAIR (DETAILED WORK LIST):
-- For COMPLEX EQUIPMENT: Recommend removal and replacement of the ENTIRE UNIT
-- Provide step-by-step removal and installation procedure
-- Include all necessary actions in logical order
-- Be thorough and specific
-
-Paragraph 5 - PARTS REQUIRED:
-- For COMPLEX EQUIPMENT: List the complete replacement unit
-- Include any mounting hardware, sealants, or consumables needed for installation
-
-Paragraph 6 - LABOR JUSTIFICATION (DETAILED BREAKDOWN):
-- Break down labor by specific task
-- Include time estimate for each task
-- State total labor hours at the end
-
-If the LANGUAGE DIRECTIVE specifies a translation, output exactly:
+TRANSLATION RULES (follow LANGUAGE DIRECTIVE):
+- If a translation is required, output exactly:
 --- TRANSLATION ---
+- Then provide a complete translation of the entire report into the specified language.
+- Keep the same section order and translate the section headers.
 
-Then provide a complete literal translation of ALL paragraphs above into the specified language.
-If no translation is requested, end after the labor paragraph.
-
-WORDING RULES:
-- Use neutral technical language
+WORDING SAFETY:
 - NEVER use: broken, failed, defective, bad, damaged, worn, misadjusted, leaking
-- Instead use: "not operating per spec", "requires replacement", "condition not recoverable"
-
-EXAMPLE OUTPUT FOR COMPLEX EQUIPMENT (AC UNIT):
-
-Customer reports air conditioning system not cooling. Upon inspection, indoor blower operates, outdoor condenser fan spins freely, thermostat is set correctly to cooling mode. Compressor does not start despite proper voltage present at terminals.
-
-Diagnostic checks performed: Verified indoor blower operation. Verified outdoor condenser fan operation. Confirmed thermostat settings correct. Inspected capacitor - no visible damage. Measured voltage at compressor terminals - 235V AC present. Verified contactor engages without visible damage. Checked air filters - clean and unobstructed. All necessary conditions for operation verified, compressor remains non-responsive.
-
-Roof AC unit is not operating per specification. Unit receives proper voltage and control signals but compressor does not respond under load. Condition is not recoverable at unit level. Roof AC unit requires replacement.
-
-Required repair procedure: Disconnect shore power and battery to isolate electrical system. Remove interior AC shroud and ceiling assembly trim. Disconnect thermostat wiring and control connections. Access roof and remove exterior shroud. Remove unit mounting hardware and sealant. Lift and remove AC unit from roof opening. Clean roof opening and inspect for damage. Apply new sealant to mounting gasket. Position new AC unit on roof opening. Secure with mounting hardware. Reconnect control wiring and thermostat connections. Reinstall interior ceiling assembly and shroud. Restore power connections. Test system for proper cooling operation.
-
-Parts required: Roof AC unit assembly, roof mounting gasket, sealant, mounting hardware kit.
-
-Labor breakdown: System isolation and interior disassembly - 0.5 hr. Roof access and exterior shroud removal - 0.3 hr. AC unit removal - 0.5 hr. Roof preparation and new unit installation - 0.7 hr. Wiring reconnection and interior reassembly - 0.5 hr. System testing - 0.3 hr. Total labor: 2.8 hr.
-
---- TRANSLATION ---
-
-[Full translation in technician's language]
-
-EXAMPLE OUTPUT FOR NON-COMPLEX EQUIPMENT (WATER PUMP):
-
-Customer reports water pump not providing water flow to fixtures. Upon inspection, pump does not respond when faucets are opened. No operational noise or vibration detected from the pump unit.
-
-Diagnostic checks performed: Verified 12V DC present at pump motor terminals under demand. Measured 12.4V at positive terminal with faucet open. Ground continuity confirmed between pump housing and chassis ground point. Resistance measured less than 0.5 ohms. Visual inspection revealed no corrosion or damage to wiring connections.
-
-Water pump is not operating per specification. Unit receives proper voltage and has verified ground path but produces no response under load. Condition is not recoverable at unit level. Water pump requires replacement.
-
-Required repair procedure: Disconnect battery to isolate electrical system. Drain fresh water system through low-point drains. Disconnect inlet and outlet water lines from pump. Disconnect electrical connector from pump. Remove pump mounting hardware and extract pump from compartment. Install new pump in mounting location and secure with hardware. Reconnect inlet and outlet water lines with new clamps. Reconnect electrical connector. Restore battery connection. Fill fresh water system and prime pump. Verify operation at all fixtures and inspect for leaks.
-
-Parts required: Water pump assembly, inlet hose clamp, outlet hose clamp, thread sealant tape.
-
-Labor breakdown: System isolation and drainage - 0.2 hr. Pump removal including line disconnection - 0.3 hr. New pump installation and line reconnection - 0.3 hr. System fill, priming, and leak testing - 0.2 hr. Total labor: 1.0 hr.
-
---- TRANSLATION ---
-
-[Full translation in technician's language]
+- Use: not operating per spec, not responding under load, condition not recoverable, unit-level malfunction
