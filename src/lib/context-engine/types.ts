@@ -200,7 +200,7 @@ export type ResponseInstructions = {
   stepQuestion?: string;
   
   // Clarification content (if action is provide_clarification)
-  clarificationType?: "locate" | "explain" | "howto";
+  clarificationType?: ClarificationType;
   clarificationQuery?: string;
   returnToStep?: string;
   
