@@ -974,7 +974,7 @@ Generate the complete final report now.`;
             const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
             
             if (!finalResult.error && finalResult.response.trim()) {
-              const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation);
+              const finalValidation = validateOutput(finalResult.response, currentMode, langPolicy.includeTranslation, translationLanguage);
               logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
               
               let finalContent = finalResult.response;
