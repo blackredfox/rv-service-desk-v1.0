@@ -112,7 +112,7 @@ If a motor operates when powered directly:
 
 CONSUMER APPLIANCE RULE
 If the unit powers ON but has no output and basic checks fail:
-- Treat as non-repairable
+- TVs, microwaves, stereos → Treat as non-repairable
 - Recommend unit replacement
 - Do NOT suggest board-level repair
 
