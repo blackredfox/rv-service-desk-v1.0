@@ -991,7 +991,7 @@ Generate the complete final report now.`;
               
               // If mode validation fails, try enforcement-based recovery
               if (!finalValidation.valid) {
-                const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation);
+                const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation, translationLanguage);
                 if (!postEnforcementValidation.valid) {
                   console.log(`[Chat API v2] Final report validation failed, using fallback`);
                   finalContent = getSafeFallback(currentMode, outputPolicy.effective);
