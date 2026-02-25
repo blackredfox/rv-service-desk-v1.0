@@ -1040,7 +1040,7 @@ Generate the complete final report now.`;
           } else {
             // Could not parse confirmation — NON-BLOCKING: allow technician to respond or continue
             // Instead of blocking, let the LLM handle the response naturally
-            full = enforceLanguagePolicy(full, langPolicy);
+            full = applyLangPolicy(full, currentMode, langPolicy);
             for (const char of full) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
