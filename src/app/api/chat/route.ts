@@ -692,7 +692,7 @@ export async function POST(req: Request) {
         if (currentMode === "diagnostic" && engineResult) {
           // Determine action type based on response content
           const actionType = isFallbackResponse(full) ? "fallback" : 
-                            engineResult.context.submode !== "main" ? "clarification" : "question";
+                            engineResult.context.submode === "clarification" ? "clarification" : "question";
           
           recordAgentAction(ensuredCase.id, {
             type: actionType,
