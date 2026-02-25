@@ -18,6 +18,34 @@ export type ValidationResult = {
 // Translation separator for final report
 const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
 
+// Final report section headers (exact order required)
+const FINAL_REPORT_HEADERS = [
+  "Complaint",
+  "Diagnostic Procedure",
+  "Verified Condition",
+  "Recommended Corrective Action",
+  "Estimated Labor",
+  "Required Parts",
+];
+
+const CYRILLIC_RE = /[\u0400-\u04FF]/;
+const SPANISH_CHARS_RE = /[áéíóúñ¿¡üÁÉÍÓÚÑÜ]/;
+
+function findHeaderIndex(text: string, header: string): number {
+  const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`^\\s*${escaped}\\s*:` , "im");
+  const match = regex.exec(text);
+  return match ? match.index : -1;
+}
+
+function englishSectionHasNonEnglish(text: string): boolean {
+  return CYRILLIC_RE.test(text) || SPANISH_CHARS_RE.test(text);
+}
+
+function detectTranslationLanguage(text: string): Language {
+  return detectLanguage(text).language;
+}
+
 // Final report section indicators (heuristics)
 const FINAL_REPORT_INDICATORS = [
   /complaint\s*:/i,
