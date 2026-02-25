@@ -330,8 +330,8 @@ describe("Mode Transition Tests", () => {
         Diagnostic Procedure: Diagnostic checks verified no output.
         Verified Condition: Pump not working under load.
         Recommended Corrective Action: Replace water pump assembly.
-        Estimated Labor: Total labor: 2.0 hr.
         Required Parts: Water pump assembly.
+        Estimated Labor: Total labor: 2.0 hr.
       `;
 
       const result = validateOutput(finalReportContent, "diagnostic");
