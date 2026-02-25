@@ -832,18 +832,20 @@ export async function POST(req: Request) {
           // Transition: diagnostic → labor_confirmation (NOT directly to final_report)
           console.log(`[Chat API v2] Auto-transition detected: diagnostic → labor_confirmation`);
           
+          const transitionResponse = applyLangPolicy(transitionResult.cleanedResponse, currentMode, langPolicy);
+
           // Stream the transition message first
-          for (const char of transitionResult.cleanedResponse) {
+          for (const char of transitionResponse) {
             if (aborted) break;
             controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
           }
           
           // Save the transition message
-          if (transitionResult.cleanedResponse.trim()) {
+          if (transitionResponse.trim()) {
             await storage.appendMessage({
               caseId: ensuredCase.id,
               role: "assistant",
-              content: transitionResult.cleanedResponse,
+              content: transitionResponse,
               language: outputPolicy.effective,
               userId: user?.id,
             });
