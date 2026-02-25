@@ -177,6 +177,12 @@ export function processMessage(
       context.activeStepId = null;
       stateChanged = true;
     }
+
+    if (intent.type === "UNABLE_TO_VERIFY") {
+      context.previousSubmode = context.submode;
+      context.submode = "unable";
+      stateChanged = true;
+    }
   }
   
   // 5. Handle labor confirmation
