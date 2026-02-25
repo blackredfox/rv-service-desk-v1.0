@@ -197,7 +197,10 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
       expect(authResult.valid).toBe(true);
 
       // Final report mode (missing translation)
-      const reportResult = validateOutput("Water pump issue. Labor: 2 hours.", "final_report");
+      const reportResult = validateOutput(
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly.",
+        "final_report"
+      );
       expect(reportResult.valid).toBe(false);
     });
 
