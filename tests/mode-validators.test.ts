@@ -28,11 +28,11 @@ describe("Mode Validators", () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const finalReportLike = `
-        Observed symptoms indicate pump malfunction.
-        Diagnostic checks performed verified no output.
-        Verified condition shows motor not operating per spec.
-        Recommended replacement of water pump.
-        Labor: Remove and replace pump - 2.0 hours. Total labor: 2.0 hours.
+        Complaint: Observed symptoms indicate pump malfunction.
+        Diagnostic Procedure: Checked voltage and verified no output.
+        Verified Condition: Pump not operating per spec.
+        Estimated Labor: Total labor: 2.0 hr.
+        Required Parts: Water pump assembly.
       `;
 
       const result = validateDiagnosticOutput(finalReportLike);
