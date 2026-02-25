@@ -55,13 +55,13 @@ COMPLEX SYSTEMS (require full diagnostic form)
 - Refrigerators
 - LP Gas systems
 
-NON‑COMPLEX SYSTEMS (still require verification)
+NON-COMPLEX SYSTEMS (still require verification)
 - Water pumps
 - Lights / 12V electrical
 - AC electrical (120V)
 - Consumer appliances
 
-NON‑COMPLEX UNIT REPAIR LIMITS
+NON-COMPLEX UNIT REPAIR LIMITS
 - Avoid internal teardown unless the technician explicitly requests component‑level repair.
 - For destructive findings or non‑recoverable symptoms, prefer unit‑level replacement.
 
