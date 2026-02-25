@@ -74,6 +74,11 @@ NON-COMPLEX SYSTEMS (still require verification):
 - AC electrical (120V)
 - Consumer appliances
 
+NON-COMPLEX UNIT REPAIR LIMITS:
+- Do NOT ask for internal component teardown unless the technician explicitly requests component-level repair.
+- For destructive findings or non-recoverable symptoms, prefer unit-level replacement.
+- Avoid deep internal checks for simple units (water pump, ceiling fan) unless requested.
+
 PROCEDURE SELECTION:
 - If manufacturer/model/year is known: use manufacturer-specific procedure.
 - If unknown: use standard diagnostic procedure (provided in the procedure context).
