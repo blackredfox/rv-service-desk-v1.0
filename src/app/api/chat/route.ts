@@ -381,7 +381,7 @@ export async function POST(req: Request) {
   const ensuredCase = await storage.ensureCase({
     caseId: body?.caseId,
     titleSeed: message,
-    inputLanguage: inputLanguage.detected,
+    inputLanguage: trackedInputLanguage,
     languageSource: outputPolicy.strategy === "auto" ? "AUTO" : "MANUAL",
     userId: user?.id,
   });
