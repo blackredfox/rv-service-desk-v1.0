@@ -87,20 +87,24 @@ describe("validateFinalReportOutput – policy enforcement", () => {
   beforeEach(() => { vi.resetModules(); });
 
   const ENGLISH_ONLY_REPORT = [
-    "Water pump not operating per spec when activated.",
-    "Diagnostic checks performed included voltage verification.",
-    "Verified condition: pump motor energizes but produces no water flow.",
-    "Recommend replacement of water pump assembly.",
-    "Labor: Remove and replace water pump assembly - 1.5 hours. Total labor: 1.5 hours.",
-  ].join("\n\n");
+    "Complaint: Water pump not operating per spec when activated.",
+    "Diagnostic Procedure: Diagnostic checks included voltage verification at pump terminals.",
+    "Verified Condition: Pump receives power but produces no flow.",
+    "Recommended Corrective Action: Replace water pump assembly.",
+    "Estimated Labor: Remove and replace pump - 1.5 hr. Total labor: 1.5 hr.",
+    "Required Parts: Water pump assembly.",
+  ].join("\n");
 
   const BILINGUAL_REPORT = [
     ENGLISH_ONLY_REPORT,
     "--- TRANSLATION ---",
-    "Водяной насос не работает согласно спецификации.",
-    "Диагностические проверки включали проверку напряжения.",
-    "Работа: Снятие и замена - 1.5 часа. Общее время работы: 1.5 часа.",
-  ].join("\n\n");
+    "Жалоба: Водяной насос не работает при активации.",
+    "Диагностическая процедура: Проверено напряжение на клеммах насоса.",
+    "Подтверждённое состояние: Насос получает питание, но нет потока.",
+    "Рекомендованное корректирующее действие: Заменить узел водяного насоса.",
+    "Оценка трудоёмкости: Снятие и замена — 1.5 ч. Общее время: 1.5 ч.",
+    "Требуемые детали: Узел водяного насоса.",
+  ].join("\n");
 
   it("EN mode (includeTranslation=false) → English-only report is valid", async () => {
     const { validateFinalReportOutput } = await import("@/lib/mode-validators");
