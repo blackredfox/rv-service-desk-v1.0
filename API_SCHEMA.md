@@ -217,8 +217,22 @@ Response (200):
 ```
 
 Mode transition rules (server-side):
-- If technician content includes exact command `START AUTHORIZATION REQUEST` → mode becomes `authorization`.
-- If technician content includes exact command `START FINAL REPORT` → mode becomes `final_report`.
+- Explicit commands only (allow-list; exact/near-exact match after case/whitespace normalization only).
+- Final Report aliases:
+  - START FINAL REPORT
+  - FINAL REPORT
+  - GENERATE FINAL REPORT
+  - REPORT
+  - GIVE ME THE REPORT
+  - RU: ВЫДАЙ РЕПОРТ, РЕПОРТ, ФИНАЛЬНЫЙ РЕПОРТ, СДЕЛАЙ РЕПОРТ
+  - ES: REPORTE FINAL, GENERAR REPORTE, REPORTE
+- Authorization aliases:
+  - START AUTHORIZATION REQUEST
+  - AUTHORIZATION REQUEST
+  - REQUEST AUTHORIZATION
+  - PRE-AUTHORIZATION
+  - RU: ЗАПРОС АВТОРИЗАЦИИ, АВТОРИЗАЦИЯ, ПРЕАВТОРИЗАЦИЯ
+  - ES: SOLICITAR AUTORIZACIÓN, AUTORIZACIÓN, PREAUTORIZACIÓN
 - Otherwise keep current mode.
 
 Hard boundaries:
