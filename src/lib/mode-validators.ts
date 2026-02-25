@@ -223,7 +223,7 @@ export function validateAuthorizationOutput(text: string): ValidationResult {
 }
 
 /**
- * Validate final report mode output
+ * Validate final report mode output (shop-style)
  *
  * Translation enforcement is driven by LanguagePolicy:
  *   includeTranslation=true  → must contain '--- TRANSLATION ---'
@@ -232,43 +232,72 @@ export function validateAuthorizationOutput(text: string): ValidationResult {
  * @param text  - LLM output to validate
  * @param includeTranslation - Whether a translation block is expected (from LanguagePolicy).
  *                             Defaults to true for backward compatibility.
+ * @param translationLanguage - Expected translation language (dialogue language)
  */
-export function validateFinalReportOutput(text: string, includeTranslation: boolean = true): ValidationResult {
+export function validateFinalReportOutput(
+  text: string,
+  includeTranslation: boolean = true,
+  translationLanguage?: Language
+): ValidationResult {
   const violations: string[] = [];
+  const hasSeparator = text.includes(TRANSLATION_SEPARATOR);
 
   if (includeTranslation) {
     // RU / ES / AUTO-non-EN: Must contain translation separator
-    if (!text.includes(TRANSLATION_SEPARATOR)) {
+    if (!hasSeparator) {
       violations.push("FINAL_REPORT_FORMAT: Missing '--- TRANSLATION ---' separator");
     }
   } else {
     // EN mode: Must NOT contain translation separator
-    if (text.includes(TRANSLATION_SEPARATOR)) {
+    if (hasSeparator) {
       violations.push("FINAL_REPORT_LANG_POLICY: EN mode must not include '--- TRANSLATION ---' block");
     }
   }
 
-  // Must have labor information
-  if (!/labor/i.test(text)) {
-    violations.push("FINAL_REPORT_FORMAT: Missing labor justification");
+  const englishSection = hasSeparator
+    ? text.split(TRANSLATION_SEPARATOR)[0].trim()
+    : text.trim();
+  const translationSection = hasSeparator
+    ? (text.split(TRANSLATION_SEPARATOR)[1] || "").trim()
+    : "";
+
+  // Section headers must exist and be in correct order
+  const headerPositions = FINAL_REPORT_HEADERS.map((header) => findHeaderIndex(englishSection, header));
+  headerPositions.forEach((pos, idx) => {
+    if (pos === -1) {
+      violations.push(`FINAL_REPORT_FORMAT: Missing section header: ${FINAL_REPORT_HEADERS[idx]}`);
+    }
+  });
+
+  for (let i = 1; i < headerPositions.length; i++) {
+    const prev = headerPositions[i - 1];
+    const current = headerPositions[i];
+    if (prev !== -1 && current !== -1 && current < prev) {
+      violations.push(`FINAL_REPORT_FORMAT: Section order invalid (expected "${FINAL_REPORT_HEADERS[i - 1]}" before "${FINAL_REPORT_HEADERS[i]}")`);
+    }
   }
 
   // Must not contain prohibited words (in English section)
-  const englishSection = text.includes(TRANSLATION_SEPARATOR)
-    ? text.split(TRANSLATION_SEPARATOR)[0]
-    : text;
   const prohibited = containsProhibitedWords(englishSection);
   if (prohibited.length > 0) {
     violations.push(`PROHIBITED_WORDS: English section contains denial-trigger words: ${prohibited.join(", ")}`);
   }
 
-  // Should not have headers (lines ending with : alone)
-  if (/^[A-Z][^.!?\n]*:\s*$/m.test(text)) {
-    violations.push("FINAL_REPORT_FORMAT: Contains headers (should be plain paragraphs)");
+  // English block must be English-only
+  if (englishSectionHasNonEnglish(englishSection)) {
+    violations.push("FINAL_REPORT_LANG_POLICY: English section contains non-English characters");
+  }
+
+  // Translation block should match expected dialogue language
+  if (includeTranslation && translationLanguage && translationSection) {
+    const detected = detectTranslationLanguage(translationSection);
+    if (detected !== translationLanguage) {
+      violations.push(`FINAL_REPORT_LANG_POLICY: Translation block language mismatch (expected ${translationLanguage})`);
+    }
   }
 
   // Should not have numbered lists
-  if (/^\d+[.)]\s/m.test(text)) {
+  if (/^\s*\d+[.)]\s/m.test(text)) {
     violations.push("FINAL_REPORT_FORMAT: Contains numbered lists (forbidden)");
   }
 
@@ -276,7 +305,7 @@ export function validateFinalReportOutput(text: string, includeTranslation: bool
     valid: violations.length === 0,
     violations,
     suggestion: violations.length > 0
-      ? "Generate a Portal-Cause with: English paragraphs (no headers/numbers), labor last, then --- TRANSLATION --- and full translation."
+      ? "Generate a shop-style Final Report with required headers in order, English-first, then --- TRANSLATION --- and a full translation."
       : undefined,
   };
 }
