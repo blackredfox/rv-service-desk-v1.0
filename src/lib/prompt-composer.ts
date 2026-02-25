@@ -20,6 +20,39 @@ export const MODE_COMMANDS = {
   AUTHORIZATION: "START AUTHORIZATION REQUEST",
 } as const;
 
+// Explicit command alias allow-lists (exact/near-exact matches only)
+const FINAL_REPORT_COMMAND_ALIASES = [
+  "START FINAL REPORT",
+  "FINAL REPORT",
+  "GENERATE FINAL REPORT",
+  "REPORT",
+  "GIVE ME THE REPORT",
+  // RU
+  "ВЫДАЙ РЕПОРТ",
+  "РЕПОРТ",
+  "ФИНАЛЬНЫЙ РЕПОРТ",
+  "СДЕЛАЙ РЕПОРТ",
+  // ES
+  "REPORTE FINAL",
+  "GENERAR REPORTE",
+  "REPORTE",
+];
+
+const AUTHORIZATION_COMMAND_ALIASES = [
+  "START AUTHORIZATION REQUEST",
+  "AUTHORIZATION REQUEST",
+  "REQUEST AUTHORIZATION",
+  "PRE-AUTHORIZATION",
+  // RU
+  "ЗАПРОС АВТОРИЗАЦИИ",
+  "АВТОРИЗАЦИЯ",
+  "ПРЕАВТОРИЗАЦИЯ",
+  // ES
+  "SOLICITAR AUTORIZACIÓN",
+  "AUTORIZACIÓN",
+  "PREAUTORIZACIÓN",
+];
+
 // Transition signal that LLM outputs when ready to change mode
 export const TRANSITION_SIGNAL = "[TRANSITION: FINAL_REPORT]";
 
