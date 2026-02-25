@@ -123,14 +123,17 @@ function looksLikeFinalReport(text: string): boolean {
     /^\s*Required\s+parts\s*:/im,
   ];
 
+  // Rule 1: shop-style headers (2+)
   const shopMatches = countMatches(shopHeaderPatterns);
+  if (shopMatches >= 2) return true;
+
+  // Rule 2: legacy markers (2+)
   const legacyMatches = countMatches(legacyMarkerPatterns);
-  const totalMarkers = shopMatches + legacyMatches;
+  if (legacyMatches >= 2) return true;
+
+  // Rule 3: translation reinforcement (separator + any marker)
   const hasTranslation = sample.includes(TRANSLATION_SEPARATOR);
-
-  if (shopMatches >= 2 || legacyMatches >= 2) return true;
-
-  if (hasTranslation && totalMarkers >= 1) {
+  if (hasTranslation && shopMatches + legacyMatches >= 1) {
     return true;
   }
 
