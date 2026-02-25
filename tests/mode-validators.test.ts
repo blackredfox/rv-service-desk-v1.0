@@ -150,15 +150,15 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
       expect(result.violations.some(v => v.includes("Missing '--- TRANSLATION ---'"))).toBe(true);
     });
 
-    it("should detect missing labor section", async () => {
+    it("should detect missing section header", async () => {
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "Water pump not operating.\n\n--- TRANSLATION ---\n\nНасос не работает."
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 1.0 hr.\n\n--- TRANSLATION ---\n\nЖалоба: Насос не работает."
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("Missing labor justification"))).toBe(true);
+      expect(result.violations.some(v => v.includes("Missing section header"))).toBe(true);
     });
 
     it("should detect prohibited words in English section", async () => {
