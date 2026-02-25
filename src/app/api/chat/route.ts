@@ -783,22 +783,27 @@ export async function POST(req: Request) {
             };
             const laborResult = await callOpenAI(apiKey, laborBody, ac.signal);
             if (!laborResult.error && laborResult.response.trim()) {
-              const estimatedHours = extractLaborEstimate(laborResult.response);
+              const laborContent = applyLangPolicy(laborResult.response, currentMode, langPolicy);
+              const estimatedHours = extractLaborEstimate(laborContent);
               if (estimatedHours) setLaborEstimate(ensuredCase.id, estimatedHours);
-              for (const char of laborResult.response) {
+              for (const char of laborContent) {
                 if (aborted) break;
                 controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
               }
               await storage.appendMessage({
                 caseId: ensuredCase.id,
                 role: "assistant",
-                content: laborResult.response,
+                content: laborContent,
                 language: outputPolicy.effective,
                 userId: user?.id,
               });
-              full = full + separator + laborResult.response;
+              full = full + separator + laborContent;
             } else {
-              const fallback = getSafeFallback("labor_confirmation", outputPolicy.effective);
+              const fallback = applyLangPolicy(
+                getSafeFallback("labor_confirmation", outputPolicy.effective),
+                currentMode,
+                langPolicy
+              );
               for (const char of fallback) {
                 if (aborted) break;
                 controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
