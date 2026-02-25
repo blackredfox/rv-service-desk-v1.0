@@ -797,7 +797,7 @@ export async function POST(req: Request) {
           // Generate labor confirmation prompt
           const laborPrompt = composePromptV2({
             mode: "labor_confirmation",
-            inputDetected: inputLanguage.detected,
+            inputDetected: trackedInputLanguage,
             outputEffective: outputPolicy.effective,
             includeTranslation: false, // No translation in labor confirmation
           });
