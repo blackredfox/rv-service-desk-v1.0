@@ -124,7 +124,7 @@ describe("validateFinalReportOutput – policy enforcement", () => {
 
   it("RU mode (includeTranslation=true) → bilingual report is valid", async () => {
     const { validateFinalReportOutput } = await import("@/lib/mode-validators");
-    const result = validateFinalReportOutput(BILINGUAL_REPORT, true);
+    const result = validateFinalReportOutput(BILINGUAL_REPORT, true, "RU");
 
     expect(result.valid).toBe(true);
   });
