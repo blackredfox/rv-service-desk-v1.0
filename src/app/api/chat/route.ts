@@ -823,7 +823,11 @@ export async function POST(req: Request) {
         // ========================================
         // Check if LLM signaled a transition (e.g., isolation complete)
         const transitionResult = detectTransitionSignal(full);
-        
+        const canTransition = currentMode === "diagnostic" && (engineResult?.context?.causeAllowed ?? false);
+
+        if (transitionResult && currentMode === "diagnostic" && !canTransition) {
+          full = applyLangPolicy(transitionResult.cleanedResponse, currentMode, langPolicy);
+        }
         if (transitionResult && currentMode === "diagnostic" && !aborted) {
           // Transition: diagnostic → labor_confirmation (NOT directly to final_report)
           console.log(`[Chat API v2] Auto-transition detected: diagnostic → labor_confirmation`);
