@@ -40,6 +40,8 @@ import {
   // NOT used for: flow decisions, step selection, pivot logic
   initializeCase,
   buildRegistryContext,
+  processUserMessage,
+  isProcedureComplete,
 } from "@/lib/diagnostic-registry";
 import {
   // Context Engine — SINGLE FLOW AUTHORITY
