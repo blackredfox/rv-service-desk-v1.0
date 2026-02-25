@@ -80,14 +80,26 @@ export const runtime = "nodejs";
 const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
 
 /**
- * Output-layer enforcement: strip translation block when policy says none.
- * This is the final safety net — even if the LLM produces a translation,
- * it will be removed before the user sees it.
+ * Output-layer enforcement: apply declarative language policy to all assistant outputs.
+ * - No translation blocks outside final_report mode
+ * - In final_report: strip translation if policy says none
  */
-function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
+function applyLangPolicy(text: string, mode: CaseMode, policy: LanguagePolicy): string {
+  if (!text) return text;
+
+  // Translation blocks are NEVER allowed outside final report mode
+  if (mode !== "final_report") {
+    if (text.includes(TRANSLATION_SEPARATOR)) {
+      return text.split(TRANSLATION_SEPARATOR)[0].trim();
+    }
+    return text;
+  }
+
+  // Final report mode: only allow translation when policy requires it
   if (!policy.includeTranslation && text.includes(TRANSLATION_SEPARATOR)) {
     return text.split(TRANSLATION_SEPARATOR)[0].trim();
   }
+
   return text;
 }
 
