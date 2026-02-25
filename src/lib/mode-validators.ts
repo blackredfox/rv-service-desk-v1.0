@@ -7,6 +7,7 @@
 
 import type { CaseMode } from "./prompt-composer";
 import { PROHIBITED_WORDS } from "./prompt-composer";
+import { detectLanguage, type Language } from "./lang";
 
 export type ValidationResult = {
   valid: boolean;
