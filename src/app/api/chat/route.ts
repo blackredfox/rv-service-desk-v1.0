@@ -1011,10 +1011,10 @@ Complaint:
 Diagnostic Procedure:
 Verified Condition:
 Recommended Corrective Action:
-Estimated Labor:
 Required Parts:
+Estimated Labor:
 
-Estimated Labor must include task breakdowns that sum to exactly ${confirmedHours} hr and end with "Total labor: ${confirmedHours} hr".${translationInstruction}
+Estimated Labor must include task breakdowns that sum to exactly ${confirmedHours} hr and end with "Total labor: ${confirmedHours} hr". Labor justification must be LAST.${translationInstruction}
 
 Generate the complete final report now.`;
             
