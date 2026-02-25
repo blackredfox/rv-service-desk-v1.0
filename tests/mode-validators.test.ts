@@ -296,25 +296,28 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
 
 describe("Mode Transition Tests", () => {
   describe("Explicit command transitions", () => {
-    it("should only transition on explicit commands", async () => {
+    it("should only transition on explicit alias matches", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
 
       // These should NOT trigger transitions
       expect(detectModeCommand("I think we should finalize the report")).toBeNull();
       expect(detectModeCommand("Please authorize the repair")).toBeNull();
       expect(detectModeCommand("Generate the final cause text")).toBeNull();
+      expect(detectModeCommand("reporting voltage at converter")).toBeNull();
 
-      // Only explicit commands should work
-      expect(detectModeCommand("START FINAL REPORT")).toBe("final_report");
-      expect(detectModeCommand("START AUTHORIZATION REQUEST")).toBe("authorization");
+      // Explicit aliases should work
+      expect(detectModeCommand("FINAL REPORT")).toBe("final_report");
+      expect(detectModeCommand("GIVE ME THE REPORT")).toBe("final_report");
+      expect(detectModeCommand("ВЫДАЙ РЕПОРТ")).toBe("final_report");
+      expect(detectModeCommand("AUTHORIZATION REQUEST")).toBe("authorization");
+      expect(detectModeCommand("SOLICITAR AUTORIZACIÓN")).toBe("authorization");
     });
 
-    it("should be case-insensitive for commands", async () => {
+    it("should be case-insensitive for aliases", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
 
       expect(detectModeCommand("start final report")).toBe("final_report");
-      expect(detectModeCommand("START FINAL REPORT")).toBe("final_report");
-      expect(detectModeCommand("Start Final Report")).toBe("final_report");
+      expect(detectModeCommand("preautorización")).toBe("authorization");
     });
   });
 
