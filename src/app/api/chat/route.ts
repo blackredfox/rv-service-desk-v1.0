@@ -716,6 +716,17 @@ export async function POST(req: Request) {
             updateContext(updatedCtx);
             console.log(`[Chat API v2] Context Engine: popped clarification topic, returning to main`);
           }
+
+          // Reset unable submode after response
+          if (engineResult.context.submode === "unable") {
+            const latestCtx = getContext(ensuredCase.id) ?? engineResult.context;
+            updateContext({
+              ...latestCtx,
+              submode: "main",
+              previousSubmode: "unable",
+            });
+            console.log(`[Chat API v2] Context Engine: cleared unable submode`);
+          }
         }
 
         // ========================================
