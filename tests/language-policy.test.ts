@@ -91,8 +91,8 @@ describe("validateFinalReportOutput – policy enforcement", () => {
     "Diagnostic Procedure: Diagnostic checks included voltage verification at pump terminals.",
     "Verified Condition: Pump receives power but produces no flow.",
     "Recommended Corrective Action: Replace water pump assembly.",
-    "Estimated Labor: Remove and replace pump - 1.5 hr. Total labor: 1.5 hr.",
     "Required Parts: Water pump assembly.",
+    "Estimated Labor: Remove and replace pump - 1.5 hr. Total labor: 1.5 hr.",
   ].join("\n");
 
   const BILINGUAL_REPORT = [
