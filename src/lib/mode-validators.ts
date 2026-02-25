@@ -371,7 +371,7 @@ export function validateOutput(
     case "authorization":
       return validateAuthorizationOutput(text);
     case "final_report":
-      return validateFinalReportOutput(text, includeTranslation);
+      return validateFinalReportOutput(text, includeTranslation, translationLanguage);
     case "labor_confirmation":
       return validateLaborConfirmationOutput(text);
     default:
