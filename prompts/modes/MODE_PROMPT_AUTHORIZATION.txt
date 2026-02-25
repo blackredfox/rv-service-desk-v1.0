@@ -21,4 +21,4 @@ AUTHORIZATION TEXT SHOULD INCLUDE:
 - Parts required (if known)
 - Estimated labor with breakdown
 
-Do NOT generate a final Portal-Cause unless explicitly instructed.
+Do NOT generate a final report unless explicitly instructed.
