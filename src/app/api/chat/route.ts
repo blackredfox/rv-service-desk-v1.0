@@ -535,11 +535,15 @@ export async function POST(req: Request) {
     const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
     const replanNotice = buildReplanNotice(engineResult.context);
     const clarificationInstruction = buildReturnToMainInstruction(engineResult.context);
+    const causeGateDirective = engineResult.context.causeAllowed
+      ? ""
+      : "CAUSE GATE (SERVER AUTHORITY): Cause/report generation is NOT allowed. Continue diagnostics and ask the next valid step.";
     
     contextEngineDirectives = [
       ...antiLoopDirectives,
       replanNotice,
       clarificationInstruction,
+      causeGateDirective,
     ].filter(Boolean).join("\n\n");
     
     // ── DATA PROVIDER: Step metadata context ──
