@@ -70,7 +70,7 @@ export type Contradiction = {
 
 export type TopicStackEntry = {
   topic: string;           // e.g., "capacitor_check", "fuse_location"
-  submode: Submode;
+  clarificationType: ClarificationType;
   returnStepId: string;    // Step to return to after clarification
   pushedAt: string;
 };
