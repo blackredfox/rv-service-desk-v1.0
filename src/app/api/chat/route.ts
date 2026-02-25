@@ -402,7 +402,7 @@ export async function POST(req: Request) {
     caseId: ensuredCase.id,
     role: "user",
     content: message,
-    language: inputLanguage.detected,
+    language: detectedInputLanguage.detected,
     userId: user?.id,
   });
 
