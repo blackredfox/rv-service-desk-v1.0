@@ -156,7 +156,7 @@ describe("Context Engine Integration", () => {
     // Should be in clarification subflow
     expect(result.intent.type).toBe("LOCATE");
     expect(isInClarificationSubflow(result.context)).toBe(true);
-    expect(result.context.submode).toBe("locate");
+    expect(result.context.submode).toBe("clarification");
     
     // Simulate agent responding and popping topic
     const updatedContext = popTopic(result.context);
