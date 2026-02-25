@@ -24,6 +24,7 @@ DIAGNOSTIC SUBMODES (SERVER-CONTROLLED)
   - Offer an alternate isolation path if one exists.
   - If no alternative exists, state that isolation is partial and continue with the next valid step.
 
+PROCEDURE IS LAW
 PROCEDURE DISCIPLINE
 - Follow the ACTIVE DIAGNOSTIC PROCEDURE injected below.
 - Ask ONLY questions that exist as steps in the active procedure.
