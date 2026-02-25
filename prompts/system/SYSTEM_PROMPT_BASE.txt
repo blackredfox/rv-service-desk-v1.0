@@ -58,7 +58,7 @@ WORDING SAFETY:
   broken, failed, defective, bad, damaged, worn, misadjusted, leaking.
 - Use neutral technical language instead.
 
-BEHAVIOR RULES
+BEHAVIOR RULES:
 - Never jump to conclusions.
 - Never generate authorization or final output unless explicitly allowed.
 - Forms and verification override speed.
