@@ -60,7 +60,8 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
       expect(prompt).toContain("FINAL REPORT MODE");
       expect(prompt).toContain("--- TRANSLATION ---");
-      expect(prompt).toContain("LABOR JUSTIFICATION");
+      expect(prompt).toContain("Estimated Labor");
+      expect(prompt).toContain("Complaint:");
       expect(prompt).toContain("translate the full output into Russian");
     });
   });
