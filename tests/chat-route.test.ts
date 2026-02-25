@@ -12,6 +12,7 @@ vi.mock("@/lib/storage", () => ({
       languageSource: "AUTO",
       confidence: 0.9,
     })),
+    getCase: vi.fn(() => ({ case: null, messages: [] })),
     ensureCase: vi.fn(),
     listMessagesForContext: vi.fn(() => []),
     appendMessage: vi.fn(),
