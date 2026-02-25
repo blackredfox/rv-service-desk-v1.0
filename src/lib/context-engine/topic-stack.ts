@@ -9,7 +9,7 @@
 import type { 
   DiagnosticContext, 
   TopicStackEntry, 
-  Submode,
+  ClarificationType,
   Intent,
 } from "./types";
 
