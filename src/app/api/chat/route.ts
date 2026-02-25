@@ -526,7 +526,7 @@ export async function POST(req: Request) {
     
     // ── FLOW DECISION: Pivot ──
     // Isolation/pivot is controlled ONLY by Context Engine
-    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
+    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding && engineResult.context.causeAllowed) {
       pivotTriggered = true;
       console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
     }
