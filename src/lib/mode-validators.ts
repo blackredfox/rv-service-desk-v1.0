@@ -24,8 +24,8 @@ const FINAL_REPORT_HEADERS = [
   "Diagnostic Procedure",
   "Verified Condition",
   "Recommended Corrective Action",
-  "Estimated Labor",
   "Required Parts",
+  "Estimated Labor",
 ];
 
 const CYRILLIC_RE = /[\u0400-\u04FF]/;
