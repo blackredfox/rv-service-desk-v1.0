@@ -941,18 +941,23 @@ ${factLock}`,
             
             const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
             
-            const translationInstruction = langPolicy.includeTranslation && langPolicy.translationLanguage
-              ? `\n4. Then "--- TRANSLATION ---"\n5. Complete translation of the above into ${langPolicy.translationLanguage === "RU" ? "Russian" : langPolicy.translationLanguage === "ES" ? "Spanish" : langPolicy.translationLanguage}`
+            const translationInstruction = langPolicy.includeTranslation && translationLanguage
+              ? `\n\nAfter the English report, output "--- TRANSLATION ---" and provide a complete translation into ${translationLanguage === "RU" ? "Russian" : translationLanguage === "ES" ? "Spanish" : "English"}.`
               : "";
 
-            const finalReportRequest = `The technician has confirmed a total labor budget of ${confirmedHours} hours. Generate the Portal-Cause authorization text now.
+            const finalReportRequest = `The technician has confirmed a total labor budget of ${confirmedHours} hours. Generate the FINAL SHOP REPORT now.
 
-REQUIRED OUTPUT FORMAT:
-1. English paragraphs describing: observed symptoms, diagnostic checks, verified condition, required repair, parts required
-2. Labor breakdown by task (individual times MUST sum to exactly ${confirmedHours} hr)
-3. "Total labor: ${confirmedHours} hr"${translationInstruction}
+REQUIRED OUTPUT FORMAT (plain text, no numbering, no tables):
+Complaint:
+Diagnostic Procedure:
+Verified Condition:
+Recommended Corrective Action:
+Estimated Labor:
+Required Parts:
 
-Generate the complete Portal-Cause report now.`;
+Estimated Labor must include task breakdowns that sum to exactly ${confirmedHours} hr and end with "Total labor: ${confirmedHours} hr".${translationInstruction}
+
+Generate the complete final report now.`;
             
             const finalReportBody = {
               model: "gpt-4o-mini",
