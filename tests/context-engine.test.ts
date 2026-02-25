@@ -612,7 +612,7 @@ describe("Context Engine — Integration", () => {
     // Step 2: Technician asks clarification
     let result = processMessage(caseId, "where is the capacitor located?");
     expect(result.intent.type).toBe("LOCATE");
-    expect(result.context.submode).toBe("locate");
+    expect(result.context.submode).toBe("clarification");
     
     // Step 3: After clarification, simulate pop back to main
     // (This would normally happen after the LLM responds)
