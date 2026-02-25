@@ -31,8 +31,8 @@ describe("Mode Validators", () => {
         Complaint: Observed symptoms indicate pump malfunction.
         Diagnostic Procedure: Checked voltage and verified no output.
         Verified Condition: Pump not operating per spec.
-        Estimated Labor: Total labor: 2.0 hr.
         Required Parts: Water pump assembly.
+        Estimated Labor: Total labor: 2.0 hr.
       `;
 
       const result = validateDiagnosticOutput(finalReportLike);
