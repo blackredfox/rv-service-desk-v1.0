@@ -101,17 +101,39 @@ function containsProhibitedWords(text: string): string[] {
 }
 
 /**
- * Check if text looks like a final report (has multiple report indicators)
+ * Check if text looks like a final report (shop-style or legacy markers)
  */
 function looksLikeFinalReport(text: string): boolean {
-  let matchCount = 0;
-  for (const indicator of FINAL_REPORT_INDICATORS) {
-    if (indicator.test(text)) {
-      matchCount++;
-    }
+  const sample = text ?? "";
+  if (!sample.trim()) return false;
+
+  const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const countMatches = (patterns: RegExp[]): number =>
+    patterns.reduce((count, regex) => count + (regex.test(sample) ? 1 : 0), 0);
+
+  const shopHeaderPatterns = FINAL_REPORT_HEADERS.map(
+    (header) => new RegExp(`^\\s*${escapeRegExp(header)}\\s*:`, "im")
+  );
+
+  const legacyMarkerPatterns = [
+    /^\s*Verified\s+condition\s*:/im,
+    /^\s*Recommended\b.*$/im,
+    /^\s*Labor\s*:/im,
+    /^\s*.*\bhours\s+total\b.*$/im,
+    /^\s*Required\s+parts\s*:/im,
+  ];
+
+  const shopMatches = countMatches(shopHeaderPatterns);
+  const legacyMatches = countMatches(legacyMarkerPatterns);
+
+  if (shopMatches >= 2) return true;
+  if (legacyMatches >= 2) return true;
+
+  if (sample.includes(TRANSLATION_SEPARATOR) && shopMatches + legacyMatches >= 1) {
+    return true;
   }
-  // If 3+ indicators found, it looks like a final report
-  return matchCount >= 3;
+
+  return false;
 }
 
 // Transition signal marker
