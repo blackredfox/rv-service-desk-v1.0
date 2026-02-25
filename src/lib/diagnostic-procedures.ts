@@ -138,7 +138,7 @@ reg({
     {
       id: "lpg_3",
       question: "Gas leak detector applied at all connections from tank to appliance? Any bubbles or detector alerts?",
-      prerequisites: ["lpg_1"],
+      prerequisites: ["lpg_2"],
       matchPatterns: [/(?:no|yes)\s*(?:leak|bubble)/i, /leak.*(?:test|detect|check)/i, /(?:clean|good|tight)\s*(?:connection|fitting)/i],
     },
     {
