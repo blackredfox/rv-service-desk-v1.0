@@ -112,6 +112,7 @@ function looksLikeFinalReport(text: string): boolean {
   const countMatches = (patterns: RegExp[]): number =>
     patterns.reduce((count, regex) => count + (regex.test(sample) ? 1 : 0), 0);
 
+  // Line-based header matching (start-of-line, optional whitespace)
   const shopHeaderPatterns = FINAL_REPORT_HEADERS.map(
     (header) => new RegExp(`^\\s*${escapeRegExp(header)}\\s*:`, "im")
   );
