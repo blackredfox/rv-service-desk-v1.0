@@ -242,17 +242,34 @@ function buildResponseInstructions(
     const returnInstruction = buildReturnToMainInstruction(context);
     if (returnInstruction) constraints.push(returnInstruction);
     
-    const clarificationContext = buildClarificationContext(
-      context.submode,
-      topic?.topic || "",
-    );
+    const clarificationType = topic?.clarificationType;
+    const clarificationContext = clarificationType
+      ? buildClarificationContext(clarificationType, topic?.topic || "")
+      : "";
     if (clarificationContext) constraints.push(clarificationContext);
     
     return {
       action: "provide_clarification",
-      clarificationType: context.submode as "locate" | "explain" | "howto",
+      clarificationType,
       clarificationQuery: topic?.topic,
       returnToStep: topic?.returnStepId,
+      constraints,
+      antiLoopDirectives,
+    };
+  }
+
+  if (context.submode === "unable") {
+    constraints.push([
+      "UNABLE-TO-VERIFY NOTICE:",
+      "The technician could not perform the current step.",
+      "Log the limitation in one short sentence.",
+      "Offer an alternate isolation path if available.",
+      "If no alternative exists, state that isolation is partial and ask the next valid step.",
+    ].join("\n"));
+
+    return {
+      action: "ask_step",
+      stepId: context.activeStepId || undefined,
       constraints,
       antiLoopDirectives,
     };
