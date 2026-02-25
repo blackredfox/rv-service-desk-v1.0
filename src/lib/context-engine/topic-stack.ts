@@ -80,9 +80,7 @@ export function popTopic(context: DiagnosticContext): DiagnosticContext {
  * Check if we're in a clarification subflow
  */
 export function isInClarificationSubflow(context: DiagnosticContext): boolean {
-  return context.submode === "clarification" && context.topicStack.length 
-
- 0;
+  return context.submode === "clarification" && context.topicStack.length > 0;
 }
 
 /**
