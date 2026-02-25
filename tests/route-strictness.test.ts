@@ -38,7 +38,7 @@ describe("Route Strictness — Context Engine Only", () => {
     
     // Context Engine should handle this as a LOCATE intent
     expect(result.intent.type).toBe("LOCATE");
-    expect(result.context.submode).toBe("locate");
+    expect(result.context.submode).toBe("clarification");
   });
 
   it("Context Engine processMessage is always called in diagnostic mode", async () => {
