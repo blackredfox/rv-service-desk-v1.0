@@ -500,7 +500,7 @@ export async function POST(req: Request) {
     const contextBeforeIsolation = getContext(ensuredCase.id) ?? engineResult.context;
     const replanActive = isInReplanState(contextBeforeIsolation);
 
-    if (!replanActive) {
+    if (!replanActive  !contextBeforeIsolation.isolationComplete) {
       if (registryUpdate.keyFinding) {
         markIsolationComplete(ensuredCase.id, registryUpdate.keyFinding);
       } else if (isProcedureComplete(ensuredCase.id)) {
