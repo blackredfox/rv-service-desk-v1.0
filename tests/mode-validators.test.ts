@@ -176,7 +176,7 @@ Estimated Labor: Remove and replace pump - 1.0 hr. System prime and leak check -
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "Complaint: 1. Water pump issue\nDiagnostic Procedure: 2. Checked voltage\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly.\n\n--- TRANSLATION ---\n\n1. Проблема"
+        "Complaint: 1. Water pump issue\nDiagnostic Procedure: 2. Checked voltage\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nRequired Parts: Water pump assembly.\nEstimated Labor: Total labor: 2.0 hr.\n\n--- TRANSLATION ---\n\n1. Проблема"
       );
 
       expect(result.valid).toBe(false);
