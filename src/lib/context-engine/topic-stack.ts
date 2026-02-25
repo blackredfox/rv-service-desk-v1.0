@@ -26,7 +26,7 @@ export function pushTopic(
     return context;
   }
   
-  const submode: Submode = 
+  const clarificationType: ClarificationType = 
     intent.type === "LOCATE" ? "locate" :
     intent.type === "EXPLAIN" ? "explain" : "howto";
   
@@ -36,7 +36,7 @@ export function pushTopic(
   
   const entry: TopicStackEntry = {
     topic: query,
-    submode,
+    clarificationType,
     returnStepId: context.activeStepId || "",
     pushedAt: new Date().toISOString(),
   };
@@ -45,7 +45,7 @@ export function pushTopic(
     ...context,
     topicStack: [...context.topicStack, entry],
     previousSubmode: context.submode,
-    submode,
+    submode: "clarification",
     updatedAt: new Date().toISOString(),
   };
 }
