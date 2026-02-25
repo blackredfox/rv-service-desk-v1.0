@@ -143,7 +143,7 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
       const result = validateFinalReportOutput(
-        "Water pump not operating. Labor: 2 hours."
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding under load.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly."
       );
 
       expect(result.valid).toBe(false);
