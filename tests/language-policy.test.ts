@@ -347,7 +347,7 @@ Required Parts: Water pump assembly.`;
 
     // Bilingual report should pass
     const bilingual = englishOnly + "\n\n--- TRANSLATION ---\n\nНасос не работает. Работа: 1.0 час.";
-    const v2 = validateFinalReportOutput(bilingual, policy.includeTranslation);
+    const v2 = validateFinalReportOutput(bilingual, policy.includeTranslation, policy.translationLanguage);
     expect(v2.valid).toBe(true);
   });
 
@@ -417,7 +417,7 @@ Condición verificada: La unidad no responde bajo carga.
 Acción correctiva recomendada: Reemplazar la bomba.
 Mano de obra estimada: Total mano de obra: 1.0 hr.
 Piezas requeridas: Bomba de agua.`;
-    const v = validateFinalReportOutput(bilingual, policy.includeTranslation);
+    const v = validateFinalReportOutput(bilingual, policy.includeTranslation, policy.translationLanguage);
     expect(v.valid).toBe(true);
   });
 });
