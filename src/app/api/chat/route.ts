@@ -928,7 +928,7 @@ export async function POST(req: Request) {
               inputDetected: trackedInputLanguage,
               outputEffective: outputPolicy.effective,
               includeTranslation: langPolicy.includeTranslation,
-              translationLanguage: langPolicy.translationLanguage,
+              translationLanguage,
               additionalConstraints: `LABOR BUDGET CONSTRAINT (MANDATORY - DO NOT VIOLATE):
 The technician has confirmed a total labor budget of exactly ${confirmedHours} hours.
 Your labor breakdown MUST sum to exactly ${confirmedHours} hours.
