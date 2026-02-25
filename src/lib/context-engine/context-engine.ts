@@ -62,6 +62,7 @@ export function createContext(
     consecutiveFallbacks: 0,
     isolationComplete: false,
     isolationFinding: null,
+    causeAllowed: false,
     isolationInvalidated: false,
     replanReason: null,
     labor: {
