@@ -142,7 +142,7 @@ describe("Route Strictness — Context Engine Only", () => {
     // Clarification should be handled by Context Engine
     expect(result.intent.type).toBe("HOWTO");
     expect(isInClarificationSubflow(result.context)).toBe(true);
-    expect(result.context.submode).toBe("howto");
+    expect(result.context.submode).toBe("clarification");
     expect(result.responseInstructions.clarificationType).toBe("howto");
   });
 
