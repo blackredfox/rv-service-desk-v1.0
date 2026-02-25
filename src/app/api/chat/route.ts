@@ -828,7 +828,7 @@ export async function POST(req: Request) {
         if (transitionResult && currentMode === "diagnostic" && !canTransition) {
           full = applyLangPolicy(transitionResult.cleanedResponse, currentMode, langPolicy);
         }
-        if (transitionResult && currentMode === "diagnostic" && !aborted) {
+        if (transitionResult && currentMode === "diagnostic" && !aborted && canTransition) {
           // Transition: diagnostic → labor_confirmation (NOT directly to final_report)
           console.log(`[Chat API v2] Auto-transition detected: diagnostic → labor_confirmation`);
           
