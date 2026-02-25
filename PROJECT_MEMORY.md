@@ -1,11 +1,11 @@
 # RV Service Desk
 ## PROJECT_MEMORY-1.md
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Official Project Memory (Product + Technical)  
 **Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
 
-**Last updated:** 2026-02-12
+**Last updated:** 2026-02-25
 
 ---
 
@@ -96,24 +96,9 @@ Modes are **internal** and not shown in UI as “workflow statuses”.
 
 ### 5.2 Mode transitions (Hard Rule)
 Mode changes are **explicit only** and must never be inferred from meaning.
-- Server switches mode only on explicit allow-listed commands (exact/near-exact match after case/whitespace normalization only).
-
-**Final Report aliases:**
-- `START FINAL REPORT`
-- `FINAL REPORT`
-- `GENERATE FINAL REPORT`
-- `REPORT`
-- `GIVE ME THE REPORT`
-- RU: `ВЫДАЙ РЕПОРТ`, `РЕПОРТ`, `ФИНАЛЬНЫЙ РЕПОРТ`, `СДЕЛАЙ РЕПОРТ`
-- ES: `REPORTE FINAL`, `GENERAR REPORTE`, `REPORTE`
-
-**Authorization aliases:**
-- `START AUTHORIZATION REQUEST`
-- `AUTHORIZATION REQUEST`
-- `REQUEST AUTHORIZATION`
-- `PRE-AUTHORIZATION`
-- RU: `ЗАПРОС АВТОРИЗАЦИИ`, `АВТОРИЗАЦИЯ`, `ПРЕАВТОРИЗАЦИЯ`
-- ES: `SOLICITAR AUTORIZACIÓN`, `AUTORIZACIÓN`, `PREAUTORIZACIÓN`
+- Server switches mode only on exact technician commands:
+  - `START AUTHORIZATION REQUEST`
+  - `START FINAL REPORT`
 
 This rule exists to prevent web-agent drift and “helpful assistant” shortcuts.
 
@@ -412,5 +397,46 @@ Billing, orgs, integrations are post-v1.0 and require separate specs.
 - Procedure changes are treated as product contract changes (review + tests).
 - System prompt is treated as a product contract.
 - Any deviation in behavior is a P1 defect (authorization safety issue).
+
+---
+
+## 20) Final Report Detection Hardening — NEW (v1.2)
+
+### 20.1 Problem
+While working on branch `fix/p0-final-report-alias-and-rv-terminology`, a merge conflict inside `src/lib/mode-validators.ts` left unresolved conflict markers (`<<<<<<< HEAD`) in the `looksLikeFinalReport()` area. This corrupted the validator, caused syntax/build failures, and cascaded into test failures and incorrect drift detection.
+
+### 20.2 Root Cause
+- Incomplete merge resolution inside `looksLikeFinalReport()`.
+- Mixed detection logic (shop-style headers, legacy markers, translation reinforcement).
+- Conflict markers broke parsing and invalidated validator behavior.
+
+### 20.3 Resolution
+- Fix applied via commit: `b7c8da26a9fe40cd23dd5f4c24fa2c7b537924c6`
+- File changed: `src/lib/mode-validators.ts`
+- Implemented deterministic rule-based detection.
+
+### 20.4 Authoritative Final Report Detection Rules
+**Rule 1 — Shop style:** return `true` if **2+** shop-style section headers are present:
+- Complaint
+- Diagnostic Procedure
+- Verified Condition
+- Recommended Corrective Action
+- Estimated Labor
+- Required Parts
+
+**Rule 2 — Legacy style:** return `true` if **2+** legacy markers are present.
+
+**Rule 3 — Translation reinforcement:** return `true` if:
+- `--- TRANSLATION ---` exists **and**
+- at least **1** valid marker exists (shop or legacy).
+
+### 20.5 Architectural Decision
+Final Report drift detection is a **server-side validator responsibility** (not prompt compliance). The validator must remain deterministic, translation-aware, and isolated to avoid cross-file regression risk.
+
+### 20.6 Verification
+Full suite green:
+- Test Files: 39 passed (39)
+- Tests: 583 passed (583)
+
 
 End of file.
