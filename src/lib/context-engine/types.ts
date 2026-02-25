@@ -8,11 +8,12 @@
 
 export type Mode = "diagnostic" | "authorization" | "final_report" | "labor_confirmation";
 
+export type ClarificationType = "locate" | "explain" | "howto";
+
 export type Submode = 
   | "main"           // Primary diagnostic flow
-  | "locate"         // Answering "where is it?"
-  | "explain"        // Answering "what is this?"
-  | "howto"          // Answering "how do I check?"
+  | "clarification"  // Clarification subflow (locate/explain/howto)
+  | "unable"         // Technician unable to perform a step
   | "replan"         // Triggered by new evidence
   | "loop_break";    // Forced forward progress
 
