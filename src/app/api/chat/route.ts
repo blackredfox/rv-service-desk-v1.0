@@ -1069,7 +1069,11 @@ Generate the complete final report now.`;
                 const postEnforcementValidation = validateOutput(finalContent, currentMode, langPolicy.includeTranslation, translationLanguage);
                 if (!postEnforcementValidation.valid) {
                   console.log(`[Chat API v2] Final report validation failed, using fallback`);
-                  finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+                  finalContent = applyLangPolicy(
+                    getSafeFallback(currentMode, outputPolicy.effective),
+                    currentMode,
+                    langPolicy
+                  );
                 }
               }
               
