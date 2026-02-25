@@ -994,7 +994,7 @@ Generate the complete final report now.`;
               let finalContent = finalResult.response;
               
               // Output-layer enforcement: strip translation for EN mode
-              finalContent = enforceLanguagePolicy(finalContent, langPolicy);
+              finalContent = applyLangPolicy(finalContent, currentMode, langPolicy);
               
               // Validate labor sum consistency
               const laborValidation = validateLaborSum(finalContent, confirmedHours);
