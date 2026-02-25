@@ -345,20 +345,37 @@ export async function POST(req: Request) {
   // ========================================
   
   // 1. ALWAYS detect input language from message text (source of truth)
-  const inputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
-  
+  const detectedInputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
+
+  // 1b. Respect tracked dialogue language from case metadata (update on explicit switch)
+  let trackedInputLanguage: Language = detectedInputLanguage.detected;
+  if (body?.caseId) {
+    const existing = await storage.getCase(body.caseId, user?.id);
+    const previousLanguage = existing.case?.inputLanguage;
+    if (previousLanguage) {
+      trackedInputLanguage = previousLanguage;
+      if (previousLanguage !== detectedInputLanguage.detected) {
+        trackedInputLanguage = detectedInputLanguage.detected;
+        console.log(`[Chat API v2] Language switch detected: ${previousLanguage} → ${detectedInputLanguage.detected}`);
+      }
+    }
+  }
+
   // 2. Get output mode from request (v2 or legacy v1)
   const outputMode: LanguageMode = normalizeLanguageMode(
     body?.output?.mode ?? body?.languageMode
   );
-  
+
   // 3. Compute effective output language
-  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, inputLanguage.detected);
-  
+  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, trackedInputLanguage);
+
   // 4. Resolve declarative language policy (single source of truth for translation behavior)
-  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, inputLanguage.detected);
-  
-  console.log(`[Chat API v2] Input: detected=${inputLanguage.detected} (${inputLanguage.reason}), Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}`);
+  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, trackedInputLanguage);
+
+  // Translation language must follow tracked dialogue language (case metadata)
+  const translationLanguage = langPolicy.includeTranslation ? trackedInputLanguage : undefined;
+
+  console.log(`[Chat API v2] Input: detected=${detectedInputLanguage.detected} (${detectedInputLanguage.reason}), dialogue=${trackedInputLanguage}, Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}, translationLanguage=${translationLanguage ?? "none"}`);
 
   // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
