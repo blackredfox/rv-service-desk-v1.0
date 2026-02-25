@@ -527,10 +527,10 @@ export async function POST(req: Request) {
 
   const baseSystemPrompt = composePromptV2({
     mode: currentMode,
-    inputDetected: inputLanguage.detected,
+    inputDetected: trackedInputLanguage,
     outputEffective: outputPolicy.effective,
     includeTranslation: langPolicy.includeTranslation,
-    translationLanguage: langPolicy.translationLanguage,
+    translationLanguage,
     additionalConstraints,
   });
   
