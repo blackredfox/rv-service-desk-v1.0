@@ -336,7 +336,12 @@ Required Parts: Water pump assembly.";
     expect(directive).toContain("translate the full output into Russian");
 
     // English-only report should FAIL validation
-    const englishOnly = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr.";
+    const englishOnly = "Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.";
     const v1 = validateFinalReportOutput(englishOnly, policy.includeTranslation);
     expect(v1.valid).toBe(false);
 
@@ -356,7 +361,12 @@ Required Parts: Water pump assembly.";
     expect(input.detected).toBe("EN");
     expect(policy.includeTranslation).toBe(false);
 
-    const report = "Water pump not operating per spec. Recommend replacement. Labor: 1.0 hr.";
+    const report = "Complaint: Water pump not operating per spec.
+Diagnostic Procedure: Verified voltage at pump terminals.
+Verified Condition: Unit not responding under load.
+Recommended Corrective Action: Replace pump.
+Estimated Labor: Total labor: 1.0 hr.
+Required Parts: Water pump assembly.";
     const validation = validateFinalReportOutput(report, policy.includeTranslation);
     expect(validation.valid).toBe(true);
   });
