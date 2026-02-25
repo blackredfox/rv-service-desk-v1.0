@@ -695,7 +695,7 @@ export async function POST(req: Request) {
 
         full = applyLangPolicy(result.response, currentMode, langPolicy);
 
-        if (currentMode === "diagnostic"  engineResult  !engineResult.context.causeAllowed) {
+        if (currentMode === "diagnostic" && engineResult && !engineResult.context.causeAllowed) {
           const transitionPreview = detectTransitionSignal(full);
           if (transitionPreview) {
             full = applyLangPolicy(transitionPreview.cleanedResponse, currentMode, langPolicy);
