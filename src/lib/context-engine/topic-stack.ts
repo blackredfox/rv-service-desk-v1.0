@@ -62,9 +62,9 @@ export function popTopic(context: DiagnosticContext): DiagnosticContext {
   const poppedEntry = context.topicStack[context.topicStack.length - 1];
   
   // Determine what submode to return to
-  const returnSubmode: Submode = 
+  const returnSubmode: "clarification" | "main" = 
     newStack.length > 0 
-      ? newStack[newStack.length - 1].submode 
+      ? "clarification" 
       : "main";
   
   return {
