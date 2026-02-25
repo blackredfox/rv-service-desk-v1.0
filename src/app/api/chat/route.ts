@@ -950,6 +950,41 @@ export async function POST(req: Request) {
           // ========================================
           // LABOR CONFIRMATION → FINAL REPORT (NON-BLOCKING)
           // ========================================
+          const gateContext = getContext(ensuredCase.id);
+          const causeAllowed = gateContext?.causeAllowed ?? false;
+          if (!causeAllowed) {
+            console.log(`[Chat API v2] Cause gate blocked final report generation; returning to diagnostics`);
+            currentMode = "diagnostic";
+            await storage.updateCase(ensuredCase.id, { mode: currentMode });
+            controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
+
+            const rawGateMessage = outputPolicy.effective === "RU"
+              ? "Изоляция не завершена. Возвращаюсь к диагностике."
+              : outputPolicy.effective === "ES"
+              ? "Aislamiento no completo. Volvemos al diagnóstico."
+              : "Isolation not complete. Returning to diagnostics.";
+            const gateMessage = applyLangPolicy(rawGateMessage, currentMode, langPolicy);
+
+            for (const char of gateMessage) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            if (!aborted && gateMessage.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: gateMessage,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+
+            full = gateMessage;
+            controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+            controller.close();
+            return;
+          }
           // Parse technician's response for labor confirmation/override
           const laborEntry = getLaborEntry(ensuredCase.id);
           const confirmedHours = parseLaborConfirmation(message, laborEntry?.estimatedHours);
