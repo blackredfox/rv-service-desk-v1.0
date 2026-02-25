@@ -136,6 +136,17 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_DIAGNOSTIC).toContain("TVs, microwaves, stereos");
       expect(MODE_DIAGNOSTIC).toContain("non-repairable");
     });
+
+    it("should enforce RV terminology and battery-type question", () => {
+      expect(MODE_DIAGNOSTIC).toContain("converter/charger");
+      expect(MODE_DIAGNOSTIC).toContain("battery type/bank");
+      expect(MODE_DIAGNOSTIC).toContain("lead-acid vs lithium");
+    });
+
+    it("should limit non-complex unit teardown", () => {
+      expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX UNIT REPAIR LIMITS");
+      expect(MODE_DIAGNOSTIC).toContain("unit-level replacement");
+    });
   });
 
   describe("MODE_PROMPT_FINAL_REPORT.txt content", () => {
