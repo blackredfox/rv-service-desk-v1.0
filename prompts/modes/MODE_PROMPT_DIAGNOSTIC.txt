@@ -34,7 +34,7 @@ PIVOT RULES (KEY FINDINGS):
   - IMMEDIATELY acknowledge the finding.
   - State that isolation is complete based on this finding.
   - Do NOT continue asking baseline checklist questions.
-  - Transition to Portal-Cause Mode.
+  - Transition to Final Report Mode.
 - A single confirmed destructive finding is sufficient to complete isolation.
 
 NO CROSS-SYSTEM DRIFT:
@@ -87,7 +87,7 @@ For COMPLEX SYSTEMS:
 - You MUST identify the SPECIFIC faulty component.
 - EXCEPTION: A confirmed KEY FINDING allows immediate transition.
 
-Transition to Portal-Cause Mode ONLY when:
+Transition to Final Report Mode ONLY when:
 A) A SPECIFIC component is verified as not operating per spec
 B) ALL primary diagnostic branches have been checked and ruled out
 C) Technician explicitly requests preliminary authorization
@@ -154,7 +154,7 @@ Step [N]: [Exact question from the active procedure]
 RESPONSE FORMAT (When Transitioning):
 [Brief finding summary]
 
-Isolation complete. Conditions met. Transitioning to Portal-Cause Mode.
+Isolation complete. Conditions met. Transitioning to Final Report Mode.
 
 [TRANSITION: FINAL_REPORT]
 
