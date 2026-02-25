@@ -249,32 +249,31 @@ class PromptOrchestrationTester:
             return False
 
 def main():
-    tester = PrismaV7MigrationTester()
+    tester = PromptOrchestrationTester()
     
-    print("🚀 Starting Prisma v7 Migration Tests")
-    print("=" * 50)
+    print("🚀 RV Service Desk - Prompt Orchestration Stabilization Tests")
+    print("=" * 65)
     
-    # Run all tests
+    # Run all tests focusing on prompt orchestration features
     tests = [
-        ("TypeScript db.ts compilation", tester.test_typescript_db_compilation),
-        ("TypeScript dependent files", tester.test_typescript_dependent_files),
-        ("Total TypeScript errors count", tester.test_total_typescript_errors),
-        ("ESLint db.ts", tester.test_eslint_db),
-        ("Runtime with DATABASE_URL", tester.test_runtime_with_database_url),
-        ("Singleton behavior", tester.test_singleton_behavior),
-        ("Environment validation", tester.test_env_validation),
-        ("Export stability", tester.test_export_stability),
+        ("Alias Detection Unit Tests", tester.test_alias_detection_unit_tests),
+        ("Mode Validators Unit Tests", tester.test_mode_validators_unit_tests), 
+        ("Prompt Enforcement Unit Tests", tester.test_prompt_enforcement_unit_tests),
+        ("Language Policy Unit Tests", tester.test_language_policy_unit_tests),
+        ("Overall Unit Test Suite", tester.test_overall_unit_test_suite),
+        ("Prompt File Integrity", tester.test_prompt_file_integrity),
+        ("TypeScript Compilation Clean", tester.test_typescript_compilation_clean),
     ]
     
     for test_name, test_func in tests:
         tester.run_test(test_name, test_func)
     
     # Print results
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 65)
     print(f"📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
     
     if tester.tests_passed == tester.tests_run:
-        print("🎉 All tests passed! Prisma v7 migration is working correctly.")
+        print("🎉 All tests passed! Prompt orchestration stabilization is working correctly.")
         return 0
     else:
         print("⚠️  Some tests failed. Check the output above for details.")
