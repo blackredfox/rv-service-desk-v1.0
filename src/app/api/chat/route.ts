@@ -1066,7 +1066,7 @@ Generate the complete final report now.`;
           }
         } else {
           // No transition - apply output-layer enforcement before streaming
-          full = enforceLanguagePolicy(full, langPolicy);
+          full = applyLangPolicy(full, currentMode, langPolicy);
 
           // Stream the response normally
           for (const char of full) {
