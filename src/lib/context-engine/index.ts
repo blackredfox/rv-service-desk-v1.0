@@ -7,6 +7,7 @@
 // Types
 export type {
   Mode,
+  ClarificationType,
   Submode,
   Intent,
   EvidenceType,
