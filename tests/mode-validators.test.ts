@@ -118,27 +118,21 @@ describe("Mode Validators", () => {
     it("should pass valid final report", async () => {
       const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
-      const validReport = `Water pump not operating per spec when activated. System was energized and verified no water pressure at outlet.
-
-Diagnostic checks performed included voltage verification at pump motor terminals, pressure gauge reading at outlet, and physical inspection of pump assembly.
-
-Verified condition: pump motor energizes but produces no water flow, indicating internal pump failure.
-
-Recommend replacement of water pump assembly. Part number to be determined based on unit specifications.
-
-Labor: Remove and replace water pump assembly - 1.5 hours. Test system operation - 0.5 hours. Total labor: 2.0 hours.
+      const validReport = `Complaint: Water pump not providing flow when faucets open.
+Diagnostic Procedure: Verified 12V DC at pump terminals under demand. Confirmed ground continuity and no response under load.
+Verified Condition: Pump receives proper power and ground but does not operate; unit-level malfunction confirmed.
+Recommended Corrective Action: Replace water pump assembly.
+Estimated Labor: Remove and replace pump - 1.0 hr. System prime and leak check - 0.5 hr. Total labor: 1.5 hr.
+Required Parts: Water pump assembly, inlet/outlet hose clamps.
 
 --- TRANSLATION ---
 
-Водяной насос не работает согласно спецификации при активации. Система была под напряжением, подтверждено отсутствие давления воды на выходе.
-
-Диагностические проверки включали проверку напряжения на клеммах двигателя насоса, показания манометра на выходе и физический осмотр узла насоса.
-
-Подтверждённое состояние: двигатель насоса включается, но не создаёт поток воды, что указывает на внутреннюю неисправность насоса.
-
-Рекомендуется замена узла водяного насоса. Номер детали будет определён на основе спецификаций установки.
-
-Работа: Снятие и замена узла водяного насоса - 1.5 часа. Проверка работы системы - 0.5 часа. Общее время работы: 2.0 часа.`;
+Жалоба: Водяной насос не даёт поток воды при открытии крана.
+Диагностическая процедура: Подтверждено 12 В DC на клеммах насоса под нагрузкой. Проверена масса, реакции под нагрузкой нет.
+Подтверждённое состояние: Насос получает питание и массу, но не работает; подтверждена неисправность узла.
+Рекомендованное корректирующее действие: Заменить узел водяного насоса.
+Оценка трудоёмкости: Снятие и замена насоса — 1.0 ч. Прокачка системы и проверка на утечки — 0.5 ч. Общее время: 1.5 ч.
+Требуемые детали: Узел водяного насоса, хомуты на вход/выход.`;
 
       const result = validateFinalReportOutput(validReport);
 
