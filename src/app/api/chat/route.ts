@@ -963,11 +963,12 @@ export async function POST(req: Request) {
             controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "labor_confirmation", to: currentMode })));
             
             // Stream acknowledgment and return to diagnostic flow
-            const acknowledgment = outputPolicy.effective === "RU" 
+            const rawAcknowledgment = outputPolicy.effective === "RU" 
               ? "Понял. Продолжаем диагностику."
               : outputPolicy.effective === "ES"
               ? "Entendido. Continuamos con el diagnóstico."
               : "Understood. Returning to diagnostics.";
+            const acknowledgment = applyLangPolicy(rawAcknowledgment, currentMode, langPolicy);
             
             for (const char of acknowledgment) {
               if (aborted) break;
