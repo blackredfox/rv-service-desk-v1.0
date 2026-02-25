@@ -31,6 +31,7 @@ ESTIMATED LABOR RULES:
 - End with: "Total labor: X hr" (or hours).
 
 TRANSLATION RULES (follow LANGUAGE DIRECTIVE):
+- English block must be English-only (no mixed language).
 - If a translation is required, output exactly:
 --- TRANSLATION ---
 - Then provide a complete translation of the entire report into the specified language.
