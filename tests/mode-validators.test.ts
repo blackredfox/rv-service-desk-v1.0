@@ -198,7 +198,7 @@ Estimated Labor: Remove and replace pump - 1.0 hr. System prime and leak check -
 
       // Final report mode (missing translation)
       const reportResult = validateOutput(
-        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 2.0 hr.\nRequired Parts: Water pump assembly.",
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nRequired Parts: Water pump assembly.\nEstimated Labor: Total labor: 2.0 hr.",
         "final_report"
       );
       expect(reportResult.valid).toBe(false);
