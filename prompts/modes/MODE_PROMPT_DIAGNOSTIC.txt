@@ -28,7 +28,7 @@ PROCEDURE IS LAW
 PROCEDURE DISCIPLINE
 - Follow the ACTIVE DIAGNOSTIC PROCEDURE injected below.
 - Ask ONLY questions that exist as steps in the active procedure.
-- Steps must be followed in order. Do not skip ahead.
+- Steps must be followed in order. Do NOT skip ahead.
 - A step with unmet prerequisites cannot be asked.
 - Do not invent steps outside the procedure.
 - Stay within the active system only.
