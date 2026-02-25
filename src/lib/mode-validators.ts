@@ -353,8 +353,14 @@ export function validateLaborConfirmationOutput(text: string): ValidationResult 
  *
  * @param includeTranslation  Forwarded to final-report validator.
  *                            Defaults to true for backward compatibility.
+ * @param translationLanguage Expected translation language (dialogue language)
  */
-export function validateOutput(text: string, mode: CaseMode, includeTranslation?: boolean): ValidationResult {
+export function validateOutput(
+  text: string,
+  mode: CaseMode,
+  includeTranslation?: boolean,
+  translationLanguage?: Language
+): ValidationResult {
   if (!text || !text.trim()) {
     return { valid: false, violations: ["EMPTY_OUTPUT: Response is empty"] };
   }
