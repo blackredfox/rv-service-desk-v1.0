@@ -105,7 +105,7 @@ export function buildReturnToMainInstruction(context: DiagnosticContext): string
   return [
     "CLARIFICATION SUBFLOW RULES:",
     "",
-    `You are answering a ${topic.submode.toUpperCase()} request: "${topic.topic}"`,
+    `You are answering a ${topic.clarificationType.toUpperCase()} request: "${topic.topic}"`,
     "",
     "REQUIRED RESPONSE FORMAT:",
     "1. Provide a brief, direct answer to the clarification question",
