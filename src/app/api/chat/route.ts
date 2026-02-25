@@ -684,7 +684,7 @@ export async function POST(req: Request) {
           }
         }
 
-        full = result.response;
+        full = applyLangPolicy(result.response, currentMode, langPolicy);
 
         // ========================================
         // CONTEXT ENGINE: Record agent action (AFTER LLM response)
