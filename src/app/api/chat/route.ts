@@ -595,7 +595,7 @@ export async function POST(req: Request) {
         }
 
         // Validate output (pass language policy for translation enforcement)
-        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
+        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
         // If validation fails, retry once with correction
@@ -618,7 +618,7 @@ export async function POST(req: Request) {
           result = await callOpenAI(apiKey, retryBody, ac.signal);
 
           if (!result.error) {
-            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation);
+            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
