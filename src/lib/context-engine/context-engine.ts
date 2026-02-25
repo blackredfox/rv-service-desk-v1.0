@@ -366,6 +366,7 @@ export function markIsolationComplete(caseId: string, finding: string): void {
   
   context.isolationComplete = true;
   context.isolationFinding = finding;
+  context.causeAllowed = true;
   updateContext(context);
 }
 
