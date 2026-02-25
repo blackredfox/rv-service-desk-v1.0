@@ -369,7 +369,7 @@ describe("Context Engine — Clarification Handling (P0c)", () => {
     context = pushTopic(context, { type: "LOCATE", query: "capacitor" });
     
     expect(isInClarificationSubflow(context)).toBe(true);
-    expect(context.submode).toBe("locate");
+    expect(context.submode).toBe("clarification");
     
     const topic = getCurrentClarificationTopic(context);
     expect(topic?.topic).toBe("capacitor");
