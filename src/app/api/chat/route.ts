@@ -706,7 +706,7 @@ export async function POST(req: Request) {
             // Generate labor confirmation
             const laborPrompt = composePromptV2({
               mode: "labor_confirmation",
-              inputDetected: inputLanguage.detected,
+              inputDetected: trackedInputLanguage,
               outputEffective: outputPolicy.effective,
               includeTranslation: false,
             });
@@ -925,7 +925,7 @@ export async function POST(req: Request) {
             
             const finalReportPrompt = composePromptV2({
               mode: currentMode,
-              inputDetected: inputLanguage.detected,
+              inputDetected: trackedInputLanguage,
               outputEffective: outputPolicy.effective,
               includeTranslation: langPolicy.includeTranslation,
               translationLanguage: langPolicy.translationLanguage,
