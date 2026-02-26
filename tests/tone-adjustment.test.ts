@@ -69,9 +69,9 @@ describe("Tone Adjustment - Prompt Files", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
-    expect(content).toContain("ONE short");
-    expect(content).toContain('"Noted."');
-    expect(content).toContain('"Understood."');
+    expect(content).toContain("At most one short acknowledgment");
+    expect(content).toContain("Noted.");
+    expect(content).toContain("Understood.");
   });
 });
 
