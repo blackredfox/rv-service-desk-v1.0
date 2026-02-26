@@ -780,7 +780,11 @@ export async function POST(req: Request) {
   // 1. contextEngineDirectives: anti-loop, replan, clarification (FLOW AUTHORITY)
   // 2. procedureContext: step metadata, questions (DATA PROVIDER)
   // 3. factLockConstraint: fact lock for final report
-  const additionalConstraints = [contextEngineDirectives, procedureContext, factLockConstraint]
+  const constraintBlocks = currentMode === "final_report"
+    ? [factLockConstraint]
+    : [contextEngineDirectives, procedureContext, factLockConstraint];
+
+  const additionalConstraints = constraintBlocks
     .filter(Boolean)
     .join("\n\n") || undefined;
 
