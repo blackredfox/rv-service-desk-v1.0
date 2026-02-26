@@ -103,8 +103,6 @@ function getModePrompt(mode: CaseMode): string {
       return prompts.MODE_AUTHORIZATION;
     case "final_report":
       return prompts.MODE_FINAL_REPORT;
-    case "labor_confirmation":
-      return prompts.MODE_LABOR_CONFIRMATION;
     default:
       return prompts.MODE_DIAGNOSTIC;
   }
