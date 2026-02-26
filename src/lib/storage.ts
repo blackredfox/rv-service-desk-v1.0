@@ -377,6 +377,7 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
 
   return {
     ...created,
+    metadata: normalizeMetadata(created.metadata),
     createdAt: createdAtStr,
     updatedAt: updatedAtStr,
     ...retention,
