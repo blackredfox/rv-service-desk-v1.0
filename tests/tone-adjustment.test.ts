@@ -97,6 +97,6 @@ describe("Tone Adjustment - Behavior", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"), "utf-8");
 
-    expect(content).toContain("NEVER invent or assume facts");
+    expect(content).toContain("Never invent or assume facts the technician did not state");
   });
 });
