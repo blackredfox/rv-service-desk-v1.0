@@ -28,6 +28,15 @@ type Props = {
   disabled?: boolean;
 };
 
+type BadgeState = {
+  system: string;
+  complexity: string;
+  mode: string;
+  isolationComplete: boolean;
+  finding: string;
+  activeStepId: string;
+};
+
 export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
