@@ -356,7 +356,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       const createdAt = r.createdAt.toISOString();
       const updatedAt = r.updatedAt.toISOString();
       const retention = withRetention({ createdAt, updatedAt });
-      return { ...r, createdAt, updatedAt, ...retention };
+      return { ...r, metadata: normalizeMetadata(r.metadata), createdAt, updatedAt, ...retention };
     })
     .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
 }
@@ -657,7 +657,7 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
       const createdAt = r.createdAt.toISOString();
       const updatedAt = r.updatedAt.toISOString();
       const retention = withRetention({ createdAt, updatedAt });
-      return { ...r, createdAt, updatedAt, ...retention };
+      return { ...r, metadata: normalizeMetadata(r.metadata), createdAt, updatedAt, ...retention };
     })
     .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
 }
