@@ -54,6 +54,7 @@ type UpdateCaseInput = {
   inputLanguage?: Language;
   languageSource?: "AUTO" | "MANUAL";
   mode?: CaseMode;
+  metadata?: CaseMetadata | null;
 };
 
 function nowIso() {
