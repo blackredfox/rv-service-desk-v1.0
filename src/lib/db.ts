@@ -20,7 +20,7 @@ declare global {
   var __prismaPool: Pool | undefined;
 }
 
-function buildClient(): PrismaClient | null {
+async function buildClient(): Promise<PrismaClient | null> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.warn("[db] DATABASE_URL is not set — running without database.");
@@ -28,6 +28,7 @@ function buildClient(): PrismaClient | null {
   }
 
   try {
+    const { PrismaClient } = await import("@prisma/client");
     const pool = new Pool({ connectionString: url });
     const adapter = new PrismaPg(pool);
     const client = new PrismaClient({ adapter });
