@@ -813,6 +813,7 @@ export const storage = {
   createCase: (input: CreateCaseInput) => createCaseDb(input),
   getCase: (caseId: string, userId?: string) => getCaseDb(caseId, userId),
   updateCase: (caseId: string, input: UpdateCaseInput, userId?: string) => updateCaseDb(caseId, input, userId),
+  updateCaseMetadata: (caseId: string, patch: CaseMetadata | null, userId?: string) => updateCaseMetadataDb(caseId, patch, userId),
   softDeleteCase: (caseId: string, userId?: string) => softDeleteCaseDb(caseId, userId),
   searchCases: (q: string, userId?: string) => searchCasesDb(q, userId),
   appendMessage: (args: {
