@@ -402,6 +402,16 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           </div>
         ) : null}
 
+        {llmStatus?.status === "down" ? (
+          <div
+            data-testid="llm-status-banner"
+            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            <div className="font-semibold">AI status</div>
+            <div className="mt-1">{llmStatus.message ?? "AI is temporarily unavailable."}</div>
+          </div>
+        ) : null}
+
         {error ? (
           <div
             data-testid="chat-error"
