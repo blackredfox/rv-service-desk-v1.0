@@ -915,20 +915,25 @@ export async function POST(req: Request) {
     }
   }
 
+  let llmStatus = getCircuitStatus();
+  let llmAvailable = llmStatus.status === "up";
+
   if (userCommand === "REPORT_REQUEST") {
-    if (computedCauseAllowed) {
+    if (computedCauseAllowed  llmAvailable) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
     } else {
       reportBlocked = true;
+      reportBlockedReason = llmAvailable ? "cause" : "llm";
+      pendingReportRequest = true;
+      pendingReportLocale = outputPolicy.effective;
+      await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
       currentMode = "diagnostic";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
     }
   }
 
   const badgePayload = buildBadgesPayload(ensuredCase.id, gateContext, currentMode);
-  let llmStatus = getCircuitStatus();
-  let llmAvailable = llmStatus.status === "up";
 
   // ========================================
   // FACT LOCK: build constraint for final report
