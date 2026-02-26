@@ -104,6 +104,7 @@ model Case {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   deletedAt      DateTime?
+  metadata       Json?
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages Message[]
