@@ -108,16 +108,12 @@ describe("Chat API Route", () => {
         createdAt: new Date().toISOString(),
       } as never);
 
-      // Mock successful OpenAI streaming response
-      const mockStreamData = `data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: {"choices":[{"delta":{"content":" there"}}]}\n\ndata: [DONE]\n\n`;
-      
+      // Mock successful OpenAI response
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        body: new ReadableStream({
-          start(controller) {
-            controller.enqueue(new TextEncoder().encode(mockStreamData));
-            controller.close();
-          },
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: "Hi there" } }],
         }),
       });
 
