@@ -154,6 +154,11 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
   const isTyping = streaming && messages.length > 0;
 
+  const handleRetryAi = () => {
+    if (!canRetryAi) return;
+    void send("retry ai");
+  };
+
   async function send(overrideText?: string) {
     const isOverride = typeof overrideText === "string";
     const text = (isOverride ? overrideText : input).trim();
