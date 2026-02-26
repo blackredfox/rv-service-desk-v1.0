@@ -9,10 +9,17 @@ import type { CaseMode } from "./prompt-composer";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyObj = any;
 
+export type PendingReportPayload = {
+  requestedAt: string;
+  language: Language;
+  reason: "llm_down" | "cause_gate";
+  requestedBy: "command" | "auto_transition";
+  lastKnownMode: string;
+  lastKnownSystem: string;
+};
+
 export type CaseMetadata = {
-  pendingReportRequest?: boolean;
-  pendingReportRequestedAt?: string | null;
-  pendingReportLocale?: Language | null;
+  pendingReportRequest?: PendingReportPayload | null;
 };
 
 export type CaseSummary = {

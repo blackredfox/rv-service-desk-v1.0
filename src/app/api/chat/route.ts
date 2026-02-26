@@ -9,7 +9,7 @@ import {
   type OutputLanguagePolicyV2,
   type LanguagePolicy,
 } from "@/lib/lang";
-import { storage, type CaseMetadata } from "@/lib/storage";
+import { storage, type CaseMetadata, type PendingReportPayload } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import { 
   composePromptV2, 
