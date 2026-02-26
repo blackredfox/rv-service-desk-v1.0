@@ -224,6 +224,28 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           return;
         }
 
+        if (ev.type === "badges") {
+          setBadges({
+            system: ev.system,
+            complexity: ev.complexity,
+            mode: ev.mode,
+            isolationComplete: ev.isolationComplete,
+            finding: ev.finding,
+            activeStepId: ev.activeStepId,
+          });
+          return;
+        }
+
+        if (ev.type === "mode") {
+          setBadges((prev) => (prev ? { ...prev, mode: ev.mode } : prev));
+          return;
+        }
+
+        if (ev.type === "mode_transition") {
+          setBadges((prev) => (prev ? { ...prev, mode: ev.to } : prev));
+          return;
+        }
+
         if (ev.type === "token") {
           setMessages((prev) =>
             prev.map((m) =>
