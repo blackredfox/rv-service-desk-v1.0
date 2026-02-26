@@ -723,7 +723,6 @@ export async function POST(req: Request) {
   // Get current mode from case
   let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
   let pendingReportRequest = Boolean(caseMetadata?.pendingReportRequest);
-  let pendingReportLocale = caseMetadata?.pendingReportLocale || trackedInputLanguage;
 
   // Detect user-level commands (report/continue)
   const userCommand = detectUserCommand(message);
