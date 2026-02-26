@@ -53,7 +53,6 @@ import {
   popTopic,
   updateContext,
   isFallbackResponse,
-  setActiveStep,
   markStepCompleted as markContextStepCompleted,
   markStepUnable as markContextStepUnable,
   type ContextEngineResult,
