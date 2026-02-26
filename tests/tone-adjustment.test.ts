@@ -89,7 +89,7 @@ describe("Tone Adjustment - Behavior", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"), "utf-8");
 
-    expect(content).toContain("Never use filler phrases");
+    expect(content).toContain("Avoid filler phrases");
   });
 
   it("SYSTEM_PROMPT_BASE: prohibits inventing facts", async () => {
