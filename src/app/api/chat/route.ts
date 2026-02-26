@@ -997,6 +997,37 @@ export async function POST(req: Request) {
           return;
         }
 
+        if (!llmAvailable) {
+          const checklistResponse = scrubTelemetry(buildChecklistResponse(ensuredCase.id, gateContext, outputPolicy.effective));
+
+          for (const char of checklistResponse) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+
+          recordAgentAction(ensuredCase.id, {
+            actionType: "question",
+            response: checklistResponse,
+            currentMode: currentMode,
+            llmBypassed: true,
+          });
+
+          if (!aborted && checklistResponse.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: checklistResponse,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          full = checklistResponse;
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
+
         // Build initial request
         const openAiBody = {
           model: OPENAI_MODEL,
@@ -1011,12 +1042,44 @@ export async function POST(req: Request) {
         };
 
         // First attempt
-        let result = await callOpenAI(apiKey, openAiBody, ac.signal);
+        let result = await callOpenAIWithFallback(apiKey, openAiBody, ac.signal);
 
-        if (result.error) {
-          controller.enqueue(
-            encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.error }))
-          );
+        if (result.errorType) {
+          llmStatus = getCircuitStatus();
+          llmAvailable = false;
+
+          const statusPayload = buildStatusPayload({
+            llmStatus: { status: "down", reason: llmStatus.reason ?? result.errorType },
+            fallback: "checklist",
+            mode: currentMode,
+            message: buildLlmDownBanner(outputPolicy.effective),
+          });
+          controller.enqueue(encoder.encode(sseEncode(statusPayload)));
+
+          const checklistResponse = scrubTelemetry(buildChecklistResponse(ensuredCase.id, gateContext, outputPolicy.effective));
+          for (const char of checklistResponse) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+
+          recordAgentAction(ensuredCase.id, {
+            actionType: "question",
+            response: checklistResponse,
+            currentMode: currentMode,
+            llmBypassed: true,
+          });
+
+          if (!aborted && checklistResponse.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: checklistResponse,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          full = checklistResponse;
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
