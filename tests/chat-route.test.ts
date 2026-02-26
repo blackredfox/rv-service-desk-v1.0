@@ -16,6 +16,8 @@ vi.mock("@/lib/storage", () => ({
     ensureCase: vi.fn(),
     listMessagesForContext: vi.fn(() => []),
     appendMessage: vi.fn(),
+    updateCase: vi.fn(),
+    updateCaseMetadata: vi.fn(),
   },
 }));
 
