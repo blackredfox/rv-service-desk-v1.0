@@ -251,11 +251,7 @@ describe("Automatic Mode Transition", () => {
     it("should return null when no transition signal present", async () => {
       const { detectTransitionSignal } = await import("@/lib/prompt-composer");
 
-      const response = `System: Water pump
-Classification: Non-complex
-Mode: Guided Diagnostics
-
-Step 2: Is 12V DC present at the pump motor terminals?`;
+      const response = `Is 12V DC present at the pump motor terminals?`;
 
       const result = detectTransitionSignal(response);
 
