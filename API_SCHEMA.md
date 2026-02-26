@@ -251,6 +251,8 @@ Mode transition rules (server-side):
   - RU: ЗАПРОС АВТОРИЗАЦИИ, АВТОРИЗАЦИЯ, ПРЕАВТОРИЗАЦИЯ
   - ES: SOLICITAR AUTORIZACIÓN, AUTORIZACIÓN, PREAUTORIZACIÓN
 - Otherwise keep current mode.
+- Retry AI command (LLM availability check):
+  - RETRY AI
 
 Hard boundaries:
 - server must never infer mode transitions from meaning
