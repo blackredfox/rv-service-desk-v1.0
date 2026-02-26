@@ -151,6 +151,7 @@ async function createCaseMemory(input: CreateCaseInput): Promise<CaseSummary> {
     inputLanguage: "EN" as Language,
     languageSource: "AUTO" as const,
     mode: "diagnostic" as CaseMode,
+    metadata: undefined,
     createdAt: ts,
     updatedAt: ts,
     ...retention,
