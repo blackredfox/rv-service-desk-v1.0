@@ -832,6 +832,33 @@ export async function POST(req: Request) {
         // Emit badges (UI only)
         controller.enqueue(encoder.encode(sseEncode(badgePayload)));
 
+        if (reportBlocked) {
+          const hasProcedure = Boolean(getRegistryEntry(ensuredCase.id)?.procedure);
+          const reasons = buildReportMissingReasons(gateContext, hasProcedure, outputPolicy.effective);
+          const nextQuestion = getNextDiagnosticQuestion(ensuredCase.id, gateContext);
+          const refusal = scrubTelemetry(buildReportRefusal(outputPolicy.effective, reasons, nextQuestion));
+
+          for (const char of refusal) {
+            if (aborted) break;
+            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+          }
+
+          if (!aborted  refusal.trim()) {
+            await storage.appendMessage({
+              caseId: ensuredCase.id,
+              role: "assistant",
+              content: refusal,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          full = refusal;
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
+
         // Build initial request
         const openAiBody = {
           model: OPENAI_MODEL,
