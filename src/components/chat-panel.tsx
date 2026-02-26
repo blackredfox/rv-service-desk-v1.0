@@ -351,7 +351,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                 {badges ? (badges.isolationComplete ? "Complete" : "In progress") : "—"}
               </div>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+            <div data-testid="badge-finding-card" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
               <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Finding</div>
               <div data-testid="badge-finding" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                 {badges?.finding || "—"}
