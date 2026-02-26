@@ -214,9 +214,9 @@ function formatLlmReason(reason?: LlmErrorType): string | undefined {
 function buildLlmDownBanner(language: Language): string {
   const lang = (language || "EN") as "EN" | "RU" | "ES";
   const messages = {
-    EN: "AI is temporarily unavailable (account/model access). Your request is saved. You can continue diagnostics or click Retry AI.",
-    RU: "AI временно недоступен (доступ к аккаунту/модели). Запрос сохранён. Продолжайте диагностику или нажмите Retry AI.",
-    ES: "La IA no está disponible temporalmente (acceso a cuenta/modelo). Tu solicitud se guardó. Continúa el diagnóstico o pulsa Retry AI.",
+    EN: "AI temporarily unavailable. Use Checklist Mode to continue. Your report request will be queued.",
+    RU: "AI временно недоступен. Продолжайте по чек-листу. Запрос на отчёт поставлен в очередь.",
+    ES: "AI no disponible temporalmente. Continúe con el modo lista de verificación. Su solicitud de informe queda en cola.",
   } as const;
   return messages[lang];
 }
@@ -231,24 +231,31 @@ function buildReportQueuedBanner(language: Language): string {
   return messages[lang];
 }
 
-async function setPendingReportRequest(
-  caseId: string,
-  language: Language,
-  userId?: string,
-): Promise<void> {
+async function setPendingReportRequest(args: {
+  caseId: string;
+  language: Language;
+  reason: PendingReportPayload["reason"];
+  requestedBy: PendingReportPayload["requestedBy"];
+  lastKnownMode: string;
+  lastKnownSystem: string;
+  userId?: string;
+}): Promise<void> {
   const payload: CaseMetadata = {
-    pendingReportRequest: true,
-    pendingReportRequestedAt: new Date().toISOString(),
-    pendingReportLocale: language,
+    pendingReportRequest: {
+      requestedAt: new Date().toISOString(),
+      language: args.language,
+      reason: args.reason,
+      requestedBy: args.requestedBy,
+      lastKnownMode: args.lastKnownMode,
+      lastKnownSystem: args.lastKnownSystem,
+    },
   };
-  await storage.updateCaseMetadata(caseId, payload, userId);
+  await storage.updateCaseMetadata(args.caseId, payload, args.userId);
 }
 
 async function clearPendingReportRequest(caseId: string, userId?: string): Promise<void> {
   const payload: CaseMetadata = {
-    pendingReportRequest: false,
-    pendingReportRequestedAt: null,
-    pendingReportLocale: null,
+    pendingReportRequest: null,
   };
   await storage.updateCaseMetadata(caseId, payload, userId);
 }
