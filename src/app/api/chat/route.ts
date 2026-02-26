@@ -659,8 +659,10 @@ export async function POST(req: Request) {
 
   // 1b. Respect tracked dialogue language from case metadata (update on explicit switch)
   let trackedInputLanguage: Language = detectedInputLanguage.detected;
+  let caseMetadata: CaseMetadata | undefined;
   if (body?.caseId) {
     const existing = await storage.getCase(body.caseId, user?.id);
+    caseMetadata = existing.case?.metadata;
     const previousLanguage = existing.case?.inputLanguage;
     if (previousLanguage) {
       trackedInputLanguage = previousLanguage;
