@@ -192,10 +192,9 @@ describe("Guided Diagnostics State Machine", () => {
       const promptPath = join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt");
       const promptContent = readFileSync(promptPath, "utf-8");
       
-      expect(promptContent).toContain("no information");
-      expect(promptContent).toContain("UNKNOWN");
-      expect(promptContent).toContain("next diagnostic step");
-      expect(promptContent).toContain("Do NOT repeat the same question");
+      expect(promptContent).toContain("don't know");
+      expect(promptContent).toContain("unable to verify");
+      expect(promptContent).toContain("Do not repeat the same question");
     });
   });
 });
