@@ -47,6 +47,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [reportCopied, setReportCopied] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [badges, setBadges] = useState<BadgeState | null>(null);
+  const [llmStatus, setLlmStatus] = useState<{ status: "up" | "down"; message?: string; fallback?: string } | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
