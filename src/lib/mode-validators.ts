@@ -335,43 +335,6 @@ export function validateFinalReportOutput(
   };
 }
 
-/**
- * Validate labor confirmation mode output
- * 
- * Must contain an estimated labor total and a prompt for confirmation.
- */
-export function validateLaborConfirmationOutput(text: string): ValidationResult {
-  const violations: string[] = [];
-
-  // Must contain labor estimate pattern
-  if (!/(?:estimated\s+total\s+labor|total\s+labor)[:\s]+\d+(?:\.\d+)?\s*(?:hours?|hrs?|hr)/i.test(text)) {
-    violations.push("LABOR_CONFIRMATION: Missing 'Estimated total labor: X.X hours' pattern");
-  }
-
-  // Must ask for confirmation
-  if (!/confirm|adjust|different/i.test(text)) {
-    violations.push("LABOR_CONFIRMATION: Missing confirmation prompt");
-  }
-
-  // Must not contain prohibited words
-  const prohibited = containsProhibitedWords(text);
-  if (prohibited.length > 0) {
-    violations.push(`PROHIBITED_WORDS: Contains denial-trigger words: ${prohibited.join(", ")}`);
-  }
-
-  // Must not look like a full final report
-  if (looksLikeFinalReport(text)) {
-    violations.push("LABOR_CONFIRMATION_DRIFT: Output looks like a final report (should only show estimate)");
-  }
-
-  return {
-    valid: violations.length === 0,
-    violations,
-    suggestion: violations.length > 0
-      ? "Output an estimated total labor with confirmation prompt. Do NOT generate the full report."
-      : undefined,
-  };
-}
 
 /**
  * Main validator dispatcher based on mode
