@@ -63,6 +63,11 @@ export type ChatSseEvent =
   | { type: "case"; caseId: string }
   | { type: "token"; token: string }
   | { type: "error"; message: string; code?: string }
+  | { type: "mode"; mode: string }
+  | { type: "mode_transition"; from: string; to: string }
+  | { type: "badges"; system: string; complexity: string; mode: string; isolationComplete: boolean; finding: string; activeStepId: string }
+  | { type: "validation"; valid: boolean; violations: string[] }
+  | { type: "validation_fallback"; violations: string[] }
   | { type: "done" };
 
 export async function apiChatStream(args: { caseId?: string; message: string; languageMode: LanguageMode }) {
