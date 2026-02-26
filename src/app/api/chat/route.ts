@@ -26,15 +26,6 @@ import {
   logValidation,
 } from "@/lib/mode-validators";
 import {
-  setLaborEstimate,
-  confirmLabor,
-  getLaborEntry,
-  getConfirmedHours,
-  extractLaborEstimate,
-  parseLaborConfirmation,
-  validateLaborSum,
-} from "@/lib/labor-store";
-import {
   // Diagnostic Registry — DATA PROVIDER ONLY (not flow authority)
   // Used for: procedure catalog, step definitions, static metadata
   // NOT used for: flow decisions, step selection, pivot logic
