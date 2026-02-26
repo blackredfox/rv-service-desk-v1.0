@@ -1272,7 +1272,7 @@ Generate the complete final report now.`;
             logValidation(finalValidation, { caseId: ensuredCase.id, mode: "final_report" });
             if (!finalValidation.valid) {
               const fallback = applyLangPolicy(getSafeFallback("final_report", outputPolicy.effective), "final_report", langPolicy);
-              return scrubTelemetry(fallback);
+              return { content: scrubTelemetry(fallback), llmDown: false };
             }
             return { content: finalContent, llmDown: false };
           }
