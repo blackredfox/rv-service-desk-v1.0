@@ -305,6 +305,24 @@ function buildBadgesPayload(caseId: string, context: DiagnosticContext | null | 
   };
 }
 
+function buildStatusPayload(args: {
+  llmStatus: { status: "up" | "down"; reason?: LlmErrorType };
+  fallback: "llm" | "checklist";
+  mode: CaseMode;
+  message?: string;
+}) {
+  return {
+    type: "status",
+    llm: {
+      status: args.llmStatus.status,
+      reason: formatLlmReason(args.llmStatus.reason),
+    },
+    fallback: args.fallback,
+    mode: args.mode,
+    message: args.message,
+  };
+}
+
 // Attachment validation constants
 const MAX_ATTACHMENTS = 10;
 const MAX_TOTAL_ATTACHMENT_BYTES = 6_000_000; // 6MB server-side (slightly higher than client)
