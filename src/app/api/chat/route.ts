@@ -934,6 +934,10 @@ export async function POST(req: Request) {
   let llmStatus = getCircuitStatus();
   let llmAvailable = llmStatus.status === "up";
 
+  // Compute system name for metadata (before badgePayload which depends on currentMode)
+  const registryEntryForSystem = getRegistryEntry(ensuredCase.id);
+  const systemName = registryEntryForSystem?.procedure?.displayName || gateContext?.primarySystem || "Unknown";
+
   if (retryAiRequested) {
     console.log(`[Chat API v2] Retry AI command received (llmAvailable=${llmAvailable})`);
   }
