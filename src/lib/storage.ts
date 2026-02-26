@@ -526,6 +526,83 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
   }
 }
 
+async function updateCaseMetadataDb(caseId: string, patch: CaseMetadata | null, userId?: string): Promise<CaseSummary | null> {
+  const prisma = await getPrisma();
+  if (!prisma) return updateCaseMetadataMemory(caseId, patch);
+
+  if (userId) {
+    const existing = await prisma.case.findFirst({
+      where: { id: caseId, userId, deletedAt: null },
+      select: { metadata: true },
+    });
+    if (!existing) return null;
+
+    const merged = mergeMetadata(normalizeMetadata(existing.metadata), patch);
+    const updated = await prisma.case.update({
+      where: { id: caseId },
+      data: { metadata: merged ?? null },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        inputLanguage: true,
+        languageSource: true,
+        mode: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const createdAtStr = updated.createdAt.toISOString();
+    const updatedAtStr = updated.updatedAt.toISOString();
+    const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+
+    return {
+      ...updated,
+      metadata: normalizeMetadata(updated.metadata),
+      createdAt: createdAtStr,
+      updatedAt: updatedAtStr,
+      ...retention,
+    };
+  }
+
+  const existing = await prisma.case.findFirst({
+    where: { id: caseId, deletedAt: null },
+    select: { metadata: true },
+  });
+  if (!existing) return null;
+
+  const merged = mergeMetadata(normalizeMetadata(existing.metadata), patch);
+  const updated = await prisma.case.update({
+    where: { id: caseId },
+    data: { metadata: merged ?? null },
+    select: {
+      id: true,
+      title: true,
+      userId: true,
+      inputLanguage: true,
+      languageSource: true,
+      mode: true,
+      metadata: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  const createdAtStr = updated.createdAt.toISOString();
+  const updatedAtStr = updated.updatedAt.toISOString();
+  const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+
+  return {
+    ...updated,
+    metadata: normalizeMetadata(updated.metadata),
+    createdAt: createdAtStr,
+    updatedAt: updatedAtStr,
+    ...retention,
+  };
+}
+
 async function softDeleteCaseDb(caseId: string, userId?: string): Promise<void> {
   const prisma = await getPrisma();
   if (!prisma) return softDeleteCaseMemory(caseId);
