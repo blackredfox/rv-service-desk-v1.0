@@ -99,7 +99,7 @@ function applyLangPolicy(text: string, mode: CaseMode, policy: LanguagePolicy): 
 
 type UserCommand = "REPORT_REQUEST" | "CONTINUE_DIAGNOSTICS";
 
-function detectUserCommand(message: string): UserCommand | null {
+export function detectUserCommand(message: string): UserCommand | null {
   const text = (message || "").toLowerCase();
   if (!text.trim()) return null;
 
