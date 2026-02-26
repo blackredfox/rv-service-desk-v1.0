@@ -918,6 +918,10 @@ export async function POST(req: Request) {
   let llmStatus = getCircuitStatus();
   let llmAvailable = llmStatus.status === "up";
 
+  if (retryAiRequested) {
+    console.log(`[Chat API v2] Retry AI command received (llmAvailable=${llmAvailable})`);
+  }
+
   if (currentMode === "final_report" && !llmAvailable) {
     reportBlocked = true;
     reportBlockedReason = "llm";
