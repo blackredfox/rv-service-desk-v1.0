@@ -829,7 +829,7 @@ export async function POST(req: Request) {
 
         // Build initial request
         const openAiBody = {
-          model: "gpt-4o-mini",
+          model: OPENAI_MODEL,
           stream: false,
           temperature: 0.2,
           messages: buildOpenAiMessages({
@@ -988,7 +988,7 @@ export async function POST(req: Request) {
             });
             const updatedHistoryPivot = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
             const laborBody = {
-              model: "gpt-4o-mini",
+              model: OPENAI_MODEL,
               stream: false,
               temperature: 0.2,
               messages: buildOpenAiMessages({
@@ -1092,7 +1092,7 @@ export async function POST(req: Request) {
           const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
           
           const laborBody = {
-            model: "gpt-4o-mini",
+            model: OPENAI_MODEL,
             stream: false,
             temperature: 0.2,
             messages: buildOpenAiMessages({
@@ -1287,7 +1287,7 @@ Estimated Labor must include task breakdowns that sum to exactly ${confirmedHour
 Generate the complete final report now.`;
             
             const finalReportBody = {
-              model: "gpt-4o-mini",
+              model: OPENAI_MODEL,
               stream: false,
               temperature: 0.2,
               messages: buildOpenAiMessages({
