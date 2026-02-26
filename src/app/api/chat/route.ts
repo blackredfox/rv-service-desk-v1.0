@@ -676,6 +676,13 @@ export async function POST(req: Request) {
     if (syncedContext) {
       engineResult.context = syncedContext;
     }
+
+    computedCauseAllowed = computeCauseAllowed(engineResult.context, ensuredCase.id);
+    if (engineResult.context.causeAllowed !== computedCauseAllowed) {
+      const updatedContext = { ...engineResult.context, causeAllowed: computedCauseAllowed };
+      updateContext(updatedContext);
+      engineResult.context = updatedContext;
+    }
     
     // Log context engine decision (SINGLE SOURCE OF TRUTH)
     console.log(`[Chat API v2] Context Engine: intent=${engineResult.intent.type}, submode=${engineResult.context.submode}, stateChanged=${engineResult.stateChanged}`);
