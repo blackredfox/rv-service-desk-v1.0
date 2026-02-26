@@ -1,38 +1,38 @@
-# RV Service Desk v3 PRD
+# RV Service Desk v4 PRD
 
 ## Original Problem Statement
-Upgrade the Diagnostic Compliance Engine into a Senior RV Technician agent with strict portal discipline, modular prompts, adaptive diagnostics (no looping), server-side cause gating, and strict language policy enforcement. Maintain Context Engine authority and produce insurance-ready final reports with labor breakdown.
+Orchestration v4: enforce a senior RV technician chat flow with no internal telemetry in assistant output, remove labor_confirmation mode, add report command routing, server-side cause gating, telemetry scrubber, SSE-only badges, and strict final report format (labor last). All OpenAI calls must use a single OPENAI_MODEL constant.
 
 ## Architecture Decisions
-- Prompts remain modular: SYSTEM_PROMPT_BASE + mode-specific prompts (diagnostic, final report, labor confirmation).
-- Context Engine remains flow authority; server enforces cause gating via context state (causeAllowed).
-- Output-layer language enforcement via applyLangPolicy across all assistant outputs.
-- Diagnostic registry used as data provider for step tracking; synced into Context Engine state.
-- Final report order updated (Required Parts before Estimated Labor) with labor last.
+- Centralize model selection via `OPENAI_MODEL` constant in chat route.
+- Command router in `route.ts` handles report/continue intents outside the LLM.
+- Server-side `computeCauseAllowed` enforces report eligibility; LLM cannot decide.
+- Output scrubber removes telemetry lines before streaming/saving.
+- SSE badges emitted from backend; frontend renders badge panel.
+- Labor confirmation mode removed; labor included only in final report.
 
 ## Implemented
-- SYSTEM_PROMPT_BASE refactored with senior tech persona, industry reality rules, and scope enforcement.
-- MODE_PROMPT_DIAGNOSTIC rewritten with diagnostic submodes (main/clarification/unable) and anti-loop rules.
-- MODE_PROMPT_FINAL_REPORT rewritten with warranty-defensible tone and new section order.
-- Context Engine: clarification submode, unable handling, causeAllowed state, replan resets.
-- Server route: applyLangPolicy everywhere, cause gating, transition blocking, labor status localization.
-- Diagnostic procedures: LP gas prerequisites tightened; detectSystem patterns expanded.
-- Tests updated for new submode and final report order; targeted vitest run passed.
+- Added `OPENAI_MODEL` constant and replaced all model references.
+- Added `detectUserCommand`, `computeCauseAllowed`, and telemetry scrubber in `route.ts`.
+- Removed labor_confirmation mode across context engine, mode validators, route flow, and tests.
+- Added report command handling (allowed → final report, blocked → refusal + next question).
+- Added SSE `badges` event and frontend badge panel with data-testid coverage.
+- Updated prompts to remove telemetry output and keep labor last in final report.
+- Added/updated tests for routing, telemetry scrubber, model constant, and report format.
 
 ## Prioritized Backlog
 P0:
 - Run full test suite to confirm no regressions.
-- Investigate frontend service availability (connection refused at localhost:3000).
+- Verify frontend SSE badge rendering in live UI.
 
 P1:
-- Add more explicit causeAllowed criteria for partial isolation requests.
-- Expand unit tests for cause gating and unable submode.
+- Expand telemetry scrub patterns if new internal labels appear.
+- Add unit tests for report refusal text localization.
 
 P2:
-- Add more diagnostic pattern coverage and system synonyms.
-- Localize all system status events (non-LLM messages) beyond labor status.
+- Add badge persistence on page reload.
+- Add UI compact badge layout for mobile.
 
 ## Next Tasks
-- Execute full `vitest run` and resolve any remaining failures.
-- Validate Chat API flows with live LLM keys.
-- Confirm UI behavior once frontend is available.
+- Validate report command behavior with live LLM key.
+- Confirm no internal telemetry appears in live chat output.
