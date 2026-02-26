@@ -9,6 +9,12 @@ import type { CaseMode } from "./prompt-composer";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyObj = any;
 
+export type CaseMetadata = {
+  pendingReportRequest?: boolean;
+  pendingReportRequestedAt?: string;
+  pendingReportLocale?: Language;
+};
+
 export type CaseSummary = {
   id: string;
   title: string;
@@ -16,6 +22,7 @@ export type CaseSummary = {
   inputLanguage: Language;
   languageSource: "AUTO" | "MANUAL";
   mode: CaseMode;
+  metadata?: CaseMetadata;
   createdAt: string;
   updatedAt: string;
   lastActivityAt: string;
