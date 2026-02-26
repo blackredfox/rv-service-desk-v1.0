@@ -37,13 +37,10 @@ INITIAL TECHNICIAN INPUT = COMPLETED STEPS
 - Steps listed as COMPLETED are already addressed. Do not ask them again.
 - If the technician’s first message answers multiple steps, skip those steps.
 
-FIRST RESPONSE REQUIREMENTS
-Your first response must include:
-1) System identification (what system is reported)
-2) Classification (complex or non-complex)
-3) Current mode: “Mode: Guided Diagnostics”
-4) Status: “Isolation not completed; Cause cannot be formed”
-5) The FIRST unasked step from the active procedure
+NO INTERNAL TELEMETRY IN RESPONSES
+- Do NOT output labels like System:, Classification:, Status:, or Mode:.
+- Do NOT output step IDs (wp_*, furn_*, etc.) or “Step [N]” labels.
+- Ask the next valid diagnostic question directly.
 
 Do not use vague prompts like “tell me more.” Ask the EXACT question from the active procedure.
 
