@@ -706,7 +706,7 @@ export async function POST(req: Request) {
     
     // ── FLOW DECISION: Pivot ──
     // Isolation/pivot is controlled ONLY by Context Engine
-    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding && engineResult.context.causeAllowed) {
+    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding && computedCauseAllowed) {
       pivotTriggered = true;
       console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
     }
@@ -715,7 +715,7 @@ export async function POST(req: Request) {
     const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
     const replanNotice = buildReplanNotice(engineResult.context);
     const clarificationInstruction = buildReturnToMainInstruction(engineResult.context);
-    const causeGateDirective = engineResult.context.causeAllowed
+    const causeGateDirective = computedCauseAllowed
       ? ""
       : "CAUSE GATE (SERVER AUTHORITY): Cause/report generation is NOT allowed. Continue diagnostics and ask the next valid step.";
     
