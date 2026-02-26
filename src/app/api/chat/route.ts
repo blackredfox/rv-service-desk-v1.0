@@ -918,7 +918,7 @@ export async function POST(req: Request) {
   let llmStatus = getCircuitStatus();
   let llmAvailable = llmStatus.status === "up";
 
-  if (currentMode === "final_report"  !llmAvailable) {
+  if (currentMode === "final_report" && !llmAvailable) {
     reportBlocked = true;
     reportBlockedReason = "llm";
     pendingReportRequest = true;
