@@ -109,6 +109,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     if (!caseId) {
       setMessages([]);
       setBadges(null);
+      setLlmStatus(null);
       return;
     }
 
