@@ -672,6 +672,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
 
   return {
     ...created,
+    metadata: normalizeMetadata(created.metadata),
     createdAt: created.createdAt.toISOString(),
     updatedAt: created.updatedAt.toISOString(),
     ...withRetention({ createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() }),
