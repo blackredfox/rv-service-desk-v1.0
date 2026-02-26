@@ -579,6 +579,14 @@ export async function POST(req: Request) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
+  const earlyContext = getContext(ensuredCase.id);
+  const earlyCauseAllowed = computeCauseAllowed(earlyContext, ensuredCase.id);
+  if (currentMode === "final_report" && !earlyCauseAllowed && userCommand !== "REPORT_REQUEST") {
+    console.log(`[Chat API v2] Cause gate blocked existing final_report mode; reverting to diagnostic`);
+    currentMode = "diagnostic";
+    await storage.updateCase(ensuredCase.id, { mode: currentMode });
+  }
+
   // Persist user message with detected language
   await storage.appendMessage({
     caseId: ensuredCase.id,
