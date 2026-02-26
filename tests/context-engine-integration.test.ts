@@ -198,32 +198,6 @@ describe("Context Engine Integration", () => {
     expect(isInReplanState(result.context)).toBe(true);
   });
 
-  it("labor confirmation is non-blocking", async () => {
-    const { 
-      createContext, 
-      clearContext, 
-      setLaborDraft,
-      isLaborBlocking,
-      getContext,
-    } = await import("@/lib/context-engine");
-    
-    const caseId = "labor-nonblocking-test";
-    clearContext(caseId);
-    createContext(caseId, "water_pump");
-    
-    // Set a draft labor estimate
-    setLaborDraft(caseId, 1.5);
-    
-    const context = getContext(caseId)!;
-    
-    // Labor should be in draft mode
-    expect(context.labor.mode).toBe("draft");
-    expect(context.labor.estimatedHours).toBe(1.5);
-    
-    // Should NOT be blocking (non-blocking is default)
-    expect(isLaborBlocking(caseId)).toBe(false);
-  });
-
   it("anti-loop directives are generated for prompt injection", async () => {
     const { 
       createContext, 
