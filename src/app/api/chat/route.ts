@@ -159,7 +159,7 @@ const TELEMETRY_LINE_PATTERNS: RegExp[] = [
   /^\s*(?:Step|Шаг)\s+\w+_/i,
 ];
 
-function scrubTelemetry(text: string): string {
+export function scrubTelemetry(text: string): string {
   if (!text) return text;
   const withoutMarkers = text.replace(/\[TRANSITION: FINAL_REPORT\]/g, "").trim();
   const lines = withoutMarkers.split("\n");
