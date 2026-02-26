@@ -31,7 +31,7 @@ describe("Tone Adjustment - Prompt Files", () => {
 
     expect(content).toContain("Professional and concise");
     expect(content).toContain("Do NOT say");
-    expect(content).toContain("Prefer silence over politeness");
+    expect(content).toContain("Avoid filler phrases");
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: no 'Thank you' default", async () => {
