@@ -97,6 +97,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   useEffect(() => {
     if (!caseId) {
       setMessages([]);
+      setBadges(null);
       return;
     }
 
