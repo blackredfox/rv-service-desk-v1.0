@@ -1015,60 +1015,32 @@ export async function POST(req: Request) {
           message: llmAvailable ? undefined : buildLlmDownBanner(outputPolicy.effective),
         });
         controller.enqueue(encoder.encode(sseEncode(statusPayload)));
-
         if (reportBlocked) {
-          const hasProcedure = Boolean(getRegistryEntry(ensuredCase.id)?.procedure);
-          const reasons = buildReportMissingReasons(gateContext, hasProcedure, outputPolicy.effective);
           const nextQuestion = getNextDiagnosticQuestion(ensuredCase.id, gateContext);
-          const refusal = scrubTelemetry(buildReportRefusal(outputPolicy.effective, reasons, nextQuestion));
+          const banner = reportBlockedReason === "llm"
+            ? buildLlmDownBanner(outputPolicy.effective)
+            : buildReportQueuedBanner(outputPolicy.effective);
+          const responseParts = nextQuestion ? [banner, nextQuestion] : [banner];
+          const responseText = scrubTelemetry(responseParts.join("
 
-          for (const char of refusal) {
+"));
+
+          for (const char of responseText) {
             if (aborted) break;
             controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
           }
 
-          if (!aborted && refusal.trim()) {
+          if (!aborted && responseText.trim()) {
             await storage.appendMessage({
               caseId: ensuredCase.id,
               role: "assistant",
-              content: refusal,
+              content: responseText,
               language: outputPolicy.effective,
               userId: user?.id,
             });
           }
 
-          full = refusal;
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
-          controller.close();
-          return;
-        }
-
-        if (!llmAvailable) {
-          const checklistResponse = scrubTelemetry(buildChecklistResponse(ensuredCase.id, gateContext, outputPolicy.effective));
-
-          for (const char of checklistResponse) {
-            if (aborted) break;
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
-
-          recordAgentAction(ensuredCase.id, {
-            type: "question",
-            content: checklistResponse.slice(0, 200),
-            stepId: gateContext?.activeStepId || undefined,
-            submode: gateContext?.submode,
-          }, DEFAULT_CONFIG);
-
-          if (!aborted && checklistResponse.trim()) {
-            await storage.appendMessage({
-              caseId: ensuredCase.id,
-              role: "assistant",
-              content: checklistResponse,
-              language: outputPolicy.effective,
-              userId: user?.id,
-            });
-          }
-
-          full = checklistResponse;
+          full = responseText;
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
