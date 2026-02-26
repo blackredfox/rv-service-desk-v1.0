@@ -480,6 +480,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           <div ref={bottomRef} />
         </div>
       </div>
+    </div>
 
       <div className="border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
         <div className="mx-auto max-w-2xl">
