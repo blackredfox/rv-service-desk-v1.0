@@ -263,36 +263,13 @@ function buildResponseInstructions(
     };
   }
   
-  // Handle labor confirmation mode
-  if (context.mode === "labor_confirmation") {
-    if (context.labor.mode === "confirmed") {
-      return {
-        action: "generate_report",
-        constraints: [
-          `Labor confirmed: ${context.labor.confirmedHours} hours`,
-          "Generate final report with this labor budget",
-        ],
-        antiLoopDirectives,
-      };
-    }
-    return {
-      action: "generate_labor",
-      constraints: [
-        "Generate labor estimate as a DRAFT",
-        "Do NOT block diagnostics - this is non-blocking",
-        "Technician can continue or confirm later",
-      ],
-      antiLoopDirectives,
-    };
-  }
-  
   // Handle transition (isolation complete)
   if (context.isolationComplete && context.isolationFinding) {
     return {
       action: "transition",
       constraints: [
         `Isolation finding: ${context.isolationFinding}`,
-        "Ready to transition to labor estimate or final report",
+        "Ready to transition to final report",
       ],
       antiLoopDirectives,
     };
