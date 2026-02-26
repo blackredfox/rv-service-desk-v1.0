@@ -205,11 +205,9 @@ describe("Fallback Behavior", () => {
     it("should NOT trigger fallback for valid multi-line output", async () => {
       const { validateOutput } = await import("@/lib/mode-validators");
 
-      const validOutput = `Система: Водяной насос
-Классификация: Не сложное оборудование
-Режим: Управляемая диагностика
+      const validOutput = `Noted.
 
-Шаг 1: Издаёт ли насос какие-либо звуки при открытии крана?`;
+Издаёт ли насос какие-либо звуки при открытии крана?`;
 
       const result = validateOutput(validOutput, "diagnostic");
 
