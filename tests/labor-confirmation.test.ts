@@ -12,6 +12,11 @@ describe("Orchestration v4 - command router", () => {
     const content = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
 
     expect(content).toContain("detectUserCommand");
+    expect(content).toMatch(/computeCauseAllowed/);
+    expect(content).toMatch(/isolationComplete/);
+    expect(content).toMatch(/isolationFinding/);
+    expect(content).toMatch(/submode\s*!==\s*\"clarification\"/);
+    expect(content).toMatch(/hasProcedure/);
     expect(content).toMatch(/write\\s\+report/);
     expect(content).toMatch(/generate\\s\+report/);
     expect(content).toMatch(/напиши\\s\+репорт/);
