@@ -83,12 +83,9 @@ describe("Guided Diagnostics Validator", () => {
     it("should allow English Guided Diagnostics format", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const guidedDiagnosticsOutput = `System: Water pump
-Classification: Non-complex
-Mode: Guided Diagnostics
-Status: Isolation not completed; Cause cannot be formed
+      const guidedDiagnosticsOutput = `Confirmed.
 
-Step 1: Does the pump attempt to run (any noise or vibration) when a faucet is opened?`;
+Does the pump attempt to run (any noise or vibration) when a faucet is opened?`;
 
       const result = validateDiagnosticOutput(guidedDiagnosticsOutput);
 
