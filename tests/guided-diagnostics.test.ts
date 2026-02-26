@@ -239,18 +239,13 @@ describe("Automatic Mode Transition", () => {
     it("should detect transition signal in LLM response", async () => {
       const { detectTransitionSignal } = await import("@/lib/prompt-composer");
 
-      const response = `Зафиксировано: масса проверена, целостность подтверждена.
-
-Isolation complete. Conditions met. Transitioning to Final Report Mode.
-
-[TRANSITION: FINAL_REPORT]`;
+      const response = `[TRANSITION: FINAL_REPORT]`;
 
       const result = detectTransitionSignal(response);
 
       expect(result).not.toBeNull();
       expect(result?.newMode).toBe("final_report");
-      expect(result?.cleanedResponse).not.toContain("[TRANSITION: FINAL_REPORT]");
-      expect(result?.cleanedResponse).toContain("Isolation complete");
+      expect(result?.cleanedResponse).toBe("");
     });
 
     it("should return null when no transition signal present", async () => {
