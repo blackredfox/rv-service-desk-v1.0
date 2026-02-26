@@ -117,9 +117,7 @@ Can you hear the motor?`;
     it("should reject output without any question", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const output = `System: Water pump
-Classification: Non-complex
-Please provide more information about the issue.`;
+      const output = `Pump details recorded. Awaiting next step.`;
 
       const result = validateDiagnosticOutput(output);
 
