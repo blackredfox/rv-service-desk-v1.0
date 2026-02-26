@@ -1006,11 +1006,11 @@ export async function POST(req: Request) {
           }
 
           recordAgentAction(ensuredCase.id, {
-            actionType: "question",
-            response: checklistResponse,
-            currentMode: currentMode,
-            llmBypassed: true,
-          });
+            type: "question",
+            content: checklistResponse.slice(0, 200),
+            stepId: gateContext?.activeStepId || undefined,
+            submode: gateContext?.submode,
+          }, DEFAULT_CONFIG);
 
           if (!aborted && checklistResponse.trim()) {
             await storage.appendMessage({
@@ -1063,11 +1063,11 @@ export async function POST(req: Request) {
           }
 
           recordAgentAction(ensuredCase.id, {
-            actionType: "question",
-            response: checklistResponse,
-            currentMode: currentMode,
-            llmBypassed: true,
-          });
+            type: "question",
+            content: checklistResponse.slice(0, 200),
+            stepId: gateContext?.activeStepId || undefined,
+            submode: gateContext?.submode,
+          }, DEFAULT_CONFIG);
 
           if (!aborted && checklistResponse.trim()) {
             await storage.appendMessage({
