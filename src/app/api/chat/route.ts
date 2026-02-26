@@ -601,6 +601,8 @@ export async function POST(req: Request) {
   let pivotTriggered = false;
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
+  let computedCauseAllowed = false;
+  let reportBlocked = false;
 
   if (currentMode === "diagnostic") {
     // ── STRICT MODE GUARD ──
