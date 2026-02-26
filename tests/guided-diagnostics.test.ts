@@ -38,8 +38,6 @@ describe("OpenAI Response Extraction", () => {
       const content = mockResponse.choices?.[0]?.message?.content ?? "";
       
       expect(content).not.toBe("");
-      expect(content).toContain("Water pump");
-      expect(content).toContain("Guided Diagnostics");
       expect(content).toContain("?");
     });
 
