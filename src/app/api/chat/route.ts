@@ -35,6 +35,7 @@ import {
   isProcedureComplete,
   getRegistryEntry,
 } from "@/lib/diagnostic-registry";
+import { getNextStep } from "@/lib/diagnostic-procedures";
 import {
   // Context Engine — SINGLE FLOW AUTHORITY
   // All flow decisions, submode selection, replan, loop guard come from here
