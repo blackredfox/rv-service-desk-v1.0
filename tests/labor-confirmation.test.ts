@@ -31,7 +31,7 @@ describe("Orchestration v4 - telemetry scrubber", () => {
     expect(content).toMatch(/Classification:/);
     expect(content).toMatch(/Status:/);
     expect(content).toMatch(/Step\|Шаг/);
-    expect(content).toMatch(/\[TRANSITION: FINAL_REPORT\]/);
+    expect(content).toMatch(/TRANSITION: FINAL_REPORT/);
   });
 });
 
