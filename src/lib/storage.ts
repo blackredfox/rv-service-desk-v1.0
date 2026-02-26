@@ -11,8 +11,8 @@ type AnyObj = any;
 
 export type CaseMetadata = {
   pendingReportRequest?: boolean;
-  pendingReportRequestedAt?: string;
-  pendingReportLocale?: Language;
+  pendingReportRequestedAt?: string | null;
+  pendingReportLocale?: Language | null;
 };
 
 export type CaseSummary = {
