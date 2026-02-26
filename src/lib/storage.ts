@@ -189,6 +189,7 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
     inputLanguage: input.inputLanguage ?? c.inputLanguage,
     languageSource: input.languageSource ?? c.languageSource,
     mode: input.mode ?? c.mode,
+    metadata: mergeMetadata(c.metadata, input.metadata),
     updatedAt: ts,
     ...retention,
   };
