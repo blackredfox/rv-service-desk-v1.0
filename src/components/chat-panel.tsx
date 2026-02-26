@@ -73,10 +73,20 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     
     // Check if it looks like a report (has structured content)
     // Reports typically have section headers or multiple paragraphs
+    const hasHeaders = [
+      "Complaint:",
+      "Diagnostic Procedure:",
+      "Verified Condition:",
+      "Recommended Corrective Action:",
+      "Required Parts:",
+      "Estimated Labor:",
+    ].every((header) => lastMessage.content.includes(header));
+
     const hasStructure = lastMessage.content.includes("\n\n") || 
                          lastMessage.content.includes("---") ||
                          lastMessage.content.includes("**") ||
-                         lastMessage.content.includes("##");
+                         lastMessage.content.includes("##") ||
+                         hasHeaders;
     
     return hasStructure ? lastMessage.content : null;
   }, [messages]);
