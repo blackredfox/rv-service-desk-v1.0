@@ -952,7 +952,7 @@ export async function POST(req: Request) {
       reason: "llm_down",
       requestedBy: "auto_transition",
       lastKnownMode: "final_report",
-      lastKnownSystem: badgePayload.system,
+      lastKnownSystem: systemName,
       userId: user?.id,
     });
     currentMode = "diagnostic";
@@ -977,7 +977,7 @@ export async function POST(req: Request) {
         reason: llmAvailable ? "cause_gate" : "llm_down",
         requestedBy: "command",
         lastKnownMode: currentMode,
-        lastKnownSystem: badgePayload.system,
+        lastKnownSystem: systemName,
         userId: user?.id,
       });
       currentMode = "diagnostic";
@@ -1347,7 +1347,7 @@ Generate the complete final report now.`;
               reason: "llm_down",
               requestedBy: "auto_transition",
               lastKnownMode: "final_report",
-              lastKnownSystem: badgePayload.system,
+              lastKnownSystem: systemName,
               userId: user?.id,
             });
 
