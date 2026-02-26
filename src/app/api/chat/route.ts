@@ -60,6 +60,15 @@ import {
   DEFAULT_CONFIG,
 } from "@/lib/context-engine";
 import { buildFactLockConstraint } from "@/lib/fact-pack";
+import {
+  classifyOpenAiError,
+  getModelAllowlist,
+  getCircuitStatus,
+  openCircuit,
+  clearCircuit,
+  shouldTripCircuit,
+  type LlmErrorType,
+} from "@/lib/llm-resilience";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 // When true (default), all diagnostic flow decisions come from Context Engine.
