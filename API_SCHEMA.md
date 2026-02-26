@@ -62,6 +62,11 @@ Status codes:
   "title": "string",
   "inputLanguage": "en" | "ru" | "es",
   "languageSource": "AUTO" | "MANUAL",
+  "metadata": {
+    "pendingReportRequest": true,
+    "pendingReportRequestedAt": "2026-02-03T23:12:00Z",
+    "pendingReportLocale": "en" | "ru" | "es"
+  },
   "createdAt": "2026-02-03T23:12:00Z",
   "updatedAt": "2026-02-03T23:45:00Z"
 }
