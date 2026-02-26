@@ -231,6 +231,28 @@ function buildReportQueuedBanner(language: Language): string {
   return messages[lang];
 }
 
+async function setPendingReportRequest(
+  caseId: string,
+  language: Language,
+  userId?: string,
+): Promise<void> {
+  const payload: CaseMetadata = {
+    pendingReportRequest: true,
+    pendingReportRequestedAt: new Date().toISOString(),
+    pendingReportLocale: language,
+  };
+  await storage.updateCaseMetadata(caseId, payload, userId);
+}
+
+async function clearPendingReportRequest(caseId: string, userId?: string): Promise<void> {
+  const payload: CaseMetadata = {
+    pendingReportRequest: false,
+    pendingReportRequestedAt: null,
+    pendingReportLocale: null,
+  };
+  await storage.updateCaseMetadata(caseId, payload, userId);
+}
+
 function getNextDiagnosticQuestion(caseId: string, context: DiagnosticContext | null | undefined): string | null {
   const entry = getRegistryEntry(caseId);
   if (!entry?.procedure) return null;
