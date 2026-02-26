@@ -109,30 +109,43 @@ function applyLangPolicy(text: string, mode: CaseMode, policy: LanguagePolicy): 
 type UserCommand = "REPORT_REQUEST" | "CONTINUE_DIAGNOSTICS" | "RETRY_AI";
 
 export function detectUserCommand(message: string): UserCommand | null {
-  const text = (message || "").toLowerCase();
-  if (!text.trim()) return null;
+  const raw = (message || "").toLowerCase();
+  const normalized = raw.replace(/[.!?]/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
 
   const reportPatterns: RegExp[] = [
-    /\bwrite\s+report\b/i,
-    /\bgenerate\s+report\b/i,
-    /\breport\b/i,
-    /\bрепорт\b/i,
-    /напиши\s+репорт/i,
-    /сделай\s+репорт/i,
-    /напиши\s+отч(?:ет|ёт)/i,
-    /сделай\s+отч(?:ет|ёт)/i,
-    /\bотч(?:ет|ёт)\b/i,
+    /^(please\s+)?report(\s+please)?$/i,
+    /^(please\s+)?final\s+report(\s+please)?$/i,
+    /^(please\s+)?generate\s+report(\s+please)?$/i,
+    /^(please\s+)?write(\s+the)?\s+report(\s+.*)?$/i,
+    /^reporte(\s+por\s+favor)?$/i,
+    /^informe(\s+por\s+favor)?$/i,
+    /^(genera(r)?|genere)\s+el\s+reporte(\s+.*)?$/i,
+    /^(haz|haga)\s+el\s+informe(\s+.*)?$/i,
+    /^репорт(\s+.*)?$/i,
+    /^отч(?:ет|ё?т)(\s+.*)?$/i,
+    /^напиши\s+репорт(\s+.*)?$/i,
+    /^напиши\s+отч(?:ет|ё?т)(\s+.*)?$/i,
+    /^сделай\s+репорт(\s+.*)?$/i,
+    /^сделай\s+отч(?:ет|ё?т)(\s+.*)?$/i,
+    /^сгенерируй\s+отч(?:ет|ё?т)(\s+.*)?$/i,
   ];
 
   const continuePatterns: RegExp[] = [
-    /продолжаем/i,
-    /давай\s+дальше/i,
-    /continue\s+diagnostics?/i,
-    /continue\s+diagnostic/i,
+    /^продолжаем$/i,
+    /^давай\s+дальше$/i,
+    /^continue\s+diagnostics?$/i,
+    /^continue\s+diagnostic$/i,
   ];
 
-  if (reportPatterns.some((p) => p.test(text))) return "REPORT_REQUEST";
-  if (continuePatterns.some((p) => p.test(text))) return "CONTINUE_DIAGNOSTICS";
+  const retryPatterns: RegExp[] = [
+    /^retry\s+ai$/i,
+    /^retry\s+ai\s+please$/i,
+  ];
+
+  if (reportPatterns.some((p) => p.test(normalized))) return "REPORT_REQUEST";
+  if (continuePatterns.some((p) => p.test(normalized))) return "CONTINUE_DIAGNOSTICS";
+  if (retryPatterns.some((p) => p.test(normalized))) return "RETRY_AI";
   return null;
 }
 
