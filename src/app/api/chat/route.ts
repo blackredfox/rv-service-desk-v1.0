@@ -1092,8 +1092,6 @@ Generate the complete final report now.`;
             userId: user?.id,
           });
         }
-        }
-
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } catch (e: unknown) {
