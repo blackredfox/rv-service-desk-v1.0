@@ -765,7 +765,7 @@ export async function POST(req: Request) {
   // FACT LOCK: build constraint for final report
   // ========================================
   let factLockConstraint = "";
-  if (currentMode === "final_report" || currentMode === "labor_confirmation") {
+  if (currentMode === "final_report") {
     factLockConstraint = buildFactLockConstraint(history);
   }
 
