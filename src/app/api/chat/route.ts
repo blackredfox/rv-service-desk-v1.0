@@ -920,6 +920,10 @@ export async function POST(req: Request) {
 
   if (userCommand === "REPORT_REQUEST") {
     if (computedCauseAllowed && llmAvailable) {
+      if (pendingReportRequest) {
+        pendingReportRequest = false;
+        await clearPendingReportRequest(ensuredCase.id, user?.id);
+      }
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
     } else {
@@ -931,6 +935,13 @@ export async function POST(req: Request) {
       currentMode = "diagnostic";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
     }
+  }
+
+  if (!reportBlocked && pendingReportRequest && computedCauseAllowed && llmAvailable && currentMode !== "final_report") {
+    pendingReportRequest = false;
+    await clearPendingReportRequest(ensuredCase.id, user?.id);
+    currentMode = "final_report";
+    await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
   const badgePayload = buildBadgesPayload(ensuredCase.id, gateContext, currentMode);
