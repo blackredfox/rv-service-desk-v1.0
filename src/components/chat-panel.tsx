@@ -150,25 +150,32 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     [input, loading, disabled]
   );
 
+  const canRetryAi = useMemo(() => !loading && !disabled, [loading, disabled]);
+
   const isTyping = streaming && messages.length > 0;
 
-  async function send() {
-    const text = input.trim();
+  async function send(overrideText?: string) {
+    const isOverride = typeof overrideText === "string";
+    const text = (isOverride ? overrideText : input).trim();
     if (!text) return;
 
-    // Validate attachments before sending
-    if (photoAttachments.length > MAX_IMAGES) {
-      setError(`Maximum ${MAX_IMAGES} photos allowed per message.`);
-      return;
-    }
-    
-    const totalBytes = calculateTotalBytes(photoAttachments);
-    if (totalBytes > MAX_TOTAL_BYTES) {
-      setError(`Total attachment size exceeds 5MB limit. Please remove some photos.`);
-      return;
+    if (!isOverride) {
+      // Validate attachments before sending
+      if (photoAttachments.length > MAX_IMAGES) {
+        setError(`Maximum ${MAX_IMAGES} photos allowed per message.`);
+        return;
+      }
+      
+      const totalBytes = calculateTotalBytes(photoAttachments);
+      if (totalBytes > MAX_TOTAL_BYTES) {
+        setError(`Total attachment size exceeds 5MB limit. Please remove some photos.`);
+        return;
+      }
     }
 
-    setInput("");
+    if (!isOverride) {
+      setInput("");
+    }
     setError(null);
     setLoading(true);
     setStreaming(true);
@@ -177,8 +184,10 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const now = new Date().toISOString();
 
     // Capture and clear attachments before sending
-    const currentAttachments = [...photoAttachments];
-    setPhotoAttachments([]);
+    const currentAttachments = isOverride ? [] : [...photoAttachments];
+    if (!isOverride) {
+      setPhotoAttachments([]);
+    }
 
     setMessages((prev) => [
       ...prev,
