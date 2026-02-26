@@ -962,6 +962,14 @@ export async function POST(req: Request) {
         // Emit badges (UI only)
         controller.enqueue(encoder.encode(sseEncode(badgePayload)));
 
+        const statusPayload = buildStatusPayload({
+          llmStatus: { status: llmAvailable ? "up" : "down", reason: llmStatus.reason ?? undefined },
+          fallback: llmAvailable ? "llm" : "checklist",
+          mode: currentMode,
+          message: llmAvailable ? undefined : buildLlmDownBanner(outputPolicy.effective),
+        });
+        controller.enqueue(encoder.encode(sseEncode(statusPayload)));
+
         if (reportBlocked) {
           const hasProcedure = Boolean(getRegistryEntry(ensuredCase.id)?.procedure);
           const reasons = buildReportMissingReasons(gateContext, hasProcedure, outputPolicy.effective);
