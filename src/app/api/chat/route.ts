@@ -1225,8 +1225,8 @@ Generate the complete final report now.`;
             }),
           };
 
-          const finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
-          if (!finalResult.error && finalResult.response.trim()) {
+          const finalResult = await callOpenAIWithFallback(apiKey, finalReportBody, ac.signal);
+          if (!finalResult.errorType && finalResult.response.trim()) {
             let finalContent = applyLangPolicy(finalResult.response, "final_report", langPolicy);
             finalContent = scrubTelemetry(finalContent);
             const finalValidation = validateOutput(finalContent, "final_report", langPolicy.includeTranslation, translationLanguage);
