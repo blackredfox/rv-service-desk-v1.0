@@ -53,12 +53,13 @@ describe("Orchestration v5 - no labor_confirmation mode", () => {
 
 describe("Orchestration v5 - model allowlist", () => {
   it("uses allowlist fallback and resilience helpers", () => {
-    const content = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
-    expect(content).toMatch(/getModelAllowlist/);
-    expect(content).toMatch(/callOpenAIWithFallback/);
-    expect(content).toMatch(/gpt-5\.1/);
-    expect(content).toMatch(/gpt-4\.1/);
-    expect(content).toMatch(/o4-mini/);
+    const routeContent = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
+    const resilienceContent = readFileSync(join(process.cwd(), "src", "lib", "llm-resilience.ts"), "utf-8");
+    expect(routeContent).toMatch(/callOpenAIWithFallback/);
+    expect(routeContent).toMatch(/getModelAllowlist/);
+    expect(resilienceContent).toMatch(/gpt-5\.1/);
+    expect(resilienceContent).toMatch(/gpt-4\.1/);
+    expect(resilienceContent).toMatch(/o4-mini/);
   });
 });
 
