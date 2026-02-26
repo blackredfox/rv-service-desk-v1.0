@@ -182,6 +182,42 @@ export function scrubTelemetry(text: string): string {
   return filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+function formatLlmReason(reason?: LlmErrorType): string | undefined {
+  if (!reason) return undefined;
+  switch (reason) {
+    case "MODEL_NOT_FOUND":
+      return "model_not_found";
+    case "AUTH_BLOCKED":
+      return "auth_blocked";
+    case "RATE_LIMITED":
+      return "rate_limited";
+    case "PROVIDER_DOWN":
+      return "provider_down";
+    default:
+      return "unknown";
+  }
+}
+
+function buildLlmDownBanner(language: Language): string {
+  const lang = (language || "EN") as "EN" | "RU" | "ES";
+  const messages = {
+    EN: "AI is temporarily unavailable (account/model access). Your request is saved. You can continue diagnostics or click Retry AI.",
+    RU: "AI временно недоступен (доступ к аккаунту/модели). Запрос сохранён. Продолжайте диагностику или нажмите Retry AI.",
+    ES: "La IA no está disponible temporalmente (acceso a cuenta/modelo). Tu solicitud se guardó. Continúa el diagnóstico o pulsa Retry AI.",
+  } as const;
+  return messages[lang];
+}
+
+function buildReportQueuedBanner(language: Language): string {
+  const lang = (language || "EN") as "EN" | "RU" | "ES";
+  const messages = {
+    EN: "Report is queued. I’ll generate it as soon as isolation is complete.",
+    RU: "Отчёт поставлен в очередь. Сгенерирую, как только изоляция будет завершена.",
+    ES: "El reporte está en cola. Lo generaré en cuanto termine el aislamiento.",
+  } as const;
+  return messages[lang];
+}
+
 function getNextDiagnosticQuestion(caseId: string, context: DiagnosticContext | null | undefined): string | null {
   const entry = getRegistryEntry(caseId);
   if (!entry?.procedure) return null;
