@@ -886,6 +886,8 @@ export async function POST(req: Request) {
   }
 
   const badgePayload = buildBadgesPayload(ensuredCase.id, gateContext, currentMode);
+  let llmStatus = getCircuitStatus();
+  let llmAvailable = llmStatus.status === "up";
 
   // ========================================
   // FACT LOCK: build constraint for final report
