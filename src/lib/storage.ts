@@ -198,6 +198,23 @@ async function updateCaseMemory(caseId: string, input: UpdateCaseInput): Promise
   return summary;
 }
 
+async function updateCaseMetadataMemory(caseId: string, patch: CaseMetadata | null): Promise<CaseSummary | null> {
+  const store = getMemoryStore();
+  const c = store.cases.get(caseId);
+  if (!c || c.deletedAt) return null;
+  const ts = nowIso();
+  const retention = withRetention({ createdAt: c.createdAt, updatedAt: ts, lastActivityAt: ts });
+  const updated = {
+    ...c,
+    metadata: mergeMetadata(c.metadata, patch),
+    updatedAt: ts,
+    ...retention,
+  };
+  store.cases.set(caseId, updated);
+  const { deletedAt: _d, ...summary } = updated;
+  return summary;
+}
+
 async function softDeleteCaseMemory(caseId: string): Promise<void> {
   const store = getMemoryStore();
   const c = store.cases.get(caseId);
