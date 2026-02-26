@@ -308,8 +308,7 @@ Isolation complete. Conditions met. Transitioning to Final Report Mode.
       const promptContent = readFileSync(promptPath, "utf-8");
       
       expect(promptContent).toContain("[TRANSITION: FINAL_REPORT]");
-      expect(promptContent).toContain("WHEN READY TO TRANSITION");
-      expect(promptContent).toContain("Isolation complete");
+      expect(promptContent).toContain("TRANSITION RULES");
     });
   });
 });
