@@ -894,12 +894,13 @@ export async function POST(req: Request) {
           }
         }
 
-        full = applyLangPolicy(result.response, currentMode, langPolicy);
+        const rawResponse = applyLangPolicy(result.response, currentMode, langPolicy);
+        full = scrubTelemetry(rawResponse);
 
-        if (currentMode === "diagnostic" && engineResult && !engineResult.context.causeAllowed) {
-          const transitionPreview = detectTransitionSignal(full);
+        if (currentMode === "diagnostic" && engineResult && !computedCauseAllowed) {
+          const transitionPreview = detectTransitionSignal(rawResponse);
           if (transitionPreview) {
-            full = applyLangPolicy(transitionPreview.cleanedResponse, currentMode, langPolicy);
+            full = scrubTelemetry(applyLangPolicy(transitionPreview.cleanedResponse, currentMode, langPolicy));
           }
         }
 
