@@ -119,6 +119,14 @@ Seat enforcement occurs at API layer.
 
 No PII in logs.
 
+## 2.7 LLM Resilience & Checklist Mode
+
+- Model allowlist fallback (env override, gpt-5.1, gpt-4.1, o4-mini).
+- Circuit breaker with TTL to avoid hammering the provider on auth/rate/5xx failures.
+- Deterministic checklist mode keeps diagnostics moving if LLM is down.
+- Pending report requests are stored in case metadata and auto-run when AI recovers.
+- UI shows a friendly LLM status banner and supports Retry AI.
+
 ------------------------------------------------------------------------
 
 # 3. System Architecture
