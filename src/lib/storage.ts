@@ -399,6 +399,7 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
       inputLanguage: true,
       languageSource: true,
       mode: true,
+      metadata: true,
       createdAt: true,
       updatedAt: true,
       messages: {
