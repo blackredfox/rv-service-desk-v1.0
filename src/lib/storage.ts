@@ -499,6 +499,7 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
 
     return {
       ...updated,
+      metadata: normalizeMetadata(updated.metadata),
       createdAt: createdAtStr,
       updatedAt: updatedAtStr,
       ...retention,
