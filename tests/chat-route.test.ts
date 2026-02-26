@@ -91,6 +91,7 @@ describe("Chat API Route", () => {
         userId: "user_123",
         inputLanguage: "EN",
         languageSource: "AUTO",
+        mode: "diagnostic",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -153,6 +154,7 @@ describe("Chat API Route", () => {
         userId: "user_123",
         inputLanguage: "EN",
         languageSource: "AUTO",
+        mode: "diagnostic",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
