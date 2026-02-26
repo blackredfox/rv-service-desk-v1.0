@@ -1043,9 +1043,7 @@ export async function POST(req: Request) {
             ? buildLlmDownBanner(outputPolicy.effective)
             : buildReportQueuedBanner(outputPolicy.effective);
           const responseParts = nextQuestion ? [banner, nextQuestion] : [banner];
-          const responseText = scrubTelemetry(responseParts.join("
-
-"));
+          const responseText = scrubTelemetry(responseParts.join("\n\n"));
 
           for (const char of responseText) {
             if (aborted) break;
