@@ -70,12 +70,9 @@ describe("Guided Diagnostics Validator", () => {
     it("should allow multi-line Guided Diagnostics format", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const guidedDiagnosticsOutput = `Система: Водяной насос
-Классификация: Не сложное оборудование
-Режим: Управляемая диагностика
-Статус: Изоляция не завершена; Причина не может быть сформирована
+      const guidedDiagnosticsOutput = `Noted.
 
-Шаг 1: Издаёт ли насос какие-либо звуки или вибрации при открытии крана?`;
+Издаёт ли насос какие-либо звуки или вибрации при открытии крана?`;
 
       const result = validateDiagnosticOutput(guidedDiagnosticsOutput);
 
