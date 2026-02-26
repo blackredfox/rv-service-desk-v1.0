@@ -285,6 +285,12 @@ function buildReportMissingReasons(context: DiagnosticContext | null | undefined
   return reasons;
 }
 
+function buildChecklistResponse(caseId: string, context: DiagnosticContext | null | undefined, language: Language): string {
+  const nextQuestion = getNextDiagnosticQuestion(caseId, context);
+  if (nextQuestion) return nextQuestion;
+  return getSafeFallback("diagnostic", language);
+}
+
 function buildBadgesPayload(caseId: string, context: DiagnosticContext | null | undefined, mode: CaseMode) {
   const entry = getRegistryEntry(caseId);
   const system = entry?.procedure?.displayName || context?.primarySystem || "Unknown";
