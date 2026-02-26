@@ -61,7 +61,7 @@ describe("Tone Adjustment - Prompt Files", () => {
 
     expect(content).toContain("PIVOT RULES");
     expect(content).toContain("KEY FINDING");
-    expect(content).toContain("IMMEDIATELY");
+    expect(content).toContain("Transition to Final Report Mode");
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: allows at most one-word acknowledgment", async () => {
