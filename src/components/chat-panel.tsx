@@ -589,38 +589,55 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               Enter to send. Shift+Enter for newline.
             </div>
             
-            {/* Copy Report Button */}
-            <button
-              type="button"
-              onClick={handleCopyReport}
-              disabled={!latestReport || loading}
-              data-testid="copy-report-button"
-              title={latestReport ? "Copy the generated report" : "Generate a report first"}
-              className={`
-                flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium
-                transition-colors
-                ${latestReport 
-                  ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                  : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-600"
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRetryAi}
+                disabled={!canRetryAi}
+                data-testid="retry-ai-button"
+                className={
+                  `flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ` +
+                  `${canRetryAi
+                    ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40"
+                    : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-600"}`
                 }
-              `}
-            >
-              {reportCopied ? (
-                <>
-                  <svg className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Copy Report
-                </>
-              )}
-            </button>
+              >
+                Retry AI
+              </button>
+
+              {/* Copy Report Button */}
+              <button
+                type="button"
+                onClick={handleCopyReport}
+                disabled={!latestReport || loading}
+                data-testid="copy-report-button"
+                title={latestReport ? "Copy the generated report" : "Generate a report first"}
+                className={`
+                  flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium
+                  transition-colors
+                  ${latestReport 
+                    ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                    : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-600"
+                  }
+                `}
+              >
+                {reportCopied ? (
+                  <>
+                    <svg className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Copy Report
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
