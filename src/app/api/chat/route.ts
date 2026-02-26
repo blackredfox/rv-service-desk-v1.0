@@ -435,7 +435,7 @@ async function callOpenAI(
   apiKey: string,
   body: object,
   signal: AbortSignal
-): Promise<{ response: string; error?: string }> {
+): Promise<{ response: string; error?: string; status?: number; raw?: string }> {
   try {
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -449,25 +449,33 @@ async function callOpenAI(
 
     if (!upstream.ok) {
       const text = await upstream.text().catch(() => "");
-      return { response: "", error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500) };
+      return {
+        response: "",
+        status: upstream.status,
+        raw: text.slice(0, 500),
+        error: text
+          ? `Upstream error (${upstream.status}) ${text}`.slice(0, 500)
+          : `Upstream error (${upstream.status})`,
+      };
     }
 
-    // Non-streaming: read the full JSON response
-    const json = await upstream.json() as {
+    const json = (await upstream.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
       error?: { message?: string };
     };
 
-    // Check for API error in response
     if (json.error) {
-      return { response: "", error: `OpenAI error: ${json.error.message || "Unknown"}` };
+      return {
+        response: "",
+        status: upstream.status,
+        error: `OpenAI error: ${json.error.message || "Unknown"}`,
+      };
     }
 
-    // Extract content from chat completions format
     const content = json.choices?.[0]?.message?.content ?? "";
-    
+
     if (!content) {
-      console.warn("[Chat API] Empty content from OpenAI response:", JSON.stringify(json).slice(0, 500));
+      return { response: "", status: upstream.status, error: "Empty response from OpenAI" };
     }
 
     return { response: content };
