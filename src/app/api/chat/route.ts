@@ -775,6 +775,7 @@ export async function POST(req: Request) {
   let contextEngineDirectives = "";
   let computedCauseAllowed = false;
   let reportBlocked = false;
+  let reportBlockedReason: "cause" | "llm" | null = null;
 
   if (currentMode === "diagnostic") {
     // ── STRICT MODE GUARD ──
