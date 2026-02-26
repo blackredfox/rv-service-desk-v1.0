@@ -99,6 +99,169 @@ function applyLangPolicy(text: string, mode: CaseMode, policy: LanguagePolicy): 
   return text;
 }
 
+type UserCommand = "REPORT_REQUEST" | "CONTINUE_DIAGNOSTICS";
+
+function detectUserCommand(message: string): UserCommand | null {
+  const text = (message || "").toLowerCase();
+  if (!text.trim()) return null;
+
+  const reportPatterns: RegExp[] = [
+    /\bwrite\s+report\b/i,
+    /\bgenerate\s+report\b/i,
+    /\breport\b/i,
+    /\bрепорт\b/i,
+    /напиши\s+репорт/i,
+    /сделай\s+репорт/i,
+    /напиши\s+отч(?:ет|ёт)/i,
+    /сделай\s+отч(?:ет|ёт)/i,
+    /\bотч(?:ет|ёт)\b/i,
+  ];
+
+  const continuePatterns: RegExp[] = [
+    /продолжаем/i,
+    /давай\s+дальше/i,
+    /continue\s+diagnostics?/i,
+    /continue\s+diagnostic/i,
+  ];
+
+  if (reportPatterns.some((p) => p.test(text))) return "REPORT_REQUEST";
+  if (continuePatterns.some((p) => p.test(text))) return "CONTINUE_DIAGNOSTICS";
+  return null;
+}
+
+function computeCauseAllowed(context: DiagnosticContext | null | undefined, caseId: string): boolean {
+  if (!context) return false;
+  const entry = getRegistryEntry(caseId);
+  const hasProcedure = Boolean(entry?.procedure);
+  return Boolean(
+    context.isolationComplete &&
+    context.isolationFinding &&
+    context.submode !== "clarification" &&
+    hasProcedure
+  );
+}
+
+const TELEMETRY_PREFIXES = [
+  "Система:",
+  "System:",
+  "Классификация:",
+  "Classification:",
+  "Статус:",
+  "Status:",
+  "Режим:",
+  "Mode:",
+  "Изоляция завершена",
+  "Isolation complete",
+  "Переход к режиму",
+  "Transition to mode",
+  "Transitioning to",
+];
+
+const TELEMETRY_LINE_PATTERNS: RegExp[] = [
+  /^\s*(?:Step|Шаг)\s+\w+_/i,
+];
+
+function scrubTelemetry(text: string): string {
+  if (!text) return text;
+  const withoutMarkers = text.replace(/\[TRANSITION: FINAL_REPORT\]/g, "").trim();
+  const lines = withoutMarkers.split("\n");
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trimStart();
+    if (!trimmed) return false;
+    if (TELEMETRY_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) return false;
+    if (TELEMETRY_LINE_PATTERNS.some((pattern) => pattern.test(trimmed))) return false;
+    return true;
+  });
+  return filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function getNextDiagnosticQuestion(caseId: string, context: DiagnosticContext | null | undefined): string | null {
+  const entry = getRegistryEntry(caseId);
+  if (!entry?.procedure) return null;
+
+  const activeStepId = context?.activeStepId || null;
+  if (activeStepId) {
+    const step = entry.procedure.steps.find((s) => s.id === activeStepId);
+    if (step?.question) return step.question;
+  }
+
+  const nextStep = getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
+  return nextStep?.question || null;
+}
+
+function buildReportRefusal(language: Language, reasons: string[], nextQuestion: string | null): string {
+  const lang = (language || "EN") as "EN" | "RU" | "ES";
+  const headers: Record<"EN" | "RU" | "ES", string> = {
+    EN: "Report not available yet.",
+    RU: "Репорт пока недоступен.",
+    ES: "El reporte aún no está disponible.",
+  };
+
+  const fallbackQuestions: Record<"EN" | "RU" | "ES", string> = {
+    EN: "Which RV system are you diagnosing (roof AC, furnace, water pump, etc.)?",
+    RU: "Какую систему RV вы диагностируете сейчас (крышный кондиционер, печь, водяной насос и т.д.)?",
+    ES: "¿Qué sistema de la RV está diagnosticando (A/C de techo, calefacción, bomba de agua, etc.)?",
+  };
+
+  const lines = [headers[lang], ...reasons];
+  const question = nextQuestion || fallbackQuestions[lang];
+  if (question) {
+    lines.push("", question);
+  }
+  return lines.join("\n").trim();
+}
+
+function buildReportMissingReasons(context: DiagnosticContext | null | undefined, hasProcedure: boolean, language: Language): string[] {
+  const lang = (language || "EN") as "EN" | "RU" | "ES";
+  const dictionary = {
+    EN: {
+      isolation: "Isolation is not complete.",
+      finding: "No verified finding yet.",
+      clarification: "Clarification in progress.",
+      procedure: "No valid procedure selected.",
+    },
+    RU: {
+      isolation: "Изоляция не завершена.",
+      finding: "Нет подтверждённого вывода.",
+      clarification: "Идёт уточнение.",
+      procedure: "Процедура не определена.",
+    },
+    ES: {
+      isolation: "El aislamiento no está completo.",
+      finding: "No hay un hallazgo verificado.",
+      clarification: "La aclaración está en curso.",
+      procedure: "No hay un procedimiento válido.",
+    },
+  } as const;
+
+  const reasons: string[] = [];
+  if (!context?.isolationComplete) reasons.push(dictionary[lang].isolation);
+  if (!context?.isolationFinding) reasons.push(dictionary[lang].finding);
+  if (context?.submode === "clarification") reasons.push(dictionary[lang].clarification);
+  if (!hasProcedure) reasons.push(dictionary[lang].procedure);
+  return reasons;
+}
+
+function buildBadgesPayload(caseId: string, context: DiagnosticContext | null | undefined, mode: CaseMode) {
+  const entry = getRegistryEntry(caseId);
+  const system = entry?.procedure?.displayName || context?.primarySystem || "Unknown";
+  const complexity = entry?.procedure
+    ? entry.procedure.complex
+      ? "complex"
+      : "non_complex"
+    : context?.classification || "unknown";
+
+  return {
+    type: "badges",
+    system,
+    complexity,
+    mode,
+    isolationComplete: Boolean(context?.isolationComplete),
+    finding: context?.isolationFinding || "",
+    activeStepId: context?.activeStepId || "",
+  };
+}
+
 // Attachment validation constants
 const MAX_ATTACHMENTS = 10;
 const MAX_TOTAL_ATTACHMENT_BYTES = 6_000_000; // 6MB server-side (slightly higher than client)
