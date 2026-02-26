@@ -54,5 +54,5 @@ export async function getPrisma(): Promise<PrismaClient | null> {
   if (globalThis.__prismaClient !== undefined) {
     return globalThis.__prismaClient;
   }
-  return buildClient();
+  return await buildClient();
 }
