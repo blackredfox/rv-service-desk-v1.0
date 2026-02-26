@@ -185,18 +185,6 @@ export function processMessage(
     }
   }
   
-  // 5. Handle labor confirmation
-  if (context.mode === "labor_confirmation" && intent.type === "CONFIRMATION") {
-    if (intent.value === "accept" && context.labor.estimatedHours) {
-      context.labor.confirmedHours = context.labor.estimatedHours;
-      context.labor.mode = "confirmed";
-    } else if (typeof intent.value === "number") {
-      context.labor.confirmedHours = intent.value;
-      context.labor.mode = "confirmed";
-    }
-    stateChanged = true;
-  }
-  
   // 6. Build response instructions
   const responseInstructions = buildResponseInstructions(context, intent, config);
   
