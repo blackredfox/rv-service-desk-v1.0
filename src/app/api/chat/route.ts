@@ -1274,7 +1274,7 @@ Generate the complete final report now.`;
               const fallback = applyLangPolicy(getSafeFallback("final_report", outputPolicy.effective), "final_report", langPolicy);
               return scrubTelemetry(fallback);
             }
-            return finalContent;
+            return { content: finalContent, llmDown: false };
           }
 
           const fallback = applyLangPolicy(getSafeFallback("final_report", outputPolicy.effective), "final_report", langPolicy);
