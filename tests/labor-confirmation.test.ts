@@ -3,30 +3,24 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 /**
- * Orchestration v4 tests (replaces labor confirmation coverage).
- * Ensures report routing, telemetry scrubbing, model constant, and no labor_confirmation mode.
+ * Orchestration v5 tests (resilience + routing + no labor confirmation).
  */
 
-describe("Orchestration v4 - command router", () => {
-  it("detectUserCommand patterns include report and continue intents", () => {
+describe("Orchestration v5 - command router", () => {
+  it("detectUserCommand patterns include report, retry, and continue intents", () => {
     const content = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
 
     expect(content).toContain("detectUserCommand");
-    expect(content).toMatch(/computeCauseAllowed/);
-    expect(content).toMatch(/isolationComplete/);
-    expect(content).toMatch(/isolationFinding/);
-    expect(content).toMatch(/submode\s*!==\s*\"clarification\"/);
-    expect(content).toMatch(/hasProcedure/);
-    expect(content).toMatch(/write\\s\+report/);
-    expect(content).toMatch(/generate\\s\+report/);
-    expect(content).toMatch(/напиши\\s\+репорт/);
-    expect(content).toMatch(/сделай\\s\+отч/);
+    expect(content).toMatch(/final\s\+report/);
+    expect(content).toMatch(/generate\s\+report/);
+    expect(content).toMatch(/reporte/);
+    expect(content).toMatch(/informe/);
+    expect(content).toMatch(/retry\s\+ai/);
     expect(content).toMatch(/продолжаем/);
-    expect(content).toMatch(/continue\\s\+diagnostic/);
   });
 });
 
-describe("Orchestration v4 - telemetry scrubber", () => {
+describe("Orchestration v5 - telemetry scrubber", () => {
   it("scrubTelemetry removes internal telemetry lines", () => {
     const content = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
 
@@ -40,7 +34,7 @@ describe("Orchestration v4 - telemetry scrubber", () => {
   });
 });
 
-describe("Orchestration v4 - no labor_confirmation mode", () => {
+describe("Orchestration v5 - no labor_confirmation mode", () => {
   it("core files contain no labor_confirmation references", () => {
     const root = process.cwd();
     const files = [
@@ -57,12 +51,14 @@ describe("Orchestration v4 - no labor_confirmation mode", () => {
   });
 });
 
-describe("Orchestration v4 - model constant", () => {
-  it("uses OPENAI_MODEL constant for all OpenAI calls", () => {
+describe("Orchestration v5 - model allowlist", () => {
+  it("uses allowlist fallback and resilience helpers", () => {
     const content = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
-    expect(content).toContain('const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-5-latest"');
-    expect(content).toMatch(/model:\s*OPENAI_MODEL/g);
-    expect(content).not.toMatch(/model:\s*"gpt-/);
+    expect(content).toMatch(/getModelAllowlist/);
+    expect(content).toMatch(/callOpenAIWithFallback/);
+    expect(content).toMatch(/gpt-5\.1/);
+    expect(content).toMatch(/gpt-4\.1/);
+    expect(content).toMatch(/o4-mini/);
   });
 });
 
