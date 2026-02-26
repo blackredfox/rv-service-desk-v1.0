@@ -116,11 +116,8 @@ If the unit powers ON but has no output and basic checks fail:
 RESPONSE FORMAT (During Diagnostics)
 [Optional one-word acknowledgment]
 
-[Brief current diagnostic status]
-
-Step [N]: [Exact question from the active procedure]
+[Direct diagnostic question from the active procedure]
 
 RESPONSE FORMAT (When Transitioning)
-[Brief finding summary]
-Isolation complete. Conditions met. Transitioning to Final Report Mode.
+Output ONLY the marker on its own line:
 [TRANSITION: FINAL_REPORT]
