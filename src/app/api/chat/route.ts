@@ -1066,33 +1066,32 @@ Generate the complete final report now.`;
           return;
         }
 
-        // No transition - apply output-layer enforcement before streaming
-          // No transition - apply output-layer enforcement before streaming
-          full = applyLangPolicy(full, currentMode, langPolicy);
+        // No transition - stream the response normally
+        full = scrubTelemetry(full);
 
-          // Stream the response normally
-          for (const char of full) {
-            if (aborted) break;
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
+        // Stream the response normally
+        for (const char of full) {
+          if (aborted) break;
+          controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+        }
 
-          // Send validation info
-          if (!validation.valid) {
-            controller.enqueue(
-              encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
-            );
-          }
+        // Send validation info
+        if (!validation.valid) {
+          controller.enqueue(
+            encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
+          );
+        }
 
-          // Save assistant message with effective output language
-          if (!aborted && full.trim()) {
-            await storage.appendMessage({
-              caseId: ensuredCase.id,
-              role: "assistant",
-              content: full,
-              language: outputPolicy.effective,
-              userId: user?.id,
-            });
-          }
+        // Save assistant message with effective output language
+        if (!aborted && full.trim()) {
+          await storage.appendMessage({
+            caseId: ensuredCase.id,
+            role: "assistant",
+            content: full,
+            language: outputPolicy.effective,
+            userId: user?.id,
+          });
+        }
         }
 
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
