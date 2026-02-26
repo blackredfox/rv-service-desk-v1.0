@@ -57,7 +57,7 @@ describe("Orchestration v4 - no labor_confirmation mode", () => {
 describe("Orchestration v4 - model constant", () => {
   it("uses OPENAI_MODEL constant for all OpenAI calls", () => {
     const content = readFileSync(join(process.cwd(), "src", "app", "api", "chat", "route.ts"), "utf-8");
-    expect(content).toContain("const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-5-latest"");
+    expect(content).toContain('const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-5-latest"');
     expect(content).toMatch(/model:\s*OPENAI_MODEL/g);
     expect(content).not.toMatch(/model:\s*"gpt-/);
   });
