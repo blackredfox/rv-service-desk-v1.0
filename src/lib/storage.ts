@@ -71,6 +71,26 @@ function clampTitleSeed(seed: string) {
   return (s.slice(0, 60) || "New Case").trim();
 }
 
+function normalizeMetadata(raw: unknown): CaseMetadata | undefined {
+  if (!raw) return undefined;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as CaseMetadata;
+      return parsed && typeof parsed === "object" ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof raw === "object") return raw as CaseMetadata;
+  return undefined;
+}
+
+function mergeMetadata(base: CaseMetadata | undefined, patch: CaseMetadata | null | undefined): CaseMetadata | undefined {
+  if (patch === null) return undefined;
+  if (!patch) return base;
+  return { ...(base ?? {}), ...patch };
+}
+
 /** Enrich a raw case object with computed retention fields. */
 function withRetention(c: {
   createdAt: string;
