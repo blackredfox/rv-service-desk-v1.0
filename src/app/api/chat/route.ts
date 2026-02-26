@@ -562,8 +562,17 @@ export async function POST(req: Request) {
   // Get current mode from case
   let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
 
-  // Check for explicit mode transition commands
-  const commandMode = detectModeCommand(message);
+  // Detect user-level commands (report/continue)
+  const userCommand = detectUserCommand(message);
+
+  if (userCommand === "CONTINUE_DIAGNOSTICS" && currentMode !== "diagnostic") {
+    console.log(`[Chat API v2] Command: continue diagnostics → switching to diagnostic`);
+    currentMode = "diagnostic";
+    await storage.updateCase(ensuredCase.id, { mode: currentMode });
+  }
+
+  // Check for explicit mode transition commands (legacy aliases)
+  const commandMode = userCommand ? null : detectModeCommand(message);
   if (commandMode && commandMode !== currentMode) {
     console.log(`[Chat API v2] Mode transition: ${currentMode} → ${commandMode} (explicit command)`);
     currentMode = commandMode;
