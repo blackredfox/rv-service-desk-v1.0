@@ -236,6 +236,15 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           return;
         }
 
+        if (ev.type === "status") {
+          setLlmStatus({
+            status: ev.llm.status,
+            message: ev.message,
+            fallback: ev.fallback,
+          });
+          return;
+        }
+
         if (ev.type === "badges") {
           setBadges({
             system: ev.system,
