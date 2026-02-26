@@ -95,10 +95,8 @@ Does the pump attempt to run (any noise or vibration) when a faucet is opened?`;
     it("should allow up to 2 questions (for clarifications)", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const output = `System: Water pump
-Status: Need clarification
-
-Is the pump making noise? Can you hear the motor?`;
+      const output = `Is the pump making noise?
+Can you hear the motor?`;
 
       const result = validateDiagnosticOutput(output);
 
