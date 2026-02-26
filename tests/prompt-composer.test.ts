@@ -54,7 +54,7 @@ describe("Prompt Files", () => {
     
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("FINAL REPORT MODE");
-    expect(content).toContain("Shop-Style");
+    expect(content).toContain("Warranty");
     expect(content).toContain("OUTPUT FORMAT");
     expect(content).toContain("Complaint:");
     expect(content).toContain("Estimated Labor:");
