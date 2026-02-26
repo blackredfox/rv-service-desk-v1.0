@@ -701,6 +701,7 @@ export async function POST(req: Request) {
 
   // Detect user-level commands (report/continue)
   const userCommand = detectUserCommand(message);
+  const retryAiRequested = userCommand === "RETRY_AI";
 
   if (userCommand === "CONTINUE_DIAGNOSTICS" && currentMode !== "diagnostic") {
     console.log(`[Chat API v2] Command: continue diagnostics → switching to diagnostic`);
