@@ -193,7 +193,7 @@ describe("Guided Diagnostics State Machine", () => {
       const promptContent = readFileSync(promptPath, "utf-8");
       
       expect(promptContent.toLowerCase()).toContain("unable to verify");
-      expect(promptContent.toLowerCase()).toContain("can't check");
+      expect(promptContent).toMatch(/can.?t check/i);
       expect(promptContent).toContain("Do not repeat the same question");
     });
   });
