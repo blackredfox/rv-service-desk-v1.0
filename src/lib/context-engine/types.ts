@@ -6,7 +6,7 @@
 
 // ── Mode & Submode ──────────────────────────────────────────────────
 
-export type Mode = "diagnostic" | "authorization" | "final_report" | "labor_confirmation";
+export type Mode = "diagnostic" | "authorization" | "final_report";
 
 export type ClarificationType = "locate" | "explain" | "howto";
 
