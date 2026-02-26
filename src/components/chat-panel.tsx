@@ -315,7 +315,57 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
   return (
     <section data-testid="chat-panel" className="flex h-full flex-1 flex-col">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 flex flex-col md:flex-row">
+        <aside
+          data-testid="badges-panel"
+          className="border-b border-zinc-200 bg-white/70 px-4 py-4 text-sm text-zinc-700 backdrop-blur md:w-60 md:shrink-0 md:border-b-0 md:border-r dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+        >
+          <div
+            data-testid="badges-title"
+            className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+          >
+            Live Status
+          </div>
+          <div className="mt-3 space-y-3">
+            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">System</div>
+              <div data-testid="badge-system" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {badges?.system || "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Complexity</div>
+              <div data-testid="badge-complexity" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {badges?.complexity || "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Mode</div>
+              <div data-testid="badge-mode" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {badges?.mode || "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Isolation</div>
+              <div data-testid="badge-isolation" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {badges ? (badges.isolationComplete ? "Complete" : "In progress") : "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Finding</div>
+              <div data-testid="badge-finding" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {badges?.finding || "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Active Step</div>
+              <div data-testid="badge-active-step" className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {badges?.activeStepId || "—"}
+              </div>
+            </div>
+          </div>
+        </aside>
+        <div className="flex-1 overflow-y-auto p-6">
         {!caseId && messages.length === 0 ? (
           <div
             data-testid="chat-empty-state"
