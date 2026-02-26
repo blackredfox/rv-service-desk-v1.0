@@ -106,7 +106,7 @@ function applyLangPolicy(text: string, mode: CaseMode, policy: LanguagePolicy): 
   return text;
 }
 
-type UserCommand = "REPORT_REQUEST" | "CONTINUE_DIAGNOSTICS";
+type UserCommand = "REPORT_REQUEST" | "CONTINUE_DIAGNOSTICS" | "RETRY_AI";
 
 export function detectUserCommand(message: string): UserCommand | null {
   const text = (message || "").toLowerCase();
