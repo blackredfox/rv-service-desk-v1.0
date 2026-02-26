@@ -27,7 +27,7 @@ describe("OpenAI Response Extraction", () => {
             index: 0,
             message: {
               role: "assistant",
-              content: "System: Water pump\nClassification: Non-complex\nMode: Guided Diagnostics\n\nStep 1: Does the pump attempt to run when a faucet is opened?",
+              content: "Does the pump attempt to run when a faucet is opened?",
             },
             finish_reason: "stop",
           },
