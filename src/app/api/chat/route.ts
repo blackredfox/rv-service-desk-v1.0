@@ -925,7 +925,6 @@ export async function POST(req: Request) {
     reportBlocked = true;
     reportBlockedReason = "llm";
     pendingReportRequest = true;
-    pendingReportLocale = outputPolicy.effective;
     await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
     currentMode = "diagnostic";
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
