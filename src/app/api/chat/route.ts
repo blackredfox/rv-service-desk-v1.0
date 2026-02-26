@@ -843,7 +843,7 @@ export async function POST(req: Request) {
             controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
           }
 
-          if (!aborted  refusal.trim()) {
+          if (!aborted && refusal.trim()) {
             await storage.appendMessage({
               caseId: ensuredCase.id,
               role: "assistant",
