@@ -1277,8 +1277,12 @@ Generate the complete final report now.`;
             return { content: finalContent, llmDown: false };
           }
 
+          if (finalResult.errorType) {
+            return { content: "", llmDown: true };
+          }
+
           const fallback = applyLangPolicy(getSafeFallback("final_report", outputPolicy.effective), "final_report", langPolicy);
-          return scrubTelemetry(fallback);
+          return { content: scrubTelemetry(fallback), llmDown: false };
         };
 
         // ========================================
