@@ -116,19 +116,21 @@ export function detectUserCommand(message: string): UserCommand | null {
   const reportPatterns: RegExp[] = [
     /^(please\s+)?report(\s+please)?$/i,
     /^(please\s+)?final\s+report(\s+please)?$/i,
-    /^(please\s+)?generate\s+report(\s+please)?$/i,
+    /^(please\s+)?generate\s+report(\s+.*)?$/i,
     /^(please\s+)?write(\s+the)?\s+report(\s+.*)?$/i,
     /^reporte(\s+por\s+favor)?$/i,
     /^informe(\s+por\s+favor)?$/i,
     /^(genera(r)?|genere)\s+el\s+reporte(\s+.*)?$/i,
+    /^(genera(r)?|genere)\s+el\s+informe(\s+.*)?$/i,
     /^(haz|haga)\s+el\s+informe(\s+.*)?$/i,
-    /^репорт(\s+.*)?$/i,
-    /^отч(?:ет|ё?т)(\s+.*)?$/i,
-    /^напиши\s+репорт(\s+.*)?$/i,
-    /^напиши\s+отч(?:ет|ё?т)(\s+.*)?$/i,
-    /^сделай\s+репорт(\s+.*)?$/i,
-    /^сделай\s+отч(?:ет|ё?т)(\s+.*)?$/i,
-    /^сгенерируй\s+отч(?:ет|ё?т)(\s+.*)?$/i,
+    /^(haz|haga)\s+el\s+reporte(\s+.*)?$/i,
+    /^репорт$/i,
+    /^отч[её]т$/i,
+    /^напиши\s+отч[её]т(\s+.*)?$/i,
+    /^сделай\s+отч[её]т(\s+.*)?$/i,
+    /^сгенерируй\s+отч[её]т(\s+.*)?$/i,
+    /^сделай\s+репорт$/i,
+    /^напиши\s+репорт$/i,
   ];
 
   const continuePatterns: RegExp[] = [
@@ -141,6 +143,14 @@ export function detectUserCommand(message: string): UserCommand | null {
   const retryPatterns: RegExp[] = [
     /^retry\s+ai$/i,
     /^retry\s+ai\s+please$/i,
+    /^retry$/i,
+    /^try\s+again$/i,
+    /^повтори$/i,
+    /^повтори\s+ai$/i,
+    /^попробуй\s+снова$/i,
+    /^reintentar$/i,
+    /^reintentar\s+ai$/i,
+    /^intenta\s+de\s+nuevo$/i,
   ];
 
   if (reportPatterns.some((p) => p.test(normalized))) return "REPORT_REQUEST";
