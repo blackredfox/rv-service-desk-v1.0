@@ -31,8 +31,7 @@ describe("Orchestration v4 - telemetry scrubber", () => {
       "Status: Isolation not complete",
       "Step wp_1: Verify pump noise",
       "Actual question?",
-    ].join("
-");
+    ].join("\n");
 
     expect(scrubTelemetry(input)).toBe("Actual question?");
   });
