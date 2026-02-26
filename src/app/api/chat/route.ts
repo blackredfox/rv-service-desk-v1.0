@@ -1106,15 +1106,16 @@ export async function POST(req: Request) {
             }),
           };
 
-          result = await callOpenAI(apiKey, retryBody, ac.signal);
+          const retryResult = await callOpenAIWithFallback(apiKey, retryBody, ac.signal);
 
-          if (!result.error) {
+          if (!retryResult.errorType) {
+            result = retryResult;
             validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
           // If still fails, use safe fallback with EFFECTIVE OUTPUT language
-          if (!validation.valid || result.error) {
+          if (!validation.valid || retryResult.errorType) {
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
             result.response = getSafeFallback(currentMode, outputPolicy.effective);
             
