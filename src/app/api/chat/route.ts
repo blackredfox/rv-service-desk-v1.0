@@ -1220,7 +1220,7 @@ export async function POST(req: Request) {
           }
         }
 
-        const generateFinalReport = async (): Promise<string> => {
+        const generateFinalReport = async (): Promise<{ content: string; llmDown: boolean }> => {
           const updatedHistory = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
           const factLock = buildFactLockConstraint(updatedHistory);
           const finalReportPrompt = composePromptV2({
