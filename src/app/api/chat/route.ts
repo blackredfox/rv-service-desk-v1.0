@@ -485,6 +485,55 @@ async function callOpenAI(
   }
 }
 
+type ResilientOpenAiResult = {
+  response: string;
+  errorType?: LlmErrorType;
+  errorMessage?: string;
+  modelUsed?: string;
+};
+
+async function callOpenAIWithFallback(
+  apiKey: string,
+  body: object,
+  signal: AbortSignal
+): Promise<ResilientOpenAiResult> {
+  const circuitStatus = getCircuitStatus();
+  if (circuitStatus.status === "down") {
+    return { response: "", errorType: circuitStatus.reason ?? "PROVIDER_DOWN" };
+  }
+
+  const candidates = getModelAllowlist(process.env.OPENAI_MODEL);
+  let lastError: LlmErrorType | undefined;
+
+  for (const model of candidates) {
+    const result = await callOpenAI(apiKey, { ...body, model }, signal);
+    if (!result.error) {
+      clearCircuit();
+      return { response: result.response, modelUsed: model };
+    }
+
+    const errorType = classifyOpenAiError({ status: result.status, message: result.error });
+    lastError = errorType;
+
+    if (errorType === "MODEL_NOT_FOUND") {
+      continue;
+    }
+
+    if (shouldTripCircuit(errorType)) {
+      openCircuit(errorType);
+    }
+
+    return { response: "", errorType, errorMessage: result.error, modelUsed: model };
+  }
+
+  if (lastError === "MODEL_NOT_FOUND") {
+    openCircuit("MODEL_NOT_FOUND");
+    return { response: "", errorType: "MODEL_NOT_FOUND", errorMessage: "model_not_found" };
+  }
+
+  return { response: "", errorType: lastError ?? "UNKNOWN", errorMessage: "unknown" };
+}
+
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
