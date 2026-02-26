@@ -67,7 +67,7 @@ export type ChatSseEvent =
   | { type: "mode_transition"; from: string; to: string }
   | { type: "badges"; system: string; complexity: string; mode: string; isolationComplete: boolean; finding: string; activeStepId: string }
   | { type: "validation"; valid: boolean; violations: string[] }
-  | { type: "validation_fallback"; violations: string[] }
+  | { type: "status"; llm: { status: "up" | "down"; reason?: string }; fallback: "llm" | "checklist"; mode: string; message?: string }
   | { type: "done" };
 
 export async function apiChatStream(args: { caseId?: string; message: string; languageMode: LanguageMode }) {
