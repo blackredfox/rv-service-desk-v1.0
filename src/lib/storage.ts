@@ -291,6 +291,7 @@ async function ensureCaseMemory(input: EnsureCaseInput): Promise<CaseSummary> {
     inputLanguage: input.inputLanguage,
     languageSource: input.languageSource,
     mode: "diagnostic" as CaseMode,
+    metadata: undefined,
     createdAt: ts,
     updatedAt: ts,
     ...retention,
