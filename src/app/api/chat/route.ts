@@ -1307,7 +1307,6 @@ Generate the complete final report now.`;
             llmStatus = getCircuitStatus();
             llmAvailable = false;
             pendingReportRequest = true;
-            pendingReportLocale = outputPolicy.effective;
             await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
 
             const statusPayload = buildStatusPayload({
