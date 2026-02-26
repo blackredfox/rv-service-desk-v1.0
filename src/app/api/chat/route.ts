@@ -611,6 +611,10 @@ export async function POST(req: Request) {
     // ── DATA PROVIDER: Initialize procedure catalog ──
     // This ONLY provides step metadata; it does NOT control flow
     const initResult = initializeCase(ensuredCase.id, message);
+    if (initResult.system) {
+      const classification = initResult.procedure?.complex ? "complex" : "non_complex";
+      getOrCreateContext(ensuredCase.id, initResult.system, classification);
+    }
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
       console.log(`[Chat API v2] Procedure catalog: ${initResult.procedure.displayName}, initial steps: ${initResult.preCompletedSteps.join(", ")}`);
       // Sync pre-completed steps to Context Engine
