@@ -33,6 +33,7 @@ import {
   buildRegistryContext,
   processUserMessage,
   isProcedureComplete,
+  getRegistryEntry,
 } from "@/lib/diagnostic-registry";
 import {
   // Context Engine — SINGLE FLOW AUTHORITY
