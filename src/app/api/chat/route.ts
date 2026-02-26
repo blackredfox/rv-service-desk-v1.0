@@ -761,6 +761,8 @@ export async function POST(req: Request) {
     }
   }
 
+  const badgePayload = buildBadgesPayload(ensuredCase.id, gateContext, currentMode);
+
   // ========================================
   // FACT LOCK: build constraint for final report
   // ========================================
