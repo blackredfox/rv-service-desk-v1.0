@@ -942,7 +942,15 @@ export async function POST(req: Request) {
     reportBlocked = true;
     reportBlockedReason = "llm";
     pendingReportRequest = true;
-    await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
+    await setPendingReportRequest({
+      caseId: ensuredCase.id,
+      language: outputPolicy.effective,
+      reason: "llm_down",
+      requestedBy: "auto_transition",
+      lastKnownMode: "final_report",
+      lastKnownSystem: badgePayload.system,
+      userId: user?.id,
+    });
     currentMode = "diagnostic";
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
@@ -959,7 +967,15 @@ export async function POST(req: Request) {
       reportBlocked = true;
       reportBlockedReason = llmAvailable ? "cause" : "llm";
       pendingReportRequest = true;
-      await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
+      await setPendingReportRequest({
+        caseId: ensuredCase.id,
+        language: outputPolicy.effective,
+        reason: llmAvailable ? "cause_gate" : "llm_down",
+        requestedBy: "command",
+        lastKnownMode: currentMode,
+        lastKnownSystem: badgePayload.system,
+        userId: user?.id,
+      });
       currentMode = "diagnostic";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
     }
@@ -1321,7 +1337,15 @@ Generate the complete final report now.`;
             llmStatus = getCircuitStatus();
             llmAvailable = false;
             pendingReportRequest = true;
-            await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
+            await setPendingReportRequest({
+              caseId: ensuredCase.id,
+              language: outputPolicy.effective,
+              reason: "llm_down",
+              requestedBy: "auto_transition",
+              lastKnownMode: "final_report",
+              lastKnownSystem: badgePayload.system,
+              userId: user?.id,
+            });
 
             const statusPayload = buildStatusPayload({
               llmStatus: { status: "down", reason: llmStatus.reason ?? "PROVIDER_DOWN" },
