@@ -221,6 +221,18 @@ Response (200):
 }
 ```
 
+Streaming (SSE) event payloads:
+```json
+{ "type": "token", "token": "text" }
+{ "type": "badges", "system": "...", "complexity": "complex", "mode": "diagnostic", "isolationComplete": false, "finding": "", "activeStepId": "" }
+{ "type": "status", "llm": { "status": "up"|"down", "reason": "auth_blocked" }, "fallback": "llm"|"checklist", "mode": "diagnostic", "message": "..." }
+{ "type": "mode", "mode": "diagnostic" }
+{ "type": "mode_transition", "from": "diagnostic", "to": "final_report" }
+{ "type": "validation", "valid": false, "violations": ["..."] }
+{ "type": "validation_fallback", "violations": ["..."] }
+{ "type": "done" }
+```
+
 Mode transition rules (server-side):
 - Explicit commands only (allow-list; exact/near-exact match after case/whitespace normalization only).
 - Final Report aliases:
