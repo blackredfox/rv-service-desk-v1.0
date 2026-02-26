@@ -50,8 +50,8 @@ describe("Tone Adjustment - Prompt Files", () => {
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
     expect(content).toContain("PROCEDURE IS LAW");
-    expect(content).toContain("DIAGNOSTIC REGISTRY RULES");
-    expect(content).toContain("NEVER repeat a question");
+    expect(content).toContain("Ask ONLY questions");
+    expect(content).toContain("Do NOT invent diagnostic steps");
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: has pivot rules", async () => {
