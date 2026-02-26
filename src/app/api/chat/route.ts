@@ -1300,7 +1300,45 @@ Generate the complete final report now.`;
           controller.enqueue(encoder.encode(sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })));
           controller.enqueue(encoder.encode(sseEncode(buildBadgesPayload(ensuredCase.id, getContext(ensuredCase.id) ?? engineResult?.context, currentMode))));
 
-          const finalContent = await generateFinalReport();
+          const reportResult = await generateFinalReport();
+          if (reportResult.llmDown) {
+            llmStatus = getCircuitStatus();
+            llmAvailable = false;
+            pendingReportRequest = true;
+            pendingReportLocale = outputPolicy.effective;
+            await setPendingReportRequest(ensuredCase.id, outputPolicy.effective, user?.id);
+
+            const statusPayload = buildStatusPayload({
+              llmStatus: { status: "down", reason: llmStatus.reason ?? "PROVIDER_DOWN" },
+              fallback: "checklist",
+              mode: "diagnostic",
+              message: buildLlmDownBanner(outputPolicy.effective),
+            });
+            controller.enqueue(encoder.encode(sseEncode(statusPayload)));
+
+            const checklistResponse = scrubTelemetry(buildChecklistResponse(ensuredCase.id, contextForRefusal, outputPolicy.effective));
+            for (const char of checklistResponse) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            if (!aborted && checklistResponse.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: checklistResponse,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+
+            full = checklistResponse;
+            controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+            controller.close();
+            return;
+          }
+
+          const finalContent = reportResult.content;
           for (const char of finalContent) {
             if (aborted) break;
             controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
