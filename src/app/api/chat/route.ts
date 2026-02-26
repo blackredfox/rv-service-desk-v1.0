@@ -829,6 +829,9 @@ export async function POST(req: Request) {
         // Emit mode
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
+        // Emit badges (UI only)
+        controller.enqueue(encoder.encode(sseEncode(badgePayload)));
+
         // Build initial request
         const openAiBody = {
           model: OPENAI_MODEL,
