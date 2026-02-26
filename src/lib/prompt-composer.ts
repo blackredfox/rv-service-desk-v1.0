@@ -9,7 +9,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 // Case modes
-export type CaseMode = "diagnostic" | "authorization" | "final_report" | "labor_confirmation";
+export type CaseMode = "diagnostic" | "authorization" | "final_report";
 
 // Default memory window (last N messages to include)
 export const DEFAULT_MEMORY_WINDOW = 12;
