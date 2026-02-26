@@ -919,7 +919,7 @@ export async function POST(req: Request) {
   let llmAvailable = llmStatus.status === "up";
 
   if (userCommand === "REPORT_REQUEST") {
-    if (computedCauseAllowed  llmAvailable) {
+    if (computedCauseAllowed && llmAvailable) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
     } else {
