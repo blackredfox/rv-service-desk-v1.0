@@ -731,6 +731,28 @@ export async function POST(req: Request) {
     procedureContext = buildRegistryContext(ensuredCase.id);
   }
 
+  const gateContext = engineResult?.context || getContext(ensuredCase.id);
+  if (gateContext) {
+    const recomputed = computeCauseAllowed(gateContext, ensuredCase.id);
+    if (computedCauseAllowed !== recomputed || gateContext.causeAllowed !== recomputed) {
+      computedCauseAllowed = recomputed;
+      const updatedGateContext = { ...gateContext, causeAllowed: computedCauseAllowed };
+      updateContext(updatedGateContext);
+      if (engineResult) engineResult.context = updatedGateContext;
+    }
+  }
+
+  if (userCommand === "REPORT_REQUEST") {
+    if (computedCauseAllowed) {
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+    } else {
+      reportBlocked = true;
+      currentMode = "diagnostic";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+    }
+  }
+
   // ========================================
   // FACT LOCK: build constraint for final report
   // ========================================
