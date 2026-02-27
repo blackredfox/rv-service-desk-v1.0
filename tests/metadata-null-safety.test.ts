@@ -195,6 +195,8 @@ describe("Prisma select clause safety (regression for PrismaClientValidationErro
     expect(content).toContain("extractMetadata");
   });
 });
+
+describe("Prisma schema: Case.metadata", () => {
   it("Case.metadata is declared as Json? (nullable, no default)", () => {
     const fs = require("fs");
     const schema = fs.readFileSync("prisma/schema.prisma", "utf-8");
