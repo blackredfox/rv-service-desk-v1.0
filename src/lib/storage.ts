@@ -454,66 +454,80 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
 async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseSummary | null; messages: ChatMessage[] }> {
   const prisma = await getPrisma();
   if (!prisma) return getCaseMemory(caseId);
-  const c = await prisma.case.findFirst({
-    where: { 
-      id: caseId, 
-      deletedAt: null,
-      ...(userId ? { userId } : {}),
-    },
-    select: {
-      id: true,
-      title: true,
-      userId: true,
-      inputLanguage: true,
-      languageSource: true,
-      mode: true,
-      metadata: true,
-      createdAt: true,
-      updatedAt: true,
-      messages: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          caseId: true,
-          role: true,
-          content: true,
-          language: true,
-          createdAt: true,
+  let c: AnyObj;
+  try {
+    c = await prisma.case.findFirst({
+      where: { 
+        id: caseId, 
+        deletedAt: null,
+        ...(userId ? { userId } : {}),
+      },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        inputLanguage: true,
+        languageSource: true,
+        mode: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+        messages: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            caseId: true,
+            role: true,
+            content: true,
+            language: true,
+            createdAt: true,
+          },
         },
       },
-    },
-  });
+    });
+  } catch (queryErr) {
+    console.error("[storage.getCaseDb] Prisma query failed:", queryErr);
+    throw queryErr;
+  }
 
   if (!c) return { case: null, messages: [] };
 
-  const createdAtStr = c.createdAt.toISOString();
-  const updatedAtStr = c.updatedAt.toISOString();
-  const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
+  try {
+    const createdAtStr = (c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt)).toISOString();
+    const updatedAtStr = (c.updatedAt instanceof Date ? c.updatedAt : new Date(c.updatedAt)).toISOString();
+    const retention = withRetention({ createdAt: createdAtStr, updatedAt: updatedAtStr });
 
-  return {
-    case: {
-      id: c.id,
-      title: c.title,
-      userId: c.userId,
-      inputLanguage: c.inputLanguage as Language,
-      languageSource: c.languageSource as "AUTO" | "MANUAL",
-      mode: c.mode as CaseMode,
-      metadata: normalizeMetadata(c.metadata),
-      createdAt: createdAtStr,
-      updatedAt: updatedAtStr,
-      ...retention,
-    },
-    messages: c.messages
-      .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
-      .map((m: unknown) => ({
-        id: (m as AnyObj).id,
-        caseId: (m as AnyObj).caseId,
-        role: (m as AnyObj).role as "user" | "assistant",
-        content: (m as AnyObj).content,
-        language: ((m as AnyObj).language ?? c.inputLanguage) as Language,
-        createdAt: (m as AnyObj).createdAt.toISOString(),
-      })),
-  };
+    return {
+      case: {
+        id: c.id,
+        title: c.title ?? "Untitled",
+        userId: c.userId ?? null,
+        inputLanguage: (c.inputLanguage ?? "EN") as Language,
+        languageSource: (c.languageSource ?? "AUTO") as "AUTO" | "MANUAL",
+        mode: (c.mode ?? "diagnostic") as CaseMode,
+        metadata: normalizeMetadata(c.metadata),
+        createdAt: createdAtStr,
+        updatedAt: updatedAtStr,
+        ...retention,
+      },
+      messages: (c.messages ?? [])
+        .filter((m: unknown) => (m as AnyObj).role === "user" || (m as AnyObj).role === "assistant")
+        .map((m: unknown) => ({
+          id: (m as AnyObj).id,
+          caseId: (m as AnyObj).caseId,
+          role: (m as AnyObj).role as "user" | "assistant",
+          content: (m as AnyObj).content,
+          language: ((m as AnyObj).language ?? c.inputLanguage ?? "EN") as Language,
+          createdAt: ((m as AnyObj).createdAt instanceof Date
+            ? (m as AnyObj).createdAt
+            : new Date((m as AnyObj).createdAt)
+          ).toISOString(),
+        })),
+    };
+  } catch (transformErr) {
+    console.error(`[storage.getCaseDb] Failed to transform case ${caseId}:`, transformErr);
+    throw transformErr;
+  }
 }
 
 async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: string): Promise<CaseSummary | null> {
