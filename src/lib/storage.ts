@@ -664,17 +664,7 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
     },
     orderBy: { updatedAt: "desc" },
     take: 25,
-    select: {
-      id: true,
-      title: true,
-      userId: true,
-      inputLanguage: true,
-      languageSource: true,
-      mode: true,
-      metadata: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: CASE_SELECT_CORE,
   });
 
   return rows
@@ -682,7 +672,7 @@ async function searchCasesDb(q: string, userId?: string): Promise<CaseSummary[]>
       const createdAt = r.createdAt.toISOString();
       const updatedAt = r.updatedAt.toISOString();
       const retention = withRetention({ createdAt, updatedAt });
-      return { ...r, metadata: normalizeMetadata(r.metadata), createdAt, updatedAt, ...retention };
+      return { ...r, metadata: extractMetadata(r), createdAt, updatedAt, ...retention };
     })
     .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
 }
