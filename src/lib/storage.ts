@@ -402,7 +402,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       const createdAt = (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString();
       const updatedAt = (r.updatedAt instanceof Date ? r.updatedAt : new Date(r.updatedAt)).toISOString();
       const retention = withRetention({ createdAt, updatedAt });
-      const meta = normalizeMetadata(r.metadata);
+      const meta = extractMetadata(r);
       const summary: CaseSummary = {
         id: r.id,
         title: r.title ?? "Untitled",
