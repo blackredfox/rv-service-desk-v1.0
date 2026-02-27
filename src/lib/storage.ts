@@ -774,17 +774,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
       languageSource: input.languageSource,
       userId: input.userId,
     },
-    select: {
-      id: true,
-      title: true,
-      userId: true,
-      inputLanguage: true,
-      languageSource: true,
-      mode: true,
-      metadata: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: CASE_SELECT_CORE,
   });
 
   // Track case creation
@@ -794,7 +784,7 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
 
   return {
     ...created,
-    metadata: normalizeMetadata(created.metadata),
+    metadata: extractMetadata(created),
     createdAt: created.createdAt.toISOString(),
     updatedAt: created.updatedAt.toISOString(),
     ...withRetention({ createdAt: created.createdAt.toISOString(), updatedAt: created.updatedAt.toISOString() }),
