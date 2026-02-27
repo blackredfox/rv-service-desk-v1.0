@@ -44,9 +44,14 @@ Build and iteratively upgrade the "RV Service Desk" chat agent into a senior RV 
 - Expanded retry commands: EN (retry, try again), RU (повтори, попробуй снова), ES (reintentar, intenta de nuevo).
 
 ### Test Coverage
-- 675 tests across 43 test files, all passing.
+- 678 tests across 43 test files, all passing.
 - `tests/v5-resilience-behavioral.test.ts`: 94 behavioral tests covering circuit breaker lifecycle, TTL expiry, shouldTripCircuit, model allowlist, error classification edge cases, report false-positive guards, Spanish/Russian command triggers, retry AI EN/RU/ES, banner copy, metadata contract, checklist mode structure, recovery path, UI data-testids.
-- `tests/metadata-null-safety.test.ts`: 19 regression tests for legacy metadata backward compatibility (null, boolean, stale keys, empty objects, malformed JSON).
+- `tests/metadata-null-safety.test.ts`: 22 regression tests for legacy metadata backward compatibility, Prisma select clause safety, and error logging verification.
+
+### Bug Fix: 500 on /api/cases (Feb 2026)
+- **Root cause:** All Prisma `select` clauses included `metadata: true`, but the `metadata` column was added in V5 without a migration being applied. The generated Prisma client didn't know about the field, causing `PrismaClientValidationError: Unknown field 'metadata'`.
+- **Fix:** Removed `metadata` from all `select` clauses. Introduced `CASE_SELECT_CORE` constant (without `metadata`) and `extractMetadata()` helper that safely reads metadata from query results via optional property access.
+- **User action required:** Run `npx prisma generate` and `npx prisma migrate dev` (or `npx prisma db push`) to add the `metadata` column to the database.
 
 ## Prioritized Backlog
 
