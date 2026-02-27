@@ -8,7 +8,10 @@ export async function GET() {
     // Allow unauthenticated access for backward compatibility, but filter by user if authenticated
     const cases = await storage.listCases(user?.id);
     return NextResponse.json({ cases });
-  } catch {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[API /api/cases] ERROR:", msg);
+    console.error(err instanceof Error ? err.stack : err);
     return NextResponse.json({ error: "Failed to load cases" }, { status: 500 });
   }
 }
@@ -22,7 +25,10 @@ export async function POST(req: Request) {
       userId: user?.id,
     });
     return NextResponse.json({ case: created }, { status: 201 });
-  } catch {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[API /api/cases POST] ERROR:", msg);
+    console.error(err instanceof Error ? err.stack : err);
     return NextResponse.json({ error: "Failed to create case" }, { status: 500 });
   }
 }
