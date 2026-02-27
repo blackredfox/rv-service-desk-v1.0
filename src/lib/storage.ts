@@ -432,17 +432,7 @@ async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
       title: clampTitle(input.title ?? "New Case"),
       userId: input.userId,
     },
-    select: {
-      id: true,
-      title: true,
-      userId: true,
-      inputLanguage: true,
-      languageSource: true,
-      mode: true,
-      metadata: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: CASE_SELECT_CORE,
   });
 
   // Track case creation
