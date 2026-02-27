@@ -499,7 +499,7 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
         inputLanguage: (c.inputLanguage ?? "EN") as Language,
         languageSource: (c.languageSource ?? "AUTO") as "AUTO" | "MANUAL",
         mode: (c.mode ?? "diagnostic") as CaseMode,
-        metadata: normalizeMetadata(c.metadata),
+        metadata: extractMetadata(c),
         createdAt: createdAtStr,
         updatedAt: updatedAtStr,
         ...retention,
