@@ -359,33 +359,56 @@ async function listMessagesForContextMemory(caseId: string, take = 30) {
 async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
   const prisma = await getPrisma();
   if (!prisma) return listCasesMemory();
-  const rows = await prisma.case.findMany({
-    where: { 
-      deletedAt: null,
-      ...(userId ? { userId } : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      title: true,
-      userId: true,
-      inputLanguage: true,
-      languageSource: true,
-      mode: true,
-      metadata: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
-  return rows
-    .map((r: AnyObj) => {
-      const createdAt = r.createdAt.toISOString();
-      const updatedAt = r.updatedAt.toISOString();
+  let rows: AnyObj[];
+  try {
+    rows = await prisma.case.findMany({
+      where: { 
+        deletedAt: null,
+        ...(userId ? { userId } : {}),
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        inputLanguage: true,
+        languageSource: true,
+        mode: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  } catch (queryErr) {
+    console.error("[storage.listCasesDb] Prisma query failed:", queryErr);
+    throw queryErr;
+  }
+  const results: CaseSummary[] = [];
+  for (const r of rows) {
+    try {
+      const createdAt = (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString();
+      const updatedAt = (r.updatedAt instanceof Date ? r.updatedAt : new Date(r.updatedAt)).toISOString();
       const retention = withRetention({ createdAt, updatedAt });
-      return { ...r, metadata: normalizeMetadata(r.metadata), createdAt, updatedAt, ...retention };
-    })
-    .filter((r: CaseSummary) => r.timeLeftSeconds > 0);
+      const meta = normalizeMetadata(r.metadata);
+      const summary: CaseSummary = {
+        id: r.id,
+        title: r.title ?? "Untitled",
+        userId: r.userId ?? null,
+        inputLanguage: (r.inputLanguage ?? "EN") as Language,
+        languageSource: (r.languageSource ?? "AUTO") as "AUTO" | "MANUAL",
+        mode: (r.mode ?? "diagnostic") as CaseMode,
+        metadata: meta,
+        createdAt,
+        updatedAt,
+        ...retention,
+      };
+      if (summary.timeLeftSeconds > 0) results.push(summary);
+    } catch (rowErr) {
+      console.error(`[storage.listCasesDb] Skipping case ${r?.id}: ${rowErr instanceof Error ? rowErr.message : rowErr}`);
+    }
+  }
+  return results;
 }
 
 async function createCaseDb(input: CreateCaseInput): Promise<CaseSummary> {
