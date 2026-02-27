@@ -541,9 +541,8 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
     if (input.metadata !== undefined) {
       const existingMeta = await prisma.case.findUnique({
         where: { id: caseId },
-        select: { metadata: true },
       });
-      const merged = mergeMetadata(normalizeMetadata(existingMeta?.metadata), input.metadata);
+      const merged = mergeMetadata(extractMetadata(existingMeta ?? {}), input.metadata);
       metadataValue = merged ?? null;
     }
 
@@ -555,17 +554,7 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
         ...(input.languageSource ? { languageSource: input.languageSource } : {}),
         ...(metadataValue !== undefined ? { metadata: metadataValue } : {}),
       },
-      select: {
-        id: true,
-        title: true,
-        userId: true,
-        inputLanguage: true,
-        languageSource: true,
-        mode: true,
-        metadata: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: CASE_SELECT_CORE,
     });
 
     const createdAtStr = updated.createdAt.toISOString();
@@ -574,7 +563,7 @@ async function updateCaseDb(caseId: string, input: UpdateCaseInput, userId?: str
 
     return {
       ...updated,
-      metadata: normalizeMetadata(updated.metadata),
+      metadata: extractMetadata(updated),
       createdAt: createdAtStr,
       updatedAt: updatedAtStr,
       ...retention,
