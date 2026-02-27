@@ -754,22 +754,12 @@ async function ensureCaseDb(input: EnsureCaseInput): Promise<CaseSummary> {
           languageSource: input.languageSource,
           title: existing.title === "New Case" ? clampTitleSeed(input.titleSeed) : existing.title,
         },
-        select: {
-          id: true,
-          title: true,
-          userId: true,
-          inputLanguage: true,
-          languageSource: true,
-          mode: true,
-          metadata: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: CASE_SELECT_CORE,
       });
 
       return {
         ...updated,
-        metadata: normalizeMetadata(updated.metadata),
+        metadata: extractMetadata(updated),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
         ...withRetention({ createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() }),
