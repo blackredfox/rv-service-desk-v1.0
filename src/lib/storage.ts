@@ -390,17 +390,7 @@ async function listCasesDb(userId?: string): Promise<CaseSummary[]> {
       },
       orderBy: { updatedAt: "desc" },
       take: 50,
-      select: {
-        id: true,
-        title: true,
-        userId: true,
-        inputLanguage: true,
-        languageSource: true,
-        mode: true,
-        metadata: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: CASE_SELECT_CORE,
     });
   } catch (queryErr) {
     console.error("[storage.listCasesDb] Prisma query failed:", queryErr);
