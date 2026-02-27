@@ -118,6 +118,28 @@ function mergeMetadata(base: CaseMetadata | undefined, patch: CaseMetadata | nul
   return { ...(base ?? {}), ...patch };
 }
 
+/**
+ * Shared select clause for Case queries.
+ * Does NOT include `metadata` — the field may not exist in older Prisma clients
+ * that haven't been regenerated after the V5 schema change.
+ * Access metadata via `(row as AnyObj).metadata` after the query.
+ */
+const CASE_SELECT_CORE = {
+  id: true,
+  title: true,
+  userId: true,
+  inputLanguage: true,
+  languageSource: true,
+  mode: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/** Helper: safely extract metadata from a Prisma row (handles missing field). */
+function extractMetadata(row: AnyObj): CaseMetadata | undefined {
+  return normalizeMetadata(row?.metadata);
+}
+
 /** Enrich a raw case object with computed retention fields. */
 function withRetention(c: {
   createdAt: string;
