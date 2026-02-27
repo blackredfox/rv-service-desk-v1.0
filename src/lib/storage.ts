@@ -80,16 +80,36 @@ function clampTitleSeed(seed: string) {
 
 function normalizeMetadata(raw: unknown): CaseMetadata | undefined {
   if (!raw) return undefined;
+  let obj: Record<string, unknown> | undefined;
   if (typeof raw === "string") {
     try {
-      const parsed = JSON.parse(raw) as CaseMetadata;
-      return parsed && typeof parsed === "object" ? parsed : undefined;
+      const parsed = JSON.parse(raw);
+      obj = parsed && typeof parsed === "object" ? parsed : undefined;
     } catch {
       return undefined;
     }
+  } else if (typeof raw === "object") {
+    obj = raw as Record<string, unknown>;
   }
-  if (typeof raw === "object") return raw as CaseMetadata;
-  return undefined;
+  if (!obj) return undefined;
+
+  // Migrate legacy boolean pendingReportRequest → null (strip it)
+  // Legacy format had: { pendingReportRequest: true/false, pendingReportRequestedAt, pendingReportLocale }
+  // New format expects: PendingReportPayload | null
+  const pending = obj.pendingReportRequest;
+  let normalizedPending: PendingReportPayload | null | undefined;
+  if (pending === null || pending === undefined || pending === false) {
+    normalizedPending = null;
+  } else if (typeof pending === "boolean") {
+    // Legacy boolean true → cannot reconstruct payload, treat as null
+    normalizedPending = null;
+  } else if (typeof pending === "object" && pending !== null && "requestedAt" in pending) {
+    normalizedPending = pending as PendingReportPayload;
+  } else {
+    normalizedPending = null;
+  }
+
+  return { pendingReportRequest: normalizedPending };
 }
 
 function mergeMetadata(base: CaseMetadata | undefined, patch: CaseMetadata | null | undefined): CaseMetadata | undefined {
