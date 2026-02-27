@@ -44,8 +44,9 @@ Build and iteratively upgrade the "RV Service Desk" chat agent into a senior RV 
 - Expanded retry commands: EN (retry, try again), RU (повтори, попробуй снова), ES (reintentar, intenta de nuevo).
 
 ### Test Coverage
-- 656 tests across 42 test files, all passing.
+- 675 tests across 43 test files, all passing.
 - `tests/v5-resilience-behavioral.test.ts`: 94 behavioral tests covering circuit breaker lifecycle, TTL expiry, shouldTripCircuit, model allowlist, error classification edge cases, report false-positive guards, Spanish/Russian command triggers, retry AI EN/RU/ES, banner copy, metadata contract, checklist mode structure, recovery path, UI data-testids.
+- `tests/metadata-null-safety.test.ts`: 19 regression tests for legacy metadata backward compatibility (null, boolean, stale keys, empty objects, malformed JSON).
 
 ## Prioritized Backlog
 
