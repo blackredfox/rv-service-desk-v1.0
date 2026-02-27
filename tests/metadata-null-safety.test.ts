@@ -170,7 +170,31 @@ describe("Route error logging exists", () => {
   });
 });
 
-describe("Prisma schema: Case.metadata", () => {
+describe("Prisma select clause safety (regression for PrismaClientValidationError)", () => {
+  it("storage.ts does NOT include 'metadata: true' in any select clause", () => {
+    const fs = require("fs");
+    const content = fs.readFileSync("src/lib/storage.ts", "utf-8");
+    // metadata: true in a select causes PrismaClientValidationError if the
+    // generated client hasn't been regenerated after schema change
+    expect(content).not.toMatch(/select:\s*\{[^}]*metadata:\s*true/s);
+  });
+
+  it("storage.ts uses CASE_SELECT_CORE constant for all Case queries", () => {
+    const fs = require("fs");
+    const content = fs.readFileSync("src/lib/storage.ts", "utf-8");
+    expect(content).toContain("CASE_SELECT_CORE");
+    // CASE_SELECT_CORE should NOT contain metadata
+    const match = content.match(/CASE_SELECT_CORE\s*=\s*\{([^}]+)\}/);
+    expect(match).not.toBeNull();
+    expect(match![1]).not.toContain("metadata");
+  });
+
+  it("storage.ts uses extractMetadata helper (never raw .metadata access in return)", () => {
+    const fs = require("fs");
+    const content = fs.readFileSync("src/lib/storage.ts", "utf-8");
+    expect(content).toContain("extractMetadata");
+  });
+});
   it("Case.metadata is declared as Json? (nullable, no default)", () => {
     const fs = require("fs");
     const schema = fs.readFileSync("prisma/schema.prisma", "utf-8");
