@@ -465,15 +465,7 @@ async function getCaseDb(caseId: string, userId?: string): Promise<{ case: CaseS
         ...(userId ? { userId } : {}),
       },
       select: {
-        id: true,
-        title: true,
-        userId: true,
-        inputLanguage: true,
-        languageSource: true,
-        mode: true,
-        metadata: true,
-        createdAt: true,
-        updatedAt: true,
+        ...CASE_SELECT_CORE,
         messages: {
           orderBy: { createdAt: "asc" },
           select: {
