@@ -193,8 +193,8 @@ describe("Prisma schema: Case.metadata", () => {
       if (trimmed.startsWith("user ") || trimmed.startsWith("messages ") || trimmed.startsWith("reports ") || trimmed.startsWith("attachments ")) continue;
       // Known required fields that always existed
       if (trimmed.startsWith("id ") || trimmed.startsWith("userId ") || trimmed.startsWith("title ")) continue;
-      // All other fields must be optional (?) or have @default
-      if (!trimmed.includes("?") && !trimmed.includes("@default")) {
+      // All other fields must be optional (?) or have @default or @updatedAt
+      if (!trimmed.includes("?") && !trimmed.includes("@default") && !trimmed.includes("@updatedAt")) {
         // This would be a new required field without default — fail
         expect(trimmed).toContain("@default");
       }
