@@ -68,7 +68,17 @@ const STRICT_CONTEXT_ENGINE = true;
 
 export const runtime = "nodejs";
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-5-latest";
+// Model routing (SaaS-style):
+// - Diagnostic: cheaper/faster
+// - Authorization + Final report: higher quality / more reliable formatting
+const OPENAI_MODEL_DIAGNOSTIC =
+  process.env.OPENAI_MODEL_DIAGNOSTIC ?? "gpt-5-mini-2025-08-07";
+const OPENAI_MODEL_FINAL =
+  process.env.OPENAI_MODEL_FINAL ?? "gpt-5.2-2025-12-11";
+
+function getOpenAIModelForMode(mode: CaseMode): string {
+  return mode === "diagnostic" ? OPENAI_MODEL_DIAGNOSTIC : OPENAI_MODEL_FINAL;
+}
 
 // Translation separator (must match mode-validators / output-validator)
 const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
@@ -863,14 +873,13 @@ export async function POST(req: Request) {
 
         // Build initial request
         const openAiBody = {
-          model: OPENAI_MODEL,
-          stream: false,
-          temperature: 0.2,
+          model: getOpenAIModelForMode(currentMode),
+          stream: false,          
           messages: buildOpenAiMessages({
-            system: systemPrompt,
-            history,
-            userMessage: message,
-            attachments,
+          system: systemPrompt,
+          history,
+          userMessage: message,
+          attachments,
           }),
         };
 
@@ -1014,14 +1023,13 @@ Estimated Labor must be LAST and end with "Total labor: X hr".${translationInstr
 Generate the complete final report now.`;
 
           const finalReportBody = {
-            model: OPENAI_MODEL,
+            model: getOpenAIModelForMode("final_report"),
             stream: false,
-            temperature: 0.2,
             messages: buildOpenAiMessages({
-              system: finalReportPrompt,
-              history: updatedHistory,
-              userMessage: finalReportRequest,
-              attachments: undefined,
+            system: finalReportPrompt,
+            history: updatedHistory,
+            userMessage: finalReportRequest,
+            attachments: undefined,
             }),
           };
 

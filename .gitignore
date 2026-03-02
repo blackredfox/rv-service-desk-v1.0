@@ -210,3 +210,4 @@ secrets/
 # Environment files
 *.env
 *.env.*
+dev.log
