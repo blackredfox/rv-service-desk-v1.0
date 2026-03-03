@@ -24,6 +24,7 @@ import {
   buildCorrectionInstruction,
   logValidation,
 } from "@/lib/mode-validators";
+import { validateLaborSum } from "@/lib/labor-store";
 import {
   // Diagnostic Registry — DATA PROVIDER ONLY (not flow authority)
   // Used for: procedure catalog, step definitions, static metadata
@@ -74,6 +75,110 @@ function getModelForMode(mode: CaseMode): string {
     : MODELS.diagnostic;
 }
 
+const LABOR_OVERRIDE_MIN_HOURS = 0.1;
+const LABOR_OVERRIDE_MAX_HOURS = 24;
+
+function normalizeLaborHours(hours: number): number {
+  return Math.round(hours * 10) / 10;
+}
+
+function formatLaborHours(hours: number): string {
+  return normalizeLaborHours(hours).toFixed(1);
+}
+
+function parseRequestedLaborHours(message: string): number | null {
+  const sanitized = message.replace(/,/g, ".");
+  const matches = sanitized.match(/\d+(?:\.\d+)?/g);
+  if (!matches) return null;
+
+  for (const raw of matches) {
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) continue;
+    if (parsed < LABOR_OVERRIDE_MIN_HOURS || parsed > LABOR_OVERRIDE_MAX_HOURS) continue;
+    return normalizeLaborHours(parsed);
+  }
+
+  return null;
+}
+
+function detectLaborOverrideIntent(message: string): boolean {
+  const hasNumber = parseRequestedLaborHours(message) !== null;
+  if (!hasNumber) return false;
+
+  const hasActionWord = [
+    /\b(?:recalculate|set\s+to|set|make|adjust|override|change|edit|revise|update)\b/i,
+    /(?:перерасч(?:е|ё)т|пересчитай|сделай|зделай|укажи|пересчитать|измени|изменить|поменяй|поменять|поправь|правка|исправь)/i,
+    /\b(?:recalcula|recalcular|ajusta|ajustar|hazlo|hacer|cambia|cambiar|edita|editar|actualiza|actualizar)\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  const hasLaborWord = [
+    /\b(?:labor|labour|man\s*hours?)\b/i,
+    /(?:трудозатрат|трудо(?:затр|емк)|работы|рабоч(?:ее|их)?\s+время)/i,
+    /\b(?:mano\s+de\s+obra)\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  const hasTotalWord = [
+    /\btotal\b/i,
+    /(?:итого|всего)/i,
+    /\btotal\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  const hasTimeUnit = [
+    /\b(?:hours?|hrs?|hr|h)\b/i,
+    /(?:час(?:а|ов)?|ч(?=\s|$|\.)|времени)/i,
+    /\b(?:hora|horas)\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  if (!hasTimeUnit) return false;
+
+  return hasLaborWord || hasTotalWord || hasActionWord;
+}
+
+const DIAGNOSTIC_MODE_GUARD_VIOLATION =
+  "DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format";
+
+function looksLikeFinalReport(text: string): boolean {
+  const t = text.toLowerCase();
+  const required = [
+    "complaint:",
+    "diagnostic procedure:",
+    "verified condition:",
+    "recommended corrective action:",
+    "estimated labor:",
+    "required parts:",
+  ];
+  const hits = required.filter((k) => t.includes(k)).length;
+  return hits >= 4;
+}
+
+function lastAssistantLooksLikeFinalReport(history: { role: string; content: string }[]): boolean {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (msg.role === "assistant" || msg.role === "agent") {
+      return looksLikeFinalReport(msg.content || "");
+    }
+  }
+  return false;
+}
+
+function shouldTreatAsFinalReportForOverride(currentMode: CaseMode, history: { role: string; content: string }[]): boolean {
+  return currentMode === "final_report" || lastAssistantLooksLikeFinalReport(history);
+}
+
+function extractPrimaryReportBlock(text: string): string {
+  if (!text.includes(TRANSLATION_SEPARATOR)) return text;
+  return text.split(TRANSLATION_SEPARATOR)[0].trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasCanonicalTotalLaborLine(reportText: string, totalHoursText: string): boolean {
+  const escapedTotal = escapeRegExp(totalHoursText);
+  return new RegExp(`Total\\s+labor:\\s*${escapedTotal}\\s*hr\\b`, "i").test(reportText);
+}
+
 /**
  * Output-layer enforcement: strip translation block when policy says none.
  * This is the final safety net — even if the LLM produces a translation,
@@ -86,15 +191,77 @@ function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
   return text;
 }
 
+function applyDiagnosticModeValidationGuard(
+  validation: ReturnType<typeof validateOutput>,
+  mode: CaseMode,
+  responseText: string
+): ReturnType<typeof validateOutput> {
+  if (mode !== "diagnostic") return validation;
+  if (!looksLikeFinalReport(responseText)) return validation;
+
+  if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
+    return {
+      ...validation,
+      valid: false,
+    };
+  }
+
+  return {
+    ...validation,
+    valid: false,
+    violations: [...validation.violations, DIAGNOSTIC_MODE_GUARD_VIOLATION],
+  };
+}
+
+function buildDiagnosticDriftCorrectionInstruction(activeStepId?: string): string {
+  const stepHint = activeStepId
+    ? `Return to the active guided step (${activeStepId}).`
+    : "Return to the active guided diagnostic step.";
+
+  return [
+    "Diagnostic drift correction (MANDATORY):",
+    "- You are in DIAGNOSTIC mode, not FINAL_REPORT mode.",
+    "- Do NOT output final report headers (Complaint/Diagnostic Procedure/Verified Condition/etc.).",
+    `- ${stepHint}`,
+    "- Ask exactly ONE concise diagnostic question that advances the procedure.",
+  ].join("\n");
+}
+
+function buildDiagnosticDriftFallback(activeStepId?: string): string {
+  const stepLabel = activeStepId ? ` (${activeStepId})` : "";
+  return `Guided Diagnostics${stepLabel}: What is the observed result for this active diagnostic step?`;
+}
+
+function computeLaborOverrideRequest(
+  currentMode: CaseMode,
+  history: { role: string; content: string }[],
+  message: string
+): { isLaborOverrideRequest: boolean; requestedLaborHours: number | null } {
+  const parsedRequestedLaborHours = parseRequestedLaborHours(message);
+  const isLaborOverrideRequest =
+    shouldTreatAsFinalReportForOverride(currentMode, history) &&
+    detectLaborOverrideIntent(message) &&
+    parsedRequestedLaborHours !== null;
+
+  return {
+    isLaborOverrideRequest,
+    requestedLaborHours: isLaborOverrideRequest
+      ? normalizeLaborHours(parsedRequestedLaborHours ?? 0)
+      : null,
+  };
+}
+
 function buildFinalReportFallback(args: {
   policy: LanguagePolicy;
   translationLanguage?: Language;
+  laborHours?: number;
 }): string {
+  const totalLaborText = formatLaborHours(args.laborHours ?? 1.0);
   const englishReport = `Complaint: Complaint details pending verification.
 Diagnostic Procedure: Diagnostic isolation completed based on available technician inputs.
 Verified Condition: Condition not operating per specification under reported test conditions.
 Recommended Corrective Action: Perform unit-level corrective action aligned to verified condition.
-Estimated Labor: System isolation and access - 0.3 hr. Component removal and replacement - 0.5 hr. Functional verification - 0.2 hr. Total labor: 1.0 hr.
+Estimated Labor: System isolation and access - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
 Required Parts: Part number to be confirmed at service counter.`;
 
   if (!args.policy.includeTranslation || !args.translationLanguage || args.translationLanguage === "EN") {
@@ -107,13 +274,13 @@ Required Parts: Part number to be confirmed at service counter.`;
 Диагностическая процедура: Диагностическая изоляция завершена на основе доступных данных техника.
 Подтверждённое состояние: Состояние не соответствует спецификации при заявленных условиях проверки.
 Рекомендуемое корректирующее действие: Выполнить корректирующее действие на уровне узла в соответствии с подтверждённым состоянием.
-Оценка трудозатрат: Изоляция системы и доступ - 0.3 ч. Снятие и замена узла - 0.5 ч. Функциональная проверка - 0.2 ч. Total labor: 1.0 hr.
+Оценка трудозатрат: Изоляция системы и доступ - ${totalLaborText} ч. Total labor: ${totalLaborText} hr.
 Необходимые детали: Номер детали будет уточнён на сервисной стойке.`
       : `Queja: Los detalles de la queja están pendientes de verificación.
 Procedimiento de diagnóstico: El aislamiento diagnóstico se completó con base en la información disponible del técnico.
 Condición verificada: La condición no opera según especificación bajo las condiciones de prueba reportadas.
 Acción correctiva recomendada: Realizar una acción correctiva a nivel de unidad alineada con la condición verificada.
-Mano de obra estimada: Aislamiento del sistema y acceso - 0.3 hr. Retiro y reemplazo del componente - 0.5 hr. Verificación funcional - 0.2 hr. Total labor: 1.0 hr.
+Mano de obra estimada: Aislamiento del sistema y acceso - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
 Partes requeridas: El número de parte se confirmará en el mostrador de servicio.`;
 
   return `${englishReport}\n\n${TRANSLATION_SEPARATOR}\n\n${translation}`;
@@ -548,6 +715,12 @@ export async function POST(req: Request) {
     factLockConstraint = buildFactLockConstraint(history);
   }
 
+  const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
+  const isLaborOverrideRequest = laborOverride.isLaborOverrideRequest;
+  const requestedLaborHours = laborOverride.requestedLaborHours;
+  const requestedLaborHoursText =
+    requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
+
   // Compose system prompt using v2 semantics:
   // - inputDetected: what language user wrote in
   // - outputEffective: what language assistant must respond in
@@ -606,11 +779,209 @@ export async function POST(req: Request) {
         // Emit mode
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
+        if (isLaborOverrideRequest && requestedLaborHours !== null && requestedLaborHoursText) {
+          console.log(
+            `[Chat API v2] Final report labor override requested: total=${requestedLaborHoursText} hr`
+          );
+
+          const overrideConstraints = [
+            factLockConstraint,
+            `LABOR OVERRIDE (MANDATORY):
+- The technician requires total labor to be exactly ${requestedLaborHoursText} hours.
+- Rewrite ONLY the 'Estimated Labor' section to fit exactly ${requestedLaborHoursText} hr total.
+- Keep all other sections semantically identical (no new diagnostics, no new parts, no new findings).
+- Do NOT ask questions. Do NOT request confirmations.
+- End the labor section with: "Total labor: ${requestedLaborHoursText} hr"`,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+
+          const overridePrompt = composePromptV2({
+            mode: "final_report",
+            inputDetected: trackedInputLanguage,
+            outputEffective: outputPolicy.effective,
+            includeTranslation: langPolicy.includeTranslation,
+            translationLanguage,
+            additionalConstraints: overrideConstraints,
+          });
+
+          const translationInstruction =
+            langPolicy.includeTranslation && translationLanguage
+              ? `\n\nAfter the English report, output "--- TRANSLATION ---" and provide a complete translation into ${
+                  translationLanguage === "RU"
+                    ? "Russian"
+                    : translationLanguage === "ES"
+                    ? "Spanish"
+                    : "English"
+                }.`
+              : "";
+
+          const overrideRequest = `Regenerate the FINAL SHOP REPORT now with the same facts and sections.
+
+Keep Complaint, Diagnostic Procedure, Verified Condition, Recommended Corrective Action, and Required Parts semantically identical.
+Rewrite only Estimated Labor so the breakdown sums to exactly ${requestedLaborHoursText} hr.
+Use canonical format with one decimal and end with: "Total labor: ${requestedLaborHoursText} hr".
+Do NOT ask labor confirmation questions.
+Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
+
+          const overrideBody = {
+            model: getModelForMode("final_report"),
+            stream: false,            
+            messages: buildOpenAiMessages({
+              system: overridePrompt,
+              history,
+              userMessage: overrideRequest,
+              attachments: undefined,
+            }),
+          };
+
+          let overrideResult = await callOpenAI(apiKey, overrideBody, ac.signal);
+          let overrideContent = overrideResult.response;
+
+          const validateLaborOverride = (text: string) => {
+            const primary = extractPrimaryReportBlock(text);
+            const sumValidation = validateLaborSum(primary, requestedLaborHours);
+            const hasCanonicalTotal = hasCanonicalTotalLaborLine(primary, requestedLaborHoursText);
+            const violations = [
+              ...sumValidation.violations,
+              ...(hasCanonicalTotal
+                ? []
+                : [
+                    `LABOR_TOTAL_FORMAT: Final report must include \"Total labor: ${requestedLaborHoursText} hr\" in canonical one-decimal format`,
+                  ]),
+            ];
+            return {
+              valid: violations.length === 0,
+              violations,
+            };
+          };
+
+          if (!overrideResult.error && overrideContent.trim()) {
+            let modeValidation = validateOutput(
+              overrideContent,
+              "final_report",
+              langPolicy.includeTranslation,
+              translationLanguage
+            );
+            modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
+            logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
+            let laborValidation = validateLaborOverride(overrideContent);
+
+            if ((!modeValidation.valid || !laborValidation.valid) && !aborted) {
+              const correctionViolations = [
+                ...modeValidation.violations,
+                ...laborValidation.violations,
+              ];
+              const correctionInstruction = [
+                buildCorrectionInstruction(correctionViolations),
+                `Regenerate in FINAL_REPORT mode only.`,
+                `Do NOT output diagnostic steps or step IDs (no \"Step\", no \"wp_\").`,
+                `Keep all sections except Estimated Labor semantically unchanged.`,
+                `Estimated Labor must sum to exactly ${requestedLaborHoursText} hr and end with \"Total labor: ${requestedLaborHoursText} hr\".`,
+                `Do NOT ask labor confirmation. Do NOT ask follow-up questions.`,
+              ].join("\n");
+
+              const retryBody = {
+                ...overrideBody,
+                messages: buildOpenAiMessages({
+                  system: overridePrompt,
+                  history,
+                  userMessage: overrideRequest,
+                  attachments: undefined,
+                  correctionInstruction,
+                }),
+              };
+
+              overrideResult = await callOpenAI(apiKey, retryBody, ac.signal);
+              if (!overrideResult.error) {
+                overrideContent = overrideResult.response;
+                modeValidation = validateOutput(
+                  overrideContent,
+                  "final_report",
+                  langPolicy.includeTranslation,
+                  translationLanguage
+                );
+                modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
+                logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
+                laborValidation = validateLaborOverride(overrideContent);
+              }
+            }
+
+            overrideContent = enforceLanguagePolicy(overrideContent, langPolicy);
+
+            const postModeValidation = validateOutput(
+              overrideContent,
+              "final_report",
+              langPolicy.includeTranslation,
+              translationLanguage
+            );
+            const guardedPostModeValidation = applyDiagnosticModeValidationGuard(
+              postModeValidation,
+              "final_report",
+              overrideContent
+            );
+            const postLaborValidation = validateLaborOverride(overrideContent);
+
+            if (!guardedPostModeValidation.valid || !postLaborValidation.valid) {
+              console.warn(
+                `[Chat API v2] Labor override response invalid after retry, using fallback for ${requestedLaborHoursText} hr`
+              );
+              overrideContent = buildFinalReportFallback({
+                policy: langPolicy,
+                translationLanguage,
+                laborHours: requestedLaborHours,
+              });
+            }
+
+            for (const char of overrideContent) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            if (!aborted && overrideContent.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: overrideContent,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+          } else {
+            console.error(
+              `[Chat API v2] Labor override generation error: ${overrideResult.error || "empty response"}`
+            );
+            const fallback = buildFinalReportFallback({
+              policy: langPolicy,
+              translationLanguage,
+              laborHours: requestedLaborHours,
+            });
+
+            for (const char of fallback) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            if (!aborted) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: fallback,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+          }
+
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
+
         // Build initial request
         const openAiBody = {
           model: getModelForMode(currentMode),
-          stream: false,
-          temperature: 0.2,
+          stream: false,          
           messages: buildOpenAiMessages({
             system: systemPrompt,
             history,
@@ -633,13 +1004,19 @@ export async function POST(req: Request) {
 
         // Validate output (pass language policy for translation enforcement)
         let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
+        validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
         // If validation fails, retry once with correction
         if (!validation.valid && !aborted) {
           console.log(`[Chat API v2] Validation failed, retrying with correction...`);
-          
-          const correctionInstruction = buildCorrectionInstruction(validation.violations);
+          const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
+          if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
+            correctionInstructionParts.push(
+              buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId)
+            );
+          }
+          const correctionInstruction = correctionInstructionParts.join("\n");
           
           const retryBody = {
             ...openAiBody,
@@ -656,6 +1033,7 @@ export async function POST(req: Request) {
 
           if (!result.error) {
             validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
+            validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
@@ -663,7 +1041,9 @@ export async function POST(req: Request) {
           if (!validation.valid || result.error) {
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
             result.response =
-              currentMode === "final_report"
+              currentMode === "diagnostic" && validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)
+                ? buildDiagnosticDriftFallback(engineResult?.context.activeStepId)
+                : currentMode === "final_report"
                 ? buildFinalReportFallback({
                     policy: langPolicy,
                     translationLanguage,
@@ -833,6 +1213,7 @@ Do NOT ask follow-up questions.${translationInstruction}`;
               langPolicy.includeTranslation,
               translationLanguage
             );
+            finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
             logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
 
             if (!finalValidation.valid && !aborted) {
@@ -863,6 +1244,7 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                   langPolicy.includeTranslation,
                   translationLanguage
                 );
+                finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
                 logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
               }
             }
@@ -876,8 +1258,13 @@ Do NOT ask follow-up questions.${translationInstruction}`;
               langPolicy.includeTranslation,
               translationLanguage
             );
+            const guardedPostValidation = applyDiagnosticModeValidationGuard(
+              postValidation,
+              currentMode,
+              finalContent
+            );
 
-            if (!postValidation.valid) {
+            if (!guardedPostValidation.valid) {
               console.log(`[Chat API v2] Final report validation failed after retry, using fallback`);
               finalContent = buildFinalReportFallback({
                 policy: langPolicy,
@@ -985,3 +1372,12 @@ Do NOT ask follow-up questions.${translationInstruction}`;
     },
   });
 }
+
+export const __test__ = {
+  parseRequestedLaborHours,
+  detectLaborOverrideIntent,
+  looksLikeFinalReport,
+  shouldTreatAsFinalReportForOverride,
+  applyDiagnosticModeValidationGuard,
+  computeLaborOverrideRequest,
+};

@@ -5,6 +5,12 @@
 
 import dotenv from "dotenv";
 import { vi } from "vitest";
+import dotenv from "dotenv";
+
+// Load local env for tests (Node doesn't read .env files automatically)
+dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" }); // optional fallback
+
 
 // Load local env for tests (Node doesn't read .env files automatically)
 dotenv.config({ path: ".env.local" });

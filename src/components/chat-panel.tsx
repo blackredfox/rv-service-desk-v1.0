@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ChatMessage } from "@/lib/storage";
 import {
-  apiChatStream,
   apiGetCase,
   readSseStream,
   type LanguageMode,
@@ -55,26 +54,27 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   // Get the latest assistant report (if exists)
   // Report is identified by having structured content (multiple sections)
   const latestReport = useMemo(() => {
-    const assistantMessages = messages.filter(m => m.role === "assistant" && m.content.length > 100);
+    const assistantMessages = messages.filter((m) => m.role === "assistant" && m.content.length > 100);
     if (assistantMessages.length === 0) return null;
-    
+
     // Return the last substantial assistant message as the report
     const lastMessage = assistantMessages[assistantMessages.length - 1];
-    
+
     // Check if it looks like a report (has structured content)
     // Reports typically have section headers or multiple paragraphs
-    const hasStructure = lastMessage.content.includes("\n\n") || 
-                         lastMessage.content.includes("---") ||
-                         lastMessage.content.includes("**") ||
-                         lastMessage.content.includes("##");
-    
+    const hasStructure =
+      lastMessage.content.includes("\n\n") ||
+      lastMessage.content.includes("---") ||
+      lastMessage.content.includes("**") ||
+      lastMessage.content.includes("##");
+
     return hasStructure ? lastMessage.content : null;
   }, [messages]);
 
   // Handle copy report
   const handleCopyReport = useCallback(async () => {
     if (!latestReport) return;
-    
+
     try {
       await navigator.clipboard.writeText(latestReport);
       setReportCopied(true);
@@ -90,10 +90,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       return;
     }
 
-    // IMPORTANT: Capture the narrowed caseId in a local const so TS keeps it as `string`
-    // inside the async function below (avoids `string | null` issues).
     const id = caseId;
-
     let cancelled = false;
 
     async function load() {
@@ -157,6 +154,9 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const currentAttachments = [...photoAttachments];
     setPhotoAttachments([]);
 
+    // IMPORTANT:
+    // Do NOT stamp "language" into messages on the client.
+    // Language is a server-side concern (case language lock + composer directive).
     setMessages((prev) => [
       ...prev,
       {
@@ -164,17 +164,15 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
         caseId: caseId ?? "pending",
         role: "user",
         content: text,
-        language: languageMode === "AUTO" ? "EN" : languageMode,
         createdAt: now,
-      },
+      } as ChatMessage,
       {
         id: `${localId}_assistant`,
         caseId: caseId ?? "pending",
         role: "assistant",
         content: "",
-        language: languageMode === "AUTO" ? "EN" : languageMode,
         createdAt: now,
-      },
+      } as ChatMessage,
     ]);
 
     try {
@@ -183,11 +181,15 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
         caseId?: string;
         message: string;
         languageMode: LanguageMode;
+        // Optional compatibility field if backend expects a different name.
+        inputLanguage?: LanguageMode;
         attachments?: Array<{ type: "image"; dataUrl: string }>;
       } = {
         caseId: caseId ?? undefined,
         message: text,
         languageMode,
+        // Keep this for compatibility if route.ts reads inputLanguage.
+        inputLanguage: languageMode,
       };
 
       if (currentAttachments.length > 0) {
@@ -195,8 +197,6 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           type: "image" as const,
           dataUrl: a.dataUrl,
         }));
-      }
-
       const body = await apiChatStreamWithAttachments(requestBody);
 
       // Track chat sent
@@ -206,7 +206,6 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
 
       const onEvent = (ev: ChatSseEvent) => {
         if (ev.type === "case") {
-          // Be defensive: allow null if backend ever emits it.
           const newId = ev.caseId ?? null;
           serverCaseId = newId;
           onCaseId(newId);
@@ -216,9 +215,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
         if (ev.type === "token") {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === `${localId}_assistant`
-                ? { ...m, content: m.content + ev.token }
-                : m
+              m.id === `${localId}_assistant` ? { ...m, content: m.content + ev.token } : m
             )
           );
           return;
@@ -258,6 +255,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     caseId?: string;
     message: string;
     languageMode: LanguageMode;
+    inputLanguage?: LanguageMode;
     attachments?: Array<{ type: "image"; dataUrl: string }>;
   }) {
     const res = await fetch("/api/chat", {
@@ -292,8 +290,8 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               RV Service Desk
             </h1>
             <p className="mt-2 text-sm">
-              Start a new case from the left or send a message. The assistant
-              will produce an English report plus a translated copy.
+              Start a new case from the left or send a message. The assistant will
+              produce an English report plus a translated copy.
             </p>
           </div>
         ) : null}
@@ -410,7 +408,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               />
             </div>
           )}
-          
+
           <div className="flex items-end gap-3">
             {/* Photo attach button */}
             <div className="relative">
@@ -421,6 +419,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                 disabled={loading || disabled}
                 caseId={caseId}
               />
+
             </div>
             
             {/* Voice button with language support */}
@@ -429,7 +428,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               disabled={loading || disabled}
               language={languageMode === "AUTO" ? "EN" : languageMode}
             />
-            
+           
             <textarea
               data-testid="chat-composer-input"
               value={input}
@@ -455,11 +454,12 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               Send
             </button>
           </div>
+
           <div className="mt-2 flex items-center justify-between">
             <div className="text-xs text-zinc-500 dark:text-zinc-400">
               Enter to send. Shift+Enter for newline.
             </div>
-            
+
             {/* Copy Report Button */}
             <button
               type="button"
@@ -470,23 +470,44 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
               className={`
                 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium
                 transition-colors
-                ${latestReport 
-                  ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                  : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-600"
+                ${
+                  latestReport
+                    ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                    : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-600"
                 }
               `}
             >
               {reportCopied ? (
                 <>
-                  <svg className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                   Copied!
                 </>
               ) : (
                 <>
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Copy Report
                 </>
