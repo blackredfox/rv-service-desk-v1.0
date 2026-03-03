@@ -102,13 +102,34 @@ function parseRequestedLaborHours(message: string): number | null {
 }
 
 function detectLaborOverrideIntent(message: string): boolean {
-  const hasKeyword = [
-    /\b(?:total|labor|recalculate|make(?:\s+total|\s+labor|\s+it)?|set\s+(?:to|labor))/i,
-    /(?:итого|всего|перерасч(?:е|ё)т|пересчитай|сделай|укажи)/i,
-    /\b(?:total|recalcula|hazlo|ajusta)\b/i,
+  const hasNumber = parseRequestedLaborHours(message) !== null;
+  if (!hasNumber) return false;
+
+  const hasActionWord = [
+    /\b(?:recalculate|set\s+to|set|make|adjust|override)\b/i,
+    /(?:перерасч(?:е|ё)т|пересчитай|сделай|укажи|пересчитать)/i,
+    /\b(?:recalcula|ajusta|hazlo)\b/i,
   ].some((pattern) => pattern.test(message));
 
-  return hasKeyword && parseRequestedLaborHours(message) !== null;
+  const hasLaborWord = [
+    /\b(?:labor|labour|man\s*hours?)\b/i,
+    /(?:трудозатрат|трудо(?:затр|емк)|работы|рабоч(?:ее|их)?\s+время)/i,
+    /\b(?:mano\s+de\s+obra)\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  const hasTotalWord = [
+    /\btotal\b/i,
+    /(?:итого|всего)/i,
+    /\btotal\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  const hasTimeUnit = [
+    /\b(?:hours?|hrs?|hr|h)\b/i,
+    /(?:час(?:а|ов)?|ч(?:\b|\.)|времени)/i,
+    /\b(?:hora|horas)\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  return hasLaborWord || (hasTotalWord && hasTimeUnit) || (hasActionWord && hasTimeUnit);
 }
 
 function extractPrimaryReportBlock(text: string): string {
