@@ -1,0 +1,53 @@
+{
+  "summary": "Backend-only validation completed for direct diagnostic→final_report transition behavior. Scoped transition tests pass; full repo test run still has unrelated pre-existing failures.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/chat",
+        "issue": "Final-report fallback path uses generic getSafeFallback(final_report) text without mandatory Final Report headers/labor breakdown/Total labor line. If upstream final report generation fails, strict output contract is violated.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "/api/chat (test coverage)",
+        "issue": "Pivot transition test passes even when final report generation errors in test logs because assertions do not verify final report body content for pivot path."
+      },
+      {
+        "endpoint": "repo test infra",
+        "issue": "Unrelated suite failures remain: Prisma client module resolution in retention/input-language tests (Cannot find module '.prisma/client/default')."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/chat-transition-final-report.test.ts",
+    "/app/test_reports/pytest/chat-transition-final-report.junit.xml"
+  ],
+  "action_items": [
+    "Make final_report fallback response schema-compliant (required headers + labor task breakdown + 'Total labor: X hr').",
+    "Strengthen pivot-path test assertions to verify final report payload content and no labor-confirmation wording/events.",
+    "Fix Prisma test environment/generation so full suite can pass (retention/input-language files)."
+  ],
+  "critical_code_review_comments": [
+    "route.ts auto-transition logic correctly bypasses labor_confirmation and updates mode directly to final_report.",
+    "Transition constraints and final prompt correctly instruct: no labor confirmation questions and no follow-up questions.",
+    "Risk: final_report fallback in mode-validators.ts is not contract-compliant for strict Final Report output requirements."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_22.json"
+  ],
+  "success_rate": {
+    "backend": "Scoped: 100% (2/2 in chat-transition-final-report.test.ts); Full suite: failing due to unrelated pre-existing tests",
+    "frontend": "N/A (skipped by request)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Validated direct diagnostic→final_report transitions for transition-signal and context-engine-pivot flows. No labor_confirmation mode writes observed in scoped tests. Full repo `yarn test` still blocked by unrelated Prisma module issues in retention/input-language suites.",
+  "rca of the issue": "RCA-1 (strict-output risk): In /src/lib/mode-validators.ts, getSafeFallback('final_report') returns generic non-report text. When final report generation fails in /api/chat transition path, route streams that fallback; output no longer guarantees mandatory headers/labor breakdown/total line. RCA-2 (test blind spot): In pivot test, mockFetch only supplies two responses; diagnostic retry can consume extra call, causing final report call error in logs, but assertions only check mode transition and absence of labor_confirmation write, not final report content."
+}
