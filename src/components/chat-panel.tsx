@@ -197,6 +197,8 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           type: "image" as const,
           dataUrl: a.dataUrl,
         }));
+      }
+
       const body = await apiChatStreamWithAttachments(requestBody);
 
       // Track chat sent

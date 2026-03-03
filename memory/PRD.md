@@ -46,3 +46,9 @@ Implement true OpenAI streaming in `src/app/api/chat/route.ts` to reduce perceiv
 1. Validate first-token latency on real environment traffic (target <1–2s typical).
 2. Review timing logs for slow paths and identify dominant bottleneck stage.
 3. If needed, add parser edge-case fixtures in a separate test-focused PR.
+
+## Incremental Bug Fix — chat-panel parsing recovery
+- Fixed a structural TS syntax issue in `src/components/chat-panel.tsx` inside `send()`.
+- Added the missing closing brace for `if (currentAttachments.length > 0)` before the API call.
+- Scope intentionally limited to syntax restoration only; no behavior/refactor changes.
+
