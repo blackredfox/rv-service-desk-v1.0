@@ -132,6 +132,34 @@ function detectLaborOverrideIntent(message: string): boolean {
   return hasLaborWord || (hasTotalWord && hasTimeUnit) || (hasActionWord && hasTimeUnit);
 }
 
+function looksLikeFinalReport(text: string): boolean {
+  const t = text.toLowerCase();
+  const required = [
+    "complaint:",
+    "diagnostic procedure:",
+    "verified condition:",
+    "recommended corrective action:",
+    "estimated labor:",
+    "required parts:",
+  ];
+  const hits = required.filter((k) => t.includes(k)).length;
+  return hits >= 4;
+}
+
+function lastAssistantLooksLikeFinalReport(history: { role: string; content: string }[]): boolean {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (msg.role === "assistant" || msg.role === "agent") {
+      return looksLikeFinalReport(msg.content || "");
+    }
+  }
+  return false;
+}
+
+function shouldTreatAsFinalReportForOverride(currentMode: CaseMode, history: { role: string; content: string }[]): boolean {
+  return currentMode === "final_report" || lastAssistantLooksLikeFinalReport(history);
+}
+
 function extractPrimaryReportBlock(text: string): string {
   if (!text.includes(TRANSLATION_SEPARATOR)) return text;
   return text.split(TRANSLATION_SEPARATOR)[0].trim();
@@ -156,6 +184,31 @@ function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
     return text.split(TRANSLATION_SEPARATOR)[0].trim();
   }
   return text;
+}
+
+function applyDiagnosticModeValidationGuard(
+  validation: ReturnType<typeof validateOutput>,
+  mode: CaseMode,
+  responseText: string
+): ReturnType<typeof validateOutput> {
+  if (mode !== "diagnostic") return validation;
+  if (!looksLikeFinalReport(responseText)) return validation;
+
+  const guardViolation =
+    "DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format";
+
+  if (validation.violations.includes(guardViolation)) {
+    return {
+      ...validation,
+      valid: false,
+    };
+  }
+
+  return {
+    ...validation,
+    valid: false,
+    violations: [...validation.violations, guardViolation],
+  };
 }
 
 function buildFinalReportFallback(args: {
@@ -624,7 +677,7 @@ export async function POST(req: Request) {
 
   const parsedRequestedLaborHours = parseRequestedLaborHours(message);
   const isLaborOverrideRequest =
-    currentMode === "final_report" &&
+    shouldTreatAsFinalReportForOverride(currentMode, history) &&
     detectLaborOverrideIntent(message) &&
     parsedRequestedLaborHours !== null;
   const requestedLaborHours = isLaborOverrideRequest
@@ -775,6 +828,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
               langPolicy.includeTranslation,
               translationLanguage
             );
+            modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
             logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
             let laborValidation = validateLaborOverride(overrideContent);
 
@@ -812,6 +866,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                   langPolicy.includeTranslation,
                   translationLanguage
                 );
+                modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
                 logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
                 laborValidation = validateLaborOverride(overrideContent);
               }
@@ -825,9 +880,14 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
               langPolicy.includeTranslation,
               translationLanguage
             );
+            const guardedPostModeValidation = applyDiagnosticModeValidationGuard(
+              postModeValidation,
+              "final_report",
+              overrideContent
+            );
             const postLaborValidation = validateLaborOverride(overrideContent);
 
-            if (!postModeValidation.valid || !postLaborValidation.valid) {
+            if (!guardedPostModeValidation.valid || !postLaborValidation.valid) {
               console.warn(
                 `[Chat API v2] Labor override response invalid after retry, using fallback for ${requestedLaborHoursText} hr`
               );
@@ -909,6 +969,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
         // Validate output (pass language policy for translation enforcement)
         let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
+        validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
 
         // If validation fails, retry once with correction
@@ -932,6 +993,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
           if (!result.error) {
             validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
+            validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
           }
 
@@ -1109,6 +1171,7 @@ Do NOT ask follow-up questions.${translationInstruction}`;
               langPolicy.includeTranslation,
               translationLanguage
             );
+            finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
             logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
 
             if (!finalValidation.valid && !aborted) {
@@ -1139,6 +1202,7 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                   langPolicy.includeTranslation,
                   translationLanguage
                 );
+                finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
                 logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
               }
             }
@@ -1152,8 +1216,13 @@ Do NOT ask follow-up questions.${translationInstruction}`;
               langPolicy.includeTranslation,
               translationLanguage
             );
+            const guardedPostValidation = applyDiagnosticModeValidationGuard(
+              postValidation,
+              currentMode,
+              finalContent
+            );
 
-            if (!postValidation.valid) {
+            if (!guardedPostValidation.valid) {
               console.log(`[Chat API v2] Final report validation failed after retry, using fallback`);
               finalContent = buildFinalReportFallback({
                 policy: langPolicy,
