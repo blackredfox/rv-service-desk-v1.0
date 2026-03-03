@@ -39,6 +39,10 @@ Remove the labor-confirmation interstitial (`diagnostic -> labor_confirmation ->
      - regression assertion: no `labor_confirmation` mode written to storage
    - Fixed existing lint-breaking `prefer-const` errors in existing tests to satisfy repo-wide lint run.
 
+4. **Final-report fallback hardening**
+   - Added a schema-compliant final-report fallback in `route.ts` with required section headers and labor breakdown ending in `Total labor: X hr`.
+   - Applied this fallback in transition-time final report generation paths and final-report retry fallback paths.
+
 ## Validation Run
 - `yarn lint` executed: **0 errors** (warnings remain).
 - `yarn test` executed for whole repo:

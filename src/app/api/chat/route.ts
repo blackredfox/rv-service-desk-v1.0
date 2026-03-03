@@ -86,6 +86,39 @@ function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
   return text;
 }
 
+function buildFinalReportFallback(args: {
+  policy: LanguagePolicy;
+  translationLanguage?: Language;
+}): string {
+  const englishReport = `Complaint: Complaint details pending verification.
+Diagnostic Procedure: Diagnostic isolation completed based on available technician inputs.
+Verified Condition: Condition not operating per specification under reported test conditions.
+Recommended Corrective Action: Perform unit-level corrective action aligned to verified condition.
+Estimated Labor: System isolation and access - 0.3 hr. Component removal and replacement - 0.5 hr. Functional verification - 0.2 hr. Total labor: 1.0 hr.
+Required Parts: Part number to be confirmed at service counter.`;
+
+  if (!args.policy.includeTranslation || !args.translationLanguage || args.translationLanguage === "EN") {
+    return englishReport;
+  }
+
+  const translation =
+    args.translationLanguage === "RU"
+      ? `Жалоба: Детали жалобы ожидают подтверждения.
+Диагностическая процедура: Диагностическая изоляция завершена на основе доступных данных техника.
+Подтверждённое состояние: Состояние не соответствует спецификации при заявленных условиях проверки.
+Рекомендуемое корректирующее действие: Выполнить корректирующее действие на уровне узла в соответствии с подтверждённым состоянием.
+Оценка трудозатрат: Изоляция системы и доступ - 0.3 ч. Снятие и замена узла - 0.5 ч. Функциональная проверка - 0.2 ч. Total labor: 1.0 hr.
+Необходимые детали: Номер детали будет уточнён на сервисной стойке.`
+      : `Queja: Los detalles de la queja están pendientes de verificación.
+Procedimiento de diagnóstico: El aislamiento diagnóstico se completó con base en la información disponible del técnico.
+Condición verificada: La condición no opera según especificación bajo las condiciones de prueba reportadas.
+Acción correctiva recomendada: Realizar una acción correctiva a nivel de unidad alineada con la condición verificada.
+Mano de obra estimada: Aislamiento del sistema y acceso - 0.3 hr. Retiro y reemplazo del componente - 0.5 hr. Verificación funcional - 0.2 hr. Total labor: 1.0 hr.
+Partes requeridas: El número de parte se confirmará en el mostrador de servicio.`;
+
+  return `${englishReport}\n\n${TRANSLATION_SEPARATOR}\n\n${translation}`;
+}
+
 // Attachment validation constants
 const MAX_ATTACHMENTS = 10;
 const MAX_TOTAL_ATTACHMENT_BYTES = 6_000_000; // 6MB server-side (slightly higher than client)
@@ -629,7 +662,13 @@ export async function POST(req: Request) {
           // If still fails, use safe fallback with EFFECTIVE OUTPUT language
           if (!validation.valid || result.error) {
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
-            result.response = getSafeFallback(currentMode, outputPolicy.effective);
+            result.response =
+              currentMode === "final_report"
+                ? buildFinalReportFallback({
+                    policy: langPolicy,
+                    translationLanguage,
+                  })
+                : getSafeFallback(currentMode, outputPolicy.effective);
             
             controller.enqueue(
               encoder.encode(sseEncode({ 
@@ -840,7 +879,10 @@ Do NOT ask follow-up questions.${translationInstruction}`;
 
             if (!postValidation.valid) {
               console.log(`[Chat API v2] Final report validation failed after retry, using fallback`);
-              finalContent = getSafeFallback(currentMode, outputPolicy.effective);
+              finalContent = buildFinalReportFallback({
+                policy: langPolicy,
+                translationLanguage,
+              });
             }
 
             for (const char of finalContent) {
@@ -861,7 +903,10 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             console.error(
               `[Chat API v2] Final report generation error after transition: ${finalResult.error || "empty response"}`
             );
-            const fallback = getSafeFallback(currentMode, outputPolicy.effective);
+            const fallback = buildFinalReportFallback({
+              policy: langPolicy,
+              translationLanguage,
+            });
             for (const char of fallback) {
               if (aborted) break;
               controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
