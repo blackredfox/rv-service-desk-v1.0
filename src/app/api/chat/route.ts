@@ -738,8 +738,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
           const overrideBody = {
             model: getModelForMode("final_report"),
-            stream: false,
-            temperature: 0.2,
+            stream: false,            
             messages: buildOpenAiMessages({
               system: overridePrompt,
               history,
@@ -887,8 +886,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         // Build initial request
         const openAiBody = {
           model: getModelForMode(currentMode),
-          stream: false,
-          temperature: 0.2,
+          stream: false,          
           messages: buildOpenAiMessages({
             system: systemPrompt,
             history,
