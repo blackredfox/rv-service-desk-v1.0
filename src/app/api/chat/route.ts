@@ -446,13 +446,60 @@ function buildOpenAiMessages(args: {
 }
 
 /**
- * Call OpenAI (non-streaming) and return the response
+ * Extract text tokens from OpenAI Chat Completions chunk payload.
+ */
+function extractOpenAiChunkContent(payload: unknown): string {
+  const choice = (payload as { choices?: Array<{ delta?: { content?: unknown }; message?: { content?: unknown } }> })
+    ?.choices?.[0];
+
+  const deltaContent = choice?.delta?.content;
+  if (typeof deltaContent === "string") return deltaContent;
+  if (Array.isArray(deltaContent)) {
+    return deltaContent
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (typeof part === "object" && part && "text" in part) {
+          const text = (part as { text?: unknown }).text;
+          return typeof text === "string" ? text : "";
+        }
+        return "";
+      })
+      .join("");
+  }
+
+  const messageContent = choice?.message?.content;
+  if (typeof messageContent === "string") return messageContent;
+  if (Array.isArray(messageContent)) {
+    return messageContent
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (typeof part === "object" && part && "text" in part) {
+          const text = (part as { text?: unknown }).text;
+          return typeof text === "string" ? text : "";
+        }
+        return "";
+      })
+      .join("");
+  }
+
+  return "";
+}
+
+function logTiming(stage: string, payload: Record<string, number | string | boolean | undefined>) {
+  console.log(`[Chat API v2][timing] ${JSON.stringify({ stage, ...payload })}`);
+}
+
+/**
+ * Call OpenAI with true streaming and emit tokens immediately.
+ * Also supports non-streaming fallback responses used in unit tests.
  */
 async function callOpenAI(
   apiKey: string,
   body: object,
-  signal: AbortSignal
-): Promise<{ response: string; error?: string }> {
+  signal: AbortSignal,
+  onToken?: (token: string) => void
+): Promise<{ response: string; durationMs: number; error?: string }> {
+  const startedAt = Date.now();
   try {
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -461,40 +508,122 @@ async function callOpenAI(
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, stream: true }),
     });
 
     if (!upstream.ok) {
       const text = await upstream.text().catch(() => "");
-      return { response: "", error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500) };
+      return {
+        response: "",
+        durationMs: Date.now() - startedAt,
+        error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500),
+      };
     }
 
-    // Non-streaming: read the full JSON response
-    const json = await upstream.json() as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message?: string };
+    // Fallback path for mocked/non-streaming test responses
+    if (!upstream.body) {
+      const json = (await upstream.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+        error?: { message?: string };
+      };
+
+      if (json.error) {
+        return {
+          response: "",
+          durationMs: Date.now() - startedAt,
+          error: `OpenAI error: ${json.error.message || "Unknown"}`,
+        };
+      }
+
+      const content = json.choices?.[0]?.message?.content ?? "";
+      if (content) onToken?.(content);
+      return {
+        response: content,
+        durationMs: Date.now() - startedAt,
+      };
+    }
+
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let response = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || !line.startsWith("data:")) continue;
+
+        const data = line.slice(5).trim();
+        if (!data) continue;
+        if (data === "[DONE]") {
+          return {
+            response,
+            durationMs: Date.now() - startedAt,
+          };
+        }
+
+        let parsed: { error?: { message?: string } } | null = null;
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          continue;
+        }
+
+        if (parsed?.error?.message) {
+          return {
+            response,
+            durationMs: Date.now() - startedAt,
+            error: `OpenAI error: ${parsed.error.message}`,
+          };
+        }
+
+        const token = extractOpenAiChunkContent(parsed);
+        if (!token) continue;
+
+        response += token;
+        onToken?.(token);
+      }
+    }
+
+    if (buffer.trim().startsWith("data:")) {
+      const data = buffer.trim().slice(5).trim();
+      if (data && data !== "[DONE]") {
+        try {
+          const parsed = JSON.parse(data) as unknown;
+          const token = extractOpenAiChunkContent(parsed);
+          if (token) {
+            response += token;
+            onToken?.(token);
+          }
+        } catch {
+          // ignore trailing partial chunks
+        }
+      }
+    }
+
+    return {
+      response,
+      durationMs: Date.now() - startedAt,
     };
-
-    // Check for API error in response
-    if (json.error) {
-      return { response: "", error: `OpenAI error: ${json.error.message || "Unknown"}` };
-    }
-
-    // Extract content from chat completions format
-    const content = json.choices?.[0]?.message?.content ?? "";
-    
-    if (!content) {
-      console.warn("[Chat API] Empty content from OpenAI response:", JSON.stringify(json).slice(0, 500));
-    }
-
-    return { response: content };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    return { response: "", error: msg };
+    return {
+      response: "",
+      durationMs: Date.now() - startedAt,
+      error: msg,
+    };
   }
 }
 
 export async function POST(req: Request) {
+  const requestStartedAt = Date.now();
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(
@@ -611,7 +740,12 @@ export async function POST(req: Request) {
   });
 
   // Load conversation history (memory window)
+  const historyLoadStart = Date.now();
   const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
+  logTiming("load_history", {
+    caseId: ensuredCase.id,
+    loadHistoryMs: Date.now() - historyLoadStart,
+  });
 
   // ========================================
   // CONTEXT ENGINE: SINGLE FLOW AUTHORITY
@@ -735,6 +869,7 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("\n\n") || undefined;
 
+  const composePromptStart = Date.now();
   const baseSystemPrompt = composePromptV2({
     mode: currentMode,
     inputDetected: trackedInputLanguage,
@@ -742,6 +877,11 @@ export async function POST(req: Request) {
     includeTranslation: langPolicy.includeTranslation,
     translationLanguage,
     additionalConstraints,
+  });
+  logTiming("compose_prompt", {
+    caseId: ensuredCase.id,
+    mode: currentMode,
+    composePromptMs: Date.now() - composePromptStart,
   });
   
   const visionInstruction = buildVisionInstruction(attachmentCount);
@@ -754,6 +894,10 @@ export async function POST(req: Request) {
     async start(controller) {
       let full = "";
       let aborted = false;
+      const emitToken = (token: string) => {
+        if (aborted || !token) return;
+        controller.enqueue(encoder.encode(sseEncode({ type: "token", token })));
+      };
 
       const onAbort = () => {
         aborted = true;
@@ -796,6 +940,7 @@ export async function POST(req: Request) {
             .filter(Boolean)
             .join("\n\n");
 
+          const overrideComposeStart = Date.now();
           const overridePrompt = composePromptV2({
             mode: "final_report",
             inputDetected: trackedInputLanguage,
@@ -803,6 +948,12 @@ export async function POST(req: Request) {
             includeTranslation: langPolicy.includeTranslation,
             translationLanguage,
             additionalConstraints: overrideConstraints,
+          });
+          logTiming("compose_prompt", {
+            caseId: ensuredCase.id,
+            mode: "final_report",
+            path: "labor_override",
+            composePromptMs: Date.now() - overrideComposeStart,
           });
 
           const translationInstruction =
@@ -826,7 +977,6 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
           const overrideBody = {
             model: getModelForMode("final_report"),
-            stream: false,            
             messages: buildOpenAiMessages({
               system: overridePrompt,
               history,
@@ -835,7 +985,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             }),
           };
 
-          let overrideResult = await callOpenAI(apiKey, overrideBody, ac.signal);
+          let overrideResult = await callOpenAI(apiKey, overrideBody, ac.signal, emitToken);
+          logTiming("openai_call", {
+            caseId: ensuredCase.id,
+            mode: "final_report",
+            path: "labor_override_first",
+            openAiMs: overrideResult.durationMs,
+          });
           let overrideContent = overrideResult.response;
 
           const validateLaborOverride = (text: string) => {
@@ -857,6 +1013,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
           };
 
           if (!overrideResult.error && overrideContent.trim()) {
+            const validateStart = Date.now();
             let modeValidation = validateOutput(
               overrideContent,
               "final_report",
@@ -866,8 +1023,15 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
             logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
             let laborValidation = validateLaborOverride(overrideContent);
+            logTiming("validate_output", {
+              caseId: ensuredCase.id,
+              mode: "final_report",
+              path: "labor_override_first",
+              validateMs: Date.now() - validateStart,
+            });
 
             if ((!modeValidation.valid || !laborValidation.valid) && !aborted) {
+              emitToken("\n\n[System] Repairing output...\n\n");
               const correctionViolations = [
                 ...modeValidation.violations,
                 ...laborValidation.violations,
@@ -892,9 +1056,16 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                 }),
               };
 
-              overrideResult = await callOpenAI(apiKey, retryBody, ac.signal);
+              overrideResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
+              logTiming("openai_call", {
+                caseId: ensuredCase.id,
+                mode: "final_report",
+                path: "labor_override_retry",
+                openAiMs: overrideResult.durationMs,
+              });
               if (!overrideResult.error) {
                 overrideContent = overrideResult.response;
+                const retryValidateStart = Date.now();
                 modeValidation = validateOutput(
                   overrideContent,
                   "final_report",
@@ -904,11 +1075,18 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                 modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
                 logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
                 laborValidation = validateLaborOverride(overrideContent);
+                logTiming("validate_output", {
+                  caseId: ensuredCase.id,
+                  mode: "final_report",
+                  path: "labor_override_retry",
+                  validateMs: Date.now() - retryValidateStart,
+                });
               }
             }
 
             overrideContent = enforceLanguagePolicy(overrideContent, langPolicy);
 
+            const postValidateStart = Date.now();
             const postModeValidation = validateOutput(
               overrideContent,
               "final_report",
@@ -921,6 +1099,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
               overrideContent
             );
             const postLaborValidation = validateLaborOverride(overrideContent);
+            logTiming("validate_output", {
+              caseId: ensuredCase.id,
+              mode: "final_report",
+              path: "labor_override_post",
+              validateMs: Date.now() - postValidateStart,
+            });
 
             if (!guardedPostModeValidation.valid || !postLaborValidation.valid) {
               console.warn(
@@ -931,11 +1115,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                 translationLanguage,
                 laborHours: requestedLaborHours,
               });
-            }
-
-            for (const char of overrideContent) {
-              if (aborted) break;
-              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              emitToken(overrideContent);
             }
 
             if (!aborted && overrideContent.trim()) {
@@ -956,11 +1136,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
               translationLanguage,
               laborHours: requestedLaborHours,
             });
-
-            for (const char of fallback) {
-              if (aborted) break;
-              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-            }
+            emitToken(fallback);
 
             if (!aborted) {
               await storage.appendMessage({
@@ -981,7 +1157,6 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         // Build initial request
         const openAiBody = {
           model: getModelForMode(currentMode),
-          stream: false,          
           messages: buildOpenAiMessages({
             system: systemPrompt,
             history,
@@ -991,7 +1166,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         };
 
         // First attempt
-        let result = await callOpenAI(apiKey, openAiBody, ac.signal);
+        let result = await callOpenAI(apiKey, openAiBody, ac.signal, emitToken);
+        logTiming("openai_call", {
+          caseId: ensuredCase.id,
+          mode: currentMode,
+          path: "primary_first",
+          openAiMs: result.durationMs,
+        });
 
         if (result.error) {
           controller.enqueue(
@@ -1003,13 +1184,21 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         }
 
         // Validate output (pass language policy for translation enforcement)
+        const validateStart = Date.now();
         let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
         validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
+        logTiming("validate_output", {
+          caseId: ensuredCase.id,
+          mode: currentMode,
+          path: "primary_first",
+          validateMs: Date.now() - validateStart,
+        });
 
         // If validation fails, retry once with correction
         if (!validation.valid && !aborted) {
           console.log(`[Chat API v2] Validation failed, retrying with correction...`);
+          emitToken("\n\n[System] Repairing output...\n\n");
           const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
           if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
             correctionInstructionParts.push(
@@ -1029,12 +1218,25 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             }),
           };
 
-          result = await callOpenAI(apiKey, retryBody, ac.signal);
+          result = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
+          logTiming("openai_call", {
+            caseId: ensuredCase.id,
+            mode: currentMode,
+            path: "primary_retry",
+            openAiMs: result.durationMs,
+          });
 
           if (!result.error) {
+            const retryValidateStart = Date.now();
             validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
             validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
             logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
+            logTiming("validate_output", {
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              path: "primary_retry",
+              validateMs: Date.now() - retryValidateStart,
+            });
           }
 
           // If still fails, use safe fallback with EFFECTIVE OUTPUT language
@@ -1049,6 +1251,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                     translationLanguage,
                   })
                 : getSafeFallback(currentMode, outputPolicy.effective);
+            emitToken(result.response);
             
             controller.enqueue(
               encoder.encode(sseEncode({ 
@@ -1110,12 +1313,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
           console.log(`[Chat API v2] Auto-transition to final_report (${transitionReason})`);
 
-          // 1) Stream and persist diagnostic response (if any)
-          for (const char of diagnosticContent) {
-            if (aborted) break;
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
-
+          // 1) Persist diagnostic response (already streamed in real-time)
           if (!aborted && diagnosticContent.trim()) {
             await storage.appendMessage({
               caseId: ensuredCase.id,
@@ -1135,17 +1333,20 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             )
           );
 
-          const separator = "\n\n";
-          for (const char of separator) {
-            if (aborted) break;
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
+          emitToken("\n\n");
 
           // 3) Compose and request final report
+          const transitionHistoryStart = Date.now();
           const updatedHistoryForReport = await storage.listMessagesForContext(
             ensuredCase.id,
             DEFAULT_MEMORY_WINDOW
           );
+          logTiming("load_history", {
+            caseId: ensuredCase.id,
+            mode: "final_report",
+            path: "transition",
+            loadHistoryMs: Date.now() - transitionHistoryStart,
+          });
           const factLock = buildFactLockConstraint(updatedHistoryForReport);
           const transitionConstraints = [
             "FINAL REPORT DIRECTIVE (MANDATORY): Generate the complete FINAL SHOP REPORT immediately.",
@@ -1157,6 +1358,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             .filter(Boolean)
             .join("\n\n");
 
+          const transitionComposeStart = Date.now();
           const finalReportPrompt = composePromptV2({
             mode: currentMode,
             inputDetected: trackedInputLanguage,
@@ -1164,6 +1366,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             includeTranslation: langPolicy.includeTranslation,
             translationLanguage,
             additionalConstraints: transitionConstraints,
+          });
+          logTiming("compose_prompt", {
+            caseId: ensuredCase.id,
+            mode: currentMode,
+            path: "transition",
+            composePromptMs: Date.now() - transitionComposeStart,
           });
 
           const translationInstruction =
@@ -1193,7 +1401,6 @@ Do NOT ask follow-up questions.${translationInstruction}`;
 
           const finalReportBody = {
             model: getModelForMode("final_report"),
-            stream: false,
             temperature: 0.2,
             messages: buildOpenAiMessages({
               system: finalReportPrompt,
@@ -1203,10 +1410,17 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             }),
           };
 
-          let finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal);
+          let finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal, emitToken);
+          logTiming("openai_call", {
+            caseId: ensuredCase.id,
+            mode: "final_report",
+            path: "transition_first",
+            openAiMs: finalResult.durationMs,
+          });
           let finalContent = finalResult.response;
 
           if (!finalResult.error && finalContent.trim()) {
+            const finalValidateStart = Date.now();
             let finalValidation = validateOutput(
               finalContent,
               currentMode,
@@ -1215,8 +1429,15 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             );
             finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
             logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
+            logTiming("validate_output", {
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              path: "transition_first",
+              validateMs: Date.now() - finalValidateStart,
+            });
 
             if (!finalValidation.valid && !aborted) {
+              emitToken("\n\n[System] Repairing output...\n\n");
               const correctionInstruction = [
                 buildCorrectionInstruction(finalValidation.violations),
                 "Ensure Estimated Labor includes task-level breakdown and ends with 'Total labor: X hr'.",
@@ -1235,9 +1456,16 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                 }),
               };
 
-              finalResult = await callOpenAI(apiKey, retryBody, ac.signal);
+              finalResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
+              logTiming("openai_call", {
+                caseId: ensuredCase.id,
+                mode: currentMode,
+                path: "transition_retry",
+                openAiMs: finalResult.durationMs,
+              });
               if (!finalResult.error) {
                 finalContent = finalResult.response;
+                const retryValidateStart = Date.now();
                 finalValidation = validateOutput(
                   finalContent,
                   currentMode,
@@ -1246,6 +1474,12 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                 );
                 finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
                 logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
+                logTiming("validate_output", {
+                  caseId: ensuredCase.id,
+                  mode: currentMode,
+                  path: "transition_retry",
+                  validateMs: Date.now() - retryValidateStart,
+                });
               }
             }
 
@@ -1270,11 +1504,7 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                 policy: langPolicy,
                 translationLanguage,
               });
-            }
-
-            for (const char of finalContent) {
-              if (aborted) break;
-              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+              emitToken(finalContent);
             }
 
             if (!aborted && finalContent.trim()) {
@@ -1294,10 +1524,7 @@ Do NOT ask follow-up questions.${translationInstruction}`;
               policy: langPolicy,
               translationLanguage,
             });
-            for (const char of fallback) {
-              if (aborted) break;
-              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-            }
+            emitToken(fallback);
             if (!aborted) {
               await storage.appendMessage({
                 caseId: ensuredCase.id,
@@ -1313,14 +1540,8 @@ Do NOT ask follow-up questions.${translationInstruction}`;
           controller.close();
           return;
         } else {
-          // No transition - apply output-layer enforcement before streaming
+          // No transition - apply output-layer enforcement for persisted content
           full = enforceLanguagePolicy(full, langPolicy);
-
-          // Stream the response normally
-          for (const char of full) {
-            if (aborted) break;
-            controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
-          }
 
           // Send validation info
           if (!validation.valid) {
@@ -1356,6 +1577,11 @@ Do NOT ask follow-up questions.${translationInstruction}`;
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } finally {
+        logTiming("request_total", {
+          caseId: ensuredCase.id,
+          totalMs: Date.now() - requestStartedAt,
+          aborted,
+        });
         req.signal.removeEventListener("abort", onAbort);
       }
     },

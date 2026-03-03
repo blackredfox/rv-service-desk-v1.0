@@ -1,59 +1,48 @@
-# PRD — NEO TASK: Labor Override Detection + Diagnostic Drift Guard
+# PRD — NEO TASK: Reduce Chat Latency with True OpenAI Streaming
 
 ## Original Problem Statement
-Implement a clean, scoped update on branch `feat/final-report-labor-override` to:
-1. Improve labor-override intent detection (RU/EN/ES)
-2. Allow labor override when a final report exists in history even if mode drifted
-3. Add diagnostic drift guard so diagnostic mode cannot emit final-report sections
-4. Add focused deterministic tests
+Implement true OpenAI streaming in `src/app/api/chat/route.ts` to reduce perceived latency, while preserving existing behavior (modes, validators, labor override flow, translation policy), and add timing logs for observability.
 
 ## Architecture Decisions
-- Kept all runtime behavior changes isolated to `src/app/api/chat/route.ts`.
-- Added local helpers in `route.ts` only (no public API shape changes).
-- Added test-only exports via `__test__` for deterministic unit assertions.
-- Added one focused test file for this task with dependency mocks and no network calls.
+- Kept implementation scoped to server route logic and existing chat route tests.
+- Replaced buffered OpenAI completion handling with real fetch streaming parser for Chat Completions SSE.
+- Preserved existing SSE contract to frontend (`type: token`, `mode`, `language`, `validation`, `done`, etc.).
+- Maintained single-retry validation policy to bound latency.
 
 ## What Has Been Implemented
-- Expanded `detectLaborOverrideIntent(message)` vocabulary:
-  - EN: change/edit/update/make/set/adjust/override/recalculate/revise
-  - RU: includes existing words plus typo `зделай`
-  - ES: imperative + infinitive variants (recalcula/recalcular, ajusta/ajustar, hazlo/hacer, cambia/cambiar, edita/editar, actualiza/actualizar)
-- Enforced labor override intent shape: valid numeric hours + explicit time unit required.
-- Added `computeLaborOverrideRequest(...)` and now computes override path using:
-  - `shouldTreatAsFinalReportForOverride(currentMode, history)`
-- Added stricter diagnostic drift handling:
-  - `applyDiagnosticModeValidationGuard(...)` with dedicated violation code
-  - correction instruction when drift is detected
-  - deterministic diagnostic fallback question aligned to active step when retry still fails
-- Added test-only exports in `route.ts`:
-  - `parseRequestedLaborHours`, `detectLaborOverrideIntent`, `looksLikeFinalReport`, `shouldTreatAsFinalReportForOverride`, `applyDiagnosticModeValidationGuard`, `computeLaborOverrideRequest`
-- Added tests: `tests/chat-labor-override-drift-guard.test.ts` covering:
-  - RU override detection (including typo)
-  - ES override detection
-  - override path when mode=diagnostic but history already has final report
-  - diagnostic drift correction back to guided diagnostic question
-
-## Test Status
-- Passed targeted tests:
-  - `tests/chat-labor-override-drift-guard.test.ts`
-  - `tests/chat-transition-final-report.test.ts`
-  - `tests/chat-final-report-override-intent-false-positive.test.ts`
-- Full suite `yarn test` has pre-existing unrelated failures in:
-  - `tests/retention.test.ts`
-  - `tests/input-language-lock.test.ts`
+- Added true streaming OpenAI reader in `route.ts`:
+  - uses `response.body.getReader()`
+  - parses `data: ...` SSE lines
+  - emits tokens to client immediately as they arrive
+  - still accumulates full text for post-stream validation
+  - supports non-stream fallback for mocked unit tests when `response.body` is absent
+- Validation/retry flow updated to stream-first pattern:
+  - stream first attempt immediately
+  - validate after stream end
+  - on invalid output: emit `[System] Repairing output...`, run one retry, stream retry
+  - if still invalid: stream fallback and continue existing event behavior
+- Applied streaming path consistently across:
+  - main diagnostic/authorization/final report generation
+  - labor override generation
+  - auto-transition final report generation
+- Added structured timing logs (no PII):
+  - `loadHistoryMs`
+  - `composePromptMs`
+  - `openAiMs` (per call path)
+  - `validateMs`
+  - `totalMs`
 
 ## Prioritized Backlog
 ### P0
-- Stabilize unrelated failing suites (`retention`, `input-language-lock`) outside this scoped task.
+- Add optional metrics export/aggregation around p50/p95 first-token latency in production logs.
 
 ### P1
-- Add additional negative intent tests (e.g., action words without time unit).
-- Add assertions for one-question diagnostic correction consistency across locales.
+- Add dedicated unit tests for stream parser edge cases (multi-line chunk boundaries, partial trailing lines).
 
 ### P2
-- Consolidate final-report drift heuristics between route and validators into one shared utility.
+- Consider guard for suppressing known transition marker text from first-pass stream if needed for UX polish.
 
 ## Next Tasks
-1. If desired, address the unrelated failing test suites in a separate scoped PR.
-2. Add more multilingual edge-case fixtures for labor intent parsing.
-3. Keep monitoring drift guard metrics to tune strictness vs false positives.
+1. Validate first-token latency on real environment traffic (target <1–2s typical).
+2. Review timing logs for slow paths and identify dominant bottleneck stage.
+3. If needed, add parser edge-case fixtures in a separate test-focused PR.
