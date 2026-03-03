@@ -106,9 +106,9 @@ function detectLaborOverrideIntent(message: string): boolean {
   if (!hasNumber) return false;
 
   const hasActionWord = [
-    /\b(?:recalculate|set\s+to|set|make|adjust|override)\b/i,
-    /(?:перерасч(?:е|ё)т|пересчитай|сделай|укажи|пересчитать)/i,
-    /\b(?:recalcula|ajusta|hazlo)\b/i,
+    /\b(?:recalculate|set\s+to|set|make|adjust|override|change|edit|revise|update)\b/i,
+    /(?:перерасч(?:е|ё)т|пересчитай|сделай|зделай|укажи|пересчитать|измени|изменить|поменяй|поменять|поправь|правка|исправь)/i,
+    /\b(?:recalcula|recalcular|ajusta|ajustar|hazlo|hacer|cambia|cambiar|edita|editar|actualiza|actualizar)\b/i,
   ].some((pattern) => pattern.test(message));
 
   const hasLaborWord = [
@@ -125,12 +125,17 @@ function detectLaborOverrideIntent(message: string): boolean {
 
   const hasTimeUnit = [
     /\b(?:hours?|hrs?|hr|h)\b/i,
-    /(?:час(?:а|ов)?|ч(?:\b|\.)|времени)/i,
+    /(?:час(?:а|ов)?|ч(?=\s|$|\.)|времени)/i,
     /\b(?:hora|horas)\b/i,
   ].some((pattern) => pattern.test(message));
 
-  return hasLaborWord || (hasTotalWord && hasTimeUnit) || (hasActionWord && hasTimeUnit);
+  if (!hasTimeUnit) return false;
+
+  return hasLaborWord || hasTotalWord || hasActionWord;
 }
+
+const DIAGNOSTIC_MODE_GUARD_VIOLATION =
+  "DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format";
 
 function looksLikeFinalReport(text: string): boolean {
   const t = text.toLowerCase();
@@ -194,10 +199,7 @@ function applyDiagnosticModeValidationGuard(
   if (mode !== "diagnostic") return validation;
   if (!looksLikeFinalReport(responseText)) return validation;
 
-  const guardViolation =
-    "DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format";
-
-  if (validation.violations.includes(guardViolation)) {
+  if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
     return {
       ...validation,
       valid: false,
@@ -207,7 +209,45 @@ function applyDiagnosticModeValidationGuard(
   return {
     ...validation,
     valid: false,
-    violations: [...validation.violations, guardViolation],
+    violations: [...validation.violations, DIAGNOSTIC_MODE_GUARD_VIOLATION],
+  };
+}
+
+function buildDiagnosticDriftCorrectionInstruction(activeStepId?: string): string {
+  const stepHint = activeStepId
+    ? `Return to the active guided step (${activeStepId}).`
+    : "Return to the active guided diagnostic step.";
+
+  return [
+    "Diagnostic drift correction (MANDATORY):",
+    "- You are in DIAGNOSTIC mode, not FINAL_REPORT mode.",
+    "- Do NOT output final report headers (Complaint/Diagnostic Procedure/Verified Condition/etc.).",
+    `- ${stepHint}`,
+    "- Ask exactly ONE concise diagnostic question that advances the procedure.",
+  ].join("\n");
+}
+
+function buildDiagnosticDriftFallback(activeStepId?: string): string {
+  const stepLabel = activeStepId ? ` (${activeStepId})` : "";
+  return `Guided Diagnostics${stepLabel}: What is the observed result for this active diagnostic step?`;
+}
+
+function computeLaborOverrideRequest(
+  currentMode: CaseMode,
+  history: { role: string; content: string }[],
+  message: string
+): { isLaborOverrideRequest: boolean; requestedLaborHours: number | null } {
+  const parsedRequestedLaborHours = parseRequestedLaborHours(message);
+  const isLaborOverrideRequest =
+    shouldTreatAsFinalReportForOverride(currentMode, history) &&
+    detectLaborOverrideIntent(message) &&
+    parsedRequestedLaborHours !== null;
+
+  return {
+    isLaborOverrideRequest,
+    requestedLaborHours: isLaborOverrideRequest
+      ? normalizeLaborHours(parsedRequestedLaborHours ?? 0)
+      : null,
   };
 }
 
@@ -675,14 +715,9 @@ export async function POST(req: Request) {
     factLockConstraint = buildFactLockConstraint(history);
   }
 
-  const parsedRequestedLaborHours = parseRequestedLaborHours(message);
-  const isLaborOverrideRequest =
-    shouldTreatAsFinalReportForOverride(currentMode, history) &&
-    detectLaborOverrideIntent(message) &&
-    parsedRequestedLaborHours !== null;
-  const requestedLaborHours = isLaborOverrideRequest
-    ? normalizeLaborHours(parsedRequestedLaborHours ?? 0)
-    : null;
+  const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
+  const isLaborOverrideRequest = laborOverride.isLaborOverrideRequest;
+  const requestedLaborHours = laborOverride.requestedLaborHours;
   const requestedLaborHoursText =
     requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
 
@@ -975,8 +1010,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         // If validation fails, retry once with correction
         if (!validation.valid && !aborted) {
           console.log(`[Chat API v2] Validation failed, retrying with correction...`);
-          
-          const correctionInstruction = buildCorrectionInstruction(validation.violations);
+          const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
+          if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
+            correctionInstructionParts.push(
+              buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId)
+            );
+          }
+          const correctionInstruction = correctionInstructionParts.join("\n");
           
           const retryBody = {
             ...openAiBody,
@@ -1001,7 +1041,9 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
           if (!validation.valid || result.error) {
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
             result.response =
-              currentMode === "final_report"
+              currentMode === "diagnostic" && validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)
+                ? buildDiagnosticDriftFallback(engineResult?.context.activeStepId)
+                : currentMode === "final_report"
                 ? buildFinalReportFallback({
                     policy: langPolicy,
                     translationLanguage,
@@ -1330,3 +1372,12 @@ Do NOT ask follow-up questions.${translationInstruction}`;
     },
   });
 }
+
+export const __test__ = {
+  parseRequestedLaborHours,
+  detectLaborOverrideIntent,
+  looksLikeFinalReport,
+  shouldTreatAsFinalReportForOverride,
+  applyDiagnosticModeValidationGuard,
+  computeLaborOverrideRequest,
+};

@@ -1,41 +1,59 @@
-# PRD — Chat API Route Update
+# PRD — NEO TASK: Labor Override Detection + Diagnostic Drift Guard
 
 ## Original Problem Statement
-Replace code behavior in `src/app/api/chat/route.ts` by applying only two logic updates (not full file replacement):
-1. Update `isLaborOverrideRequest` to use `shouldTreatAsFinalReportForOverride(...)`
-2. Add a diagnostic-mode validation guard after `validateOutput(...)` calls
+Implement a clean, scoped update on branch `feat/final-report-labor-override` to:
+1. Improve labor-override intent detection (RU/EN/ES)
+2. Allow labor override when a final report exists in history even if mode drifted
+3. Add diagnostic drift guard so diagnostic mode cannot emit final-report sections
+4. Add focused deterministic tests
 
 ## Architecture Decisions
-- Kept existing Next.js API route architecture unchanged.
-- Added minimal helper logic inside `route.ts` only; no cross-file refactors.
-- Preserved current flow/state handling and fallback behavior.
+- Kept all runtime behavior changes isolated to `src/app/api/chat/route.ts`.
+- Added local helpers in `route.ts` only (no public API shape changes).
+- Added test-only exports via `__test__` for deterministic unit assertions.
+- Added one focused test file for this task with dependency mocks and no network calls.
 
 ## What Has Been Implemented
-- Added final-report heuristic helpers:
-  - `looksLikeFinalReport(...)`
-  - `lastAssistantLooksLikeFinalReport(...)`
-  - `shouldTreatAsFinalReportForOverride(...)`
-- Updated labor override gate:
-  - from strict `currentMode === "final_report"`
-  - to `shouldTreatAsFinalReportForOverride(currentMode, history)`
-- Added route-level diagnostic guard:
-  - `applyDiagnosticModeValidationGuard(...)`
-  - applied immediately after `validateOutput(...)` results to force invalidation when diagnostic output drifts into final-report section format.
+- Expanded `detectLaborOverrideIntent(message)` vocabulary:
+  - EN: change/edit/update/make/set/adjust/override/recalculate/revise
+  - RU: includes existing words plus typo `зделай`
+  - ES: imperative + infinitive variants (recalcula/recalcular, ajusta/ajustar, hazlo/hacer, cambia/cambiar, edita/editar, actualiza/actualizar)
+- Enforced labor override intent shape: valid numeric hours + explicit time unit required.
+- Added `computeLaborOverrideRequest(...)` and now computes override path using:
+  - `shouldTreatAsFinalReportForOverride(currentMode, history)`
+- Added stricter diagnostic drift handling:
+  - `applyDiagnosticModeValidationGuard(...)` with dedicated violation code
+  - correction instruction when drift is detected
+  - deterministic diagnostic fallback question aligned to active step when retry still fails
+- Added test-only exports in `route.ts`:
+  - `parseRequestedLaborHours`, `detectLaborOverrideIntent`, `looksLikeFinalReport`, `shouldTreatAsFinalReportForOverride`, `applyDiagnosticModeValidationGuard`, `computeLaborOverrideRequest`
+- Added tests: `tests/chat-labor-override-drift-guard.test.ts` covering:
+  - RU override detection (including typo)
+  - ES override detection
+  - override path when mode=diagnostic but history already has final report
+  - diagnostic drift correction back to guided diagnostic question
+
+## Test Status
+- Passed targeted tests:
+  - `tests/chat-labor-override-drift-guard.test.ts`
+  - `tests/chat-transition-final-report.test.ts`
+  - `tests/chat-final-report-override-intent-false-positive.test.ts`
+- Full suite `yarn test` has pre-existing unrelated failures in:
+  - `tests/retention.test.ts`
+  - `tests/input-language-lock.test.ts`
 
 ## Prioritized Backlog
 ### P0
-- Add focused unit tests for:
-  - labor override detection when final report exists in history but mode is not yet switched
-  - diagnostic guard invalidation behavior
+- Stabilize unrelated failing suites (`retention`, `input-language-lock`) outside this scoped task.
 
 ### P1
-- Deduplicate/centralize final-report detection heuristics between route and validators.
-- Add structured metrics for guard-trigger frequency.
+- Add additional negative intent tests (e.g., action words without time unit).
+- Add assertions for one-question diagnostic correction consistency across locales.
 
 ### P2
-- Expand multilingual labor-override intent patterns and synonym coverage.
+- Consolidate final-report drift heuristics between route and validators into one shared utility.
 
 ## Next Tasks
-1. Add/update tests around `POST /api/chat` for labor override and diagnostic drift scenarios.
-2. Validate end-to-end behavior with representative conversation fixtures.
-3. Consider consolidating guard logic into shared validator module for single-source enforcement.
+1. If desired, address the unrelated failing test suites in a separate scoped PR.
+2. Add more multilingual edge-case fixtures for labor intent parsing.
+3. Keep monitoring drift guard metrics to tune strictness vs false positives.
