@@ -24,6 +24,7 @@ import {
   buildCorrectionInstruction,
   logValidation,
 } from "@/lib/mode-validators";
+import { validateLaborSum } from "@/lib/labor-store";
 import {
   // Diagnostic Registry — DATA PROVIDER ONLY (not flow authority)
   // Used for: procedure catalog, step definitions, static metadata
@@ -74,6 +75,56 @@ function getModelForMode(mode: CaseMode): string {
     : MODELS.diagnostic;
 }
 
+const LABOR_OVERRIDE_MIN_HOURS = 0.1;
+const LABOR_OVERRIDE_MAX_HOURS = 24;
+
+function normalizeLaborHours(hours: number): number {
+  return Math.round(hours * 10) / 10;
+}
+
+function formatLaborHours(hours: number): string {
+  return normalizeLaborHours(hours).toFixed(1);
+}
+
+function parseRequestedLaborHours(message: string): number | null {
+  const sanitized = message.replace(/,/g, ".");
+  const matches = sanitized.match(/\d+(?:\.\d+)?/g);
+  if (!matches) return null;
+
+  for (const raw of matches) {
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) continue;
+    if (parsed < LABOR_OVERRIDE_MIN_HOURS || parsed > LABOR_OVERRIDE_MAX_HOURS) continue;
+    return normalizeLaborHours(parsed);
+  }
+
+  return null;
+}
+
+function detectLaborOverrideIntent(message: string): boolean {
+  const hasKeyword = [
+    /\b(?:total|labor|recalculate|make(?:\s+total|\s+labor|\s+it)?|set\s+(?:to|labor))/i,
+    /(?:итого|всего|перерасч(?:е|ё)т|пересчитай|сделай|укажи)/i,
+    /\b(?:total|recalcula|hazlo|ajusta)\b/i,
+  ].some((pattern) => pattern.test(message));
+
+  return hasKeyword && parseRequestedLaborHours(message) !== null;
+}
+
+function extractPrimaryReportBlock(text: string): string {
+  if (!text.includes(TRANSLATION_SEPARATOR)) return text;
+  return text.split(TRANSLATION_SEPARATOR)[0].trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasCanonicalTotalLaborLine(reportText: string, totalHoursText: string): boolean {
+  const escapedTotal = escapeRegExp(totalHoursText);
+  return new RegExp(`Total\\s+labor:\\s*${escapedTotal}\\s*hr\\b`, "i").test(reportText);
+}
+
 /**
  * Output-layer enforcement: strip translation block when policy says none.
  * This is the final safety net — even if the LLM produces a translation,
@@ -89,12 +140,14 @@ function enforceLanguagePolicy(text: string, policy: LanguagePolicy): string {
 function buildFinalReportFallback(args: {
   policy: LanguagePolicy;
   translationLanguage?: Language;
+  laborHours?: number;
 }): string {
+  const totalLaborText = formatLaborHours(args.laborHours ?? 1.0);
   const englishReport = `Complaint: Complaint details pending verification.
 Diagnostic Procedure: Diagnostic isolation completed based on available technician inputs.
 Verified Condition: Condition not operating per specification under reported test conditions.
 Recommended Corrective Action: Perform unit-level corrective action aligned to verified condition.
-Estimated Labor: System isolation and access - 0.3 hr. Component removal and replacement - 0.5 hr. Functional verification - 0.2 hr. Total labor: 1.0 hr.
+Estimated Labor: System isolation and access - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
 Required Parts: Part number to be confirmed at service counter.`;
 
   if (!args.policy.includeTranslation || !args.translationLanguage || args.translationLanguage === "EN") {
@@ -107,13 +160,13 @@ Required Parts: Part number to be confirmed at service counter.`;
 Диагностическая процедура: Диагностическая изоляция завершена на основе доступных данных техника.
 Подтверждённое состояние: Состояние не соответствует спецификации при заявленных условиях проверки.
 Рекомендуемое корректирующее действие: Выполнить корректирующее действие на уровне узла в соответствии с подтверждённым состоянием.
-Оценка трудозатрат: Изоляция системы и доступ - 0.3 ч. Снятие и замена узла - 0.5 ч. Функциональная проверка - 0.2 ч. Total labor: 1.0 hr.
+Оценка трудозатрат: Изоляция системы и доступ - ${totalLaborText} ч. Total labor: ${totalLaborText} hr.
 Необходимые детали: Номер детали будет уточнён на сервисной стойке.`
       : `Queja: Los detalles de la queja están pendientes de verificación.
 Procedimiento de diagnóstico: El aislamiento diagnóstico se completó con base en la información disponible del técnico.
 Condición verificada: La condición no opera según especificación bajo las condiciones de prueba reportadas.
 Acción correctiva recomendada: Realizar una acción correctiva a nivel de unidad alineada con la condición verificada.
-Mano de obra estimada: Aislamiento del sistema y acceso - 0.3 hr. Retiro y reemplazo del componente - 0.5 hr. Verificación funcional - 0.2 hr. Total labor: 1.0 hr.
+Mano de obra estimada: Aislamiento del sistema y acceso - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
 Partes requeridas: El número de parte se confirmará en el mostrador de servicio.`;
 
   return `${englishReport}\n\n${TRANSLATION_SEPARATOR}\n\n${translation}`;
@@ -548,6 +601,17 @@ export async function POST(req: Request) {
     factLockConstraint = buildFactLockConstraint(history);
   }
 
+  const parsedRequestedLaborHours = parseRequestedLaborHours(message);
+  const isLaborOverrideRequest =
+    currentMode === "final_report" &&
+    detectLaborOverrideIntent(message) &&
+    parsedRequestedLaborHours !== null;
+  const requestedLaborHours = isLaborOverrideRequest
+    ? normalizeLaborHours(parsedRequestedLaborHours ?? 0)
+    : null;
+  const requestedLaborHoursText =
+    requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
+
   // Compose system prompt using v2 semantics:
   // - inputDetected: what language user wrote in
   // - outputEffective: what language assistant must respond in
@@ -605,6 +669,199 @@ export async function POST(req: Request) {
         
         // Emit mode
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
+
+        if (isLaborOverrideRequest && requestedLaborHours !== null && requestedLaborHoursText) {
+          console.log(
+            `[Chat API v2] Final report labor override requested: total=${requestedLaborHoursText} hr`
+          );
+
+          const overrideConstraints = [
+            factLockConstraint,
+            `LABOR OVERRIDE (MANDATORY):
+- The technician requires total labor to be exactly ${requestedLaborHoursText} hours.
+- Rewrite ONLY the 'Estimated Labor' section to fit exactly ${requestedLaborHoursText} hr total.
+- Keep all other sections semantically identical (no new diagnostics, no new parts, no new findings).
+- Do NOT ask questions. Do NOT request confirmations.
+- End the labor section with: "Total labor: ${requestedLaborHoursText} hr"`,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+
+          const overridePrompt = composePromptV2({
+            mode: "final_report",
+            inputDetected: trackedInputLanguage,
+            outputEffective: outputPolicy.effective,
+            includeTranslation: langPolicy.includeTranslation,
+            translationLanguage,
+            additionalConstraints: overrideConstraints,
+          });
+
+          const translationInstruction =
+            langPolicy.includeTranslation && translationLanguage
+              ? `\n\nAfter the English report, output "--- TRANSLATION ---" and provide a complete translation into ${
+                  translationLanguage === "RU"
+                    ? "Russian"
+                    : translationLanguage === "ES"
+                    ? "Spanish"
+                    : "English"
+                }.`
+              : "";
+
+          const overrideRequest = `Regenerate the FINAL SHOP REPORT now with the same facts and sections.
+
+Keep Complaint, Diagnostic Procedure, Verified Condition, Recommended Corrective Action, and Required Parts semantically identical.
+Rewrite only Estimated Labor so the breakdown sums to exactly ${requestedLaborHoursText} hr.
+Use canonical format with one decimal and end with: "Total labor: ${requestedLaborHoursText} hr".
+Do NOT ask labor confirmation questions.
+Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
+
+          const overrideBody = {
+            model: getModelForMode("final_report"),
+            stream: false,
+            temperature: 0.2,
+            messages: buildOpenAiMessages({
+              system: overridePrompt,
+              history,
+              userMessage: overrideRequest,
+              attachments: undefined,
+            }),
+          };
+
+          let overrideResult = await callOpenAI(apiKey, overrideBody, ac.signal);
+          let overrideContent = overrideResult.response;
+
+          const validateLaborOverride = (text: string) => {
+            const primary = extractPrimaryReportBlock(text);
+            const sumValidation = validateLaborSum(primary, requestedLaborHours);
+            const hasCanonicalTotal = hasCanonicalTotalLaborLine(primary, requestedLaborHoursText);
+            const violations = [
+              ...sumValidation.violations,
+              ...(hasCanonicalTotal
+                ? []
+                : [
+                    `LABOR_TOTAL_FORMAT: Final report must include \"Total labor: ${requestedLaborHoursText} hr\" in canonical one-decimal format`,
+                  ]),
+            ];
+            return {
+              valid: violations.length === 0,
+              violations,
+            };
+          };
+
+          if (!overrideResult.error && overrideContent.trim()) {
+            let modeValidation = validateOutput(
+              overrideContent,
+              "final_report",
+              langPolicy.includeTranslation,
+              translationLanguage
+            );
+            logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
+            let laborValidation = validateLaborOverride(overrideContent);
+
+            if ((!modeValidation.valid || !laborValidation.valid) && !aborted) {
+              const correctionViolations = [
+                ...modeValidation.violations,
+                ...laborValidation.violations,
+              ];
+              const correctionInstruction = [
+                buildCorrectionInstruction(correctionViolations),
+                `Regenerate in FINAL_REPORT mode only.`,
+                `Do NOT output diagnostic steps or step IDs (no \"Step\", no \"wp_\").`,
+                `Keep all sections except Estimated Labor semantically unchanged.`,
+                `Estimated Labor must sum to exactly ${requestedLaborHoursText} hr and end with \"Total labor: ${requestedLaborHoursText} hr\".`,
+                `Do NOT ask labor confirmation. Do NOT ask follow-up questions.`,
+              ].join("\n");
+
+              const retryBody = {
+                ...overrideBody,
+                messages: buildOpenAiMessages({
+                  system: overridePrompt,
+                  history,
+                  userMessage: overrideRequest,
+                  attachments: undefined,
+                  correctionInstruction,
+                }),
+              };
+
+              overrideResult = await callOpenAI(apiKey, retryBody, ac.signal);
+              if (!overrideResult.error) {
+                overrideContent = overrideResult.response;
+                modeValidation = validateOutput(
+                  overrideContent,
+                  "final_report",
+                  langPolicy.includeTranslation,
+                  translationLanguage
+                );
+                logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
+                laborValidation = validateLaborOverride(overrideContent);
+              }
+            }
+
+            overrideContent = enforceLanguagePolicy(overrideContent, langPolicy);
+
+            const postModeValidation = validateOutput(
+              overrideContent,
+              "final_report",
+              langPolicy.includeTranslation,
+              translationLanguage
+            );
+            const postLaborValidation = validateLaborOverride(overrideContent);
+
+            if (!postModeValidation.valid || !postLaborValidation.valid) {
+              console.warn(
+                `[Chat API v2] Labor override response invalid after retry, using fallback for ${requestedLaborHoursText} hr`
+              );
+              overrideContent = buildFinalReportFallback({
+                policy: langPolicy,
+                translationLanguage,
+                laborHours: requestedLaborHours,
+              });
+            }
+
+            for (const char of overrideContent) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            if (!aborted && overrideContent.trim()) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: overrideContent,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+          } else {
+            console.error(
+              `[Chat API v2] Labor override generation error: ${overrideResult.error || "empty response"}`
+            );
+            const fallback = buildFinalReportFallback({
+              policy: langPolicy,
+              translationLanguage,
+              laborHours: requestedLaborHours,
+            });
+
+            for (const char of fallback) {
+              if (aborted) break;
+              controller.enqueue(encoder.encode(sseEncode({ type: "token", token: char })));
+            }
+
+            if (!aborted) {
+              await storage.appendMessage({
+                caseId: ensuredCase.id,
+                role: "assistant",
+                content: fallback,
+                language: outputPolicy.effective,
+                userId: user?.id,
+              });
+            }
+          }
+
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
 
         // Build initial request
         const openAiBody = {

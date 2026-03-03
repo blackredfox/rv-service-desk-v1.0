@@ -198,3 +198,165 @@ describe("Chat transition: diagnostic -> final_report", () => {
     ).toBe(false);
   });
 });
+
+describe("Chat final_report labor override", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    process.env.OPENAI_API_KEY = "sk-test-mock";
+
+    mockGetCurrentUser.mockResolvedValue({ id: "user_123" });
+    mockStorage.getCase.mockResolvedValue({ case: null, messages: [] });
+    mockStorage.ensureCase.mockResolvedValue({
+      id: "case_789",
+      title: "Water Pump Final Report",
+      userId: "user_123",
+      inputLanguage: "EN",
+      languageSource: "AUTO",
+      mode: "final_report",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockStorage.listMessagesForContext.mockResolvedValue([
+      {
+        role: "assistant",
+        content:
+          "Complaint: Water pump not operating.\nDiagnostic Procedure: Direct voltage test done.\nVerified Condition: Pump failed under direct 12V.\nRecommended Corrective Action: Replace pump assembly.\nEstimated Labor: Isolate and access - 0.4 hr. Replace pump - 0.6 hr. Total labor: 1.0 hr.\nRequired Parts: Water pump assembly.",
+      },
+    ]);
+    mockStorage.appendMessage.mockResolvedValue({ id: "msg_2" });
+    mockStorage.updateCase.mockResolvedValue({ id: "case_789" });
+  });
+
+  it("keeps mode in final_report and regenerates report with canonical labor total", async () => {
+    const overriddenReport = `Complaint: Water pump not operating.
+Diagnostic Procedure: Direct voltage test done.
+Verified Condition: Pump failed under direct 12V.
+Recommended Corrective Action: Replace pump assembly.
+Estimated Labor: Isolate and access system - 0.3 hr. Remove and replace pump assembly - 0.5 hr. Functional verification - 0.2 hr. Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: overriddenReport } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: "case_789",
+        message: "make total labor 1 hr",
+      }),
+    });
+
+    const response = await POST(req);
+    const streamText = await response.text();
+
+    const assistantMessages = mockStorage.appendMessage.mock.calls
+      .map(([payload]) => payload)
+      .filter((payload) => payload.role === "assistant")
+      .map((payload) => payload.content as string);
+    const latestAssistant = assistantMessages.at(-1) ?? "";
+
+    expect(latestAssistant).toContain("Complaint:");
+    expect(latestAssistant).toContain("Estimated Labor:");
+    expect(latestAssistant).toContain("Total labor: 1.0 hr");
+    expect(latestAssistant).not.toContain("Step ");
+    expect(latestAssistant).not.toContain("wp_");
+    expect(latestAssistant).not.toContain("Режим:");
+
+    expect(streamText).not.toContain('"type":"mode_transition"');
+
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith(
+      "case_789",
+      expect.objectContaining({ mode: "diagnostic" })
+    );
+
+    const openAiCall = mockFetch.mock.calls[0][1] as RequestInit;
+    const payload = JSON.parse(openAiCall.body as string);
+    expect(payload.model).toBe("gpt-5.2-2025-12-11");
+    expect(payload.messages[0].content).toContain("LABOR OVERRIDE (MANDATORY)");
+    expect(payload.messages[0].content).toContain("exactly 1.0 hours");
+  });
+
+  it("parses Russian override request and normalizes total to one decimal", async () => {
+    const overriddenReport = `Complaint: Водяной насос не работает.
+Diagnostic Procedure: Выполнен прямой тест 12V.
+Verified Condition: Насос не запускается под прямым питанием.
+Recommended Corrective Action: Заменить насос в сборе.
+Estimated Labor: Подготовка и доступ - 0.3 hr. Замена насоса - 0.5 hr. Проверка работы - 0.2 hr. Total labor: 1.0 hr.
+Required Parts: Насос в сборе.`;
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: overriddenReport } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: "case_789",
+        message: "сделай 1 час на все",
+      }),
+    });
+
+    const response = await POST(req);
+    await response.text();
+
+    const assistantMessages = mockStorage.appendMessage.mock.calls
+      .map(([payload]) => payload)
+      .filter((payload) => payload.role === "assistant")
+      .map((payload) => payload.content as string);
+    const latestAssistant = assistantMessages.at(-1) ?? "";
+
+    expect(latestAssistant).toContain("Total labor: 1.0 hr");
+
+    const openAiCall = mockFetch.mock.calls[0][1] as RequestInit;
+    const payload = JSON.parse(openAiCall.body as string);
+    expect(payload.messages[0].content).toContain("exactly 1.0 hours");
+  });
+
+  it("does not trigger labor override when intent keywords are absent", async () => {
+    const normalFinalReport = `Complaint: Water pump not operating.
+Diagnostic Procedure: Direct voltage test done.
+Verified Condition: Pump failed under direct 12V.
+Recommended Corrective Action: Replace pump assembly.
+Estimated Labor: Isolate and access - 0.4 hr. Replace pump - 0.6 hr. Total labor: 1.0 hr.
+Required Parts: Water pump assembly.`;
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: normalFinalReport } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: "case_789",
+        message: "thanks",
+      }),
+    });
+
+    await POST(req);
+
+    const openAiCall = mockFetch.mock.calls[0][1] as RequestInit;
+    const payload = JSON.parse(openAiCall.body as string);
+    expect(payload.messages[0].content).not.toContain("LABOR OVERRIDE (MANDATORY)");
+    expect(payload.messages.at(-1).content).toBe("thanks");
+  });
+});
