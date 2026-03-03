@@ -174,7 +174,7 @@ describe("Context Engine — Loop Breaker (P0b)", () => {
       content: "Can you provide more information?",
     });
     
-    let context = getContext(caseId)!;
+    const context = getContext(caseId)!;
     expect(context.consecutiveFallbacks).toBe(1);
     
     // Second fallback should be blocked
@@ -211,7 +211,7 @@ describe("Context Engine — Loop Breaker (P0b)", () => {
       stepId: "wp_2",
     });
     
-    let context = getContext(caseId)!;
+    const context = getContext(caseId)!;
     expect(context.consecutiveFallbacks).toBe(0);
     
     // Now fallback should be allowed
@@ -646,7 +646,7 @@ describe("Context Engine — Integration", () => {
     // Mark isolation complete
     markIsolationComplete(caseId, "Compressor not starting - capacitor failure suspected");
     
-    let context = getContext(caseId)!;
+    const context = getContext(caseId)!;
     expect(context.isolationComplete).toBe(true);
     
     // Technician discovers new evidence

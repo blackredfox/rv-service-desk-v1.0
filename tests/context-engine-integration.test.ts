@@ -186,7 +186,7 @@ describe("Context Engine Integration", () => {
     // Mark isolation as complete
     markIsolationComplete(caseId, "Compressor not starting");
     
-    let context = getContext(caseId)!;
+    const context = getContext(caseId)!;
     expect(context.isolationComplete).toBe(true);
     
     // Process message with new evidence

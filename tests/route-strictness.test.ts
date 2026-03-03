@@ -163,7 +163,7 @@ describe("Route Strictness — Context Engine Only", () => {
     
     // Initial isolation
     markIsolationComplete(caseId, "Compressor not starting");
-    let context = getContext(caseId)!;
+    const context = getContext(caseId)!;
     expect(context.isolationComplete).toBe(true);
     
     // New evidence should trigger REPLAN, not create dual pivot state
