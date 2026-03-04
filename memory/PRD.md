@@ -1,64 +1,65 @@
-# PRD — Spanish Detection + Language Fallback Update
+# PRD — RU/EN Switch Parity Tests + Language Badge UI
 
 ## Original Problem Statement
-Fix Spanish language detection and stop English-only fallback behavior for inputs like:
-- "LA BOMBA DE AGUA NO FUNCIONA"
-- "habla espanol" / "habla español" / "spanish"
-
-Keep final-report rules unchanged (English + translation for RU/ES).
+Follow-up request:
+1) Add RU/EN explicit language-switch parity tests.
+2) Add a tiny UI badge in chat showing detected language per turn for transparency.
 
 ## Architecture Decisions
-- Kept changes scoped to language handling and route language-policy selection only.
-- Added explicit forced-language detection helper in `lang.ts`.
-- Preserved streaming/SSE shape, mode flow, and final-report translation policy.
-- Added focused deterministic tests without network or UI changes.
+- Extended existing language-force detector rather than creating a new pathway.
+- Kept server API/SSE contract stable; only expanded frontend event typing for already-emitted `language` events.
+- Implemented badge as lightweight local UI state keyed by assistant message ID (no backend schema changes).
 
 ## What Has Been Implemented
-1. `src/lib/lang.ts`
-   - Added Spanish RV keyword heuristics: `bomba, agua, funciona, grifo, voltios, fusible, cable, relé/rele`.
-   - Added explicit forced Spanish detection for:
-     - `habla espanol`
-     - `habla español`
-     - `spanish`
-   - `detectLanguage(...)` now returns ES with high confidence for explicit Spanish requests and for strong RV Spanish keyword hits.
-   - Added neutral language-choice fallback helper:
-     - `Please choose language: English / Русский / Español`
+### 1) RU/EN explicit language-switch parity
+- Updated `src/lib/lang.ts`:
+  - `detectForcedOutputLanguage(...)` now supports RU explicit phrases:
+    - `говори по-русски`, `на русском`, `русский*`, `russian`
+  - Supports EN explicit phrases:
+    - `speak english`, `english`, `на английском`, `говори по-английски`, `английский*`
+  - `detectLanguage(...)` now returns explicit reasons for RU/EN requests too:
+    - `explicit-russian-request`, `explicit-english-request`.
 
-2. `src/app/api/chat/route.ts`
-   - Uses `detectForcedOutputLanguage(message)` before output policy resolution.
-   - If explicit Spanish request is present, output mode is forced to `ES` and tracked dialogue language is set to `ES` for this turn.
-   - Diagnostic dialogue therefore follows Spanish for detected/forced Spanish inputs.
-   - Final-report logic remains unchanged.
+### 2) Route parity validation
+- Existing route logic already applies forced output from `detectForcedOutputLanguage(...)`.
+- Added tests in `tests/chat-route.test.ts`:
+  - force RU despite conflicting selector mode
+  - force EN despite conflicting selector mode
+  - assertions cover SSE language payload and prompt language directive.
 
-3. `src/lib/mode-validators.ts`
-   - Unknown language fallback no longer defaults silently to EN.
-   - Returns neutral fallback message instead:
-     - `Please choose language: English / Русский / Español`
+### 3) Tiny UI language badge per turn
+- Updated `src/lib/api.ts`:
+  - expanded `ChatSseEvent` union to include `type: "language"` payload.
+- Updated `src/components/chat-panel.tsx`:
+  - listens for SSE `language` events
+  - stores per-turn language info (`inputDetected`, `outputEffective`)
+  - renders compact assistant badge:
+    - `Detected <X> · Reply <Y>`
+  - adds `data-testid` for badge: `chat-language-badge-<messageId>`.
 
-4. Tests
-   - Updated `tests/chat-route.test.ts` with two acceptance-oriented route tests:
-     - Uppercase Spanish RV input produces `outputEffective: ES` and Spanish dialogue directive.
-     - `habla espanol` forces Spanish output even if request asks EN.
-   - Added `tests/lang-spanish-detection.test.ts`:
-     - ES detection for uppercase RV phrase
-     - explicit Spanish force phrases
-     - neutral language-choice fallback behavior
+### 4) Focused tests
+- Updated `tests/lang-spanish-detection.test.ts`:
+  - added RU explicit force tests
+  - added EN explicit force tests.
 
-## Validation Run
+## Verification
 - Passed:
   - `yarn test tests/lang-spanish-detection.test.ts tests/chat-route.test.ts`
+- Parse validation passed:
+  - `src/components/chat-panel.tsx`
+  - `src/lib/api.ts`
 
 ## Prioritized Backlog
 ### P0
-- Add an end-to-end API test fixture for mixed-case/ASCII Spanish (`rele`, uppercase variants, punctuation-free phrases).
+- Add component-level UI test for the new language badge rendering in chat panel.
 
 ### P1
-- Extend forced-language parser to support explicit RU/EN switch phrases with same deterministic precedence.
+- Persist turn-level detected language metadata for historical messages after refresh/reload (currently strongest for active turn).
 
 ### P2
-- Add lightweight telemetry counter for language override usage and confidence buckets.
+- Add explicit force-phrase parity for more variants/typos across RU/EN/ES.
 
 ## Next Tasks
-1. Add multilingual language-switch acceptance tests at API level (RU/EN parity with ES).
-2. Consider surfacing detected language + reason in internal diagnostics panel (server-only logs already present).
-3. Keep prompt/content contracts unchanged while improving language UX robustness.
+1. Add a small chat-panel rendering test for `language` SSE event badge.
+2. Optionally expose badge tooltip with detector confidence.
+3. Keep final-report translation contract unchanged while iterating language UX.

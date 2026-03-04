@@ -61,6 +61,14 @@ export async function apiSearch(q: string) {
 
 export type ChatSseEvent =
   | { type: "case"; caseId: string }
+  | {
+      type: "language";
+      inputDetected: "EN" | "RU" | "ES";
+      outputMode: LanguageMode;
+      outputEffective: "EN" | "RU" | "ES";
+      detector?: "server" | "client";
+      confidence?: number;
+    }
   | { type: "token"; token: string }
   | { type: "error"; message: string; code?: string }
   | { type: "done" };

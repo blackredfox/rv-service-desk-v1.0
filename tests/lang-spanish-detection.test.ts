@@ -18,6 +18,22 @@ describe("Spanish detection + language fallback", () => {
     expect(detectForcedOutputLanguage("spanish")).toBe("ES");
   });
 
+  it("forces Russian output for explicit requests", async () => {
+    const { detectForcedOutputLanguage } = await import("@/lib/lang");
+
+    expect(detectForcedOutputLanguage("говори по-русски")).toBe("RU");
+    expect(detectForcedOutputLanguage("на русском")).toBe("RU");
+    expect(detectForcedOutputLanguage("russian")).toBe("RU");
+  });
+
+  it("forces English output for explicit requests", async () => {
+    const { detectForcedOutputLanguage } = await import("@/lib/lang");
+
+    expect(detectForcedOutputLanguage("speak english")).toBe("EN");
+    expect(detectForcedOutputLanguage("на английском")).toBe("EN");
+    expect(detectForcedOutputLanguage("english")).toBe("EN");
+  });
+
   it("returns neutral language chooser fallback when language is unknown", async () => {
     const { getSafeFallback } = await import("@/lib/mode-validators");
 

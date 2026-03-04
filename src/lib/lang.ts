@@ -35,6 +35,21 @@ const FORCED_SPANISH_PATTERNS = [
   /\bspanish\b/i,
 ];
 
+const FORCED_RUSSIAN_PATTERNS = [
+  /говори\s+по[-\s]?русски/i,
+  /на\s+русском/i,
+  /русск(?:ий|ом|ому)?/i,
+  /\brussian\b/i,
+];
+
+const FORCED_ENGLISH_PATTERNS = [
+  /\bspeak\s+english\b/i,
+  /\benglish\b/i,
+  /на\s+английском/i,
+  /говори\s+по[-\s]?английски/i,
+  /английск(?:ий|ом|ому)?/i,
+];
+
 const SPANISH_RV_KEYWORDS = [
   "bomba",
   "agua",
@@ -52,6 +67,14 @@ const LANGUAGE_CHOICE_FALLBACK = "Please choose language: English / Русски
 export function detectForcedOutputLanguage(text: string): Language | null {
   const sample = (text ?? "").trim();
   if (!sample) return null;
+
+  if (FORCED_RUSSIAN_PATTERNS.some((pattern) => pattern.test(sample))) {
+    return "RU";
+  }
+
+  if (FORCED_ENGLISH_PATTERNS.some((pattern) => pattern.test(sample))) {
+    return "EN";
+  }
 
   if (FORCED_SPANISH_PATTERNS.some((pattern) => pattern.test(sample))) {
     return "ES";
@@ -73,8 +96,14 @@ export function detectLanguage(text: string): { language: Language; confidence: 
   if (!sample) return { language: "EN", confidence: 0.3, reason: "empty-input" };
 
   const forcedOutputLanguage = detectForcedOutputLanguage(sample);
-  if (forcedOutputLanguage === "ES") {
-    return { language: "ES", confidence: 0.99, reason: "explicit-spanish-request" };
+  if (forcedOutputLanguage) {
+    const reason =
+      forcedOutputLanguage === "ES"
+        ? "explicit-spanish-request"
+        : forcedOutputLanguage === "RU"
+        ? "explicit-russian-request"
+        : "explicit-english-request";
+    return { language: forcedOutputLanguage, confidence: 0.99, reason };
   }
 
   if (CYRILLIC_RE.test(sample)) return { language: "RU", confidence: 0.9, reason: "heuristic-cyrillic" };
