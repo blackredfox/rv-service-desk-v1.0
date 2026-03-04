@@ -30,6 +30,40 @@ export type OutputLanguagePolicyV2 = {
 
 const CYRILLIC_RE = /[\u0400-\u04FF]/;
 
+const FORCED_SPANISH_PATTERNS = [
+  /\bhabla\s+espa(?:ñ|n)ol\b/i,
+  /\bspanish\b/i,
+];
+
+const SPANISH_RV_KEYWORDS = [
+  "bomba",
+  "agua",
+  "funciona",
+  "grifo",
+  "voltios",
+  "fusible",
+  "cable",
+  "relé",
+  "rele",
+];
+
+const LANGUAGE_CHOICE_FALLBACK = "Please choose language: English / Русский / Español";
+
+export function detectForcedOutputLanguage(text: string): Language | null {
+  const sample = (text ?? "").trim();
+  if (!sample) return null;
+
+  if (FORCED_SPANISH_PATTERNS.some((pattern) => pattern.test(sample))) {
+    return "ES";
+  }
+
+  return null;
+}
+
+export function getLanguageChoiceFallback(): string {
+  return LANGUAGE_CHOICE_FALLBACK;
+}
+
 /**
  * Lightweight heuristic language detection (MVP-safe, deterministic)
  * Returns detected language, confidence, and reason
@@ -37,6 +71,11 @@ const CYRILLIC_RE = /[\u0400-\u04FF]/;
 export function detectLanguage(text: string): { language: Language; confidence: number; reason: string } {
   const sample = (text ?? "").trim();
   if (!sample) return { language: "EN", confidence: 0.3, reason: "empty-input" };
+
+  const forcedOutputLanguage = detectForcedOutputLanguage(sample);
+  if (forcedOutputLanguage === "ES") {
+    return { language: "ES", confidence: 0.99, reason: "explicit-spanish-request" };
+  }
 
   if (CYRILLIC_RE.test(sample)) return { language: "RU", confidence: 0.9, reason: "heuristic-cyrillic" };
 
@@ -55,8 +94,15 @@ export function detectLanguage(text: string): { language: Language; confidence: 
     "garantía",
     "cliente",
   ];
-  const hits = spanishSignals.reduce((acc, s) => (lowered.includes(s) ? acc + 1 : acc), 0);
-  if (hits >= 2) return { language: "ES", confidence: 0.75, reason: "heuristic-spanish-markers" };
+  const markerHits = spanishSignals.reduce((acc, s) => (lowered.includes(s) ? acc + 1 : acc), 0);
+  const rvKeywordHits = SPANISH_RV_KEYWORDS.reduce((acc, s) => (lowered.includes(s) ? acc + 1 : acc), 0);
+  if (markerHits >= 2 || rvKeywordHits >= 2) {
+    return {
+      language: "ES",
+      confidence: rvKeywordHits >= 2 ? 0.92 : 0.75,
+      reason: rvKeywordHits >= 2 ? "heuristic-spanish-rv-keywords" : "heuristic-spanish-markers",
+    };
+  }
 
   return { language: "EN", confidence: 0.6, reason: "heuristic-default" };
 }

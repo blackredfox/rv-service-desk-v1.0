@@ -205,5 +205,123 @@ describe("Chat API Route", () => {
         })
       );
     });
+
+    it("should detect Spanish RV diagnostic input and keep diagnostic dialogue in Spanish", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const mockCase = {
+        id: "case_es_1",
+        title: "Caso ES",
+        userId: "user_123",
+        inputLanguage: "ES",
+        languageSource: "AUTO",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_es_1",
+        caseId: "case_es_1",
+        role: "assistant",
+        content: "¿Qué voltaje mide en la bomba de agua?",
+        language: "ES",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"¿Qué voltaje mide en la bomba de agua?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "LA BOMBA DE AGUA NO FUNCIONA" }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"type":"language"');
+      expect(streamText).toContain('"outputEffective":"ES"');
+
+      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
+      const payload = JSON.parse(firstCall.body as string);
+      expect(payload.messages[0].content).toContain("All dialogue MUST be in Spanish (ES)");
+    });
+
+    it("should force Spanish output when message explicitly requests Spanish", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const mockCase = {
+        id: "case_es_2",
+        title: "Language Switch Case",
+        userId: "user_123",
+        inputLanguage: "ES",
+        languageSource: "MANUAL",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_es_2",
+        caseId: "case_es_2",
+        role: "assistant",
+        content: "Claro. ¿Qué síntoma ve primero?",
+        language: "ES",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"Claro. ¿Qué síntoma ve primero?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "habla espanol",
+          languageMode: "EN",
+        }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"outputEffective":"ES"');
+      expect(storage.ensureCase).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputLanguage: "ES",
+          languageSource: "MANUAL",
+        })
+      );
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { 
   normalizeLanguageMode, 
   detectInputLanguageV2, 
+  detectForcedOutputLanguage,
   computeOutputPolicy,
   resolveLanguagePolicy,
   type LanguageMode, 
@@ -687,10 +688,16 @@ export async function POST(req: Request) {
     }
   }
 
-  // 2. Get output mode from request (v2 or legacy v1)
-  const outputMode: LanguageMode = normalizeLanguageMode(
+  // 2. Get output mode from request (v2 or legacy v1), with explicit in-message override
+  const requestedOutputMode: LanguageMode = normalizeLanguageMode(
     body?.output?.mode ?? body?.languageMode
   );
+  const forcedOutputLanguage = detectForcedOutputLanguage(message);
+  const outputMode: LanguageMode = forcedOutputLanguage ?? requestedOutputMode;
+
+  if (forcedOutputLanguage) {
+    trackedInputLanguage = forcedOutputLanguage;
+  }
 
   // 3. Compute effective output language
   const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, trackedInputLanguage);
@@ -701,7 +708,7 @@ export async function POST(req: Request) {
   // Translation language must follow tracked dialogue language (case metadata)
   const translationLanguage = langPolicy.includeTranslation ? trackedInputLanguage : undefined;
 
-  console.log(`[Chat API v2] Input: detected=${detectedInputLanguage.detected} (${detectedInputLanguage.reason}), dialogue=${trackedInputLanguage}, Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}, translationLanguage=${translationLanguage ?? "none"}`);
+  console.log(`[Chat API v2] Input: detected=${detectedInputLanguage.detected} (${detectedInputLanguage.reason}), dialogue=${trackedInputLanguage}, forcedOutput=${forcedOutputLanguage ?? "none"}, Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}, translationLanguage=${translationLanguage ?? "none"}`);
 
   // Ensure case exists - use detected language for case, not forced output
   const ensuredCase = await storage.ensureCase({
