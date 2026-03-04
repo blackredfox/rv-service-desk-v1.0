@@ -3,7 +3,8 @@ import path from "node:path";
 import admin from "firebase-admin";
 
 /**
- * Shape of firebase service account JSON (snake_case, as Google provides it)
+ * Shape of firebase-admin service account JSON (snake_case, as Google provides it)
+ * NOTE: Keys are exactly as in the Google service account JSON.
  */
 type FirebaseServiceAccountJson = {
   type: string;
@@ -19,64 +20,67 @@ type FirebaseServiceAccountJson = {
   universe_domain?: string;
 };
 
-function parseServiceAccountJson(raw: string): FirebaseServiceAccountJson {
-  const json = JSON.parse(raw) as FirebaseServiceAccountJson;
-
+function assertServiceAccount(json: FirebaseServiceAccountJson): FirebaseServiceAccountJson {
   if (typeof json.project_id !== "string" || json.project_id.length === 0) {
-    throw new Error(
-      "Service account JSON must contain a non-empty string 'project_id'.",
-    );
+    throw new Error("Service account JSON must contain non-empty 'project_id'.");
   }
-
   if (typeof json.client_email !== "string" || json.client_email.length === 0) {
     throw new Error("Service account JSON is missing 'client_email'.");
   }
-
   if (typeof json.private_key !== "string" || json.private_key.length === 0) {
     throw new Error("Service account JSON is missing 'private_key'.");
   }
-
   return json;
 }
 
-function loadServiceAccount(): FirebaseServiceAccountJson {
-  const envJson = process.env.FIREBASE_ADMIN_CREDENTIALS_JSON;
-  const envPath = process.env.FIREBASE_ADMIN_KEY_PATH;
+function parseServiceAccountJson(raw: string, sourceLabel: string): FirebaseServiceAccountJson {
+  const trimmed = raw.trim();
 
-  // Preferred for serverless/prod (e.g., Vercel): JSON stored directly in env var
-  if (envJson && envJson.trim().length > 0) {
-    try {
-      return parseServiceAccountJson(envJson);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `Failed to parse FIREBASE_ADMIN_CREDENTIALS_JSON: ${msg}`,
-      );
-    }
-  }
-
-  // Production must always provide credentials somehow.
-  if (process.env.NODE_ENV === "production" && !envPath) {
+  try {
+    const json = JSON.parse(trimmed) as FirebaseServiceAccountJson;
+    return assertServiceAccount(json);
+  } catch (e) {
+    // This is the #1 failure on Vercel: the value contains REAL line breaks inside private_key,
+    // which makes the JSON invalid. The fix is to store one-line JSON and escape newlines as \\n.
     throw new Error(
-      "Firebase Admin credentials are not configured. Set FIREBASE_ADMIN_CREDENTIALS_JSON (recommended) or FIREBASE_ADMIN_KEY_PATH.",
+      `Failed to parse ${sourceLabel}. ` +
+        `Ensure it's VALID JSON (single line). For private_key, use escaped newlines (\\\\n) NOT real line breaks. ` +
+        `${e instanceof Error ? e.message : String(e)}`
     );
   }
+}
+
+function loadServiceAccount(): FirebaseServiceAccountJson {
+  // Preferred for serverless (Vercel): store the full JSON in env.
+  const jsonB64 = process.env.FIREBASE_ADMIN_CREDENTIALS_JSON_B64;
+  const jsonRaw = process.env.FIREBASE_ADMIN_CREDENTIALS_JSON;
+
+  if (jsonB64 && jsonB64.trim().length > 0) {
+    const decoded = Buffer.from(jsonB64.trim(), "base64").toString("utf8");
+    return parseServiceAccountJson(decoded, "FIREBASE_ADMIN_CREDENTIALS_JSON_B64");
+  }
+
+  if (jsonRaw && jsonRaw.trim().length > 0) {
+    return parseServiceAccountJson(jsonRaw, "FIREBASE_ADMIN_CREDENTIALS_JSON");
+  }
+
+  // Fallback for local/dev: read from a file path.
+  const envPath = process.env.FIREBASE_ADMIN_KEY_PATH;
 
   // Local dev convenience: default to ./secrets/firebase-admin.json.
   const keyPath = envPath || "./secrets/firebase-admin.json";
 
-  const fullPath = path.isAbsolute(keyPath)
-    ? keyPath
-    : path.join(process.cwd(), keyPath);
+  const fullPath = path.isAbsolute(keyPath) ? keyPath : path.join(process.cwd(), keyPath);
 
   if (!fs.existsSync(fullPath)) {
     throw new Error(
-      `Firebase admin key file not found at: ${fullPath}. Set FIREBASE_ADMIN_KEY_PATH or use FIREBASE_ADMIN_CREDENTIALS_JSON.`,
+      `Firebase admin key file not found at: ${fullPath}. ` +
+        `Set FIREBASE_ADMIN_KEY_PATH, or provide FIREBASE_ADMIN_CREDENTIALS_JSON(_B64).`
     );
   }
 
   const raw = fs.readFileSync(fullPath, "utf8");
-  return parseServiceAccountJson(raw);
+  return parseServiceAccountJson(raw, `firebase-admin.json at ${fullPath}`);
 }
 
 /**
@@ -87,21 +91,23 @@ export function getFirebaseAdmin() {
 
   const serviceAccount = loadServiceAccount();
 
+  // firebase-admin expects camelCase keys
+  const privateKey =
+    serviceAccount.private_key.includes("\\n")
+      ? serviceAccount.private_key.replace(/\\n/g, "\n")
+      : serviceAccount.private_key;
+
   admin.initializeApp({
     credential: admin.credential.cert({
-      // firebase-admin expects camelCase keys
       projectId: serviceAccount.project_id,
       clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key.replace(/\\n/g, "\n"),
+      privateKey,
     }),
   });
 
   return admin;
 }
 
-/**
- * Convenience helpers (what routes usually import)
- */
 export function getFirebaseAuth() {
   return getFirebaseAdmin().auth();
 }
