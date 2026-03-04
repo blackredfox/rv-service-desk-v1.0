@@ -1,274 +1,474 @@
 # RV Service Desk
 
-**Version:** 1.x\
-**Type:** Multi-Tenant B2B SaaS\
-**Domain:** RV Service Operations / Warranty Authorization\
-**Architecture:** Next.js + Prisma + Postgres + Server-Enforced AI
-Orchestration
+**Version:** 1.x
+**Type:** Multi-Tenant B2B SaaS
+**Domain:** RV Service Operations / Warranty Authorization
 
-------------------------------------------------------------------------
+RV Service Desk is a **procedure-driven diagnostic and documentation engine** for RV service businesses in the United States.
 
-# 1. Overview
+It helps technicians produce **authorization-safe documentation** while maintaining disciplined diagnostics.
 
-**RV Service Desk** is an approval-safe, procedure-driven AI diagnostic
-and authorization engine for RV service businesses in the United States.
+The system is designed for **real shop workflows**, not conversational AI.
 
-It is **not a chatbot**.\
-It is **not a mechanical decision system**.\
-It is a **controlled documentation and diagnostic orchestration
-platform** designed to:
+---
 
--   standardize diagnostic workflows,
--   prevent unsafe authorization language,
--   reduce claim denials,
--   enforce documentation completeness,
--   support multi-technician service shops.
+# Product Positioning
 
-The technician always makes the final repair decision.
+RV Service Desk is:
 
-------------------------------------------------------------------------
+* NOT a chatbot
+* NOT an autopilot mechanic
+* NOT a repair decision system
 
-# 2. Core Capabilities
+It is a **controlled diagnostic + documentation platform**.
 
-## 2.1 Procedure-Driven Diagnostics
+The technician always makes the **final diagnostic and repair decision**.
 
--   Each RV system is governed by a structured procedure.
--   Strict ordering and prerequisites are enforced.
--   Steps cannot be skipped unless already completed.
--   If a technician asks *"How do I check that?"*, the assistant
-    provides safe, procedure-aligned instructions.
--   No cross-system drift is allowed.
+The platform focuses on:
 
-**Principle:** Procedure is law.
+* procedure-driven diagnostics
+* authorization-safe wording
+* documentation completeness
+* claim denial reduction
+* consistent shop documentation
 
-------------------------------------------------------------------------
+---
 
-## 2.2 Mode-Based AI Enforcement (Server Controlled)
+# Key Principles
 
-Modes are internal and cannot change implicitly.
+The platform is built around several strict principles.
 
-Mode transitions occur **only** via exact commands in technician input:
+**Procedure over conversation**
 
-    START AUTHORIZATION REQUEST
-    START FINAL REPORT
+Diagnostics follow structured procedures.
+
+**Determinism over creativity**
+
+The system prioritizes predictable behavior over flexible responses.
+
+**Server enforcement over model trust**
+
+AI outputs are validated and controlled by server logic.
+
+**Explicit state over inference**
+
+Modes and transitions are explicit and validated.
+
+---
+
+# Core Capabilities
+
+## Procedure-Driven Diagnostics
+
+Each RV system is governed by a structured procedure.
+
+Procedures enforce:
+
+* strict step ordering
+* prerequisite validation
+* controlled diagnostic flow
+* recognition of steps already completed
+
+If a technician asks:
+
+> "How do I check that?"
+
+The system may provide **short, safe instructions aligned with the active procedure**.
+
+Principle:
+
+**Procedure is law.**
+
+---
+
+## Mode-Based AI Enforcement
+
+The system operates in three internal modes.
+
+Modes are **not exposed in the UI** and cannot change implicitly.
+
+Mode transitions occur **only through explicit technician commands**:
+
+```
+START AUTHORIZATION REQUEST
+START FINAL REPORT
+```
 
 Modes:
 
-  Mode            Purpose
-  --------------- ---------------------------
-  diagnostic      Guided procedure form
-  authorization   Pre-approval request text
-  final_report    Shop-ready report output
+| Mode          | Purpose                             |
+| ------------- | ----------------------------------- |
+| diagnostic    | guided diagnostic workflow          |
+| authorization | generate authorization request text |
+| final_report  | produce final shop-style report     |
 
-The server validates mode compliance and prevents unsafe transitions.
+The server validates all mode transitions.
 
-------------------------------------------------------------------------
+---
 
-## 2.3 Complex System Gating
+## Complex System Gating
 
-For major systems (AC, furnace, refrigerator, slide-out, leveling,
-inverter, major electrical):
+Major RV systems require full diagnostic isolation before authorization output.
 
--   No portal cause generation until isolation is complete.
--   No labor estimates before validation.
--   No part replacement before rule-based confirmation.
+Complex systems include:
+
+* roof AC
+* furnaces
+* refrigerators
+* slide systems
+* leveling systems
+* inverters / converters
+* major electrical systems
+
+Rules:
+
+* no portal cause before isolation
+* no labor estimate before validation
+* no repair recommendation before rule confirmation
 
 Additional guardrails:
 
--   Post-repair fallback to diagnostics if repair fails.
--   Mechanical guardrail (no motor replacement if direct power confirms
-    operation).
--   Consumer appliance replacement logic (unit-level only).
+* post-repair fallback to diagnostics
+* mechanical protection (motor replacement blocked if direct power proves operation)
+* consumer appliance replacement logic
 
-------------------------------------------------------------------------
+---
 
-## 2.4 Language Enforcement Contract
+## Language Enforcement
 
-Dialogue language: - Auto / EN / RU / ES
+Dialogue language:
 
-Final outputs: 1. **English block first** 2. `--- TRANSLATION ---` 3.
-Full translation into technician language
+```
+Auto / EN / RU / ES
+```
 
-Server validates translation presence and repairs/retries if missing.
+Final outputs follow a strict contract:
 
-Language metadata is persisted per case and per message.
+```
+English output block
+--- TRANSLATION ---
+Full translation
+```
 
-------------------------------------------------------------------------
+The server validates translation presence and retries if necessary.
 
-## 2.5 Multi-Tenant B2B Architecture
+Language metadata is stored per:
 
-The platform supports:
+* case
+* message
 
--   Organizations
--   Members
--   Seat limits
--   Stripe subscription billing
--   Seat synchronization via webhook
--   Member invitation & claim flow
+---
 
-Seat enforcement occurs at API layer.
+# Architecture Overview
 
-------------------------------------------------------------------------
+The platform is built as a **server-controlled AI orchestration system**.
 
-## 2.6 Retention & Data Boundaries
+## Frontend
 
--   Text-only storage (cases + messages + outputs)
--   Session-only image/audio (never persisted)
--   Case retention policy + cleanup workflow
--   Refresh TTL metadata on read
+Technology:
 
-No PII in logs.
+* Next.js (App Router)
+* React
+* responsive chat UI
 
-------------------------------------------------------------------------
+Features:
 
-# 3. System Architecture
+* case sidebar
+* chat interface
+* language selector
+* voice input (STT)
+* session photo attach
+* terms acceptance gate
+* light / dark theme
 
-## 3.1 Frontend
+---
 
--   Next.js (App Router)
--   Light/Dark themes
--   Sidebar case management
--   Chat panel
--   Language selector
--   Voice input (STT)
--   Photo attach (session only)
--   Terms gate
+## Backend
 
-------------------------------------------------------------------------
+Technology stack:
 
-## 3.2 Backend
+* Next.js API routes
+* Node.js runtime
+* Prisma ORM
+* PostgreSQL
+* Stripe billing
+* structured logging
 
--   Next.js API routes
--   Prisma ORM
--   PostgreSQL
--   Stripe billing integration
--   Firebase Admin (optional support services)
--   Structured logging
+Key backend modules:
 
-Core libraries:
+* diagnostic-procedures
+* diagnostic-registry
+* mode-validators
+* output-validator
+* retention
+* billing / seat control
 
--   diagnostic-procedures
--   diagnostic-registry
--   mode-validators
--   output-validator
--   retention
--   b2b-stripe
+---
 
-------------------------------------------------------------------------
+# AI Runtime Architecture
 
-## 3.3 AI Orchestration Layer
+The AI system is **not autonomous**.
+All AI behavior is orchestrated by the server.
 
-Prompt system is modular:
+Runtime pipeline:
 
--   SYSTEM_PROMPT_BASE
--   MODE_PROMPT_DIAGNOSTIC
--   MODE_PROMPT_AUTHORIZATION
--   MODE_PROMPT_FINAL_REPORT
+```
+Client
+  → API
+  → Context Engine
+  → Prompt Builder
+  → LLM
+  → Output Validator
+  → Response
+```
 
-The server composes prompts and validates outputs.
+---
 
-AI cannot bypass:
+## Context Engine
 
--   mode gates
--   diagnostic completeness gates
--   language rules
--   output formatting rules
+The Context Engine is the **single authority** controlling diagnostic flow.
 
-------------------------------------------------------------------------
+It determines:
 
-# 4. API Surface (MVP)
+* procedure selection
+* next diagnostic step
+* diagnostic branching
+* isolation completion
+* authorization eligibility
 
-Core endpoint:
+No other system component may determine the next diagnostic step.
 
+---
+
+## LLM Responsibilities
+
+The LLM is used strictly for:
+
+* generating technician-readable language
+* translation
+* structured output formatting
+
+The LLM does **not** decide:
+
+* diagnostic steps
+* isolation completeness
+* authorization readiness
+
+---
+
+## Server Responsibilities
+
+The server enforces:
+
+* mode transitions
+* output format validation
+* translation guarantees
+* diagnostic gating
+* security boundaries
+
+The server never replaces diagnostic logic with heuristics.
+
+---
+
+# Architecture Rules
+
+The project enforces strict architecture invariants to prevent diagnostic drift.
+
+Diagnostic step flow must remain under **Context Engine control only**.
+
+Detailed engineering rules and PR review gates are defined in:
+
+```
+ARCHITECTURE_RULES.md
+```
+
+All changes affecting diagnostic flow must comply with these rules.
+
+---
+
+# Multi-Tenant B2B Platform
+
+The system supports service organizations.
+
+Capabilities include:
+
+* organizations
+* members
+* seat limits
+* Stripe subscriptions
+* webhook-driven seat synchronization
+* member invitations
+
+Seat enforcement occurs at the API layer.
+
+---
+
+# Data Boundaries
+
+Stored data:
+
+* cases
+* messages
+* final outputs
+
+Not stored:
+
+* images
+* audio
+* files
+
+Media attachments are **session-only artifacts**.
+
+---
+
+# Case Retention
+
+Cases follow a retention policy.
+
+Retention metadata is refreshed when cases are accessed.
+
+Cleanup jobs remove expired cases.
+
+---
+
+# API Surface
+
+Primary endpoint:
+
+```
 POST /api/chat
+```
 
 Supporting endpoints:
 
--   /api/cases
--   /api/stt/transcribe
--   /api/billing/\*
--   /api/org/\*
--   /api/analytics/event
--   /api/search
+```
+/api/cases
+/api/stt/transcribe
+/api/billing/*
+/api/org/*
+/api/search
+/api/analytics/event
+```
 
-Mode transitions are enforced server-side only.
+Mode transitions are enforced server-side.
 
-------------------------------------------------------------------------
+The complete API contract is defined in:
 
-# 5. Database
+```
+API_SCHEMA.md
+```
 
-Prisma schema with language metadata support and migration tracking.
+---
 
-------------------------------------------------------------------------
+# Database
 
-# 6. Testing Strategy
+The system uses Prisma with PostgreSQL.
 
-## Unit & Component Tests
+The schema supports:
 
-    yarn test
+* case metadata
+* language tracking
+* message persistence
+* migration history
 
--   Deterministic test environment
--   Mode validator tests
--   Diagnostic gating tests
--   Stripe webhook tests
--   Seat synchronization tests
--   Translation enforcement tests
+---
 
-------------------------------------------------------------------------
+# Testing Strategy
 
-# 7. Environment Setup
+Unit and component tests run in deterministic mode.
 
-### Requirements
+```
+yarn test
+```
 
--   Node 18+
--   Yarn
--   PostgreSQL
+Tests cover:
 
-### Install
+* diagnostic gating
+* mode validation
+* output validation
+* Stripe webhooks
+* seat synchronization
+* translation enforcement
 
-    yarn install
+Database connections are disabled during default tests.
 
-### Prisma
+---
 
-    npx prisma generate
-    npx prisma db push
+# Environment Setup
 
-### Run
+Requirements:
 
-    yarn dev
+* Node.js 18+
+* Yarn
+* PostgreSQL
 
-### Test
+---
 
-    yarn test
+## Install
 
-------------------------------------------------------------------------
+```
+yarn install
+```
 
-# 8. Security & Compliance Boundaries
+---
 
--   No approval guarantees
--   No repair decisions
--   No stored media
--   No secret exposure to client
--   Rate limiting on sensitive routes
--   Translation validation to prevent output corruption
+## Prisma
 
-------------------------------------------------------------------------
+```
+npx prisma generate
+npx prisma db push
+```
 
-# 9. Product Philosophy
+---
 
--   Determinism over creativity
--   Procedure over conversation
--   Authorization safety over verbosity
--   Explicit state over inference
--   Server enforcement over model trust
+## Run Development Server
 
-------------------------------------------------------------------------
+```
+yarn dev
+```
 
-# 10. Project Status
+---
 
-This project operates as:
+## Run Tests
 
--   Multi-tenant SaaS
--   Seat-controlled subscription system
--   AI-validated diagnostic engine
--   Test-covered authorization platform
+```
+yarn test
+```
+
+---
+
+# Security & Compliance
+
+The system enforces several safety boundaries:
+
+* no approval guarantees
+* no repair decision authority
+* no stored media artifacts
+* no exposure of secrets to the client
+* rate limiting on sensitive endpoints
+* server validation of AI outputs
+
+---
+
+# Product Philosophy
+
+RV Service Desk prioritizes **safe documentation over conversational flexibility**.
+
+Guiding rules:
+
+* procedure over conversation
+* determinism over creativity
+* explicit state over inference
+* server enforcement over model trust
+
+---
+
+# Project Status
+
+The platform currently operates as:
+
+* multi-tenant SaaS
+* seat-controlled subscription system
+* procedure-driven diagnostic engine
+* server-orchestrated AI platform
+* test-covered authorization workflow
