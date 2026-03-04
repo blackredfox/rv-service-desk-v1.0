@@ -712,10 +712,10 @@ export async function POST(req: Request) {
         /^(?:ok|okay|yes|y|no|n|sí|si|да|нет)$/i.test(compactMessage);
 
       const shouldAutoSwitch =
-        !forcedOutputLanguage &&
-        previousLanguage !== detectedInputLanguage.detected &&
-        detectedInputLanguage.confidence >= 0.85 &&
-        !isShortAck;
+  !forcedOutputLanguage &&
+  previousLanguage !== detectedInputLanguage.detected &&
+  (detectedInputLanguage.confidence ?? 0) >= 0.85 &&
+  !isShortAck;
 
       if (shouldAutoSwitch) {
         trackedInputLanguage = detectedInputLanguage.detected;
@@ -1307,7 +1307,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
           const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
           if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
             correctionInstructionParts.push(
-              buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId)
+              buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId ?? undefined)
             );
           }
           const correctionInstruction = correctionInstructionParts.join("\n");
@@ -1364,7 +1364,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
             result.response =
               currentMode === "diagnostic" && validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)
-                ? buildDiagnosticDriftFallback(engineResult?.context.activeStepId)
+                ? buildDiagnosticDriftFallback(engineResult?.context.activeStepId ?? undefined)
                 : currentMode === "final_report"
                 ? buildFinalReportFallback({
                     policy: langPolicy,
