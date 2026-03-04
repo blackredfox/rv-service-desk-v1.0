@@ -3,7 +3,7 @@ import path from "node:path";
 import admin from "firebase-admin";
 
 /**
- * Shape of firebase-admin.json (snake_case, as Google provides it)
+ * Shape of firebase service account JSON (snake_case, as Google provides it)
  */
 type FirebaseServiceAccountJson = {
   type: string;
@@ -19,16 +19,50 @@ type FirebaseServiceAccountJson = {
   universe_domain?: string;
 };
 
+function parseServiceAccountJson(raw: string): FirebaseServiceAccountJson {
+  const json = JSON.parse(raw) as FirebaseServiceAccountJson;
+
+  if (typeof json.project_id !== "string" || json.project_id.length === 0) {
+    throw new Error(
+      "Service account JSON must contain a non-empty string 'project_id'.",
+    );
+  }
+
+  if (typeof json.client_email !== "string" || json.client_email.length === 0) {
+    throw new Error("Service account JSON is missing 'client_email'.");
+  }
+
+  if (typeof json.private_key !== "string" || json.private_key.length === 0) {
+    throw new Error("Service account JSON is missing 'private_key'.");
+  }
+
+  return json;
+}
+
 function loadServiceAccount(): FirebaseServiceAccountJson {
+  const envJson = process.env.FIREBASE_ADMIN_CREDENTIALS_JSON;
   const envPath = process.env.FIREBASE_ADMIN_KEY_PATH;
 
-  // Production must always provide an explicit service account path.
+  // Preferred for serverless/prod (e.g., Vercel): JSON stored directly in env var
+  if (envJson && envJson.trim().length > 0) {
+    try {
+      return parseServiceAccountJson(envJson);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Failed to parse FIREBASE_ADMIN_CREDENTIALS_JSON: ${msg}`,
+      );
+    }
+  }
+
+  // Production must always provide credentials somehow.
   if (process.env.NODE_ENV === "production" && !envPath) {
-    throw new Error("FIREBASE_ADMIN_KEY_PATH is not set");
+    throw new Error(
+      "Firebase Admin credentials are not configured. Set FIREBASE_ADMIN_CREDENTIALS_JSON (recommended) or FIREBASE_ADMIN_KEY_PATH.",
+    );
   }
 
   // Local dev convenience: default to ./secrets/firebase-admin.json.
-  // This keeps credentials out of the repo root and aligns with documented setup.
   const keyPath = envPath || "./secrets/firebase-admin.json";
 
   const fullPath = path.isAbsolute(keyPath)
@@ -36,25 +70,13 @@ function loadServiceAccount(): FirebaseServiceAccountJson {
     : path.join(process.cwd(), keyPath);
 
   if (!fs.existsSync(fullPath)) {
-    throw new Error(`Firebase admin key file not found at: ${fullPath}. Set FIREBASE_ADMIN_KEY_PATH to your service account json.`);
+    throw new Error(
+      `Firebase admin key file not found at: ${fullPath}. Set FIREBASE_ADMIN_KEY_PATH or use FIREBASE_ADMIN_CREDENTIALS_JSON.`,
+    );
   }
 
   const raw = fs.readFileSync(fullPath, "utf8");
-  const json = JSON.parse(raw) as FirebaseServiceAccountJson;
-
-  if (typeof json.project_id !== "string" || json.project_id.length === 0) {
-    throw new Error("Service account object must contain a string 'project_id' property.");
-  }
-
-  if (typeof json.client_email !== "string" || json.client_email.length === 0) {
-    throw new Error("firebase-admin.json is missing client_email");
-  }
-
-  if (typeof json.private_key !== "string" || json.private_key.length === 0) {
-    throw new Error("firebase-admin.json is missing private_key");
-  }
-
-  return json;
+  return parseServiceAccountJson(raw);
 }
 
 /**
