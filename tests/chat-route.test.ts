@@ -205,5 +205,311 @@ describe("Chat API Route", () => {
         })
       );
     });
+
+    it("should detect Spanish RV diagnostic input and keep diagnostic dialogue in Spanish", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const mockCase = {
+        id: "case_es_1",
+        title: "Caso ES",
+        userId: "user_123",
+        inputLanguage: "ES",
+        languageSource: "AUTO",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_es_1",
+        caseId: "case_es_1",
+        role: "assistant",
+        content: "¿Qué voltaje mide en la bomba de agua?",
+        language: "ES",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"¿Qué voltaje mide en la bomba de agua?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "LA BOMBA DE AGUA NO FUNCIONA" }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"type":"language"');
+      expect(streamText).toContain('"outputEffective":"ES"');
+
+      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
+      const payload = JSON.parse(firstCall.body as string);
+      expect(payload.messages[0].content).toContain("All dialogue MUST be in Spanish (ES)");
+    });
+
+    it("should keep existing Spanish dialogue language on short acknowledgment", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const existingCase = {
+        id: "case_es_existing",
+        title: "Spanish Existing Case",
+        userId: "user_123",
+        inputLanguage: "ES",
+        languageSource: "AUTO",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.getCase).mockResolvedValue({ case: existingCase as never, messages: [] } as never);
+      vi.mocked(storage.ensureCase).mockResolvedValue(existingCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_es_ack",
+        caseId: "case_es_existing",
+        role: "assistant",
+        content: "Entendido. ¿Hay voltaje en los terminales de la bomba?",
+        language: "ES",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"Entendido. ¿Hay voltaje en los terminales de la bomba?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caseId: "case_es_existing",
+          message: "Sí",
+        }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"outputEffective":"ES"');
+
+      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
+      const payload = JSON.parse(firstCall.body as string);
+      expect(payload.messages[0].content).toContain("All dialogue MUST be in Spanish (ES)");
+    });
+
+    it("should force Spanish output when message explicitly requests Spanish", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const mockCase = {
+        id: "case_es_2",
+        title: "Language Switch Case",
+        userId: "user_123",
+        inputLanguage: "ES",
+        languageSource: "MANUAL",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_es_2",
+        caseId: "case_es_2",
+        role: "assistant",
+        content: "Claro. ¿Qué síntoma ve primero?",
+        language: "ES",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"Claro. ¿Qué síntoma ve primero?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "habla espanol",
+          languageMode: "EN",
+        }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"outputEffective":"ES"');
+      expect(storage.ensureCase).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputLanguage: "ES",
+          languageSource: "MANUAL",
+        })
+      );
+    });
+
+    it("should force Russian output when message explicitly requests Russian", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const mockCase = {
+        id: "case_ru_1",
+        title: "RU Switch Case",
+        userId: "user_123",
+        inputLanguage: "RU",
+        languageSource: "MANUAL",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_ru_1",
+        caseId: "case_ru_1",
+        role: "assistant",
+        content: "Хорошо. Какое напряжение на насосе?",
+        language: "RU",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"Хорошо. Какое напряжение на насосе?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "говори по-русски",
+          languageMode: "EN",
+        }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"outputEffective":"RU"');
+      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
+      const payload = JSON.parse(firstCall.body as string);
+      expect(payload.messages[0].content).toContain("All dialogue MUST be in Russian (RU)");
+      expect(storage.ensureCase).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputLanguage: "RU",
+          languageSource: "MANUAL",
+        })
+      );
+    });
+
+    it("should force English output when message explicitly requests English", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
+      const mockCase = {
+        id: "case_en_1",
+        title: "EN Switch Case",
+        userId: "user_123",
+        inputLanguage: "EN",
+        languageSource: "MANUAL",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_en_1",
+        caseId: "case_en_1",
+        role: "assistant",
+        content: "Sure. What voltage do you measure at the water pump?",
+        language: "EN",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"Sure. What voltage do you measure at the water pump?"}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "speak english",
+          languageMode: "RU",
+        }),
+      });
+
+      const response = await POST(req);
+      const streamText = await response.text();
+
+      expect(streamText).toContain('"outputEffective":"EN"');
+      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
+      const payload = JSON.parse(firstCall.body as string);
+      expect(payload.messages[0].content).toContain("All dialogue MUST be in English (EN)");
+      expect(storage.ensureCase).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputLanguage: "EN",
+          languageSource: "MANUAL",
+        })
+      );
+    });
   });
 });

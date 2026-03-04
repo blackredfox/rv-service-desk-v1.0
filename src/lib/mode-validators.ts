@@ -7,7 +7,7 @@
 
 import type { CaseMode } from "./prompt-composer";
 import { PROHIBITED_WORDS } from "./prompt-composer";
-import { detectLanguage, type Language } from "./lang";
+import { detectLanguage, getLanguageChoiceFallback, type Language } from "./lang";
 
 export type ValidationResult = {
   valid: boolean;
@@ -413,14 +413,12 @@ export function validateOutput(
  * Normalize language to a valid Language type
  * Never returns AUTO - defaults to EN if unknown
  */
-function normalizeLanguage(lang?: string): "EN" | "RU" | "ES" {
+function normalizeLanguage(lang?: string): "EN" | "RU" | "ES" | null {
   const upper = (lang || "").toUpperCase();
   if (upper === "RU" || upper === "ES" || upper === "EN") {
     return upper as "EN" | "RU" | "ES";
   }
-  // Default to EN for unknown/AUTO
-  console.warn(`[Fallback] Unknown language "${lang}", defaulting to EN`);
-  return "EN";
+  return null;
 }
 
 /**
@@ -431,6 +429,9 @@ function normalizeLanguage(lang?: string): "EN" | "RU" | "ES" {
  */
 export function getSafeFallback(mode: CaseMode, language?: string): string {
   const lang = normalizeLanguage(language);
+  if (!lang) {
+    return getLanguageChoiceFallback();
+  }
 
   switch (mode) {
     case "diagnostic":

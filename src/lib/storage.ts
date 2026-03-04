@@ -527,25 +527,48 @@ async function appendMessageDb(args: {
 }): Promise<ChatMessage> {
   const prisma = await getPrisma();
   if (!prisma) return appendMessageMemory(args);
-  const created = await prisma.message.create({
-    data: {
-      caseId: args.caseId,
-      role: args.role,
-      content: args.content,
-      language: args.language,
-    },
-    select: {
-      id: true,
-      caseId: true,
-      role: true,
-      content: true,
-      language: true,
-      createdAt: true,
-    },
-  });
 
-  // touch case updatedAt
-  await prisma.case.update({ where: { id: args.caseId }, data: { updatedAt: new Date() } });
+  // Unauthenticated flows are memory-only by design (Case.userId is required in DB).
+  // Avoid FK crashes by keeping append behavior consistent with ensureCase/createCase fallbacks.
+  if (!args.userId) return appendMessageMemory(args);
+
+  const executeWrite = async (db: AnyObj) => {
+    await db.case.upsert({
+      where: { id: args.caseId },
+      update: {},
+      create: {
+        id: args.caseId,
+        title: "New Case",
+        userId: args.userId,
+        inputLanguage: args.language,
+        languageSource: "AUTO",
+      },
+    });
+
+    const created = await db.message.create({
+      data: {
+        caseId: args.caseId,
+        role: args.role,
+        content: args.content,
+        language: args.language,
+      },
+      select: {
+        id: true,
+        caseId: true,
+        role: true,
+        content: true,
+        language: true,
+        createdAt: true,
+      },
+    });
+
+    await db.case.update({ where: { id: args.caseId }, data: { updatedAt: new Date() } });
+    return created;
+  };
+
+  const created = typeof prisma.$transaction === "function"
+    ? await prisma.$transaction((tx: AnyObj) => executeWrite(tx))
+    : await executeWrite(prisma as unknown as AnyObj);
 
   // Track message sent (only for user messages)
   if (args.role === "user" && args.userId) {

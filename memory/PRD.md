@@ -1,59 +1,68 @@
-# PRD — NEO TASK: Labor Override Detection + Diagnostic Drift Guard
+# PRD — Language Stability Fix + First-Token Latency Investigation (Follow-up)
 
-## Original Problem Statement
-Implement a clean, scoped update on branch `feat/final-report-labor-override` to:
-1. Improve labor-override intent detection (RU/EN/ES)
-2. Allow labor override when a final report exists in history even if mode drifted
-3. Add diagnostic drift guard so diagnostic mode cannot emit final-report sections
-4. Add focused deterministic tests
+## Original User Report
+1) Language switched incorrectly in the same Spanish diagnostic thread (`"Sí"` caused ES → EN).
+2) First-token latency still ~20s; continue investigation with actionable logs.
 
-## Architecture Decisions
-- Kept all runtime behavior changes isolated to `src/app/api/chat/route.ts`.
-- Added local helpers in `route.ts` only (no public API shape changes).
-- Added test-only exports via `__test__` for deterministic unit assertions.
-- Added one focused test file for this task with dependency mocks and no network calls.
+## Scope Applied
+- Updated only:
+  - `src/app/api/chat/route.ts`
+  - `src/lib/lang.ts`
+  - `tests/chat-route.test.ts`
+  - `tests/lang-spanish-detection.test.ts`
+- No SSE event schema changes.
+- No UI contract changes.
 
-## What Has Been Implemented
-- Expanded `detectLaborOverrideIntent(message)` vocabulary:
-  - EN: change/edit/update/make/set/adjust/override/recalculate/revise
-  - RU: includes existing words plus typo `зделай`
-  - ES: imperative + infinitive variants (recalcula/recalcular, ajusta/ajustar, hazlo/hacer, cambia/cambiar, edita/editar, actualiza/actualizar)
-- Enforced labor override intent shape: valid numeric hours + explicit time unit required.
-- Added `computeLaborOverrideRequest(...)` and now computes override path using:
-  - `shouldTreatAsFinalReportForOverride(currentMode, history)`
-- Added stricter diagnostic drift handling:
-  - `applyDiagnosticModeValidationGuard(...)` with dedicated violation code
-  - correction instruction when drift is detected
-  - deterministic diagnostic fallback question aligned to active step when retry still fails
-- Added test-only exports in `route.ts`:
-  - `parseRequestedLaborHours`, `detectLaborOverrideIntent`, `looksLikeFinalReport`, `shouldTreatAsFinalReportForOverride`, `applyDiagnosticModeValidationGuard`, `computeLaborOverrideRequest`
-- Added tests: `tests/chat-labor-override-drift-guard.test.ts` covering:
-  - RU override detection (including typo)
-  - ES override detection
-  - override path when mode=diagnostic but history already has final report
-  - diagnostic drift correction back to guided diagnostic question
+## What Was Implemented
 
-## Test Status
-- Passed targeted tests:
-  - `tests/chat-labor-override-drift-guard.test.ts`
-  - `tests/chat-transition-final-report.test.ts`
-  - `tests/chat-final-report-override-intent-false-positive.test.ts`
-- Full suite `yarn test` has pre-existing unrelated failures in:
-  - `tests/retention.test.ts`
-  - `tests/input-language-lock.test.ts`
+### A) Language detection stability fix (Spanish thread)
+- In `route.ts`, dialogue language switching for existing cases is now **guarded**:
+  - Keeps previous case language on short acknowledgements (`Sí`, `ok`, `yes`, etc.)
+  - Auto-switches only on strong detection confidence (>= 0.85) and non-ack turns
+  - Explicit forced language commands still override immediately
+- In `lang.ts`, expanded explicit English switch detection to include Spanish phrasing:
+  - `en inglés` now maps to forced `EN`
+
+### B) Latency investigation resumed with deeper timing
+- Added `openAiStartMs` to each OpenAI call log (offset from request start), in addition to:
+  - `openAiFirstTokenMs`
+  - `openAiMs`
+- Existing key timing/flow logs preserved and now form full chain:
+  - `loadHistoryMs`
+  - `composePromptMs`
+  - `openAiStartMs`
+  - `openAiFirstTokenMs`
+  - `validateMs`
+  - `totalMs`
+  - `sse_first_token`
+- Repair path observability retained:
+  - `validation_failed`
+  - `retry_triggered`
+  - `safe_fallback_used`
+
+## Why this helps
+- Language bug: prevents accidental ES→EN drift on short user confirmations in active Spanish sessions.
+- Latency: logs now clearly separate:
+  - pre-OpenAI delay (`openAiStartMs`)
+  - upstream first-token delay (`openAiFirstTokenMs`)
+  - server-to-client first token emission (`sse_first_token`)
+  This pinpoints whether 20s silence is upstream model latency or internal buffering/prework.
+
+## Validation
+- Passed:
+  - `yarn test tests/lang-spanish-detection.test.ts tests/chat-route.test.ts tests/chat-transition-final-report.test.ts`
 
 ## Prioritized Backlog
 ### P0
-- Stabilize unrelated failing suites (`retention`, `input-language-lock`) outside this scoped task.
+- Collect 5–10 real request log samples and compare `openAiStartMs` vs `openAiFirstTokenMs`.
 
 ### P1
-- Add additional negative intent tests (e.g., action words without time unit).
-- Add assertions for one-question diagnostic correction consistency across locales.
+- Add percentile summary logging (p50/p95) for first-token latency.
 
 ### P2
-- Consolidate final-report drift heuristics between route and validators into one shared utility.
+- Add similar acknowledgement-lock behavior for RU/EN if needed.
 
 ## Next Tasks
-1. If desired, address the unrelated failing test suites in a separate scoped PR.
-2. Add more multilingual edge-case fixtures for labor intent parsing.
-3. Keep monitoring drift guard metrics to tune strictness vs false positives.
+1. Run one real request and capture timing lines for diagnosis.
+2. If `openAiFirstTokenMs` dominates, optimize model/Prompt size path; if `openAiStartMs` dominates, optimize pre-call stages.
+3. Keep streaming/validation contract unchanged while tuning latency.

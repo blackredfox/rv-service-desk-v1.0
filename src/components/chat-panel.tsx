@@ -27,6 +27,11 @@ type Props = {
   disabled?: boolean;
 };
 
+type TurnLanguageBadge = {
+  inputDetected: "EN" | "RU" | "ES";
+  outputEffective: "EN" | "RU" | "ES";
+};
+
 export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -36,6 +41,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const [photoAttachments, setPhotoAttachments] = useState<PhotoAttachment[]>([]);
   const [reportCopied, setReportCopied] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [turnLanguageByMessageId, setTurnLanguageByMessageId] = useState<Record<string, TurnLanguageBadge>>({});
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -87,6 +93,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   useEffect(() => {
     if (!caseId) {
       setMessages([]);
+      setTurnLanguageByMessageId({});
       return;
     }
 
@@ -148,6 +155,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     setStreaming(true);
 
     const localId = `local_${Date.now()}`;
+    const assistantMessageId = `${localId}_assistant`;
     const now = new Date().toISOString();
 
     // Capture and clear attachments before sending
@@ -167,7 +175,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
         createdAt: now,
       } as ChatMessage,
       {
-        id: `${localId}_assistant`,
+        id: assistantMessageId,
         caseId: caseId ?? "pending",
         role: "assistant",
         content: "",
@@ -197,12 +205,15 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           type: "image" as const,
           dataUrl: a.dataUrl,
         }));
+      }
+
       const body = await apiChatStreamWithAttachments(requestBody);
 
       // Track chat sent
       void analytics.chatSent(caseId ?? undefined);
 
       let serverCaseId: string | null = null;
+      let pendingTurnLanguage: TurnLanguageBadge | null = null;
 
       const onEvent = (ev: ChatSseEvent) => {
         if (ev.type === "case") {
@@ -212,10 +223,22 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           return;
         }
 
+        if (ev.type === "language") {
+          pendingTurnLanguage = {
+            inputDetected: ev.inputDetected,
+            outputEffective: ev.outputEffective,
+          };
+          setTurnLanguageByMessageId((prev) => ({
+            ...prev,
+            [assistantMessageId]: pendingTurnLanguage as TurnLanguageBadge,
+          }));
+          return;
+        }
+
         if (ev.type === "token") {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === `${localId}_assistant` ? { ...m, content: m.content + ev.token } : m
+              m.id === assistantMessageId ? { ...m, content: m.content + ev.token } : m
             )
           );
           return;
@@ -234,7 +257,18 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
           const effectiveCaseId = serverCaseId ?? caseId;
           if (effectiveCaseId) {
             void apiGetCase(effectiveCaseId)
-              .then((res) => setMessages(res.messages))
+              .then((res) => {
+                setMessages(res.messages);
+                if (pendingTurnLanguage) {
+                  const lastAssistant = [...res.messages].reverse().find((m) => m.role === "assistant");
+                  if (lastAssistant) {
+                    setTurnLanguageByMessageId((prev) => ({
+                      ...prev,
+                      [lastAssistant.id]: pendingTurnLanguage as TurnLanguageBadge,
+                    }));
+                  }
+                }
+              })
               .catch(() => {});
           }
         }
@@ -372,6 +406,24 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
                   </div>
                 ) : null}
               </div>
+
+              {(() => {
+                if (m.role !== "assistant") return null;
+                const turnLanguage = turnLanguageByMessageId[m.id];
+                const replyLanguage = turnLanguage?.outputEffective ?? m.language;
+                if (!turnLanguage && !replyLanguage) return null;
+
+                return (
+                  <div
+                    data-testid={`chat-language-badge-${m.id}`}
+                    className="mb-2 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  >
+                    {turnLanguage
+                      ? `Detected ${turnLanguage.inputDetected} · Reply ${turnLanguage.outputEffective}`
+                      : `Reply ${replyLanguage}`}
+                  </div>
+                );
+              })()}
 
               <div className="whitespace-pre-wrap">{m.content}</div>
             </div>
