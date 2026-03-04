@@ -1,65 +1,48 @@
-# PRD — RU/EN Switch Parity Tests + Language Badge UI
+# PRD — Investigate First-Token Latency in /api/chat Streaming
 
 ## Original Problem Statement
-Follow-up request:
-1) Add RU/EN explicit language-switch parity tests.
-2) Add a tiny UI badge in chat showing detected language per turn for transparency.
+Investigate ~20s first-token silence in `/api/chat` despite streaming, and add timing visibility to distinguish OpenAI pre-token latency vs server-side buffering.
 
-## Architecture Decisions
-- Extended existing language-force detector rather than creating a new pathway.
-- Kept server API/SSE contract stable; only expanded frontend event typing for already-emitted `language` events.
-- Implemented badge as lightweight local UI state keyed by assistant message ID (no backend schema changes).
+## Scope Applied
+- Updated only `src/app/api/chat/route.ts`
+- No UI/API contract changes
+- Kept existing SSE event schema unchanged
 
-## What Has Been Implemented
-### 1) RU/EN explicit language-switch parity
-- Updated `src/lib/lang.ts`:
-  - `detectForcedOutputLanguage(...)` now supports RU explicit phrases:
-    - `говори по-русски`, `на русском`, `русский*`, `russian`
-  - Supports EN explicit phrases:
-    - `speak english`, `english`, `на английском`, `говори по-английски`, `английский*`
-  - `detectLanguage(...)` now returns explicit reasons for RU/EN requests too:
-    - `explicit-russian-request`, `explicit-english-request`.
+## What Was Implemented
+1. **Precise latency instrumentation**
+   - Added `openAiFirstTokenMs` directly inside OpenAI streaming reader (`callOpenAI`) when first delta token arrives.
+   - Existing timing logs retained/used:
+     - `loadHistoryMs`
+     - `composePromptMs`
+     - `validateMs`
+     - `totalMs`
+   - Added `sse_first_token` log to confirm first token dispatch timing to client side from server.
 
-### 2) Route parity validation
-- Existing route logic already applies forced output from `detectForcedOutputLanguage(...)`.
-- Added tests in `tests/chat-route.test.ts`:
-  - force RU despite conflicting selector mode
-  - force EN despite conflicting selector mode
-  - assertions cover SSE language payload and prompt language directive.
+2. **Streaming-path confirmation (no buffering before token emit)**
+   - `callOpenAI(..., onToken)` still uses `stream:true` and forwards upstream deltas immediately.
+   - `emitToken(...)` sends SSE `type:"token"` as soon as tokens arrive.
+   - No API shape changes.
 
-### 3) Tiny UI language badge per turn
-- Updated `src/lib/api.ts`:
-  - expanded `ChatSseEvent` union to include `type: "language"` payload.
-- Updated `src/components/chat-panel.tsx`:
-  - listens for SSE `language` events
-  - stores per-turn language info (`inputDetected`, `outputEffective`)
-  - renders compact assistant badge:
-    - `Detected <X> · Reply <Y>`
-  - adds `data-testid` for badge: `chat-language-badge-<messageId>`.
+3. **Validator/repair observability**
+   - Added explicit flow logs:
+     - `validation_post_stream` (proves validation runs after stream collection path)
+     - `validation_failed`
+     - `retry_triggered`
+     - `safe_fallback_used`
+   - Logged across primary path, labor override path, and transition final-report path.
 
-### 4) Focused tests
-- Updated `tests/lang-spanish-detection.test.ts`:
-  - added RU explicit force tests
-  - added EN explicit force tests.
+## Acceptance Mapping
+- First-token latency now explicitly visible via:
+  - `openAiFirstTokenMs` (upstream first delta arrival)
+  - `sse_first_token.firstSseTokenMs` (first token emitted to client)
+- Validator behavior is observable and clearly post-stream via `validation_post_stream`.
+- Retry/repair/fallback events are explicitly logged.
 
 ## Verification
-- Passed:
-  - `yarn test tests/lang-spanish-detection.test.ts tests/chat-route.test.ts`
-- Parse validation passed:
-  - `src/components/chat-panel.tsx`
-  - `src/lib/api.ts`
+- Passed regression tests:
+  - `yarn test tests/chat-route.test.ts tests/chat-transition-final-report.test.ts`
 
-## Prioritized Backlog
-### P0
-- Add component-level UI test for the new language badge rendering in chat panel.
-
-### P1
-- Persist turn-level detected language metadata for historical messages after refresh/reload (currently strongest for active turn).
-
-### P2
-- Add explicit force-phrase parity for more variants/typos across RU/EN/ES.
-
-## Next Tasks
-1. Add a small chat-panel rendering test for `language` SSE event badge.
-2. Optionally expose badge tooltip with detector confidence.
-3. Keep final-report translation contract unchanged while iterating language UX.
+## Next Actions
+1. Run on real workload and compare `openAiFirstTokenMs` vs `firstSseTokenMs` to isolate upstream vs server delay.
+2. Track p50/p95 of these metrics in log aggregation to validate <3s first-token goal where feasible.
+3. If upstream dominates latency, evaluate model/region/request-size effects without changing API contract.

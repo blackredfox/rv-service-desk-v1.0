@@ -490,6 +490,10 @@ function logTiming(stage: string, payload: Record<string, number | string | bool
   console.log(`[Chat API v2][timing] ${JSON.stringify({ stage, ...payload })}`);
 }
 
+function logFlow(stage: string, payload: Record<string, number | string | boolean | undefined>) {
+  console.log(`[Chat API v2][flow] ${JSON.stringify({ stage, ...payload })}`);
+}
+
 /**
  * Call OpenAI with true streaming and emit tokens immediately.
  * Also supports non-streaming fallback responses used in unit tests.
@@ -499,8 +503,18 @@ async function callOpenAI(
   body: object,
   signal: AbortSignal,
   onToken?: (token: string) => void
-): Promise<{ response: string; durationMs: number; error?: string }> {
+): Promise<{ response: string; durationMs: number; firstTokenMs?: number; error?: string }> {
   const startedAt = Date.now();
+  let firstTokenMs: number | undefined;
+
+  const emitUpstreamToken = (token: string) => {
+    if (!token) return;
+    if (firstTokenMs === undefined) {
+      firstTokenMs = Date.now() - startedAt;
+    }
+    onToken?.(token);
+  };
+
   try {
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -517,6 +531,7 @@ async function callOpenAI(
       return {
         response: "",
         durationMs: Date.now() - startedAt,
+        firstTokenMs,
         error: `Upstream error (${upstream.status}) ${text}`.slice(0, 500),
       };
     }
@@ -532,15 +547,17 @@ async function callOpenAI(
         return {
           response: "",
           durationMs: Date.now() - startedAt,
+          firstTokenMs,
           error: `OpenAI error: ${json.error.message || "Unknown"}`,
         };
       }
 
       const content = json.choices?.[0]?.message?.content ?? "";
-      if (content) onToken?.(content);
+      emitUpstreamToken(content);
       return {
         response: content,
         durationMs: Date.now() - startedAt,
+        firstTokenMs,
       };
     }
 
@@ -567,6 +584,7 @@ async function callOpenAI(
           return {
             response,
             durationMs: Date.now() - startedAt,
+            firstTokenMs,
           };
         }
 
@@ -581,6 +599,7 @@ async function callOpenAI(
           return {
             response,
             durationMs: Date.now() - startedAt,
+            firstTokenMs,
             error: `OpenAI error: ${parsed.error.message}`,
           };
         }
@@ -589,7 +608,7 @@ async function callOpenAI(
         if (!token) continue;
 
         response += token;
-        onToken?.(token);
+        emitUpstreamToken(token);
       }
     }
 
@@ -601,7 +620,7 @@ async function callOpenAI(
           const token = extractOpenAiChunkContent(parsed);
           if (token) {
             response += token;
-            onToken?.(token);
+            emitUpstreamToken(token);
           }
         } catch {
           // ignore trailing partial chunks
@@ -612,12 +631,14 @@ async function callOpenAI(
     return {
       response,
       durationMs: Date.now() - startedAt,
+      firstTokenMs,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     return {
       response: "",
       durationMs: Date.now() - startedAt,
+      firstTokenMs,
       error: msg,
     };
   }
@@ -901,8 +922,16 @@ export async function POST(req: Request) {
     async start(controller) {
       let full = "";
       let aborted = false;
+      let firstSseTokenEmitted = false;
       const emitToken = (token: string) => {
         if (aborted || !token) return;
+        if (!firstSseTokenEmitted) {
+          firstSseTokenEmitted = true;
+          logTiming("sse_first_token", {
+            caseId: ensuredCase.id,
+            firstSseTokenMs: Date.now() - requestStartedAt,
+          });
+        }
         controller.enqueue(encoder.encode(sseEncode({ type: "token", token })));
       };
 
@@ -998,6 +1027,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             mode: "final_report",
             path: "labor_override_first",
             openAiMs: overrideResult.durationMs,
+            openAiFirstTokenMs: overrideResult.firstTokenMs,
           });
           let overrideContent = overrideResult.response;
 
@@ -1020,6 +1050,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
           };
 
           if (!overrideResult.error && overrideContent.trim()) {
+            logFlow("validation_post_stream", {
+              caseId: ensuredCase.id,
+              mode: "final_report",
+              path: "labor_override_first",
+              openAiFirstTokenMs: overrideResult.firstTokenMs,
+              responseChars: overrideContent.length,
+            });
             const validateStart = Date.now();
             let modeValidation = validateOutput(
               overrideContent,
@@ -1038,6 +1075,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             });
 
             if ((!modeValidation.valid || !laborValidation.valid) && !aborted) {
+              logFlow("validation_failed", {
+                caseId: ensuredCase.id,
+                mode: "final_report",
+                path: "labor_override_first",
+                violations: modeValidation.violations.length + laborValidation.violations.length,
+              });
               emitToken("\n\n[System] Repairing output...\n\n");
               const correctionViolations = [
                 ...modeValidation.violations,
@@ -1063,12 +1106,19 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                 }),
               };
 
+              logFlow("retry_triggered", {
+                caseId: ensuredCase.id,
+                mode: "final_report",
+                path: "labor_override_retry",
+              });
+
               overrideResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
               logTiming("openai_call", {
                 caseId: ensuredCase.id,
                 mode: "final_report",
                 path: "labor_override_retry",
                 openAiMs: overrideResult.durationMs,
+                openAiFirstTokenMs: overrideResult.firstTokenMs,
               });
               if (!overrideResult.error) {
                 overrideContent = overrideResult.response;
@@ -1114,6 +1164,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             });
 
             if (!guardedPostModeValidation.valid || !postLaborValidation.valid) {
+              logFlow("safe_fallback_used", {
+                caseId: ensuredCase.id,
+                mode: "final_report",
+                path: "labor_override_post",
+                reason: "validation_after_retry_failed",
+              });
               console.warn(
                 `[Chat API v2] Labor override response invalid after retry, using fallback for ${requestedLaborHoursText} hr`
               );
@@ -1135,6 +1191,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
               });
             }
           } else {
+            logFlow("safe_fallback_used", {
+              caseId: ensuredCase.id,
+              mode: "final_report",
+              path: "labor_override_first",
+              reason: "upstream_error_or_empty",
+            });
             console.error(
               `[Chat API v2] Labor override generation error: ${overrideResult.error || "empty response"}`
             );
@@ -1179,6 +1241,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
           mode: currentMode,
           path: "primary_first",
           openAiMs: result.durationMs,
+          openAiFirstTokenMs: result.firstTokenMs,
         });
 
         if (result.error) {
@@ -1191,6 +1254,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         }
 
         // Validate output (pass language policy for translation enforcement)
+        logFlow("validation_post_stream", {
+          caseId: ensuredCase.id,
+          mode: currentMode,
+          path: "primary_first",
+          openAiFirstTokenMs: result.firstTokenMs,
+          responseChars: result.response.length,
+        });
         const validateStart = Date.now();
         let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
         validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
@@ -1204,6 +1274,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
         // If validation fails, retry once with correction
         if (!validation.valid && !aborted) {
+          logFlow("validation_failed", {
+            caseId: ensuredCase.id,
+            mode: currentMode,
+            path: "primary_first",
+            violations: validation.violations.length,
+          });
           console.log(`[Chat API v2] Validation failed, retrying with correction...`);
           emitToken("\n\n[System] Repairing output...\n\n");
           const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
@@ -1225,12 +1301,19 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             }),
           };
 
+          logFlow("retry_triggered", {
+            caseId: ensuredCase.id,
+            mode: currentMode,
+            path: "primary_retry",
+          });
+
           result = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
           logTiming("openai_call", {
             caseId: ensuredCase.id,
             mode: currentMode,
             path: "primary_retry",
             openAiMs: result.durationMs,
+            openAiFirstTokenMs: result.firstTokenMs,
           });
 
           if (!result.error) {
@@ -1248,6 +1331,12 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
           // If still fails, use safe fallback with EFFECTIVE OUTPUT language
           if (!validation.valid || result.error) {
+            logFlow("safe_fallback_used", {
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              path: "primary_retry",
+              reason: result.error ? "upstream_error_on_retry" : "validation_after_retry_failed",
+            });
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
             result.response =
               currentMode === "diagnostic" && validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)
@@ -1423,10 +1512,18 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             mode: "final_report",
             path: "transition_first",
             openAiMs: finalResult.durationMs,
+            openAiFirstTokenMs: finalResult.firstTokenMs,
           });
           let finalContent = finalResult.response;
 
           if (!finalResult.error && finalContent.trim()) {
+            logFlow("validation_post_stream", {
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              path: "transition_first",
+              openAiFirstTokenMs: finalResult.firstTokenMs,
+              responseChars: finalContent.length,
+            });
             const finalValidateStart = Date.now();
             let finalValidation = validateOutput(
               finalContent,
@@ -1444,6 +1541,12 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             });
 
             if (!finalValidation.valid && !aborted) {
+              logFlow("validation_failed", {
+                caseId: ensuredCase.id,
+                mode: currentMode,
+                path: "transition_first",
+                violations: finalValidation.violations.length,
+              });
               emitToken("\n\n[System] Repairing output...\n\n");
               const correctionInstruction = [
                 buildCorrectionInstruction(finalValidation.violations),
@@ -1463,12 +1566,19 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                 }),
               };
 
+              logFlow("retry_triggered", {
+                caseId: ensuredCase.id,
+                mode: currentMode,
+                path: "transition_retry",
+              });
+
               finalResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
               logTiming("openai_call", {
                 caseId: ensuredCase.id,
                 mode: currentMode,
                 path: "transition_retry",
                 openAiMs: finalResult.durationMs,
+                openAiFirstTokenMs: finalResult.firstTokenMs,
               });
               if (!finalResult.error) {
                 finalContent = finalResult.response;
@@ -1506,6 +1616,12 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             );
 
             if (!guardedPostValidation.valid) {
+              logFlow("safe_fallback_used", {
+                caseId: ensuredCase.id,
+                mode: currentMode,
+                path: "transition_post",
+                reason: "validation_after_retry_failed",
+              });
               console.log(`[Chat API v2] Final report validation failed after retry, using fallback`);
               finalContent = buildFinalReportFallback({
                 policy: langPolicy,
@@ -1524,6 +1640,12 @@ Do NOT ask follow-up questions.${translationInstruction}`;
               });
             }
           } else {
+            logFlow("safe_fallback_used", {
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              path: "transition_first",
+              reason: "upstream_error_or_empty",
+            });
             console.error(
               `[Chat API v2] Final report generation error after transition: ${finalResult.error || "empty response"}`
             );
