@@ -14,7 +14,7 @@ function getStripe(): Stripe {
     }
     stripeInstance = new Stripe(secretKey, {
       // Keep aligned with the installed Stripe SDK's supported apiVersion union.
-      apiVersion: "2026-01-28.clover",
+     
     });
   }
   return stripeInstance;
@@ -89,7 +89,7 @@ export async function createBillingPortalSession(args: {
   
   // Get or create portal configuration that allows subscription updates
   // This enables users to upgrade their seat tier (5 → 10 → 25)
-  const priceId = process.env.STRIPE_PRICE_SEAT_MONTHLY;
+  //const priceId = process.env.STRIPE_PRICE_SEAT_MONTHLY;
   
   // Create session with subscription update enabled
   // Note: Portal configuration must be set up in Stripe Dashboard to allow:
