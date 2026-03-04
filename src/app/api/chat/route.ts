@@ -695,16 +695,33 @@ export async function POST(req: Request) {
   // 1. ALWAYS detect input language from message text (source of truth)
   const detectedInputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
 
-  // 1b. Respect tracked dialogue language from case metadata (update on explicit switch)
+  const forcedOutputLanguage = detectForcedOutputLanguage(message);
+
+  // 1b. Respect tracked dialogue language from case metadata.
+  // Only auto-switch on strong signals; avoid switching on short acknowledgements.
   let trackedInputLanguage: Language = detectedInputLanguage.detected;
   if (body?.caseId) {
     const existing = await storage.getCase(body.caseId, user?.id);
     const previousLanguage = existing.case?.inputLanguage;
     if (previousLanguage) {
       trackedInputLanguage = previousLanguage;
-      if (previousLanguage !== detectedInputLanguage.detected) {
+
+      const compactMessage = message.trim();
+      const isShortAck =
+        compactMessage.length <= 4 ||
+        /^(?:ok|okay|yes|y|no|n|sí|si|да|нет)$/i.test(compactMessage);
+
+      const shouldAutoSwitch =
+        !forcedOutputLanguage &&
+        previousLanguage !== detectedInputLanguage.detected &&
+        detectedInputLanguage.confidence >= 0.85 &&
+        !isShortAck;
+
+      if (shouldAutoSwitch) {
         trackedInputLanguage = detectedInputLanguage.detected;
-        console.log(`[Chat API v2] Language switch detected: ${previousLanguage} → ${detectedInputLanguage.detected}`);
+        console.log(
+          `[Chat API v2] Language switch detected: ${previousLanguage} → ${detectedInputLanguage.detected}`
+        );
       }
     }
   }
@@ -713,7 +730,6 @@ export async function POST(req: Request) {
   const requestedOutputMode: LanguageMode = normalizeLanguageMode(
     body?.output?.mode ?? body?.languageMode
   );
-  const forcedOutputLanguage = detectForcedOutputLanguage(message);
   const outputMode: LanguageMode = forcedOutputLanguage ?? requestedOutputMode;
 
   if (forcedOutputLanguage) {
@@ -1021,11 +1037,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             }),
           };
 
+          const overrideFirstStart = Date.now();
           let overrideResult = await callOpenAI(apiKey, overrideBody, ac.signal, emitToken);
           logTiming("openai_call", {
             caseId: ensuredCase.id,
             mode: "final_report",
             path: "labor_override_first",
+            openAiStartMs: overrideFirstStart - requestStartedAt,
             openAiMs: overrideResult.durationMs,
             openAiFirstTokenMs: overrideResult.firstTokenMs,
           });
@@ -1112,11 +1130,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
                 path: "labor_override_retry",
               });
 
+              const overrideRetryStart = Date.now();
               overrideResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
               logTiming("openai_call", {
                 caseId: ensuredCase.id,
                 mode: "final_report",
                 path: "labor_override_retry",
+                openAiStartMs: overrideRetryStart - requestStartedAt,
                 openAiMs: overrideResult.durationMs,
                 openAiFirstTokenMs: overrideResult.firstTokenMs,
               });
@@ -1235,11 +1255,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
         };
 
         // First attempt
+        const primaryFirstStart = Date.now();
         let result = await callOpenAI(apiKey, openAiBody, ac.signal, emitToken);
         logTiming("openai_call", {
           caseId: ensuredCase.id,
           mode: currentMode,
           path: "primary_first",
+          openAiStartMs: primaryFirstStart - requestStartedAt,
           openAiMs: result.durationMs,
           openAiFirstTokenMs: result.firstTokenMs,
         });
@@ -1307,11 +1329,13 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
             path: "primary_retry",
           });
 
+          const primaryRetryStart = Date.now();
           result = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
           logTiming("openai_call", {
             caseId: ensuredCase.id,
             mode: currentMode,
             path: "primary_retry",
+            openAiStartMs: primaryRetryStart - requestStartedAt,
             openAiMs: result.durationMs,
             openAiFirstTokenMs: result.firstTokenMs,
           });
@@ -1506,11 +1530,13 @@ Do NOT ask follow-up questions.${translationInstruction}`;
             }),
           };
 
+          const transitionFirstStart = Date.now();
           let finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal, emitToken);
           logTiming("openai_call", {
             caseId: ensuredCase.id,
             mode: "final_report",
             path: "transition_first",
+            openAiStartMs: transitionFirstStart - requestStartedAt,
             openAiMs: finalResult.durationMs,
             openAiFirstTokenMs: finalResult.firstTokenMs,
           });
@@ -1572,11 +1598,13 @@ Do NOT ask follow-up questions.${translationInstruction}`;
                 path: "transition_retry",
               });
 
+              const transitionRetryStart = Date.now();
               finalResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
               logTiming("openai_call", {
                 caseId: ensuredCase.id,
                 mode: currentMode,
                 path: "transition_retry",
+                openAiStartMs: transitionRetryStart - requestStartedAt,
                 openAiMs: finalResult.durationMs,
                 openAiFirstTokenMs: finalResult.firstTokenMs,
               });

@@ -30,6 +30,7 @@ describe("Spanish detection + language fallback", () => {
     const { detectForcedOutputLanguage } = await import("@/lib/lang");
 
     expect(detectForcedOutputLanguage("speak english")).toBe("EN");
+    expect(detectForcedOutputLanguage("respuesta en inglés")).toBe("EN");
     expect(detectForcedOutputLanguage("на английском")).toBe("EN");
     expect(detectForcedOutputLanguage("english")).toBe("EN");
   });

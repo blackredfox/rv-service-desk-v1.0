@@ -45,6 +45,7 @@ const FORCED_RUSSIAN_PATTERNS = [
 const FORCED_ENGLISH_PATTERNS = [
   /\bspeak\s+english\b/i,
   /\benglish\b/i,
+  /\ben\s+ingl(?:e|é)s\b/i,
   /на\s+английском/i,
   /говори\s+по[-\s]?английски/i,
   /английск(?:ий|ом|ому)?/i,
