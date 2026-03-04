@@ -147,15 +147,15 @@ export function validateResponse(args: {
     return { valid: true, violations: [] };
   }
   
-  if (currentState === "DIAGNOSTICS") {
+  if (currentState === "diagnostic") {
     // Rule: English is FORBIDDEN during diagnostics (except EN dialogue)
     if (containsEnglishDuringDiagnostics(response, dialogueLanguage)) {
-      violations.push(`LANG_VIOLATION: English detected during DIAGNOSTICS state (dialogue: ${dialogueLanguage})`);
+      violations.push(`LANG_VIOLATION: English detected during diagnostic state (dialogue: ${dialogueLanguage})`);
     }
     
     // Rule: Translation is FORBIDDEN during diagnostics
     if (response.includes(TRANSLATION_SEPARATOR)) {
-      violations.push("TRANSLATION_VIOLATION: Translation separator found during DIAGNOSTICS state");
+      violations.push("TRANSLATION_VIOLATION: Translation separator found during diagnostic state");
     }
     
     // Rule: ONE question only
@@ -170,7 +170,7 @@ export function validateResponse(args: {
     }
   }
   
-  if (currentState === "CAUSE_OUTPUT") {
+  if (currentState === "final_report") {
     // Rule: Must have proper Cause format (translation separator depends on policy)
     const causeCheck = isCauseFormatCorrect(response, includeTranslation);
     if (!causeCheck.valid) {

@@ -1,442 +1,502 @@
 # RV Service Desk
-## PROJECT_MEMORY-1.md
 
-**Version:** 1.2  
-**Status:** Official Project Memory (Product + Technical)  
-**Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
+## PROJECT_MEMORY.md
 
-**Last updated:** 2026-02-25
+**Version:** 1.3
+**Status:** Official Project Memory (Product + Architecture)
+**Purpose:** Single source of truth describing the product, system architecture, and non-negotiable technical rules.
 
----
-
-## 1) Project Definition
-
-**RV Service Desk** is an approval-safe AI assistant for RV service businesses in the United States.
-
-The assistant helps technicians:
-- run structured diagnostics (step-by-step when needed),
-- document findings consistently,
-- generate authorization-ready text for:
-  - warranty,
-  - insurance,
-  - customer-pay repairs.
-
-**Critical positioning:**
-- This is **NOT** a chatbot.
-- This is **NOT** an autopilot mechanic.
-- This is a **diagnostic + documentation engine** designed to reduce claim denials and documentation errors.
-
-The technician **always** makes the final diagnostic conclusion and repair decision.
+**Last updated:** 2026-03-04
 
 ---
 
-## 2) Core Problem (Why This Exists)
+# 1. Product Definition
 
-RV technicians are technically competent, but authorization documentation often fails due to:
-- conversational wording,
-- unsafe “denial-trigger” terms,
-- missing diagnostic justification,
-- missing labor breakdown,
-- inconsistency between different writers/techs.
+**RV Service Desk** is an **approval-safe diagnostic and documentation assistant** for RV service businesses in the United States.
 
-RV Service Desk standardizes the documentation layer and reduces reliance on “tribal knowledge”.
+The system helps technicians:
 
----
+* run **structured diagnostics**
+* document findings consistently
+* generate **authorization-ready service text**
+* reduce warranty and insurance **claim denials**
 
-## 3) Non-Goals (Hard Product Boundaries)
+The system is designed for **shop technicians**, not consumers.
 
-Explicitly out of scope for MVP (and must not creep back in):
-- No automatic report submission to any portal (manual copy/paste only).
-- No integrations with DMS / warranty / insurance systems in MVP.
-- No “approval guarantee” language.
-- No repair decisions, no definitive root-cause claims without verified isolation.
-- No storing images/audio/files (session-only artifacts).
-- No liability ownership: the app assists documentation only.
+### Critical positioning
 
-**Important nuance (updated):**
-- The product **may** explain *how to perform a check* **only** when that check is part of the approved diagnostic procedure (shop context, pro-tech tone, safe sequencing).
-- The product must **not** drift into consumer “DIY coaching”, improvisation, or unapproved steps.
+RV Service Desk is:
+
+* NOT a chatbot
+* NOT an autopilot mechanic
+* NOT a repair decision system
+
+It is a **diagnostic + documentation engine**.
+
+The **technician always makes the final diagnostic and repair decision**.
 
 ---
 
-## 4) Users & Primary Workflow
+# 2. Core Problem
 
-### 4.1 Primary user
-- RV service technician (shop environment, time-constrained, may dictate notes via voice).
+RV repair documentation often fails authorization because of:
 
-### 4.2 Case-based workflow
-- Each repair = one **Case** (a self-contained chat session).
-- A case stores **text only**:
-  - technician messages,
-  - agent messages,
-  - final report text (if generated).
-- Case title is auto-generated and can be renamed.
+* conversational wording
+* denial-trigger terminology
+* missing diagnostic justification
+* missing labor breakdown
+* inconsistent documentation across technicians
+
+RV Service Desk standardizes the **documentation layer** and reduces reliance on tribal knowledge.
 
 ---
 
-## 5) Invisible Operating Modes (Enforced)
+# 3. Hard Product Boundaries (Non-Goals)
 
-Modes are **internal** and not shown in UI as “workflow statuses”.
+The following are **explicitly out of scope** for MVP:
 
-### 5.1 Modes
-1. **Diagnostic Mode (default)**
-   - Asks one question at a time (when diagnostics are needed).
-   - Records facts only.
-   - No conclusions/recommendations.
-   - Dialogue stays in technician’s language (EN/RU/ES).
+* No automatic submission to warranty or insurance portals
+* No integrations with DMS systems
+* No guarantee of approval
+* No repair decision authority
+* No autonomous root cause conclusions without verified isolation
+* No storage of images/audio/files (session-only artifacts)
 
+The product assists documentation only.
+
+---
+
+# 4. Primary User
+
+**RV service technician**
+
+Typical environment:
+
+* busy repair shop
+* time constrained
+* may dictate notes via voice
+* needs copy-ready authorization text quickly
+
+---
+
+# 5. Case-Based Workflow
+
+Each repair is a **Case**.
+
+A case stores **text only**:
+
+* technician messages
+* assistant responses
+* final output text
+
+A case never stores:
+
+* images
+* audio
+* files
+
+These are session artifacts only.
+
+---
+
+# 6. System Operating Modes
+
+Modes are **internal orchestration states** and are not exposed in UI.
+
+### Modes
+
+1. **Diagnostic Mode** (default)
 2. **Authorization Mode**
-   - Used when technician requests pre-authorization for corrective action or defined isolation work.
-   - Warranty-safe language enforcement is active.
-   - Conservative wording, no guarantees.
-
 3. **Final Report Mode**
-   - Produces the final shop-style report format (fixed sections).
-   - Output is English-first + translated copy.
-
-### 5.2 Mode transitions (Hard Rule)
-Mode changes are **explicit only** and must never be inferred from meaning.
-- Server switches mode only on exact technician commands:
-  - `START AUTHORIZATION REQUEST`
-  - `START FINAL REPORT`
-
-This rule exists to prevent web-agent drift and “helpful assistant” shortcuts.
 
 ---
 
-## 6) Language Rules (Hard Contract)
+## Mode Contracts
 
-- Diagnostic dialogue: **technician language** (EN/RU/ES).
-- Final output text (Cause / Report): **100% English first**.
-- Immediately after English output: `--- TRANSLATION ---` + full literal translation into dialogue language.
-- Never mix languages inside the English block.
+### Diagnostic Mode
 
-**Reliability rule (updated):**
-- Translation must not be left to “model luck”.️
-- Server must validate presence/format of the translation block and apply a retry/repair strategy if missing.
+Purpose:
 
----
+* gather facts
+* guide procedure steps
+* maintain diagnostic discipline
 
-## 7) Output Formats (Fixed)
+Rules:
 
-### 7.1 Final Report (Shop-style, copy/paste-ready)
-Plain text, no numbering, no tables.
+* one question at a time
+* no conclusions
+* no repair recommendations
+* no labor estimates
 
-Sections (exact order):
-- Complaint
-- Diagnostic Procedure
-- Verified Condition
-- Recommended Corrective Action
-- Estimated Labor
-- Required Parts
-
-### 7.2 Portal-Cause Output (when allowed)
-Single English block, no headers, no numbering, paragraphs separated by blank lines, then translation block.
-
-Paragraph order (fixed):
-1) Observed symptoms  
-2) Diagnostic checks performed  
-3) Verified condition or isolation status  
-4) Required repair or replacement  
-5) Labor justification (ALWAYS LAST)
-
-**Labor requirement:**
-- Task-level breakdown
-- Each task includes hours
-- Total labor stated
+Dialogue language = technician language.
 
 ---
 
-## 8) Safety / Wording Guardrails
+### Authorization Mode
 
-### 8.1 Prohibited words (Service Authorization wording)
-The assistant must avoid denial-trigger words in Service Authorization phrasing:
-- broken, failed, defective, bad, damaged, worn, misadjusted, leaking
+Purpose:
 
-Technician may use them; the assistant **internally normalizes** to neutral technical language without asking the technician to rephrase.
+Generate authorization-safe wording for corrective work.
 
-### 8.2 Approved technical language (examples)
-- not operating per spec
-- performance below spec
-- no response under load
-- measured values out of spec
-- condition not recoverable
-- unit-level malfunction
+Rules:
 
-### 8.3 “No assumptions / no invention”
-The assistant never invents:
-- measurements
-- test results
-- parts
-- model/serial identifiers
-- causes not supported by provided isolation
+* conservative language
+* no guarantees
+* neutral technical phrasing
 
 ---
 
-## 9) Diagnostic Logic Contract (Customer-Approved)
+### Final Report Mode
 
-### 9.1 Complex equipment classification (locked)
-Always complex:
-- Roof AC / heat pumps
-- Furnaces
-- Slide-out systems
-- Leveling systems
-- Inverters / converters
-- Refrigerators
+Purpose:
 
-Simple items (lights, latches, doors, trim) are NOT complex.
+Produce a **shop-style final report**.
 
-### 9.2 Diagnostic Form Enforcement (critical)
-If system is complex AND isolation is incomplete:
-- switch into diagnostic form behavior (one question at a time, strict order),
-- do NOT generate Cause,
-- do NOT suggest repair or replacement,
-- do NOT estimate labor.
+Format:
 
-Form mode continues until at least one is true:
-A) specific component/subsystem verified not operating per spec  
-B) all primary diagnostic branches ruled out  
-C) technician explicitly requests preliminary authorization based on partial isolation
-
-### 9.3 Diagnostic Completeness Gate (critical)
-When in Guided Diagnostics or Diagnostic Form behavior:
-- MUST NOT generate Portal-Cause unless A/B/C is met.
-- If not met: continue diagnostics and state isolation is not complete.
-
-### 9.4 Post-repair guardrail (critical)
-If a previously authorized repair did NOT restore operation:
-- do NOT generate a new Cause,
-- return to diagnostic form behavior,
-- confirm post-repair checks before proceeding.
-
-### 9.5 Mechanical system guardrail (critical)
-For slide-outs, leveling, and drive systems:
-- if motor operates when powered directly → treat motor as functional.
-- do NOT recommend motor replacement.
-- do NOT conclude mechanical failure.
-Mechanical replacement is allowed only after coupling/engagement/synchronization/controller logic is verified or ruled out.
-
-### 9.6 Consumer appliance replacement logic
-For TVs / microwaves / stereos:
-- if unit powers ON but has no video/audio/OSD and basic checks fail → treat as non-repairable, recommend unit replacement, do not suggest board-level repair.
-
-### 9.7 Authorization rules
-- NEVER request authorization for diagnostics.
-- Authorization applies ONLY to corrective action or clearly defined isolation work.
-
-### 9.8 Equipment identification rule
-- Single short line only
-- Only identifiers provided by technician
-- No placeholders
-- No labels
+English block first
+followed by translation block.
 
 ---
 
-## 10) Procedure-Driven Diagnostics (Pro-Tech Contract) — NEW (v1.1)
+## Mode Transition Rule (Hard)
 
-**Principle:** *Procedure is law.*
+Modes change **only by explicit commands** in technician messages:
 
-Diagnostics are governed by explicit system procedures with:
-- strict step ordering,
-- prerequisites (no skipping),
-- recognition of steps already completed in the technician’s initial message (skip what’s already done),
-- prevention of “cross-system drift” (agent must not invent steps outside the active procedure).
+```
+START AUTHORIZATION REQUEST
+START FINAL REPORT
+```
 
-**Operational requirement (updated):**
-- If the technician asks “How do I check that?”, the agent must provide a short, safe, procedure-aligned instruction sequence.
-- The agent must never “close the step silently” (that creates absurd diagnostics and breaks customer trust).
-
-**Known procedure defects to eliminate (if observed):**
-- duplicated steps (either procedure definition bug or runtime “completed” tracking bug),
-- wrong ordering (e.g., electrical pre-checks like fuse/CB should be first when required by the procedure).
+The server **must never infer mode changes from meaning**.
 
 ---
 
-## 11) Prompt Architecture & Version Truth
+# 7. Language Contract
 
-### 11.1 Customer prompt (source of truth)
-Customer-approved behavior originates from:
-- “RV SERVICE DESK — Diagnostic & Authorization Engine (v2.3.7) PORTAL-CAUSE MODE WITH MECHANICAL, POST-REPAIR, COMPLETENESS AND DIAGNOSTIC FORM ENFORCEMENT”.
+Dialogue language:
 
-### 11.2 System prompt (production)
-Production system prompt is a structured normalization of the customer prompt:
-- **System Prompt v3.1 (PRODUCTION)** is the intended “single source of truth” for runtime orchestration.
+```
+EN / RU / ES
+```
 
-### 11.3 Important note on web-agent behavior
-A web-agent may:
-- truncate/alter system instructions,
-- inject its own system prompt,
-- ignore strict MUST/MUST NOT,
-- behave statelessly.
+Final outputs:
 
-Therefore:
-- the authoritative behavior must be enforced **server-side** with explicit mode state and validation.
+```
+English block
+--- TRANSLATION ---
+Full translation
+```
 
----
+Rules:
 
-## 12) Technical Architecture (MVP)
+* English block must be 100% English
+* translation must be full
+* server validates translation presence
+* server retries if translation missing
 
-### 12.1 Stack (MVP)
-- **Frontend:** Next.js / React (PWA-ready)
-- **Backend:** Node.js (REST API)
-- **AI Layer:** LLM called from server with strict prompt orchestration
-- **Storage:** text-only (local-first by default; optional backend persistence)
-
-### 12.2 Data boundaries & privacy
-- Store only: text messages + final outputs.
-- Do not store: images/audio/files (session-only artifacts).
-- Avoid PII in logs.
-- Rate limiting recommended (IP-based in MVP).
-
-### 12.3 API contract (high level)
-Core endpoint:
-- `POST /api/chat`
-  - appends technician message,
-  - runs AI orchestration,
-  - returns agent response + current mode.
-
-Mode transitions:
-- only via explicit commands in technician content.
-- server must never infer transitions from meaning.
+Translation reliability must **not depend on LLM luck**.
 
 ---
 
-## 13) Data Model & Persistence Updates — NEW (v1.1)
+# 8. Output Formats
 
-To harden language behavior and reduce ambiguity across messages:
+## Final Report
 
-- **Prisma schema fields added:**
-  - `Case.inputLanguage`
-  - `Case.languageSource` (default `AUTO`)
-  - `Message.language`
+Plain text.
 
-**Migration note:**
-- If production uses Neon/Postgres, deploy migrations during release (`prisma migrate deploy` or your chosen process).
+Required section order:
 
----
-
-## 14) Testing Strategy & CI Rules — UPDATED (v1.1)
-
-**Rule:** Unit/component tests must be deterministic and must not require a live DB.
-
-- Vitest defaults to **memory-mode**.
-- DB env (`DATABASE_URL`, `DIRECT_URL`) is stubbed empty in test setup so Prisma is not selected.
-- DB-backed integration tests are **opt-in** via `TEST_DATABASE_URL` (separate job later).
-
-**Why:** prevents flakes from Neon/network/schema drift and keeps PR gating fast and reliable.
+Complaint
+Diagnostic Procedure
+Verified Condition
+Recommended Corrective Action
+Estimated Labor
+Required Parts
 
 ---
 
-## 15) Case Retention (TTL) & Cleanup — UPDATED (v1.1)
+## Portal Cause
 
-Retention metadata must be **fresh** on reads:
-- `listCases`
-- `getCase`
-- `searchCases`
+Single English block.
 
-This ensures UI (e.g., sidebar expiry badge) is correct and avoids “missing retention” edge-cases.
+Paragraph order:
 
-A scheduled job may run retention cleanup (cron workflow). CI should be robust to Yarn version differences (Corepack/Berry vs Classic), but **must still fail** if `yarn.lock` truly diverges from `package.json`.
+1. Observed symptoms
+2. Diagnostic checks performed
+3. Verified condition / isolation status
+4. Required repair
+5. Labor justification
 
----
+Labor must include:
 
-## 16) Quality Gates (Must-have)
-
-### 16.1 Determinism & validation
-Server-side validation must catch and prevent:
-- language rule violations (English-first + translation block),
-- generating Cause before gates are satisfied,
-- adding forbidden “guarantee” language,
-- output format deviations (headers/numbering/tables),
-- procedure violations (skipped prerequisites, step repetition, out-of-order branching).
-
-### 16.2 Testing expectations (minimum)
-- Unit tests: mode transitions, validators, procedure engine, language gating.
-- Integration tests: `/api/chat` end-to-end for:
-  - complex equipment diagnostic form behavior,
-  - completeness gate,
-  - post-repair guardrail,
-  - mechanical guardrail cases,
-  - final output formatting.
+* task breakdown
+* hours per task
+* total labor
 
 ---
 
-## 17) Known Risks
+# 9. Safety and Language Guardrails
 
-- Web-agent prompt non-compliance (system layer not respected).
-- Stateless execution causing “mode forgetting”.
-- Model differences (temperature/context window) causing drift.
-- Liability risk if unsafe language slips through.
-- Procedure definition drift (dup steps / missing “how to check” guidance) causing customer-visible failures.
+The assistant must avoid denial-trigger terms in authorization wording.
 
-Mitigation:
-- enforce mode and gates server-side,
-- add validators + retry policy (especially translation),
-- keep prompts minimal and modular at runtime (compose from approved blocks),
-- log and audit outputs (text-only, no PII),
-- treat procedures as code: versioned, reviewed, test-covered.
+Examples to avoid:
 
----
+* broken
+* failed
+* defective
+* bad
+* damaged
+* worn
+* leaking
 
-## 18) Roadmap Pointer
+The technician may use them.
 
-See `ROADMAP.md` for phased delivery:
-- v0.1 Diagnostic UI + case sessions
-- v0.2 Authorization Mode
-- v0.3 Final Report Mode
-- v0.4 Voice + media inputs (session-only)
-- v1.0 PWA + polish
-
-Billing, orgs, integrations are post-v1.0 and require separate specs.
+The system internally converts to neutral language.
 
 ---
 
-## 19) Change Control
+# 10. Diagnostic Logic Contract
 
-- Prompt wording changes require explicit approval.
-- Procedure changes are treated as product contract changes (review + tests).
-- System prompt is treated as a product contract.
-- Any deviation in behavior is a P1 defect (authorization safety issue).
+Certain RV systems are **always treated as complex systems**:
+
+* roof AC
+* furnaces
+* refrigerators
+* slide systems
+* leveling systems
+* inverters / converters
 
 ---
 
-## 20) Final Report Detection Hardening — NEW (v1.2)
+## Diagnostic Form Enforcement
 
-### 20.1 Problem
-While working on branch `fix/p0-final-report-alias-and-rv-terminology`, a merge conflict inside `src/lib/mode-validators.ts` left unresolved conflict markers (`<<<<<<< HEAD`) in the `looksLikeFinalReport()` area. This corrupted the validator, caused syntax/build failures, and cascaded into test failures and incorrect drift detection.
+If system is complex and isolation is incomplete:
 
-### 20.2 Root Cause
-- Incomplete merge resolution inside `looksLikeFinalReport()`.
-- Mixed detection logic (shop-style headers, legacy markers, translation reinforcement).
-- Conflict markers broke parsing and invalidated validator behavior.
+The system must switch to **diagnostic form behavior**.
 
-### 20.3 Resolution
-- Fix applied via commit: `b7c8da26a9fe40cd23dd5f4c24fa2c7b537924c6`
-- File changed: `src/lib/mode-validators.ts`
-- Implemented deterministic rule-based detection.
+Rules:
 
-### 20.4 Authoritative Final Report Detection Rules
-**Rule 1 — Shop style:** return `true` if **2+** shop-style section headers are present:
-- Complaint
-- Diagnostic Procedure
-- Verified Condition
-- Recommended Corrective Action
-- Estimated Labor
-- Required Parts
+* ask one diagnostic question at a time
+* do not generate cause
+* do not recommend repair
+* do not estimate labor
 
-**Rule 2 — Legacy style:** return `true` if **2+** legacy markers are present.
+Diagnostics continue until:
 
-**Rule 3 — Translation reinforcement:** return `true` if:
-- `--- TRANSLATION ---` exists **and**
-- at least **1** valid marker exists (shop or legacy).
+A) a component is verified not operating per spec
+B) all diagnostic branches are ruled out
+C) technician explicitly requests authorization
 
-### 20.5 Architectural Decision
-Final Report drift detection is a **server-side validator responsibility** (not prompt compliance). The validator must remain deterministic, translation-aware, and isolated to avoid cross-file regression risk.
+---
 
-### 20.6 Verification
-Full suite green:
-- Test Files: 39 passed (39)
-- Tests: 583 passed (583)
+## Post-Repair Guardrail
 
+If a repair did not restore operation:
 
-End of file.
+* do not generate a new cause
+* return to diagnostic mode
+* confirm post-repair checks
+
+---
+
+## Mechanical Guardrail
+
+For slide or leveling systems:
+
+If motor runs when powered directly:
+
+* motor is treated as functional
+* motor replacement must not be recommended
+
+Mechanical failure can only be concluded after linkage/controller checks.
+
+---
+
+# 11. Procedure-Driven Diagnostics
+
+**Principle:**
+
+```
+Procedure is law
+```
+
+Diagnostics must follow **explicit system procedures**.
+
+Requirements:
+
+* strict step ordering
+* prerequisites enforced
+* steps already completed by technician must be recognized
+* agent must not invent steps outside procedure
+
+If technician asks:
+
+> "How do I check that?"
+
+The system may provide **short procedure-aligned instructions**.
+
+The system must **never silently close a step**.
+
+---
+
+# 12. Architecture Overview
+
+Frontend:
+
+Next.js / React
+
+Backend:
+
+Node.js API
+
+AI layer:
+
+LLM orchestration from server.
+
+Storage:
+
+text-only persistence.
+
+---
+
+# 13. Architecture Invariant (Critical)
+
+The **Context Engine** is the **single authority for diagnostic flow control**.
+
+It determines:
+
+* current procedure
+* next diagnostic step
+* branching logic
+* re-planning when new evidence appears
+
+No other component may control step progression.
+
+---
+
+## 14. Architecture Rules Reference
+
+The detailed engineering invariants and PR review gates for this project are defined in **`ARCHITECTURE_RULES.md`**.
+
+This document exists to prevent architectural regressions that were previously observed during development (e.g., multiple components attempting to control diagnostic flow).
+
+Key principle:
+
+> **The Context Engine is the single authority for diagnostic step flow.**
+
+Responsibilities are strictly separated:
+
+* **Context Engine** → diagnostic logic, procedures, step sequencing, isolation gates
+* **LLM** → language generation and translation only
+* **Server** → policy enforcement and output validation
+
+Any changes that introduce additional step controllers, completion parsers, or heuristic flow logic outside the Context Engine violate the architecture and must not be merged.
+
+All pull requests that affect chat orchestration, diagnostic flow, or final outputs must comply with the rules defined in `ARCHITECTURE_RULES.md`.
+
+---
+
+## Prohibited Architecture Patterns
+
+The following must **never control step progression**:
+
+* step inference
+* pendingStepId trackers
+* completion parsers
+* deterministic next-step logic outside Context Engine
+* LLM deciding the next procedure step
+
+Violating this invariant leads to:
+
+* step desynchronization
+* repeated questions
+* chatbot-like behavior
+
+---
+
+# 15. System Responsibility Boundaries
+
+Correct separation of responsibilities:
+
+Context Engine
+→ diagnostic logic
+
+LLM
+→ language generation
+
+Server
+→ policy enforcement and validation
+
+---
+
+# 16. Testing Principles
+
+Tests must be **deterministic**.
+
+Unit tests must not require live database connections.
+
+Vitest default mode:
+
+```
+memory mode
+```
+
+Database integration tests must be opt-in.
+
+---
+
+# 17. Data Model (MVP)
+
+Cases store:
+
+* technician messages
+* assistant messages
+* final outputs
+
+No storage of:
+
+* images
+* audio
+* files
+
+Session artifacts only.
+
+---
+
+# 18. Security & Privacy
+
+System must:
+
+* avoid PII in logs
+* protect API keys
+* limit request rate
+* isolate session artifacts
+
+---
+
+# 19. Development Philosophy
+
+Guiding principles:
+
+Fast > Fancy
+
+Copy-ready output > pretty formatting
+
+Procedure discipline > conversational flexibility
+
+Safe documentation > "helpful guesses"
+
+---
+
+# 20. Current Development Phase
+
+The project is currently in:
+
+```
+Architecture Stabilization
+```
+
+Primary objective:
+
+Maintain **single-authority diagnostic architecture** while improving reliability.
