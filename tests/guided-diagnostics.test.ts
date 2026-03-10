@@ -194,20 +194,29 @@ describe("Guided Diagnostics State Machine", () => {
 
   describe("Response to 'no information' should not loop", () => {
     it("should move to next step when technician says unknown", async () => {
-      // The prompt should guide the model to NOT repeat the same question
-      // and NOT ask "tell me more" when technician says "I don't know"
-      
-      // This is a prompt-level expectation tested via the prompt content
-      const { readFileSync } = await import("fs");
-      const { join } = await import("path");
-      
-      const promptPath = join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt");
-      const promptContent = readFileSync(promptPath, "utf-8");
-      
-      expect(promptContent).toContain("no information");
-      expect(promptContent).toContain("UNKNOWN");
-      expect(promptContent).toContain("next diagnostic step");
-      expect(promptContent).toContain("Do NOT repeat the same question");
+      const {
+        initializeCase,
+        processUserMessage,
+        buildRegistryContext,
+        getRegistryEntry,
+        clearRegistry,
+      } = await import("@/lib/diagnostic-registry");
+
+      clearRegistry("gd-unknown");
+      initializeCase("gd-unknown", "Water pump not working");
+
+      const before = buildRegistryContext("gd-unknown");
+      expect(before).toContain("NEXT REQUIRED STEP: wp_1");
+
+      const result = processUserMessage("gd-unknown", "I don't know");
+      const entry = getRegistryEntry("gd-unknown");
+      const after = buildRegistryContext("gd-unknown");
+
+      expect(result.unableStepIds).toContain("wp_1");
+      expect(entry?.unableStepIds.has("wp_1")).toBe(true);
+      expect(after).toContain("[SKIP] wp_1");
+      expect(after).toContain("NEXT REQUIRED STEP: wp_2");
+      expect(after).not.toContain('Ask EXACTLY: "Does the pump attempt to run when a faucet is opened? Any noise, humming, or vibration?"');
     });
   });
 });

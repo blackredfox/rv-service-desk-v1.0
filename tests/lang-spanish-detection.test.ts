@@ -35,11 +35,11 @@ describe("Spanish detection + language fallback", () => {
     expect(detectForcedOutputLanguage("english")).toBe("EN");
   });
 
-  it("returns neutral language chooser fallback when language is unknown", async () => {
+  it("defaults to English fallback when language is unknown", async () => {
     const { getSafeFallback } = await import("@/lib/mode-validators");
 
     expect(getSafeFallback("diagnostic", "AUTO")).toBe(
-      "Please choose language: English / Русский / Español"
+      "Can you provide more information about the issue?"
     );
   });
 });

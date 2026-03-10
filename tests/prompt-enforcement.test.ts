@@ -94,8 +94,9 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should NOT be a chatbot", () => {
-      expect(SYSTEM_BASE).toContain("NOT a chatbot");
-      expect(SYSTEM_BASE).toContain("NOT provide advice");
+      expect(SYSTEM_BASE).toContain("experienced senior RV technician");
+      expect(SYSTEM_BASE).toContain("Do NOT invent measurements");
+      expect(SYSTEM_BASE).toContain("Do NOT present guesses as facts");
     });
   });
 
@@ -111,7 +112,8 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should enforce step-by-step procedure rule", () => {
-      expect(MODE_DIAGNOSTIC).toContain("EXACT question from the active procedure");
+      expect(MODE_DIAGNOSTIC).toContain("You may ONLY ask questions that exist as steps in the active procedure");
+      expect(MODE_DIAGNOSTIC).toContain("Ask the exact active procedure question in natural shop language");
     });
 
     it("should prohibit unauthorized actions in diagnostic mode", () => {
@@ -140,7 +142,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     it("should enforce RV terminology and battery-type question", () => {
       expect(MODE_DIAGNOSTIC).toContain("converter/charger");
       expect(MODE_DIAGNOSTIC).toContain("battery type/bank");
-      expect(MODE_DIAGNOSTIC).toContain("lead-acid vs lithium");
+      expect(MODE_DIAGNOSTIC).toContain("ask ONE concise question about battery type/bank only when relevant");
     });
 
     it("should limit non-complex unit teardown", () => {
@@ -183,7 +185,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "Please check the water pump pressure and verify the connections.",
-        currentState: "DIAGNOSTICS",
+        currentState: "diagnostic",
         dialogueLanguage: "RU",
       });
 
@@ -196,7 +198,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "Проверьте давление в системе водяного насоса?",
-        currentState: "DIAGNOSTICS",
+        currentState: "diagnostic",
         dialogueLanguage: "RU",
       });
 
@@ -209,7 +211,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "Проверьте насос.\n\n--- TRANSLATION ---\n\nCheck the pump.",
-        currentState: "DIAGNOSTICS",
+        currentState: "diagnostic",
         dialogueLanguage: "RU",
       });
 
@@ -222,7 +224,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "Насос работает? Какое давление? Есть ли утечки?",
-        currentState: "DIAGNOSTICS",
+        currentState: "diagnostic",
         dialogueLanguage: "RU",
       });
 
@@ -235,7 +237,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "¿Funciona la bomba de agua?",
-        currentState: "DIAGNOSTICS",
+        currentState: "diagnostic",
         dialogueLanguage: "ES",
       });
 
@@ -247,7 +249,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "Is the water pump making any noise when activated?",
-        currentState: "DIAGNOSTICS",
+        currentState: "diagnostic",
         dialogueLanguage: "EN",
       });
 
@@ -261,7 +263,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "Water pump not operating per spec. Replace pump. Labor: 1.5 hours.",
-        currentState: "CAUSE_OUTPUT",
+        currentState: "final_report",
         dialogueLanguage: "RU",
       });
 
@@ -274,7 +276,7 @@ describe("Output Validator", () => {
 
       const result = validateResponse({
         response: "1. Water pump not operating.\n2. Replace pump.\n\n--- TRANSLATION ---\n\n1. Насос не работает.",
-        currentState: "CAUSE_OUTPUT",
+        currentState: "final_report",
         dialogueLanguage: "RU",
       });
 
@@ -299,7 +301,7 @@ Labor: Remove and replace water pump - 1.5 hours. Total labor: 1.5 hours.
 Рекомендуется замена узла водяного насоса. Номер детали уточняется.
 
 Работа: Снятие и замена водяного насоса - 1.5 часа. Общее время работы: 1.5 часа.`,
-        currentState: "CAUSE_OUTPUT",
+        currentState: "final_report",
         dialogueLanguage: "RU",
       });
 

@@ -7,7 +7,7 @@
 
 import type { CaseMode } from "./prompt-composer";
 import { PROHIBITED_WORDS } from "./prompt-composer";
-import { detectLanguage, getLanguageChoiceFallback, type Language } from "./lang";
+import { detectLanguage, type Language } from "./lang";
 
 export type ValidationResult = {
   valid: boolean;
@@ -428,10 +428,7 @@ function normalizeLanguage(lang?: string): "EN" | "RU" | "ES" | null {
  * @param language - The effective dialogue language (EN/RU/ES, NOT AUTO)
  */
 export function getSafeFallback(mode: CaseMode, language?: string): string {
-  const lang = normalizeLanguage(language);
-  if (!lang) {
-    return getLanguageChoiceFallback();
-  }
+  const lang = normalizeLanguage(language) ?? "EN";
 
   switch (mode) {
     case "diagnostic":

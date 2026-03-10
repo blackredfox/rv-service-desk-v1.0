@@ -19,10 +19,10 @@ describe("Prompt Files", () => {
     
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("RV Service Desk");
-    expect(content).toContain("NOT a chatbot");
+    expect(content).toContain("experienced senior RV technician");
     expect(content).toContain("LANGUAGE RULES");
     expect(content).toContain("WORDING SAFETY");
-    expect(content).toContain("denial-triggering words");
+    expect(content).toContain("Do NOT invent measurements");
   });
 
   it("should have MODE_PROMPT_DIAGNOSTIC.txt", () => {
@@ -44,8 +44,9 @@ describe("Prompt Files", () => {
     
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("AUTHORIZATION MODE");
-    expect(content).toContain("authorization-ready text");
-    expect(content).toContain("conservative, warranty-safe language");
+    expect(content).toContain("concise service authorization justification");
+    expect(content).toContain("based only on verified diagnostic findings");
+    expect(content).toContain("experienced RV technician");
   });
 
   it("should have MODE_PROMPT_FINAL_REPORT.txt", () => {

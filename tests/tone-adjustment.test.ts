@@ -29,9 +29,9 @@ describe("Tone Adjustment - Prompt Files", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"), "utf-8");
 
-    expect(content).toContain("Professional and concise");
-    expect(content).toContain("Do NOT say");
-    expect(content).toContain("Prefer silence over politeness");
+    expect(content).toContain("Be professional, concise, and natural");
+    expect(content).toContain("Do NOT use customer-support fluff or excessive politeness");
+    expect(content).toContain("Prefer practical shop language over robotic formatting");
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: no 'Thank you' default", async () => {
@@ -69,9 +69,10 @@ describe("Tone Adjustment - Prompt Files", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
-    expect(content).toContain("ONE short");
-    expect(content).toContain('"Noted."');
+    expect(content).toContain("A short acknowledgment is allowed when natural");
     expect(content).toContain('"Understood."');
+    expect(content).toContain('"Copy."');
+    expect(content).toContain('"Got it."');
   });
 });
 
@@ -81,7 +82,7 @@ describe("Tone Adjustment - Behavior", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"), "utf-8");
 
-    expect(content).toContain("Never repeat what the technician just said");
+    expect(content).toContain("Do NOT repeat the technician's words back unless needed for clarity");
   });
 
   it("SYSTEM_PROMPT_BASE: prohibits filler phrases", async () => {
@@ -89,7 +90,7 @@ describe("Tone Adjustment - Behavior", () => {
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"), "utf-8");
 
-    expect(content).toContain("Never use filler phrases");
+    expect(content).toContain("Do NOT use filler phrases");
   });
 
   it("SYSTEM_PROMPT_BASE: prohibits inventing facts", async () => {

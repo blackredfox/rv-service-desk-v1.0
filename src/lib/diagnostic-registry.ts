@@ -261,6 +261,8 @@ export function processUserMessage(caseId: string, message: string): {
 
   // Procedure-aware step tracking
   if (entry.procedure) {
+    const currentNextStep = getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
+
     for (const step of entry.procedure.steps) {
       if (entry.completedStepIds.has(step.id) || entry.unableStepIds.has(step.id)) continue;
 
@@ -273,6 +275,11 @@ export function processUserMessage(caseId: string, message: string): {
           completedStepIds.push(step.id);
         }
       }
+    }
+
+    if (isUnableToVerify && unableStepIds.length === 0 && currentNextStep) {
+      entry.unableStepIds.add(currentNextStep.id);
+      unableStepIds.push(currentNextStep.id);
     }
   }
 

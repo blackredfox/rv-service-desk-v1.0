@@ -13,6 +13,8 @@ export type ValidationResult = {
   violations: string[];
 };
 
+type ValidatorState = DiagnosticState | "DIAGNOSTICS" | "CAUSE_OUTPUT";
+
 // English detection patterns (common English words that wouldn't appear in RU/ES)
 const ENGLISH_PATTERNS = [
   /\b(the|and|is|are|was|were|have|has|been|will|would|could|should|this|that|with|from|they|their|there|here|what|when|where|which|who|how|can|may|might|must|shall)\b/gi,
@@ -93,6 +95,12 @@ function countQuestions(text: string): number {
   return Math.max(questionMarks, spanishQuestions || questionMarks);
 }
 
+function normalizeState(state: ValidatorState): DiagnosticState {
+  if (state === "DIAGNOSTICS") return "diagnostic";
+  if (state === "CAUSE_OUTPUT") return "final_report";
+  return state;
+}
+
 /**
  * Check if Cause format is correct
  *
@@ -114,7 +122,7 @@ function isCauseFormatCorrect(text: string, includeTranslation: boolean = true):
   }
   
   // Should not have numbered lists (1. 2. 3.)
-  if (/^\d+\.\s/m.test(text)) {
+  if (/^\s*\d+[.)]\s/m.test(text)) {
     issues.push("Contains numbered lists (forbidden in Cause output)");
   }
   
@@ -136,18 +144,19 @@ function isCauseFormatCorrect(text: string, includeTranslation: boolean = true):
  */
 export function validateResponse(args: {
   response: string;
-  currentState: DiagnosticState;
+  currentState: ValidatorState;
   dialogueLanguage: Language;
   includeTranslation?: boolean;
 }): ValidationResult {
   const { response, currentState, dialogueLanguage, includeTranslation = true } = args;
   const violations: string[] = [];
+  const normalizedState = normalizeState(currentState);
   
   if (!response || !response.trim()) {
     return { valid: true, violations: [] };
   }
   
-  if (currentState === "diagnostic") {
+  if (normalizedState === "diagnostic") {
     // Rule: English is FORBIDDEN during diagnostics (except EN dialogue)
     if (containsEnglishDuringDiagnostics(response, dialogueLanguage)) {
       violations.push(`LANG_VIOLATION: English detected during diagnostic state (dialogue: ${dialogueLanguage})`);
@@ -170,7 +179,7 @@ export function validateResponse(args: {
     }
   }
   
-  if (currentState === "final_report") {
+  if (normalizedState === "final_report") {
     // Rule: Must have proper Cause format (translation separator depends on policy)
     const causeCheck = isCauseFormatCorrect(response, includeTranslation);
     if (!causeCheck.valid) {

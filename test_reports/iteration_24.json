@@ -1,0 +1,39 @@
+{
+  "summary": "Backend-only verification completed for prompt persona refactor scope. Targeted prompt/validator/state-machine tests and full Vitest suite both pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/prompt-enforcement.test.ts",
+    "/app/tests/tone-adjustment.test.ts",
+    "/app/tests/prompt-composer.test.ts",
+    "/app/tests/guided-diagnostics.test.ts",
+    "/app/tests/lang-spanish-detection.test.ts",
+    "/app/tests/mode-validators.test.ts"
+  ],
+  "action_items": [
+    "No blocking issues found in requested scope; proceed with merge validation on main branch CI."
+  ],
+  "critical_code_review_comments": [
+    "Requested refactor contract is consistent across prompt content tests and validators.",
+    "No regressions observed for language fallback to EN, diagnostic unknown-step advancement, or final-report format violation detection."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_24.json"
+  ],
+  "success_rate": {
+    "backend": "100% (targeted: 119/119; full vitest run exited 0)",
+    "frontend": "N/A (skipped by request)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Prisma client generation succeeded (`npx prisma generate`) and full `yarn vitest --run` exits 0 in current workspace. Focus any further testing on unrelated suites only if new code changes are introduced.",
+  "rca of the issue": "No issue reproduced in this scope; all requested regression points passed."
+}
