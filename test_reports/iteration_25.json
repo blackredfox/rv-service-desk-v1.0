@@ -1,0 +1,37 @@
+{
+  "summary": "Backend-only regression verification completed for diagnostic framing, RV rooftop AC anchoring, translation-header consistency, and full-suite stability. All requested tests passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/diagnostic-procedures.test.ts",
+    "/app/tests/language-policy.test.ts",
+    "/app/tests/mode-validators.test.ts",
+    "/app/tests/prompt-enforcement.test.ts"
+  ],
+  "action_items": [
+    "No blocking defects found in requested scope; proceed with main-branch validation/merge checks."
+  ],
+  "critical_code_review_comments": [
+    "No functional regressions detected in the changed prompt/procedure/validator surfaces.",
+    "Maintainability note: /app/src/app/api/chat/route.ts is very large (>700 lines), which increases regression risk for future localized updates."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_25.json"
+  ],
+  "success_rate": {
+    "backend": "100% (targeted: 138/138; full vitest run exited 0)",
+    "frontend": "N/A (skipped by request)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified first-response complex-equipment framing suppression/enablement, RV rooftop AC wording anchoring, and translated final-report header enforcement in ES/RU validator paths. Full `yarn vitest run` is green in current workspace.",
+  "rca of the issue": "No issue reproduced in this testing scope."
+}

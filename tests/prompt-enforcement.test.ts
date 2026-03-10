@@ -145,6 +145,16 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_DIAGNOSTIC).toContain("ask ONE concise question about battery type/bank only when relevant");
     });
 
+    it("should anchor AC diagnostics to RV rooftop context", () => {
+      expect(MODE_DIAGNOSTIC).toContain("default to RV rooftop AC / heat pump context");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT default to residential split-system terminology");
+    });
+
+    it("should allow one concise equipment framing question on the first reply", () => {
+      expect(MODE_DIAGNOSTIC).toContain("use one concise brand/model or unit-context question on the first reply only");
+      expect(MODE_DIAGNOSTIC).toContain("do NOT block diagnostics if that info is unavailable");
+    });
+
     it("should limit non-complex unit teardown", () => {
       expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX UNIT REPAIR LIMITS");
       expect(MODE_DIAGNOSTIC).toContain("unit-level replacement");
@@ -169,6 +179,11 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     it("should require labor breakdown", () => {
       expect(MODE_FINAL_REPORT).toContain("ESTIMATED LABOR RULES");
       expect(MODE_FINAL_REPORT).toContain("Total labor");
+    });
+
+    it("should require translated headers inside translation block", () => {
+      expect(MODE_FINAL_REPORT).toContain("translate the section headers");
+      expect(MODE_FINAL_REPORT).toContain("Do NOT leave Complaint / Diagnostic Procedure / Verified Condition / Recommended Corrective Action / Estimated Labor / Required Parts in English inside the translation block");
     });
 
     it("should enforce plain format", () => {

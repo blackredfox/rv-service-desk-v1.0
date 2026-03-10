@@ -346,7 +346,7 @@ Required Parts: Water pump assembly.`;
     expect(v1.valid).toBe(false);
 
     // Bilingual report should pass
-    const bilingual = englishOnly + "\n\n--- TRANSLATION ---\n\nНасос не работает. Работа: 1.0 час.";
+    const bilingual = `${englishOnly}\n\n--- TRANSLATION ---\n\nЖалоба: Водяной насос не работает.\nДиагностическая процедура: Проверено напряжение на клеммах насоса.\nПодтверждённое состояние: Узел не реагирует под нагрузкой.\nРекомендованное корректирующее действие: Заменить насос.\nОценка трудоёмкости: Общее время: 1.0 hr.\nТребуемые детали: Узел водяного насоса.`;
     const v2 = validateFinalReportOutput(bilingual, policy.includeTranslation, policy.translationLanguage);
     expect(v2.valid).toBe(true);
   });
@@ -419,6 +419,16 @@ Mano de obra estimada: Total mano de obra: 1.0 hr.
 Piezas requeridas: Bomba de agua.`;
     const v = validateFinalReportOutput(bilingual, policy.includeTranslation, policy.translationLanguage);
     expect(v.valid).toBe(true);
+  });
+
+  it("ES mode rejects translation blocks that leave headers in English", async () => {
+    const { validateFinalReportOutput } = await import("@/lib/mode-validators");
+
+    const bilingual = `Complaint: Water pump not operating.\nDiagnostic Procedure: Verified voltage at pump terminals.\nVerified Condition: Unit not responding under load.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 1.0 hr.\nRequired Parts: Water pump assembly.\n\n--- TRANSLATION ---\n\nComplaint: La bomba de agua no funciona.\nDiagnostic Procedure: Se verificó el voltaje en los terminales.\nVerified Condition: La unidad no responde bajo carga.\nRecommended Corrective Action: Reemplazar la bomba.\nEstimated Labor: Total labor: 1.0 hr.\nRequired Parts: Bomba de agua.`;
+
+    const result = validateFinalReportOutput(bilingual, true, "ES");
+    expect(result.valid).toBe(false);
+    expect(result.violations.some((v) => v.includes("translate section header"))).toBe(true);
   });
 });
 

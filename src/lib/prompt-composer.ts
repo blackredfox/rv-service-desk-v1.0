@@ -237,7 +237,9 @@ Technician input language: ${inputDetected} (${inputLangName}).
 Final output MUST be English first.
 Then output '--- TRANSLATION ---' and translate the full output into ${translationLangName} (${translationLanguage}).
 Do not mix languages inside the English block.
-The translation must be complete and literal.`;
+The translation must be complete and professional.
+Translate all report section headers in the translation block.
+Do NOT leave Complaint / Diagnostic Procedure / Verified Condition / Recommended Corrective Action / Estimated Labor / Required Parts in English inside the translation block.`;
     }
     // No translation section (EN mode or AUTO+EN detected)
     return `LANGUAGE DIRECTIVE (MANDATORY):

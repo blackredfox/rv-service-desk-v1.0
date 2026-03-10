@@ -34,6 +34,8 @@ export type DiagnosticProcedure = {
   complex: boolean;
   /** Procedure variant */
   variant: "MANUFACTURER" | "STANDARD";
+  /** Optional first-reply framing question for complex equipment intake */
+  earlyFramingQuestion?: string;
   /** Ordered steps */
   steps: DiagnosticStep[];
 };
@@ -181,6 +183,7 @@ reg({
   displayName: "Furnace",
   complex: true,
   variant: "STANDARD",
+  earlyFramingQuestion: "What brand/model furnace is installed, if known?",
   steps: [
     {
       id: "furn_1",
@@ -252,24 +255,25 @@ reg({
   displayName: "Roof AC / Heat Pump",
   complex: true,
   variant: "STANDARD",
+  earlyFramingQuestion: "What brand/model rooftop AC or heat pump is installed, if known?",
   steps: [
     {
       id: "ac_1",
-      question: "When AC is turned on, does the compressor attempt to start? Humming, clicking, or buzzing from outside unit?",
+      question: "When cooling is called, does the rooftop compressor try to start? Any hum, click, or buzz at the roof unit?",
       prerequisites: [],
       matchPatterns: [/compressor.*(?:start|hum|click|buzz|nothing|no|dead)/i],
     },
     {
       id: "ac_2",
-      question: "Is the indoor blower fan running? Any airflow from vents?",
+      question: "Is the ceiling assembly / indoor blower running? Any airflow from the RV vents?",
       prerequisites: [],
       matchPatterns: [/(?:indoor\s*)?(?:blower|fan).*(?:run|airflow|yes|no|nothing)/i, /(?:no|yes)\s*airflow/i],
     },
     {
       id: "ac_3",
-      question: "Is the outdoor condenser fan running? Spinning freely or struggling?",
+      question: "At the rooftop unit, is the condenser fan running normally or struggling?",
       prerequisites: [],
-      matchPatterns: [/(?:outdoor|condenser)\s*fan.*(?:run|spin|struggle|no|dead)/i],
+      matchPatterns: [/(?:rooftop|roof|condenser|outdoor)\s*fan.*(?:run|spin|struggle|no|dead)/i],
     },
     {
       id: "ac_4",
@@ -291,9 +295,9 @@ reg({
     },
     {
       id: "ac_7",
-      question: "Contactor — does it engage (click) when AC is called? Contact points burnt or pitted?",
+      question: "In the rooftop control box, does the compressor relay / start device engage when cooling is called? Any heat damage?",
       prerequisites: ["ac_1"],
-      matchPatterns: [/contactor.*(?:click|engage|burnt|pitted|ok|good)/i],
+      matchPatterns: [/(?:relay|start\s*device|control\s*box|contactor).*(?:click|engage|burnt|pitted|heat|ok|good)/i],
     },
     {
       id: "ac_8",
@@ -323,6 +327,7 @@ reg({
   displayName: "Refrigerator",
   complex: true,
   variant: "STANDARD",
+  earlyFramingQuestion: "What brand/model refrigerator is installed, if known?",
   steps: [
     {
       id: "ref_1",
@@ -394,6 +399,7 @@ reg({
   displayName: "Slide-Out System",
   complex: true,
   variant: "STANDARD",
+  earlyFramingQuestion: "What brand/model slide-out system is installed, if known?",
   steps: [
     { id: "so_1", question: "When slide-out is activated, motor running? Any noise?", prerequisites: [], matchPatterns: [/(?:slide|motor).*(?:run|noise|nothing|dead|hum)/i] },
     { id: "so_2", question: "If motor runs, does slide move at all? In or out?", prerequisites: ["so_1"], matchPatterns: [/slide.*(?:move|stuck|partial|in|out|no)/i] },
@@ -413,6 +419,7 @@ reg({
   displayName: "Leveling / Jack System",
   complex: true,
   variant: "STANDARD",
+  earlyFramingQuestion: "What brand/model leveling system is installed, if known?",
   steps: [
     { id: "lv_1", question: "When leveling system is activated, pump motor running?", prerequisites: [], matchPatterns: [/(?:pump|motor).*(?:run|nothing|dead|hum)/i] },
     { id: "lv_2", question: "Jacks extending/retracting, or completely unresponsive?", prerequisites: ["lv_1"], matchPatterns: [/jack.*(?:extend|retract|unresponsive|stuck|nothing)/i] },
@@ -434,6 +441,7 @@ reg({
   displayName: "Inverter / Converter",
   complex: true,
   variant: "STANDARD",
+  earlyFramingQuestion: "What brand/model inverter or converter/charger is installed, if known?",
   steps: [
     { id: "ic_1", question: "Inverter/converter completely dead, or showing power but not functioning correctly?", prerequisites: [], matchPatterns: [/(?:dead|power|function|not\s*working)/i] },
     { id: "ic_2", question: "DC input voltage from batteries? Should be 12V-14V.", prerequisites: ["ic_1"], matchPatterns: [/(?:dc|battery|input).*(?:voltage|\d+)/i] },
@@ -672,7 +680,7 @@ export function buildProcedureContext(
   procedure: DiagnosticProcedure,
   completedIds: Set<string>,
   unableIds: Set<string>,
-  options?: { howToCheckRequested?: boolean },
+  options?: { howToCheckRequested?: boolean; initialFramingQuestion?: string | null },
 ): string {
   const nextStep = getNextStep(procedure, completedIds, unableIds);
   const totalSteps = procedure.steps.length;
@@ -709,6 +717,13 @@ export function buildProcedureContext(
 
   // Show next step
   if (nextStep) {
+    if (options?.initialFramingQuestion) {
+      lines.push("OPTIONAL FIRST-REPLY FRAMING:");
+      lines.push(`Ask once before or alongside the active step: \"${options.initialFramingQuestion}\"`);
+      lines.push("If the technician does not know, continue with the active step and do NOT ask again.");
+      lines.push("");
+    }
+
     lines.push(`NEXT REQUIRED STEP: ${nextStep.id}`);
     lines.push(`Ask EXACTLY: "${nextStep.question}"`);
 

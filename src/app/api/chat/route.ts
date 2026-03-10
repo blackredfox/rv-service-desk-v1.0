@@ -287,6 +287,19 @@ Partes requeridas: El número de parte se confirmará en el mostrador de servici
   return `${englishReport}\n\n${TRANSLATION_SEPARATOR}\n\n${translation}`;
 }
 
+function buildTranslationInstruction(translationLanguage?: Language): string {
+  if (!translationLanguage || translationLanguage === "EN") return "";
+
+  const languageName =
+    translationLanguage === "RU"
+      ? "Russian"
+      : translationLanguage === "ES"
+      ? "Spanish"
+      : "English";
+
+  return `\n\nAfter the English report, output "${TRANSLATION_SEPARATOR}" and provide a complete translation into ${languageName}. Translate both the report content and all six section headers. Keep the English block unchanged.`;
+}
+
 // Attachment validation constants
 const MAX_ATTACHMENTS = 10;
 const MAX_TOTAL_ATTACHMENT_BYTES = 6_000_000; // 6MB server-side (slightly higher than client)
@@ -882,7 +895,10 @@ export async function POST(req: Request) {
     
     // ── DATA PROVIDER: Step metadata context ──
     // This provides step text/questions to the LLM; it does NOT control flow
-    procedureContext = buildRegistryContext(ensuredCase.id);
+    const hasAssistantHistory = history.some((item) => item.role === "assistant" || item.role === "agent");
+    procedureContext = buildRegistryContext(ensuredCase.id, {
+      includeInitialFraming: !hasAssistantHistory,
+    });
   }
 
   // ========================================
@@ -1010,13 +1026,7 @@ export async function POST(req: Request) {
 
           const translationInstruction =
             langPolicy.includeTranslation && translationLanguage
-              ? `\n\nAfter the English report, output "--- TRANSLATION ---" and provide a complete translation into ${
-                  translationLanguage === "RU"
-                    ? "Russian"
-                    : translationLanguage === "ES"
-                    ? "Spanish"
-                    : "English"
-                }.`
+              ? buildTranslationInstruction(translationLanguage)
               : "";
 
           const overrideRequest = `Regenerate the FINAL SHOP REPORT now with the same facts and sections.
@@ -1496,13 +1506,7 @@ Do NOT ask follow-up diagnostic questions.${translationInstruction}`;
 
           const translationInstruction =
             langPolicy.includeTranslation && translationLanguage
-              ? `\n\nAfter the English report, output "--- TRANSLATION ---" and provide a complete translation into ${
-                  translationLanguage === "RU"
-                    ? "Russian"
-                    : translationLanguage === "ES"
-                    ? "Spanish"
-                    : "English"
-                }.`
+              ? buildTranslationInstruction(translationLanguage)
               : "";
 
           const finalReportRequest = `Generate the FINAL SHOP REPORT now.

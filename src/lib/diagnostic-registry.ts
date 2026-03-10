@@ -36,6 +36,10 @@ type DiagnosticEntry = {
   unableToVerifyKeys: Set<string>;
   /** Key findings that may trigger early isolation */
   keyFindings: string[];
+  /** Whether brand/model info is already known from intake */
+  equipmentIdentityKnown: boolean;
+  /** Whether the technician already said brand/model is unknown */
+  equipmentIdentityUnavailable: boolean;
   /** Whether initial message has been processed */
   initialized: boolean;
 };
@@ -55,6 +59,8 @@ function ensureEntry(caseId: string): DiagnosticEntry {
       answeredKeys: new Set(),
       unableToVerifyKeys: new Set(),
       keyFindings: [],
+      equipmentIdentityKnown: false,
+      equipmentIdentityUnavailable: false,
       initialized: false,
     };
     registry.set(caseId, entry);
@@ -105,6 +111,27 @@ const HOW_TO_CHECK_PATTERNS = [
 
 export function detectHowToCheck(message: string): boolean {
   return HOW_TO_CHECK_PATTERNS.some((p) => p.test(message));
+}
+
+const EQUIPMENT_IDENTITY_UNKNOWN_PATTERNS = [
+  /(?:don'?t|do\s+not)\s+know\s+(?:the\s+)?(?:brand|make|model|manufacturer)/i,
+  /(?:unknown|not\s+sure)\s+(?:brand|make|model|manufacturer)/i,
+  /(?:brand|make|model|manufacturer)\s+(?:unknown|not\s+known|not\s+available)/i,
+  /(?:не\s+знаю|неизвестн).*(?:марк|модел|производ)/i,
+  /(?:no\s+sé|desconozco).*(?:marca|modelo|fabricante)/i,
+];
+
+const EQUIPMENT_IDENTITY_KNOWN_PATTERNS = [
+  /\b(?:brand|make|model|manufacturer)\b/i,
+  /\b(?:dometic|coleman(?:\s+mach)?|mach|suburban|atwood|norcold|furrion|lippert|schwintek|hwh|power\s*gear|xantrex|magnum|victron|wfco|progressive\s+dynamics)\b/i,
+];
+
+function hasKnownEquipmentIdentity(message: string): boolean {
+  return EQUIPMENT_IDENTITY_KNOWN_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function hasUnavailableEquipmentIdentity(message: string): boolean {
+  return EQUIPMENT_IDENTITY_UNKNOWN_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 // ── Legacy topic extraction (backward compat) ───────────────────────
@@ -201,6 +228,8 @@ export function initializeCase(caseId: string, message: string): {
 
   entry.procedureSystem = system;
   entry.procedure = procedure;
+  entry.equipmentIdentityUnavailable = hasUnavailableEquipmentIdentity(message);
+  entry.equipmentIdentityKnown = !entry.equipmentIdentityUnavailable && hasKnownEquipmentIdentity(message);
   entry.initialized = true;
 
   let preCompletedSteps: string[] = [];
@@ -313,7 +342,7 @@ export function processUserMessage(caseId: string, message: string): {
  * If a procedure is active, uses structured procedure context.
  * Otherwise falls back to legacy topic-based context.
  */
-export function buildRegistryContext(caseId: string): string {
+export function buildRegistryContext(caseId: string, options?: { includeInitialFraming?: boolean }): string {
   const entry = registry.get(caseId);
   if (!entry) return "";
 
@@ -323,7 +352,16 @@ export function buildRegistryContext(caseId: string): string {
       entry.procedure,
       entry.completedStepIds,
       entry.unableStepIds,
-      { howToCheckRequested: entry.howToCheckRequested },
+      {
+        howToCheckRequested: entry.howToCheckRequested,
+        initialFramingQuestion:
+          options?.includeInitialFraming &&
+          entry.procedure.earlyFramingQuestion &&
+          !entry.equipmentIdentityKnown &&
+          !entry.equipmentIdentityUnavailable
+            ? entry.procedure.earlyFramingQuestion
+            : null,
+      },
     );
   }
 

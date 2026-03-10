@@ -28,6 +28,25 @@ const FINAL_REPORT_HEADERS = [
   "Required Parts",
 ];
 
+const TRANSLATED_FINAL_REPORT_HEADERS: Record<"RU" | "ES", Array<{ source: string; patterns: RegExp[] }>> = {
+  RU: [
+    { source: "Complaint", patterns: [/^\s*Жалоба\s*:/im] },
+    { source: "Diagnostic Procedure", patterns: [/^\s*Диагностическ(?:ая|ой)\s+процедура\s*:/im] },
+    { source: "Verified Condition", patterns: [/^\s*Подтвержд(?:ённое|енное)\s+состояние\s*:/im] },
+    { source: "Recommended Corrective Action", patterns: [/^\s*Рекомендованное\s+корректирующее\s+действие\s*:/im] },
+    { source: "Estimated Labor", patterns: [/^\s*Оценка\s+трудо(?:е|ё)мкости\s*:/im] },
+    { source: "Required Parts", patterns: [/^\s*Требуемые\s+детали\s*:/im] },
+  ],
+  ES: [
+    { source: "Complaint", patterns: [/^\s*Queja\s*:/im] },
+    { source: "Diagnostic Procedure", patterns: [/^\s*Procedimiento\s+de\s+diagn[oó]stico\s*:/im] },
+    { source: "Verified Condition", patterns: [/^\s*Condici[oó]n\s+verificada\s*:/im] },
+    { source: "Recommended Corrective Action", patterns: [/^\s*Acci[oó]n\s+correctiva\s+recomendada\s*:/im] },
+    { source: "Estimated Labor", patterns: [/^\s*Mano\s+de\s+obra\s+estimada\s*:/im] },
+    { source: "Required Parts", patterns: [/^\s*(?:Partes|Piezas)\s+requerid[ao]s\s*:/im] },
+  ],
+};
+
 const CYRILLIC_RE = /[\u0400-\u04FF]/;
 const SPANISH_CHARS_RE = /[áéíóúñ¿¡üÁÉÍÓÚÑÜ]/;
 
@@ -44,6 +63,17 @@ function englishSectionHasNonEnglish(text: string): boolean {
 
 function detectTranslationLanguage(text: string): Language {
   return detectLanguage(text).language;
+}
+
+function getMissingTranslatedHeaders(text: string, language: Language): string[] {
+  if (language === "EN") return [];
+
+  const expected = TRANSLATED_FINAL_REPORT_HEADERS[language as "RU" | "ES"];
+  if (!expected) return [];
+
+  return expected
+    .filter(({ patterns }) => !patterns.some((pattern) => pattern.test(text)))
+    .map(({ source }) => source);
 }
 
 // Final report section indicators (heuristics)
@@ -323,6 +353,11 @@ export function validateFinalReportOutput(
     const detected = detectTranslationLanguage(translationSection);
     if (detected !== translationLanguage) {
       violations.push(`FINAL_REPORT_LANG_POLICY: Translation block language mismatch (expected ${translationLanguage})`);
+    }
+
+    const missingTranslatedHeaders = getMissingTranslatedHeaders(translationSection, translationLanguage);
+    for (const header of missingTranslatedHeaders) {
+      violations.push(`FINAL_REPORT_LANG_POLICY: Translation block must translate section header: ${header}`);
     }
   }
 

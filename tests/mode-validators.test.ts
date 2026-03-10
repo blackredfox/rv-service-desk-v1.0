@@ -182,6 +182,19 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
       expect(result.valid).toBe(false);
       expect(result.violations.some(v => v.includes("numbered lists"))).toBe(true);
     });
+
+    it("should require translated headers in Spanish translation blocks", async () => {
+      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
+
+      const result = validateFinalReportOutput(
+        "Complaint: Water pump not operating.\nDiagnostic Procedure: Verified 12V present.\nVerified Condition: Unit not responding.\nRecommended Corrective Action: Replace pump.\nEstimated Labor: Total labor: 1.0 hr.\nRequired Parts: Water pump assembly.\n\n--- TRANSLATION ---\n\nComplaint: La bomba de agua no funciona.\nDiagnostic Procedure: Se verificó 12V.\nVerified Condition: La unidad no responde.\nRecommended Corrective Action: Reemplazar la bomba.\nEstimated Labor: Total labor: 1.0 hr.\nRequired Parts: Bomba de agua.",
+        true,
+        "ES"
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("Translation block must translate section header: Complaint"))).toBe(true);
+    });
   });
 
   describe("validateOutput dispatcher", () => {

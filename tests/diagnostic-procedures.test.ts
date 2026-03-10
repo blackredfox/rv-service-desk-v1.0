@@ -97,6 +97,18 @@ describe("getProcedure", () => {
     expect(getProcedure("antigravity_drive")).toBeNull();
   });
 
+  it("anchors roof AC procedure to RV rooftop terminology", async () => {
+    const { getProcedure } = await import("@/lib/diagnostic-procedures");
+    const proc = getProcedure("roof_ac")!;
+    const questions = proc.steps.map((step) => step.question).join(" ");
+
+    expect(proc.earlyFramingQuestion).toBe("What brand/model rooftop AC or heat pump is installed, if known?");
+    expect(questions).toContain("rooftop");
+    expect(questions).not.toContain("outside unit");
+    expect(questions).not.toContain("outdoor condenser fan");
+    expect(questions).not.toContain("Contactor");
+  });
+
   it("all procedures have unique step IDs", async () => {
     const { getProcedure, getRegisteredSystems } = await import("@/lib/diagnostic-procedures");
     for (const system of getRegisteredSystems()) {
@@ -253,6 +265,18 @@ describe("buildProcedureContext", () => {
     const ctx = buildProcedureContext(proc, new Set(), new Set());
     expect(ctx).toContain("Do NOT ask about systems other than Water Pump");
   });
+
+  it("can inject one early framing question for complex equipment without blocking the active step", async () => {
+    const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
+    const proc = getProcedure("roof_ac")!;
+    const ctx = buildProcedureContext(proc, new Set(), new Set(), {
+      initialFramingQuestion: proc.earlyFramingQuestion,
+    });
+
+    expect(ctx).toContain("OPTIONAL FIRST-REPLY FRAMING");
+    expect(ctx).toContain("What brand/model rooftop AC or heat pump is installed, if known?");
+    expect(ctx).toContain("NEXT REQUIRED STEP: ac_1");
+  });
 });
 
 // ── Integration: initializeCase + processUserMessage ────────────────
@@ -335,5 +359,27 @@ describe("Confusing input handling", () => {
     const result = initializeCase("conf-2", "LP gas furnace won't ignite, don't know the model");
     expect(result.procedure).not.toBeNull();
     expect(result.procedure!.variant).toBe("STANDARD");
+  });
+
+  it("asks one early brand/model framing question for complex equipment when missing", async () => {
+    const { initializeCase, buildRegistryContext, clearRegistry } = await import("@/lib/diagnostic-registry");
+    clearRegistry("conf-3");
+
+    initializeCase("conf-3", "Roof AC not cooling");
+    const ctx = buildRegistryContext("conf-3", { includeInitialFraming: true });
+
+    expect(ctx).toContain("What brand/model rooftop AC or heat pump is installed, if known?");
+    expect(ctx).toContain("NEXT REQUIRED STEP: ac_1");
+  });
+
+  it("does not repeat the brand/model framing question when technician already says unknown", async () => {
+    const { initializeCase, buildRegistryContext, clearRegistry } = await import("@/lib/diagnostic-registry");
+    clearRegistry("conf-4");
+
+    initializeCase("conf-4", "Roof AC not cooling, don't know the model");
+    const ctx = buildRegistryContext("conf-4", { includeInitialFraming: true });
+
+    expect(ctx).not.toContain("What brand/model rooftop AC or heat pump is installed, if known?");
+    expect(ctx).toContain("NEXT REQUIRED STEP: ac_1");
   });
 });
