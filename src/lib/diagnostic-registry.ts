@@ -166,6 +166,15 @@ const KEY_FINDING_PATTERNS: Array<{ pattern: RegExp; finding: string }> = [
   { pattern: /предохранител.*(?:сгор|перегор|пробит)/i, finding: "blown fuse (RU)" },
   { pattern: /лопаст.*(?:отсутств|слома|повреж|нет)/i, finding: "blade missing/damaged (RU)" },
   { pattern: /(?:не|нет)\s*(?:сопротивлен|непрерывност)/i, finding: "open circuit (RU)" },
+  // Water heater specific findings
+  { pattern: /(?:orifice|nozzle|форсунк).*(?:blocked|clogged|damage|burnt|обгор|засор|разва)/i, finding: "damaged/blocked orifice" },
+  { pattern: /(?:burner|горел).*(?:blocked|clogged|debris|spider|insect|засор|паук)/i, finding: "burner blockage" },
+  { pattern: /(?:thermocouple|термопар).*(?:bad|fail|broken|no\s*reading|0\s*mv)/i, finding: "failed thermocouple" },
+  { pattern: /(?:gas\s*valve|газов.*клапан).*(?:stuck|fail|no\s*flow|не\s*открыва)/i, finding: "gas valve failure" },
+  { pattern: /(?:igniter|поджиг|розжиг).*(?:fail|no\s*spark|no\s*glow|broken|не\s*работ)/i, finding: "igniter failure" },
+  { pattern: /(?:no|0)\s*(?:pressure|давлен).*(?:lp|gas|регулятор)/i, finding: "no LP pressure at regulator" },
+  { pattern: /(?:eco|high\s*limit).*(?:trip|tripped|reset)/i, finding: "ECO/high-limit tripped" },
+  { pattern: /форсунка.*(?:обгорел|развалива|прогор)/i, finding: "burnt/damaged orifice (RU)" },
 ];
 
 export function detectKeyFinding(message: string): string | null {
@@ -390,4 +399,41 @@ export function getRegistryEntry(caseId: string): DiagnosticEntry | undefined {
  */
 export function clearRegistry(caseId: string): void {
   registry.delete(caseId);
+}
+
+/**
+ * Mark a step as completed in the registry.
+ * Called by context-engine when technician answers a step.
+ */
+export function markStepCompleted(caseId: string, stepId: string): void {
+  const entry = ensureEntry(caseId);
+  entry.completedStepIds.add(stepId);
+  entry.askedStepIds.add(stepId); // Also mark as asked to prevent re-asking
+}
+
+/**
+ * Mark a step as unable to verify in the registry.
+ */
+export function markStepUnable(caseId: string, stepId: string): void {
+  const entry = ensureEntry(caseId);
+  entry.unableStepIds.add(stepId);
+  entry.askedStepIds.add(stepId); // Also mark as asked
+}
+
+/**
+ * Get the next available step ID for this case.
+ * Returns null if all steps complete or no procedure.
+ */
+export function getNextStepId(caseId: string): string | null {
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return null;
+  return getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
+}
+
+/**
+ * Get the active procedure for this case.
+ */
+export function getActiveProcedure(caseId: string): DiagnosticProcedure | null {
+  const entry = registry.get(caseId);
+  return entry?.procedure ?? null;
 }

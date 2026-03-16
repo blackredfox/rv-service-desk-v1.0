@@ -41,6 +41,17 @@ export type DiagnosticProcedure = {
 // ── System Detection ────────────────────────────────────────────────
 
 const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
+  // Water heater MUST be before furnace (more specific pattern)
+  { system: "water_heater", patterns: [
+    /water\s*heater/i, 
+    /водонагреват/i, 
+    /бойлер/i,
+    /calentador\s*de\s*agua/i,
+    /hot\s*water\s*(?:heater|tank|system)/i,
+    /suburban.*(?:gas|water)/i,
+    /atwood.*(?:gas|water)/i,
+    /(?:gas|propane|lp).*water\s*heater/i,
+  ]},
   { system: "water_pump", patterns: [/water\s*pump/i, /водяно[йе]\s*насос/i, /bomba\s*de\s*agua/i, /fresh\s*water\s*pump/i] },
   { system: "lp_gas", patterns: [/lp\s*gas|propane|gas\s*(?:system|leak|line|valve|regulator)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
   { system: "slide_out", patterns: [/slide[\s-]*out/i, /слайд/i, /slide\s*room/i] },
@@ -170,6 +181,157 @@ reg({
       question: "Control board error codes or fault indicators? LED status?",
       prerequisites: [],
       matchPatterns: [/(?:error|fault|code|led|blink|flash)/i],
+    },
+  ],
+});
+
+// ── Water Heater (Gas / Combo) ──────────────────────────────────────
+
+reg({
+  system: "water_heater",
+  displayName: "Water Heater (Gas/Combo)",
+  complex: true,
+  variant: "STANDARD",
+  steps: [
+    // Step 1: System type identification
+    {
+      id: "wh_1",
+      question: "What type of water heater? (Gas/LP only, Electric only, or Combo gas+electric) Make/model if known?",
+      prerequisites: [],
+      matchPatterns: [
+        /(?:gas|lp|propane|electric|combo|combination|both)/i,
+        /suburban|atwood|dometic|girard/i,
+        /(?:только\s*)?(?:газ|электр|комбинир)/i,
+      ],
+      howToCheck: "Check the label on the water heater. Gas units have a burner tube visible from outside. Electric-only units have no external burner access. Combo units have both.",
+    },
+    // Step 2: For gas/combo - LP supply verification
+    {
+      id: "wh_2",
+      question: "LP tank level — gauge reading or weight check? Main tank valve fully open?",
+      prerequisites: ["wh_1"],
+      matchPatterns: [
+        /(?:tank|level|gauge|манометр).*(?:\d+|full|empty|open|closed|0)/i,
+        /(?:valve|клапан|вентиль).*(?:open|closed|открыт|закрыт)/i,
+        /давлен.*(?:\d+|0|норм)/i,
+      ],
+      howToCheck: "Check tank gauge or weigh the tank. Ensure main valve handle is parallel to the line (open position).",
+    },
+    // Step 3: Other LP appliances check (isolation step)
+    {
+      id: "wh_3",
+      question: "Do other LP appliances work? (Stove burners, furnace, refrigerator on LP mode)",
+      prerequisites: ["wh_2"],
+      matchPatterns: [
+        /(?:other|stove|furnace|fridge|refrigerator|плита|печь|холодильник).*(?:work|yes|no|да|нет)/i,
+        /(?:да|нет|yes|no).*(?:work|работа)/i,
+      ],
+      howToCheck: "Turn on a stove burner. If it lights and burns blue, LP supply to the RV is good.",
+    },
+    // Step 4: Water heater gas valve position
+    {
+      id: "wh_4",
+      question: "Is the manual gas shutoff valve to the water heater open? (Located on gas line entering the unit)",
+      prerequisites: ["wh_3"],
+      matchPatterns: [
+        /(?:manual|shutoff|gas\s*valve).*(?:open|closed|yes|no)/i,
+        /(?:открыт|закрыт|да|нет)/i,
+      ],
+      howToCheck: "Trace the gas line to the water heater. The shutoff valve handle should be parallel to the pipe (open).",
+    },
+    // Step 5: 12V power verification
+    {
+      id: "wh_5",
+      question: "Is 12V DC present at the water heater control board/igniter? Measure voltage.",
+      prerequisites: ["wh_1"],
+      matchPatterns: [
+        /(?:\d+(?:\.\d+)?)\s*v(?:olts?|dc)?/i,
+        /(?:12v|12\s*volt|voltage|напряжени)/i,
+        /(?:no|yes|есть|нет)\s*(?:power|voltage|питани)/i,
+      ],
+      howToCheck: "With multimeter set to DC volts, measure across the 12V input terminals on the control board. Should read 11.5-13.5V.",
+    },
+    // Step 6: Ignition attempt
+    {
+      id: "wh_6",
+      question: "When water heater is turned ON: Do you hear clicking/sparking from the igniter? For glow plug models: does it glow orange?",
+      prerequisites: ["wh_4", "wh_5"],
+      matchPatterns: [
+        /(?:click|spark|glow|ignit).*(?:yes|no|hear|see)/i,
+        /(?:да|нет|слыш|виж).*(?:щелч|искр|свеч)/i,
+        /(?:no|yes)\s*(?:click|spark|glow)/i,
+      ],
+      howToCheck: "Turn the water heater switch ON. Listen near the burner for clicking (spark ignition) or look for orange glow (hot surface igniter).",
+    },
+    // Step 7: Flame presence
+    {
+      id: "wh_7",
+      question: "Does the burner flame light and stay lit? Color: blue, yellow, or no flame?",
+      prerequisites: ["wh_6"],
+      matchPatterns: [
+        /flame.*(?:yes|no|blue|yellow|orange|lit|light|stay|goes\s*out)/i,
+        /(?:пламя|огонь).*(?:да|нет|голуб|жёлт|гаснет|горит)/i,
+        /(?:no|yes)\s*flame/i,
+      ],
+      howToCheck: "Look through the burner access window. A healthy flame is mostly blue with slight yellow tips.",
+    },
+    // Step 8: Gas at valve outlet
+    {
+      id: "wh_8",
+      question: "With 12V confirmed at the gas valve solenoid: is gas flowing through? (Brief smell test at burner tube, or manometer reading)",
+      prerequisites: ["wh_5"],
+      matchPatterns: [
+        /(?:gas|smell|flow|odor).*(?:yes|no|present|none)/i,
+        /(?:газ|запах).*(?:да|нет|есть)/i,
+        /manometer.*(?:\d+|0)/i,
+      ],
+      howToCheck: "SAFETY: Brief sniff only. If 12V is at valve but no gas flows, valve solenoid may be stuck or failed.",
+    },
+    // Step 9: Thermocouple/ECO check
+    {
+      id: "wh_9",
+      question: "Thermocouple / flame sensor: Clean and properly positioned in flame path? Millivolt reading when flame present?",
+      prerequisites: ["wh_7"],
+      matchPatterns: [
+        /(?:thermocouple|flame\s*sensor|eco).*(?:clean|dirty|position|mv|millivolt|\d+)/i,
+        /(?:термопар|датчик).*(?:чист|грязн|позиц|\d+)/i,
+      ],
+      howToCheck: "With flame present, measure DC millivolts across thermocouple leads. Should be 20-30mV minimum.",
+    },
+    // Step 10: Burner/orifice inspection
+    {
+      id: "wh_10",
+      question: "Burner tube and orifice condition: Any blockage, corrosion, insect debris, or damage visible?",
+      prerequisites: ["wh_4"],
+      matchPatterns: [
+        /(?:burner|orifice|tube|nozzle|форсунк|горел).*(?:clean|blocked|clogged|damage|debris|corrosion|insect|spider|обгор|засор|грязн|паук)/i,
+        /(?:blockage|засор|debris)/i,
+        /(?:clean|clear|good|ok|чист|норм)/i,
+      ],
+      howToCheck: "Remove burner tube access cover. Look inside with flashlight. Spider webs and mud dauber nests are common blockages.",
+    },
+    // Step 11: For combo units - electric element check
+    {
+      id: "wh_11",
+      question: "For COMBO units only: Does the electric heating element work? 120V present at element when switch is ON?",
+      prerequisites: ["wh_1"],
+      matchPatterns: [
+        /(?:element|electric|120v|ac).*(?:work|yes|no|voltage|\d+)/i,
+        /(?:тэн|электр).*(?:работ|да|нет|напряж)/i,
+        /combo.*(?:electric|element)/i,
+      ],
+      howToCheck: "With electric mode ON, measure 120VAC at the heating element terminals. Element resistance should be 10-16 ohms.",
+    },
+    // Step 12: High limit / ECO reset
+    {
+      id: "wh_12",
+      question: "Has the high-limit (ECO) reset button been checked/pressed? Located on gas valve or near thermostat.",
+      prerequisites: ["wh_5"],
+      matchPatterns: [
+        /(?:eco|high\s*limit|reset).*(?:press|check|yes|no|trip)/i,
+        /(?:кнопк|сброс).*(?:нажа|провер|да|нет)/i,
+      ],
+      howToCheck: "Find the small red reset button on the gas valve assembly. Press firmly. If it clicks, the ECO had tripped.",
     },
   ],
 });

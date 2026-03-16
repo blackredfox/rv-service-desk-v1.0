@@ -22,6 +22,11 @@ import { detectIntent, describeIntent, isClarificationRequest } from "./intent-r
 import { checkLoopViolation, generateAntiLoopDirectives, updateLoopState, isFallbackResponse } from "./loop-guard";
 import { shouldReplan, executeReplan, buildReplanNotice, isInReplanState, clearReplanState } from "./replan";
 import { pushTopic, popTopic, isInClarificationSubflow, buildReturnToMainInstruction, buildClarificationContext, shouldAutoPopTopic, getCurrentClarificationTopic } from "./topic-stack";
+import { 
+  markStepCompleted as registryMarkStepCompleted, 
+  markStepUnable as registryMarkStepUnable,
+  getNextStepId as registryGetNextStepId,
+} from "../diagnostic-registry";
 
 // Re-export config
 export { DEFAULT_CONFIG } from "./types";
@@ -170,11 +175,27 @@ export function processMessage(
       stateChanged = true;
     }
     
-    // Mark steps as completed or unable based on intent
-    if (intent.type === "UNABLE_TO_VERIFY" && context.activeStepId) {
-      context.unableSteps.add(context.activeStepId);
-      context.activeStepId = null;
-      stateChanged = true;
+    // Mark current step as completed or unable based on intent
+    if (context.activeStepId) {
+      if (intent.type === "UNABLE_TO_VERIFY") {
+        context.unableSteps.add(context.activeStepId);
+        registryMarkStepUnable(caseId, context.activeStepId); // Sync to registry
+        notices.push(`Step ${context.activeStepId} marked as UNABLE`);
+        context.activeStepId = null;
+        stateChanged = true;
+      } else if (intent.type === "MAIN_DIAGNOSTIC" || intent.type === "ALREADY_ANSWERED") {
+        // Technician answered the current step — mark it complete
+        context.completedSteps.add(context.activeStepId);
+        registryMarkStepCompleted(caseId, context.activeStepId); // Sync to registry
+        notices.push(`Step ${context.activeStepId} marked as COMPLETED`);
+        context.activeStepId = null;
+        stateChanged = true;
+      }
+    }
+    
+    // Handle "already answered" — prevent re-asking
+    if (intent.type === "ALREADY_ANSWERED") {
+      notices.push("Technician indicated already answered — moving forward");
     }
   }
   

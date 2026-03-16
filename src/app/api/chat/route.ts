@@ -23,6 +23,7 @@ import {
   getSafeFallback,
   buildCorrectionInstruction,
   logValidation,
+  validateLanguageConsistency,
 } from "@/lib/mode-validators";
 import { validateLaborSum } from "@/lib/labor-store";
 import {
@@ -666,6 +667,19 @@ export async function POST(req: Request) {
         const validateStart = Date.now();
         let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
         validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
+        
+        // Also validate language consistency for diagnostic mode
+        if (currentMode === "diagnostic") {
+          const langValidation = validateLanguageConsistency(result.response, trackedInputLanguage);
+          if (!langValidation.valid) {
+            validation = {
+              ...validation,
+              valid: false,
+              violations: [...validation.violations, ...langValidation.violations],
+            };
+          }
+        }
+        
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
         logTiming("validate_output", {
           caseId: ensuredCase.id,

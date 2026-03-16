@@ -240,6 +240,45 @@ export function validateDiagnosticOutput(text: string): ValidationResult {
 }
 
 /**
+ * Validate language consistency in diagnostic output.
+ * Output language must match the expected dialogue language.
+ */
+export function validateLanguageConsistency(
+  text: string, 
+  expectedLanguage: Language
+): ValidationResult {
+  const violations: string[] = [];
+  
+  const hasCyrillic = CYRILLIC_RE.test(text);
+  const hasSpanish = SPANISH_CHARS_RE.test(text);
+  
+  if (expectedLanguage === "RU") {
+    // Russian session — should have Cyrillic, should NOT have Spanish chars
+    if (!hasCyrillic && text.length > 50) {
+      violations.push("LANGUAGE_MISMATCH: Russian session but output appears to be in English");
+    }
+    if (hasSpanish) {
+      violations.push("LANGUAGE_MISMATCH: Russian session but output contains Spanish characters");
+    }
+  } else if (expectedLanguage === "ES") {
+    // Spanish session — should have Spanish chars or at least not Cyrillic
+    if (hasCyrillic) {
+      violations.push("LANGUAGE_MISMATCH: Spanish session but output contains Cyrillic characters");
+    }
+  } else if (expectedLanguage === "EN") {
+    // English session — should NOT have Cyrillic or heavy Spanish markers
+    if (hasCyrillic) {
+      violations.push("LANGUAGE_MISMATCH: English session but output contains Cyrillic characters");
+    }
+  }
+  
+  return {
+    valid: violations.length === 0,
+    violations,
+  };
+}
+
+/**
  * Validate authorization mode output
  */
 export function validateAuthorizationOutput(text: string): ValidationResult {
