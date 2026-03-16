@@ -65,6 +65,7 @@ import {
   extractPrimaryReportBlock,
   buildFinalReportFallback,
   DIAGNOSTIC_MODE_GUARD_VIOLATION,
+  isDiagnosticDriftViolation,
   applyDiagnosticModeValidationGuard,
   buildDiagnosticDriftCorrectionInstruction,
   buildDiagnosticDriftFallback,
@@ -683,7 +684,9 @@ export async function POST(req: Request) {
           console.log(`[Chat API v2] Validation failed, retrying with correction...`);
           emitToken("\n\n[System] Repairing output...\n\n");
           const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
-          if (validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)) {
+          
+          // Add drift correction for ANY diagnostic drift violation
+          if (isDiagnosticDriftViolation(validation.violations)) {
             correctionInstructionParts.push(
               buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId ?? undefined)
             );
@@ -739,9 +742,14 @@ export async function POST(req: Request) {
               reason: result.error ? "upstream_error_on_retry" : "validation_after_retry_failed",
             });
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
+            
+            // Use diagnostic drift fallback for ANY diagnostic drift violation
+            // NEVER use final report fallback when in diagnostic mode
             result.response =
-              currentMode === "diagnostic" && validation.violations.includes(DIAGNOSTIC_MODE_GUARD_VIOLATION)
+              currentMode === "diagnostic" && isDiagnosticDriftViolation(validation.violations)
                 ? buildDiagnosticDriftFallback(engineResult?.context.activeStepId ?? undefined)
+                : currentMode === "diagnostic"
+                ? getSafeFallback(currentMode, outputPolicy.effective)
                 : currentMode === "final_report"
                 ? buildFinalReportFallback({
                     policy: langPolicy,

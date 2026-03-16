@@ -293,8 +293,8 @@ Step 2: Is 12V DC present at the pump motor terminals?`;
     });
   });
 
-  describe("validateDiagnosticOutput with transition", () => {
-    it("should allow transition response without question", async () => {
+  describe("validateDiagnosticOutput with transition (BLOCKED)", () => {
+    it("should BLOCK transition response (explicit-only mode transitions)", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const transitionOutput = `Зафиксировано: масса проверена, целостность подтверждена.
@@ -305,21 +305,22 @@ Isolation complete. Conditions met. Transitioning to Final Report Mode.
 
       const result = validateDiagnosticOutput(transitionOutput);
 
-      expect(result.valid).toBe(true);
-      expect(result.violations).toHaveLength(0);
+      // Transition responses are now BLOCKED
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("ISOLATION_DECLARATION_BLOCKED"))).toBe(true);
+      expect(result.violations.some(v => v.includes("TRANSITION_MARKER_BLOCKED"))).toBe(true);
     });
 
-    it("should reject transition response with prohibited words", async () => {
+    it("should block transition response even without explicit marker", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const transitionOutput = `The pump is broken and damaged.
+      // LLM might declare isolation complete without the marker
+      const isolationOutput = `Понял. Изоляция завершена. Условия выполнены.`;
 
-[TRANSITION: FINAL_REPORT]`;
-
-      const result = validateDiagnosticOutput(transitionOutput);
+      const result = validateDiagnosticOutput(isolationOutput);
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("PROHIBITED_WORDS"))).toBe(true);
+      expect(result.violations.some(v => v.includes("ISOLATION_DECLARATION_BLOCKED"))).toBe(true);
     });
   });
 

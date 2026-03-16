@@ -47,6 +47,8 @@ export {
   extractPrimaryReportBlock,
   buildFinalReportFallback,
   DIAGNOSTIC_MODE_GUARD_VIOLATION,
+  ISOLATION_DECLARATION_VIOLATION,
+  isDiagnosticDriftViolation,
   applyDiagnosticModeValidationGuard,
   buildDiagnosticDriftCorrectionInstruction,
   buildDiagnosticDriftFallback,

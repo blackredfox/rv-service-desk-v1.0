@@ -104,6 +104,24 @@ export const DIAGNOSTIC_MODE_GUARD_VIOLATION =
   "DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format";
 
 /**
+ * Isolation declaration violation constant.
+ */
+export const ISOLATION_DECLARATION_VIOLATION =
+  "ISOLATION_DECLARATION_BLOCKED: LLM cannot declare isolation complete";
+
+/**
+ * Check if violations indicate diagnostic drift that needs correction.
+ */
+export function isDiagnosticDriftViolation(violations: string[]): boolean {
+  return violations.some(v => 
+    v.includes("DIAGNOSTIC_DRIFT") || 
+    v.includes("DIAGNOSTIC_MODE_GUARD") ||
+    v.includes("ISOLATION_DECLARATION_BLOCKED") ||
+    v.includes("TRANSITION_MARKER_BLOCKED")
+  );
+}
+
+/**
  * Apply diagnostic mode validation guard.
  * In diagnostic mode, output must NOT look like a final report.
  */
@@ -158,6 +176,9 @@ export function buildDiagnosticDriftCorrectionInstruction(activeStepId?: string)
     "Diagnostic drift correction (MANDATORY):",
     "- You are in DIAGNOSTIC mode, not FINAL_REPORT mode.",
     "- Do NOT output final report headers (Complaint/Diagnostic Procedure/Verified Condition/etc.).",
+    "- Do NOT declare 'isolation complete', 'conditions met', or similar phrases.",
+    "- Do NOT output [TRANSITION: FINAL_REPORT] or any transition markers.",
+    "- Only the TECHNICIAN can end diagnostics by sending 'START FINAL REPORT'.",
     `- ${stepHint}`,
     "- Ask exactly ONE concise diagnostic question that advances the procedure.",
   ].join("\n");
