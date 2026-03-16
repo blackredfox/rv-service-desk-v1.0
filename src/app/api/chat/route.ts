@@ -15,7 +15,6 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   composePromptV2,
   detectModeCommand,
-  detectTransitionSignal,
   type CaseMode,
   DEFAULT_MEMORY_WINDOW,
 } from "@/lib/prompt-composer";
@@ -59,15 +58,9 @@ import {
   filterValidAttachments,
   buildVisionInstruction,
   type Attachment,
-  parseRequestedLaborHours,
-  detectLaborOverrideIntent,
-  looksLikeFinalReport,
-  shouldTreatAsFinalReportForOverride,
   computeLaborOverrideRequest,
-  normalizeLaborHours,
   formatLaborHours,
   hasCanonicalTotalLaborLine,
-  TRANSLATION_SEPARATOR,
   enforceLanguagePolicy,
   extractPrimaryReportBlock,
   buildFinalReportFallback,
@@ -75,14 +68,15 @@ import {
   applyDiagnosticModeValidationGuard,
   buildDiagnosticDriftCorrectionInstruction,
   buildDiagnosticDriftFallback,
-  buildTranslationInstruction,
-  buildFinalReportRequest,
-  buildTransitionConstraints,
   buildLaborOverrideConstraints,
   buildLaborOverrideRequest,
-  buildFinalReportCorrectionInstruction,
   logTiming,
   logFlow,
+  // Re-export for tests
+  parseRequestedLaborHours,
+  detectLaborOverrideIntent,
+  looksLikeFinalReport,
+  shouldTreatAsFinalReportForOverride,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -240,7 +234,6 @@ export async function POST(req: Request) {
 
   // ── CONTEXT ENGINE: SINGLE FLOW AUTHORITY ─────────────────────────
   let procedureContext = "";
-  let pivotTriggered = false;
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
 
@@ -284,16 +277,15 @@ export async function POST(req: Request) {
 
     if (isInReplanState(engineResult.context)) {
       console.log(`[Chat API v2] REPLAN triggered (Context Engine): ${engineResult.context.replanReason}`);
-      pivotTriggered = false;
     }
 
     if (isInClarificationSubflow(engineResult.context)) {
       console.log(`[Chat API v2] Clarification subflow (Context Engine): ${engineResult.context.submode}`);
     }
 
+    // Log isolation state for diagnostics (but do NOT trigger auto-transition)
     if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
-      pivotTriggered = true;
-      console.log(`[Chat API v2] Pivot triggered (Context Engine): "${engineResult.context.isolationFinding}"`);
+      console.log(`[Chat API v2] Context Engine isolation state: "${engineResult.context.isolationFinding}" (no auto-transition — explicit command required)`);
     }
 
     const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
@@ -796,250 +788,10 @@ export async function POST(req: Request) {
           }
         }
 
-        // ── AUTO TRANSITION: diagnostic -> final_report ─────────────
-        const transitionResult = detectTransitionSignal(full);
-        const shouldGenerateFinalReport =
-          currentMode === "diagnostic" &&
-          !aborted &&
-          (pivotTriggered || Boolean(transitionResult));
-
-        if (shouldGenerateFinalReport) {
-          const diagnosticContent = transitionResult?.cleanedResponse ?? full;
-          const transitionReason = pivotTriggered
-            ? "context-engine-pivot"
-            : "transition-signal";
-
-          console.log(`[Chat API v2] Auto-transition to final_report (${transitionReason})`);
-
-          if (!aborted && diagnosticContent.trim()) {
-            await storage.appendMessage({
-              caseId: ensuredCase.id,
-              role: "assistant",
-              content: diagnosticContent,
-              language: outputPolicy.effective,
-              userId: user?.id,
-            });
-          }
-
-          currentMode = "final_report";
-          await storage.updateCase(ensuredCase.id, { mode: currentMode });
-          controller.enqueue(
-            encoder.encode(
-              sseEncode({ type: "mode_transition", from: "diagnostic", to: currentMode })
-            )
-          );
-
-          emitToken("\n\n");
-
-          const transitionHistoryStart = Date.now();
-          const updatedHistoryForReport = await storage.listMessagesForContext(
-            ensuredCase.id,
-            DEFAULT_MEMORY_WINDOW
-          );
-          logTiming("load_history", {
-            caseId: ensuredCase.id,
-            mode: "final_report",
-            path: "transition",
-            loadHistoryMs: Date.now() - transitionHistoryStart,
-          });
-          const factLock = buildFactLockConstraint(updatedHistoryForReport);
-          const transitionConstraints = buildTransitionConstraints(factLock);
-
-          const transitionComposeStart = Date.now();
-          const finalReportPrompt = composePromptV2({
-            mode: currentMode,
-            inputDetected: trackedInputLanguage,
-            outputEffective: outputPolicy.effective,
-            includeTranslation: langPolicy.includeTranslation,
-            translationLanguage,
-            additionalConstraints: transitionConstraints,
-          });
-          logTiming("compose_prompt", {
-            caseId: ensuredCase.id,
-            mode: currentMode,
-            path: "transition",
-            composePromptMs: Date.now() - transitionComposeStart,
-          });
-
-          const finalReportRequest = buildFinalReportRequest(
-            langPolicy.includeTranslation,
-            translationLanguage
-          );
-
-          const finalReportBody = {
-            model: getModelForMode("final_report"),
-            temperature: 0.2,
-            messages: buildOpenAiMessages({
-              system: finalReportPrompt,
-              history: updatedHistoryForReport,
-              userMessage: finalReportRequest,
-              attachments: undefined,
-            }),
-          };
-
-          const transitionFirstStart = Date.now();
-          let finalResult = await callOpenAI(apiKey, finalReportBody, ac.signal, emitToken);
-          logTiming("openai_call", {
-            caseId: ensuredCase.id,
-            mode: "final_report",
-            path: "transition_first",
-            openAiStartMs: transitionFirstStart - requestStartedAt,
-            openAiMs: finalResult.durationMs,
-            openAiFirstTokenMs: finalResult.firstTokenMs,
-          });
-          let finalContent = finalResult.response;
-
-          if (!finalResult.error && finalContent.trim()) {
-            logFlow("validation_post_stream", {
-              caseId: ensuredCase.id,
-              mode: currentMode,
-              path: "transition_first",
-              openAiFirstTokenMs: finalResult.firstTokenMs,
-              responseChars: finalContent.length,
-            });
-            const finalValidateStart = Date.now();
-            let finalValidation = validateOutput(
-              finalContent,
-              currentMode,
-              langPolicy.includeTranslation,
-              translationLanguage
-            );
-            finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
-            logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
-            logTiming("validate_output", {
-              caseId: ensuredCase.id,
-              mode: currentMode,
-              path: "transition_first",
-              validateMs: Date.now() - finalValidateStart,
-            });
-
-            if (!finalValidation.valid && !aborted) {
-              logFlow("validation_failed", {
-                caseId: ensuredCase.id,
-                mode: currentMode,
-                path: "transition_first",
-                violations: finalValidation.violations.length,
-              });
-              emitToken("\n\n[System] Repairing output...\n\n");
-              const correctionInstruction = buildFinalReportCorrectionInstruction(
-                buildCorrectionInstruction(finalValidation.violations)
-              );
-
-              const retryBody = {
-                ...finalReportBody,
-                messages: buildOpenAiMessages({
-                  system: finalReportPrompt,
-                  history: updatedHistoryForReport,
-                  userMessage: finalReportRequest,
-                  attachments: undefined,
-                  correctionInstruction,
-                }),
-              };
-
-              logFlow("retry_triggered", {
-                caseId: ensuredCase.id,
-                mode: currentMode,
-                path: "transition_retry",
-              });
-
-              const transitionRetryStart = Date.now();
-              finalResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
-              logTiming("openai_call", {
-                caseId: ensuredCase.id,
-                mode: currentMode,
-                path: "transition_retry",
-                openAiStartMs: transitionRetryStart - requestStartedAt,
-                openAiMs: finalResult.durationMs,
-                openAiFirstTokenMs: finalResult.firstTokenMs,
-              });
-              if (!finalResult.error) {
-                finalContent = finalResult.response;
-                const retryValidateStart = Date.now();
-                finalValidation = validateOutput(
-                  finalContent,
-                  currentMode,
-                  langPolicy.includeTranslation,
-                  translationLanguage
-                );
-                finalValidation = applyDiagnosticModeValidationGuard(finalValidation, currentMode, finalContent);
-                logValidation(finalValidation, { caseId: ensuredCase.id, mode: currentMode });
-                logTiming("validate_output", {
-                  caseId: ensuredCase.id,
-                  mode: currentMode,
-                  path: "transition_retry",
-                  validateMs: Date.now() - retryValidateStart,
-                });
-              }
-            }
-
-            finalContent = enforceLanguagePolicy(finalContent, langPolicy);
-
-            const postValidation = validateOutput(
-              finalContent,
-              currentMode,
-              langPolicy.includeTranslation,
-              translationLanguage
-            );
-            const guardedPostValidation = applyDiagnosticModeValidationGuard(
-              postValidation,
-              currentMode,
-              finalContent
-            );
-
-            if (!guardedPostValidation.valid) {
-              logFlow("safe_fallback_used", {
-                caseId: ensuredCase.id,
-                mode: currentMode,
-                path: "transition_post",
-                reason: "validation_after_retry_failed",
-              });
-              console.log(`[Chat API v2] Final report validation failed after retry, using fallback`);
-              finalContent = buildFinalReportFallback({
-                policy: langPolicy,
-                translationLanguage,
-              });
-              emitToken(finalContent);
-            }
-
-            if (!aborted && finalContent.trim()) {
-              await storage.appendMessage({
-                caseId: ensuredCase.id,
-                role: "assistant",
-                content: finalContent,
-                language: outputPolicy.effective,
-                userId: user?.id,
-              });
-            }
-          } else {
-            logFlow("safe_fallback_used", {
-              caseId: ensuredCase.id,
-              mode: currentMode,
-              path: "transition_first",
-              reason: "upstream_error_or_empty",
-            });
-            console.error(
-              `[Chat API v2] Final report generation error after transition: ${finalResult.error || "empty response"}`
-            );
-            const fallback = buildFinalReportFallback({
-              policy: langPolicy,
-              translationLanguage,
-            });
-            emitToken(fallback);
-            if (!aborted) {
-              await storage.appendMessage({
-                caseId: ensuredCase.id,
-                role: "assistant",
-                content: fallback,
-                language: outputPolicy.effective,
-                userId: user?.id,
-              });
-            }
-          }
-
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
-          controller.close();
-          return;
-        }
+        // ── AUTO-TRANSITION DISABLED (Explicit Command Required) ────────
+        // Mode transitions happen ONLY via explicit command (START FINAL REPORT)
+        // Context Engine isolation state is tracked but does NOT trigger auto-transition
+        // This preserves the architecture rule: explicit-only mode transitions
 
         // ── NO TRANSITION ───────────────────────────────────────────
         full = enforceLanguagePolicy(full, langPolicy);

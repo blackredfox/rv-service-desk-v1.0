@@ -324,16 +324,20 @@ Isolation complete. Conditions met. Transitioning to Final Report Mode.
   });
 
   describe("Transition prompt content", () => {
-    it("should have transition signal instructions in diagnostic prompt", async () => {
+    it("should enforce explicit-only mode transitions in diagnostic prompt", async () => {
       const { readFileSync } = await import("fs");
       const { join } = await import("path");
       
       const promptPath = join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt");
       const promptContent = readFileSync(promptPath, "utf-8");
       
-      expect(promptContent).toContain("[TRANSITION: FINAL_REPORT]");
-      expect(promptContent).toContain("WHEN READY TO TRANSITION");
-      expect(promptContent).toContain("Isolation complete");
+      // Should NOT have auto-transition instructions
+      expect(promptContent).not.toContain("[TRANSITION: FINAL_REPORT]");
+      
+      // Should have explicit-only transition rules
+      expect(promptContent).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
+      expect(promptContent).toContain("START FINAL REPORT");
+      expect(promptContent).toContain("CANNOT trigger mode transitions");
     });
   });
 });

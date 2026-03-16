@@ -728,8 +728,9 @@ export function buildProcedureContext(
     lines.push("- Do NOT invent diagnostic steps outside this procedure.");
     lines.push("- Do NOT ask about systems other than " + procedure.displayName + ".");
   } else {
-    lines.push("ALL STEPS COMPLETE — ready to transition.");
-    lines.push("State isolation findings and output [TRANSITION: FINAL_REPORT].");
+    lines.push("ALL STEPS COMPLETE.");
+    lines.push("Summarize findings and ask: 'Ready to generate final report? Send START FINAL REPORT when ready.'");
+    lines.push("Do NOT generate the report. Do NOT declare isolation complete. Wait for explicit command.");
   }
 
   return lines.join("\n");

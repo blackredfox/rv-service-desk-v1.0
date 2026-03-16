@@ -238,13 +238,14 @@ describe("buildProcedureContext", () => {
     expect(ctx).toContain("[SKIP] wp_2");
   });
 
-  it("shows 'ALL STEPS COMPLETE' when done", async () => {
+  it("shows 'ALL STEPS COMPLETE' when done (no auto-transition)", async () => {
     const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
     const proc = getProcedure("water_pump")!;
     const allIds = new Set(proc.steps.map(s => s.id));
     const ctx = buildProcedureContext(proc, allIds, new Set());
     expect(ctx).toContain("ALL STEPS COMPLETE");
-    expect(ctx).toContain("[TRANSITION: FINAL_REPORT]");
+    expect(ctx).toContain("START FINAL REPORT");
+    expect(ctx).not.toContain("[TRANSITION: FINAL_REPORT]");
   });
 
   it("prevents cross-system questions", async () => {

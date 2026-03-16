@@ -201,6 +201,18 @@ Required Parts: None`;
       expect(fallback).not.toContain("--- TRANSLATION ---");
     });
 
+    it("should build final report fallback with complaint context", () => {
+      const fallback = buildFinalReportFallback({
+        policy: { includeTranslation: false },
+        laborHours: 1.0,
+        complaint: "водонагреватель не работает",
+        finding: "LP gauge shows zero pressure",
+      });
+
+      expect(fallback).toContain("Complaint: водонагреватель не работает");
+      expect(fallback).toContain("Verified Condition: LP gauge shows zero pressure");
+    });
+
     it("should build final report fallback with translation", () => {
       const fallback = buildFinalReportFallback({
         policy: { includeTranslation: true },

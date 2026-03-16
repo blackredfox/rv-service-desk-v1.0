@@ -33,16 +33,24 @@ export function extractPrimaryReportBlock(text: string): string {
 
 /**
  * Build final report fallback when LLM fails to generate valid output.
+ * Now accepts optional complaint and finding from conversation history.
  */
 export function buildFinalReportFallback(args: {
   policy: LanguagePolicy;
   translationLanguage?: Language;
   laborHours?: number;
+  complaint?: string;
+  finding?: string;
 }): string {
   const totalLaborText = formatLaborHoursForFallback(args.laborHours ?? 1.0);
-  const englishReport = `Complaint: Complaint details pending verification.
+  
+  // Use provided complaint or fallback to generic
+  const complaintText = args.complaint?.trim() || "Complaint details pending verification.";
+  const findingText = args.finding?.trim() || "Condition not operating per specification under reported test conditions.";
+  
+  const englishReport = `Complaint: ${complaintText}
 Diagnostic Procedure: Diagnostic isolation completed based on available technician inputs.
-Verified Condition: Condition not operating per specification under reported test conditions.
+Verified Condition: ${findingText}
 Recommended Corrective Action: Perform unit-level corrective action aligned to verified condition.
 Estimated Labor: System isolation and access - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
 Required Parts: Part number to be confirmed at service counter.`;
@@ -51,17 +59,30 @@ Required Parts: Part number to be confirmed at service counter.`;
     return englishReport;
   }
 
+  // For translations, use complaint as-is if provided (may already be in target language)
+  const translatedComplaint = args.complaint?.trim() || (
+    args.translationLanguage === "RU"
+      ? "Детали жалобы ожидают подтверждения."
+      : "Los detalles de la queja están pendientes de verificación."
+  );
+  
+  const translatedFinding = args.finding?.trim() || (
+    args.translationLanguage === "RU"
+      ? "Состояние не соответствует спецификации при заявленных условиях проверки."
+      : "La condición no opera según especificación bajo las condiciones de prueba reportadas."
+  );
+
   const translation =
     args.translationLanguage === "RU"
-      ? `Жалоба: Детали жалобы ожидают подтверждения.
+      ? `Жалоба: ${translatedComplaint}
 Диагностическая процедура: Диагностическая изоляция завершена на основе доступных данных техника.
-Подтверждённое состояние: Состояние не соответствует спецификации при заявленных условиях проверки.
+Подтверждённое состояние: ${translatedFinding}
 Рекомендуемое корректирующее действие: Выполнить корректирующее действие на уровне узла в соответствии с подтверждённым состоянием.
 Оценка трудозатрат: Изоляция системы и доступ - ${totalLaborText} ч. Total labor: ${totalLaborText} hr.
 Необходимые детали: Номер детали будет уточнён на сервисной стойке.`
-      : `Queja: Los detalles de la queja están pendientes de verificación.
+      : `Queja: ${translatedComplaint}
 Procedimiento de diagnóstico: El aislamiento diagnóstico se completó con base en la información disponible del técnico.
-Condición verificada: La condición no opera según especificación bajo las condiciones de prueba reportadas.
+Condición verificada: ${translatedFinding}
 Acción correctiva recomendada: Realizar una acción correctiva a nivel de unidad alineada con la condición verificada.
 Mano de obra estimada: Aislamiento del sistema y acceso - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
 Partes requeridas: El número de parte se confirmará en el mostrador de servicio.`;

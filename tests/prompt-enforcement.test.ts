@@ -115,7 +115,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should prohibit unauthorized actions in diagnostic mode", () => {
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT generate the final report yourself");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT generate the report yourself");
       expect(MODE_DIAGNOSTIC).toContain("Do NOT invent diagnostic steps");
       expect(MODE_DIAGNOSTIC).toContain("Do NOT skip ahead");
     });
