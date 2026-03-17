@@ -338,7 +338,7 @@ Isolation complete. Conditions met. Transitioning to Final Report Mode.
       // Should have explicit-only transition rules
       expect(promptContent).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
       expect(promptContent).toContain("START FINAL REPORT");
-      expect(promptContent).toContain("CANNOT trigger mode transitions");
+      expect(promptContent).toContain("CANNOT automatically switch to final_report mode");
     });
   });
 });

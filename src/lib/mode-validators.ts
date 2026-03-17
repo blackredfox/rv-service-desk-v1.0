@@ -216,12 +216,16 @@ export function validateDiagnosticOutput(text: string): ValidationResult {
     violations.push("DIAGNOSTIC_DRIFT: Output contains translation separator (final report format)");
   }
 
-  // Should have at least one question, but not too many
+  // Should have at least one question — UNLESS this is a completion offer
+  // (P1.6: completion summary + START FINAL REPORT offer is valid without a question mark)
+  const isCompletionOffer = /start\s+final\s+report/i.test(text);
   const questionCheck = hasValidDiagnosticQuestions(text);
-  if (questionCheck.count === 0) {
-    violations.push("DIAGNOSTIC_QUESTION: Output does not contain a question");
-  } else if (questionCheck.count > 2) {
-    violations.push(`DIAGNOSTIC_QUESTION: Output contains ${questionCheck.count} questions (max 2 allowed)`);
+  if (!isCompletionOffer) {
+    if (questionCheck.count === 0) {
+      violations.push("DIAGNOSTIC_QUESTION: Output does not contain a question");
+    } else if (questionCheck.count > 2) {
+      violations.push(`DIAGNOSTIC_QUESTION: Output contains ${questionCheck.count} questions (max 2 allowed)`);
+    }
   }
 
   // Must not contain prohibited words

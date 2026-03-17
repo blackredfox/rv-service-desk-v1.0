@@ -70,7 +70,7 @@ describe("Tone Adjustment - Prompt Files", () => {
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
     expect(content).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
-    expect(content).toContain("CANNOT trigger mode transitions");
+    expect(content).toContain("CANNOT automatically switch to final_report mode");
     expect(content).toContain("START FINAL REPORT");
     expect(content).not.toContain("[TRANSITION: FINAL_REPORT]");
   });

@@ -310,6 +310,32 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Context Engine isolation state: "${engineResult.context.isolationFinding}" (no auto-transition — explicit command required)`);
     }
 
+    // ── P1.6 COMPLETION OFFER DIRECTIVE ───────────────────────────────
+    // When isolation is confirmed, inject a mandatory completion-offer instruction
+    // into the prompt context. The LLM must summarize and offer START FINAL REPORT.
+    // Mode transition is still ONLY triggered by the explicit technician command.
+    if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
+      const completionDirective = [
+        "── DIAGNOSTIC ISOLATION CONFIRMED ──",
+        `Finding: ${engineResult.context.isolationFinding}`,
+        "",
+        "MANDATORY RESPONSE (this turn only):",
+        "1. Acknowledge briefly (one line, e.g. 'Принято.' or 'Noted.')",
+        "2. State the root cause or repair in 1-2 sentences.",
+        "3. End with exactly: 'Send START FINAL REPORT and I will generate the report.'",
+        "   (Russian: 'Отправь START FINAL REPORT — и я сформирую отчёт.')",
+        "   (Spanish: 'Envía START FINAL REPORT y generaré el informe.')",
+        "",
+        "CRITICAL RULES:",
+        "- Do NOT ask another diagnostic question.",
+        "- Do NOT output the final report format (no Complaint/Procedure/Verified Condition/etc.).",
+        "- Remain in diagnostic mode — mode switches ONLY via explicit START FINAL REPORT.",
+      ].join("\n");
+
+      contextEngineDirectives = [contextEngineDirectives, completionDirective].filter(Boolean).join("\n\n");
+      console.log(`[Chat API v2] Completion offer directive injected`);
+    }
+
     // ── LOOP RECOVERY ENFORCEMENT ──────────────────────────────────────
     // Check if the active step would violate loop rules, and if so, apply recovery
     const activeStepId = engineResult.context.activeStepId;

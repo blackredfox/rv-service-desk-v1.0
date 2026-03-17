@@ -47,7 +47,7 @@ A Next.js diagnostic assistant for RV technicians. The system helps technicians 
 Prompt-driven via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Voice redesign = prompt edit only.
 
 ## Current Test Status
-- **713 passed, 11 stable pre-existing failures** (Prisma client / input-language-lock, unrelated to engine)
+- **731 passed, 11 stable pre-existing failures** (Prisma client / input-language-lock, unrelated)
 
 ### P1.5 — Branch Execution Runtime Integration (DONE - Feb 2026)
 Fixed the full runtime path so branches are actually entered, traversed with distinct step IDs, and exited.
@@ -169,3 +169,13 @@ Integrated branch processing into route.ts runtime path.
 - **(P2)** Add branches to furnace, roof AC procedures
 - **(P3)** Fix remaining stable test failures (Prisma issues)
 - **(Future)** Diagnostic voice redesign (prompt-only)
+
+### P1.6 — Completion Signaling Without Auto-Transition (DONE - Feb 2026)
+**Files changed:** `context-engine.ts`, `types.ts`, `route.ts`, `mode-validators.ts`, `MODE_PROMPT_DIAGNOSTIC.txt`
+**18 new tests, all passing.** 731 total passing.
+- Added `detectCompletionSignal()`: verified_restoration + verified_fault, multilingual (EN/RU/ES)
+- `isolationComplete = true` clears `activeStepId`, sets `isolationFinding`
+- Route injects `── DIAGNOSTIC ISOLATION CONFIRMED ──` directive → LLM summarizes + offers `START FINAL REPORT`
+- Validator allows no `?` when response includes "START FINAL REPORT"
+- Prompt updated: replaced contradictory "ASK THE NEXT STEP" rule with explicit OFFER_COMPLETION instructions
+- Mode transition remains explicit-only — no auto-switch to final_report

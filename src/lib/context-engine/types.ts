@@ -230,7 +230,7 @@ export type ContextEngineResult = {
 export type ResponseInstructions = {
   // What the LLM should do
   action: "ask_step" | "provide_clarification" | "acknowledge_and_continue" | 
-          "replan_notice" | "transition" | "generate_labor" | "generate_report";
+          "replan_notice" | "transition" | "offer_completion" | "generate_labor" | "generate_report";
   
   // Step to ask (if action is ask_step)
   stepId?: string;
