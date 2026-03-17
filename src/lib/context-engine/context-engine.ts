@@ -22,6 +22,11 @@ import { detectIntent, describeIntent, isClarificationRequest } from "./intent-r
 import { checkLoopViolation, generateAntiLoopDirectives, updateLoopState, isFallbackResponse } from "./loop-guard";
 import { shouldReplan, executeReplan, buildReplanNotice, isInReplanState, clearReplanState } from "./replan";
 import { pushTopic, popTopic, isInClarificationSubflow, buildReturnToMainInstruction, buildClarificationContext, shouldAutoPopTopic, getCurrentClarificationTopic } from "./topic-stack";
+import { 
+  markStepCompleted as registryMarkStepCompleted, 
+  markStepUnable as registryMarkStepUnable,
+  getNextStepId as registryGetNextStepId,
+} from "../diagnostic-registry";
 
 // Re-export config
 export { DEFAULT_CONFIG } from "./types";
@@ -170,11 +175,41 @@ export function processMessage(
       stateChanged = true;
     }
     
-    // Mark steps as completed or unable based on intent
-    if (intent.type === "UNABLE_TO_VERIFY" && context.activeStepId) {
-      context.unableSteps.add(context.activeStepId);
-      context.activeStepId = null;
-      stateChanged = true;
+    // Mark current step as completed or unable based on intent
+    if (context.activeStepId) {
+      if (intent.type === "UNABLE_TO_VERIFY") {
+        context.unableSteps.add(context.activeStepId);
+        registryMarkStepUnable(caseId, context.activeStepId); // Sync to registry
+        notices.push(`Step ${context.activeStepId} marked as UNABLE`);
+        // Immediately assign next step from registry
+        const nextId = registryGetNextStepId(caseId);
+        context.activeStepId = nextId;
+        if (nextId) {
+          notices.push(`Next step assigned: ${nextId}`);
+        } else {
+          notices.push(`All procedure steps complete`);
+        }
+        stateChanged = true;
+      } else if (intent.type === "MAIN_DIAGNOSTIC" || intent.type === "ALREADY_ANSWERED") {
+        // Technician answered the current step — mark it complete
+        context.completedSteps.add(context.activeStepId);
+        registryMarkStepCompleted(caseId, context.activeStepId); // Sync to registry
+        notices.push(`Step ${context.activeStepId} marked as COMPLETED`);
+        // Immediately assign next step from registry
+        const nextId = registryGetNextStepId(caseId);
+        context.activeStepId = nextId;
+        if (nextId) {
+          notices.push(`Next step assigned: ${nextId}`);
+        } else {
+          notices.push(`All procedure steps complete`);
+        }
+        stateChanged = true;
+      }
+    }
+    
+    // Handle "already answered" — prevent re-asking
+    if (intent.type === "ALREADY_ANSWERED") {
+      notices.push("Technician indicated already answered — moving forward");
     }
   }
   
@@ -190,10 +225,20 @@ export function processMessage(
     stateChanged = true;
   }
   
-  // 6. Build response instructions
+  // 6. Ensure active step is always assigned when a procedure is active
+  if (!context.activeStepId && context.activeProcedureId) {
+    const nextId = registryGetNextStepId(caseId);
+    if (nextId) {
+      context.activeStepId = nextId;
+      notices.push(`Active step initialized: ${nextId}`);
+      stateChanged = true;
+    }
+  }
+  
+  // 7. Build response instructions
   const responseInstructions = buildResponseInstructions(context, intent, config);
   
-  // 7. Update context in store
+  // 8. Update context in store
   updateContext(context);
   
   return {

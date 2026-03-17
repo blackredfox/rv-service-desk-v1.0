@@ -215,36 +215,40 @@ describe("buildProcedureContext", () => {
   it("shows next step when nothing completed", async () => {
     const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
     const proc = getProcedure("water_pump")!;
+    // No activeStepId: fallback computes next step
     const ctx = buildProcedureContext(proc, new Set(), new Set());
     expect(ctx).toContain("ACTIVE DIAGNOSTIC PROCEDURE: Water Pump");
-    expect(ctx).toContain("NEXT REQUIRED STEP: wp_1");
+    expect(ctx).toContain("CURRENT STEP: wp_1");
     expect(ctx).toContain("Do NOT invent diagnostic steps");
   });
 
-  it("shows completed steps and next step", async () => {
+  it("shows active step only (authoritative mode)", async () => {
     const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
     const proc = getProcedure("water_pump")!;
-    const ctx = buildProcedureContext(proc, new Set(["wp_1", "wp_2"]), new Set());
-    expect(ctx).toContain("[DONE] wp_1");
-    expect(ctx).toContain("[DONE] wp_2");
-    expect(ctx).toContain("NEXT REQUIRED STEP: wp_3");
+    const ctx = buildProcedureContext(proc, new Set(["wp_1", "wp_2"]), new Set(), { activeStepId: "wp_3" });
+    // Should show only the active step, not completed steps
+    expect(ctx).not.toContain("[DONE]");
+    expect(ctx).toContain("CURRENT STEP: wp_3");
     expect(ctx).toContain("Progress: 2/5");
   });
 
-  it("shows unable-to-verify steps", async () => {
+  it("handles unable-to-verify in progress count", async () => {
     const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
     const proc = getProcedure("water_pump")!;
-    const ctx = buildProcedureContext(proc, new Set(["wp_1"]), new Set(["wp_2"]));
-    expect(ctx).toContain("[SKIP] wp_2");
+    const ctx = buildProcedureContext(proc, new Set(["wp_1"]), new Set(["wp_2"]), { activeStepId: "wp_3" });
+    // Unable steps should NOT be listed
+    expect(ctx).not.toContain("[SKIP]");
+    expect(ctx).toContain("Progress: 2/5");
   });
 
-  it("shows 'ALL STEPS COMPLETE' when done", async () => {
+  it("shows 'ALL STEPS COMPLETE' when done (no auto-transition)", async () => {
     const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
     const proc = getProcedure("water_pump")!;
     const allIds = new Set(proc.steps.map(s => s.id));
     const ctx = buildProcedureContext(proc, allIds, new Set());
     expect(ctx).toContain("ALL STEPS COMPLETE");
-    expect(ctx).toContain("[TRANSITION: FINAL_REPORT]");
+    expect(ctx).toContain("START FINAL REPORT");
+    expect(ctx).not.toContain("[TRANSITION: FINAL_REPORT]");
   });
 
   it("prevents cross-system questions", async () => {
@@ -287,7 +291,7 @@ describe("Integration: procedure-aware registry", () => {
     initializeCase("int-3", "Furnace won't ignite");
     const ctx = buildRegistryContext("int-3");
     expect(ctx).toContain("ACTIVE DIAGNOSTIC PROCEDURE: Furnace");
-    expect(ctx).toContain("NEXT REQUIRED STEP");
+    expect(ctx).toContain("CURRENT STEP");
   });
 
   it("falls back to legacy context when no procedure", async () => {

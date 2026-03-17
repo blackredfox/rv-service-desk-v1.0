@@ -261,17 +261,19 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
       expect(fallbackRU).toContain("Невозможно сгенерировать");
     });
 
-    it("should default to EN for unknown/undefined language", async () => {
+    it("should return language choice prompt for unknown/undefined language", async () => {
       const { getSafeFallback } = await import("@/lib/mode-validators");
 
+      const expected = "Please choose language: English / Русский / Español";
+
       const fallback1 = getSafeFallback("diagnostic", undefined);
-      expect(fallback1).toBe("Can you provide more information about the issue?");
+      expect(fallback1).toBe(expected);
 
       const fallback2 = getSafeFallback("diagnostic", "AUTO");
-      expect(fallback2).toBe("Can you provide more information about the issue?");
+      expect(fallback2).toBe(expected);
 
       const fallback3 = getSafeFallback("diagnostic", "XX");
-      expect(fallback3).toBe("Can you provide more information about the issue?");
+      expect(fallback3).toBe(expected);
     });
   });
 

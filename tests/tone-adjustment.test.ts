@@ -54,14 +54,25 @@ describe("Tone Adjustment - Prompt Files", () => {
     expect(content).toContain("NEVER repeat a question");
   });
 
-  it("MODE_PROMPT_DIAGNOSTIC: has pivot rules", async () => {
+  it("MODE_PROMPT_DIAGNOSTIC: has key findings rules (acknowledge but continue)", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
-    expect(content).toContain("PIVOT RULES");
-    expect(content).toContain("KEY FINDING");
-    expect(content).toContain("IMMEDIATELY");
+    expect(content).toContain("KEY FINDINGS");
+    expect(content).toContain("IMMEDIATELY acknowledge");
+    expect(content).toContain("CONTINUE with remaining diagnostic steps");
+  });
+
+  it("MODE_PROMPT_DIAGNOSTIC: enforces explicit-only mode transitions", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
+
+    expect(content).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
+    expect(content).toContain("CANNOT trigger mode transitions");
+    expect(content).toContain("START FINAL REPORT");
+    expect(content).not.toContain("[TRANSITION: FINAL_REPORT]");
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: allows at most one-word acknowledgment", async () => {

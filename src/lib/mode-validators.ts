@@ -145,6 +145,8 @@ function looksLikeFinalReport(text: string): boolean {
 }
 
 // Transition signal marker
+// DEPRECATED: Transition markers are no longer supported
+// Mode transitions happen ONLY via explicit user command (START FINAL REPORT)
 const TRANSITION_MARKER = "[TRANSITION: FINAL_REPORT]";
 
 /**
@@ -158,10 +160,25 @@ function hasValidDiagnosticQuestions(text: string): { valid: boolean; count: num
 }
 
 /**
- * Check if output is a valid transition response (isolation complete)
+ * Check if output contains isolation-complete language that should be blocked
+ * LLM must NEVER declare isolation complete — only technician can trigger final report
  */
-function isTransitionResponse(text: string): boolean {
-  return text.includes(TRANSITION_MARKER);
+function containsIsolationCompleteLanguage(text: string): boolean {
+  const patterns = [
+    // English
+    /isolation\s+(?:is\s+)?complete/i,
+    /conditions?\s+(?:are\s+)?met/i,
+    /ready\s+to\s+transition/i,
+    /\[TRANSITION:/i,
+    // Russian
+    /изоляция\s+завершен/i,
+    /условия\s+выполнен/i,
+    /готов\s+к\s+переходу/i,
+    // Spanish
+    /aislamiento\s+complet/i,
+    /condiciones?\s+cumplid/i,
+  ];
+  return patterns.some(p => p.test(text));
 }
 
 /**
@@ -170,32 +187,28 @@ function isTransitionResponse(text: string): boolean {
  * Guided Diagnostics format allows:
  * - Multi-line header (System, Classification, Mode, Status)
  * - ONE diagnostic question at the end
- * - OR a transition response (isolation complete, no question)
+ * 
+ * PROHIBITED in diagnostic mode:
+ * - Final report format (headers like Complaint:, Verified Condition:, etc.)
+ * - Isolation-complete declarations (LLM cannot end diagnostics)
+ * - Transition markers
  */
 export function validateDiagnosticOutput(text: string): ValidationResult {
   const violations: string[] = [];
 
-  // Check if this is a transition response (isolation complete)
-  if (isTransitionResponse(text)) {
-    // Transition responses are valid - they signal mode change
-    // Only check for prohibited words
-    const prohibited = containsProhibitedWords(text);
-    if (prohibited.length > 0) {
-      violations.push(`PROHIBITED_WORDS: Contains denial-trigger words: ${prohibited.join(", ")}`);
-    }
-    
-    return {
-      valid: violations.length === 0,
-      violations,
-      suggestion: violations.length > 0 
-        ? "Remove denial-trigger words from the transition response."
-        : undefined,
-    };
+  // CRITICAL: Must not look like a final report — checked FIRST, always
+  if (looksLikeFinalReport(text)) {
+    violations.push("DIAGNOSTIC_DRIFT: Output looks like a final report while in diagnostic mode. Diagnostic mode must ask questions, not generate reports.");
   }
 
-  // Must not look like a final report
-  if (looksLikeFinalReport(text)) {
-    violations.push("DIAGNOSTIC_DRIFT: Output looks like a final report while in diagnostic mode");
+  // CRITICAL: Must not declare isolation complete — LLM cannot end diagnostics
+  if (containsIsolationCompleteLanguage(text)) {
+    violations.push("ISOLATION_DECLARATION_BLOCKED: LLM cannot declare isolation complete. Only the technician can trigger final report via explicit command.");
+  }
+
+  // Strip transition marker if present (legacy LLM behavior) — but still flag as violation
+  if (text.includes(TRANSITION_MARKER)) {
+    violations.push("TRANSITION_MARKER_BLOCKED: Transition markers are not allowed. Mode transitions require explicit user command.");
   }
 
   // Must not contain translation separator (not in final mode)
@@ -223,6 +236,45 @@ export function validateDiagnosticOutput(text: string): ValidationResult {
     suggestion: violations.length > 0 
       ? "Produce diagnostic output with system info and ONE specific diagnostic question."
       : undefined,
+  };
+}
+
+/**
+ * Validate language consistency in diagnostic output.
+ * Output language must match the expected dialogue language.
+ */
+export function validateLanguageConsistency(
+  text: string, 
+  expectedLanguage: Language
+): ValidationResult {
+  const violations: string[] = [];
+  
+  const hasCyrillic = CYRILLIC_RE.test(text);
+  const hasSpanish = SPANISH_CHARS_RE.test(text);
+  
+  if (expectedLanguage === "RU") {
+    // Russian session — should have Cyrillic, should NOT have Spanish chars
+    if (!hasCyrillic && text.length > 50) {
+      violations.push("LANGUAGE_MISMATCH: Russian session but output appears to be in English");
+    }
+    if (hasSpanish) {
+      violations.push("LANGUAGE_MISMATCH: Russian session but output contains Spanish characters");
+    }
+  } else if (expectedLanguage === "ES") {
+    // Spanish session — should have Spanish chars or at least not Cyrillic
+    if (hasCyrillic) {
+      violations.push("LANGUAGE_MISMATCH: Spanish session but output contains Cyrillic characters");
+    }
+  } else if (expectedLanguage === "EN") {
+    // English session — should NOT have Cyrillic or heavy Spanish markers
+    if (hasCyrillic) {
+      violations.push("LANGUAGE_MISMATCH: English session but output contains Cyrillic characters");
+    }
+  }
+  
+  return {
+    valid: violations.length === 0,
+    violations,
   };
 }
 
