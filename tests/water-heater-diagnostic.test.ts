@@ -128,19 +128,26 @@ describe("Water Heater Diagnostic Procedure", () => {
   });
 
   describe("Procedure Context Building", () => {
-    it("should build correct context with completed steps", async () => {
+    it("should build correct context with active step only", async () => {
       const { getProcedure, buildProcedureContext } = await import("@/lib/diagnostic-procedures");
       const proc = getProcedure("water_heater")!;
       
-      const context = buildProcedureContext(proc, new Set(["wh_1", "wh_2"]), new Set());
+      const context = buildProcedureContext(
+        proc, 
+        new Set(["wh_1", "wh_2"]), 
+        new Set(),
+        { activeStepId: "wh_3" },
+      );
       
-      // Should show completed steps
-      expect(context).toContain("[DONE]");
-      expect(context).toContain("wh_1");
-      expect(context).toContain("wh_2");
+      // Should show the active step question
+      expect(context).toContain("CURRENT STEP: wh_3");
+      expect(context).toContain("Ask EXACTLY:");
       
-      // Should show next required step
-      expect(context).toContain("NEXT REQUIRED STEP");
+      // Should NOT show completed steps list (authoritative mode)
+      expect(context).not.toContain("[DONE]");
+      
+      // Should show progress
+      expect(context).toContain("2/12");
     });
 
     it("should show ALL STEPS COMPLETE when procedure finished", async () => {
@@ -172,10 +179,16 @@ describe("Anti-Loop Step Completion", () => {
       updateContext 
     } = await import("@/lib/context-engine");
     const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase } = await import("@/lib/diagnostic-registry");
+    
+    // Initialize a water heater case so registry knows the procedure
+    initializeCase("test_case_1", "водонагреватель не работает");
     
     // Create context with active step
     const context = getOrCreateContext("test_case_1");
+    context.activeProcedureId = "water_heater";
     context.activeStepId = "wh_2";
+    context.completedSteps.add("wh_1"); // wh_1 already done
     updateContext(context);
     
     // Process a diagnostic answer
@@ -183,8 +196,10 @@ describe("Anti-Loop Step Completion", () => {
     
     // Step should be marked as completed
     expect(result.context.completedSteps.has("wh_2")).toBe(true);
-    expect(result.context.activeStepId).toBeNull();
+    // Next step should be immediately assigned (not null)
+    expect(result.context.activeStepId).not.toBeNull();
     expect(result.notices.some(n => n.includes("COMPLETED"))).toBe(true);
+    expect(result.notices.some(n => n.includes("Next step assigned"))).toBe(true);
   });
 
   it("should mark step as unable when technician cannot verify", async () => {
@@ -194,9 +209,16 @@ describe("Anti-Loop Step Completion", () => {
       updateContext 
     } = await import("@/lib/context-engine");
     const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase } = await import("@/lib/diagnostic-registry");
+    
+    // Initialize so registry knows the procedure
+    initializeCase("test_case_2", "водонагреватель не работает");
     
     const context = getOrCreateContext("test_case_2");
+    context.activeProcedureId = "water_heater";
     context.activeStepId = "wh_3";
+    context.completedSteps.add("wh_1");
+    context.completedSteps.add("wh_2");
     updateContext(context);
     
     // Process an "unable to verify" answer
@@ -204,7 +226,8 @@ describe("Anti-Loop Step Completion", () => {
     
     // Step should be marked as unable
     expect(result.context.unableSteps.has("wh_3")).toBe(true);
-    expect(result.context.activeStepId).toBeNull();
+    // Next step should be immediately assigned (not null)
+    expect(result.context.activeStepId).not.toBeNull();
   });
 
   it("should recognize 'already answered' and move forward", async () => {
@@ -214,9 +237,14 @@ describe("Anti-Loop Step Completion", () => {
       updateContext 
     } = await import("@/lib/context-engine");
     const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase } = await import("@/lib/diagnostic-registry");
+    
+    initializeCase("test_case_3", "водонагреватель не работает");
     
     const context = getOrCreateContext("test_case_3");
+    context.activeProcedureId = "water_heater";
     context.activeStepId = "wh_5";
+    context.completedSteps.add("wh_1");
     updateContext(context);
     
     // Process "already answered" message
@@ -240,16 +268,22 @@ describe("Anti-Loop Step Completion", () => {
     initializeCase("test_case_4", "водонагреватель не работает");
     
     const context = getOrCreateContext("test_case_4");
+    context.activeProcedureId = "water_heater";
     context.activeStepId = "wh_1";
     updateContext(context);
     
     // Answer the first step
-    processMessage("test_case_4", "газовый Suburban", DEFAULT_CONFIG);
+    const result = processMessage("test_case_4", "газовый Suburban", DEFAULT_CONFIG);
     
-    // Registry should also have the step marked
-    const registryContext = buildRegistryContext("test_case_4");
-    expect(registryContext).toContain("[DONE]");
-    expect(registryContext).toContain("wh_1");
+    // Step wh_1 should be completed
+    expect(result.context.completedSteps.has("wh_1")).toBe(true);
+    
+    // Next step should be assigned
+    expect(result.context.activeStepId).not.toBeNull();
+    
+    // Registry context should show the active step (not completed list)
+    const registryContext = buildRegistryContext("test_case_4", result.context.activeStepId);
+    expect(registryContext).toContain("CURRENT STEP:");
   });
 });
 
@@ -367,3 +401,143 @@ describe("Clarification Returns to Same Step", () => {
     expect(result1.context.completedSteps.has("wh_6")).toBe(false);
   });
 });
+
+describe("Authoritative Step Progression", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    const { clearRegistry } = await import("@/lib/diagnostic-registry");
+    const { clearContext } = await import("@/lib/context-engine");
+    clearRegistry("auth_prog_1");
+    clearContext("auth_prog_1");
+  });
+
+  it("engine assigns first step automatically when procedure is active", async () => {
+    const { 
+      processMessage, 
+      getOrCreateContext, 
+      updateContext 
+    } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase } = await import("@/lib/diagnostic-registry");
+    
+    // Initialize the procedure
+    initializeCase("auth_prog_1", "водонагреватель не работает");
+    
+    // Create context with no active step
+    const context = getOrCreateContext("auth_prog_1");
+    context.activeProcedureId = "water_heater";
+    context.activeStepId = null;
+    updateContext(context);
+    
+    // Process any message — the engine should assign the first step
+    const result = processMessage("auth_prog_1", "начнём диагностику", DEFAULT_CONFIG);
+    
+    // The active step should be wh_1 (first step)
+    expect(result.context.activeStepId).toBe("wh_1");
+    expect(result.notices.some(n => n.includes("Active step initialized: wh_1"))).toBe(true);
+  });
+
+  it("completes a full 3-step sequence without losing track", async () => {
+    const { 
+      processMessage, 
+      getOrCreateContext, 
+      updateContext 
+    } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase, buildRegistryContext } = await import("@/lib/diagnostic-registry");
+    
+    // Initialize the procedure
+    initializeCase("auth_prog_1", "водонагреватель не работает");
+    
+    const context = getOrCreateContext("auth_prog_1");
+    context.activeProcedureId = "water_heater";
+    context.activeStepId = "wh_1";
+    updateContext(context);
+    
+    // Step 1: Answer — "gas Suburban"
+    const r1 = processMessage("auth_prog_1", "газовый Suburban", DEFAULT_CONFIG);
+    expect(r1.context.completedSteps.has("wh_1")).toBe(true);
+    expect(r1.context.activeStepId).toBe("wh_2"); // next step
+    
+    // Step 2: Answer — "tank is full, valve open"
+    const r2 = processMessage("auth_prog_1", "бак полный, клапан открыт", DEFAULT_CONFIG);
+    expect(r2.context.completedSteps.has("wh_2")).toBe(true);
+    expect(r2.context.activeStepId).toBe("wh_3"); // next step
+    
+    // Step 3: Answer — "yes, stove works"
+    const r3 = processMessage("auth_prog_1", "да, плита работает", DEFAULT_CONFIG);
+    expect(r3.context.completedSteps.has("wh_3")).toBe(true);
+    expect(r3.context.activeStepId).toBe("wh_4"); // next step
+    
+    // Verify the prompt context only shows the active step
+    const promptCtx = buildRegistryContext("auth_prog_1", r3.context.activeStepId);
+    expect(promptCtx).toContain("CURRENT STEP: wh_4");
+    expect(promptCtx).not.toContain("[DONE]");
+    expect(promptCtx).not.toContain("wh_1:");
+    expect(promptCtx).not.toContain("wh_2:");
+    expect(promptCtx).not.toContain("wh_3:");
+  });
+
+  it("step completion matches only against active step, not all steps", async () => {
+    const { 
+      processMessage, 
+      getOrCreateContext, 
+      updateContext 
+    } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase } = await import("@/lib/diagnostic-registry");
+    
+    initializeCase("auth_prog_1", "водонагреватель не работает");
+    
+    const context = getOrCreateContext("auth_prog_1");
+    context.activeProcedureId = "water_heater";
+    context.activeStepId = "wh_1"; // Only step 1 is active
+    updateContext(context);
+    
+    // Answer wh_1 with a message. Even though the answer looks like it could match
+    // voltage patterns (wh_5), only the active step wh_1 should be completed.
+    const result = processMessage("auth_prog_1", "газовый тип, Suburban модель", DEFAULT_CONFIG);
+    
+    expect(result.context.completedSteps.has("wh_1")).toBe(true);
+    expect(result.context.completedSteps.has("wh_5")).toBe(false); // NOT completed
+    // Next step should be wh_2 (not skip to wh_6)
+    expect(result.context.activeStepId).toBe("wh_2");
+  });
+
+  it("never resets activeStepId to null mid-procedure", async () => {
+    const { 
+      processMessage, 
+      getOrCreateContext, 
+      updateContext 
+    } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { initializeCase } = await import("@/lib/diagnostic-registry");
+    
+    initializeCase("auth_prog_1", "водонагреватель не работает");
+    
+    const context = getOrCreateContext("auth_prog_1");
+    context.activeProcedureId = "water_heater";
+    context.activeStepId = "wh_1";
+    updateContext(context);
+    
+    // Complete first 4 steps
+    const steps = [
+      "газовый бойлер",
+      "бак полный, вентиль открыт",
+      "да, плита работает",
+      "клапан открыт",
+    ];
+    
+    let lastResult;
+    for (const answer of steps) {
+      lastResult = processMessage("auth_prog_1", answer, DEFAULT_CONFIG);
+      // After each step, activeStepId must NOT be null (unless all done)
+      const totalSteps = 12; // water_heater has 12 steps
+      const doneCount = lastResult.context.completedSteps.size + lastResult.context.unableSteps.size;
+      if (doneCount < totalSteps) {
+        expect(lastResult.context.activeStepId).not.toBeNull();
+      }
+    }
+  });
+});
+

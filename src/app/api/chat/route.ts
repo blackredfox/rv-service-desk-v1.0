@@ -300,7 +300,7 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
 
-    procedureContext = buildRegistryContext(ensuredCase.id);
+    procedureContext = buildRegistryContext(ensuredCase.id, engineResult?.context.activeStepId);
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────

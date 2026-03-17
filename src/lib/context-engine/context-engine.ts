@@ -181,14 +181,28 @@ export function processMessage(
         context.unableSteps.add(context.activeStepId);
         registryMarkStepUnable(caseId, context.activeStepId); // Sync to registry
         notices.push(`Step ${context.activeStepId} marked as UNABLE`);
-        context.activeStepId = null;
+        // Immediately assign next step from registry
+        const nextId = registryGetNextStepId(caseId);
+        context.activeStepId = nextId;
+        if (nextId) {
+          notices.push(`Next step assigned: ${nextId}`);
+        } else {
+          notices.push(`All procedure steps complete`);
+        }
         stateChanged = true;
       } else if (intent.type === "MAIN_DIAGNOSTIC" || intent.type === "ALREADY_ANSWERED") {
         // Technician answered the current step — mark it complete
         context.completedSteps.add(context.activeStepId);
         registryMarkStepCompleted(caseId, context.activeStepId); // Sync to registry
         notices.push(`Step ${context.activeStepId} marked as COMPLETED`);
-        context.activeStepId = null;
+        // Immediately assign next step from registry
+        const nextId = registryGetNextStepId(caseId);
+        context.activeStepId = nextId;
+        if (nextId) {
+          notices.push(`Next step assigned: ${nextId}`);
+        } else {
+          notices.push(`All procedure steps complete`);
+        }
         stateChanged = true;
       }
     }
@@ -211,10 +225,20 @@ export function processMessage(
     stateChanged = true;
   }
   
-  // 6. Build response instructions
+  // 6. Ensure active step is always assigned when a procedure is active
+  if (!context.activeStepId && context.activeProcedureId) {
+    const nextId = registryGetNextStepId(caseId);
+    if (nextId) {
+      context.activeStepId = nextId;
+      notices.push(`Active step initialized: ${nextId}`);
+      stateChanged = true;
+    }
+  }
+  
+  // 7. Build response instructions
   const responseInstructions = buildResponseInstructions(context, intent, config);
   
-  // 7. Update context in store
+  // 8. Update context in store
   updateContext(context);
   
   return {

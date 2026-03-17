@@ -828,72 +828,92 @@ export function getStepHowToCheck(
 
 /**
  * Build a procedure context string for prompt injection.
- * Shows the active procedure, completed steps, and the next step.
+ * 
+ * AUTHORITATIVE MODE: When activeStepId is provided, only the active step
+ * question is sent to the LLM. The LLM's role is to render the question,
+ * not to decide which step comes next.
  */
 export function buildProcedureContext(
   procedure: DiagnosticProcedure,
   completedIds: Set<string>,
   unableIds: Set<string>,
-  options?: { howToCheckRequested?: boolean },
+  options?: { howToCheckRequested?: boolean; activeStepId?: string | null },
 ): string {
-  const nextStep = getNextStep(procedure, completedIds, unableIds);
   const totalSteps = procedure.steps.length;
   const doneCount = completedIds.size + unableIds.size;
 
+  // --- Authoritative mode: only show the active step ---
+  if (options?.activeStepId) {
+    const activeStep = procedure.steps.find(s => s.id === options.activeStepId);
+    if (!activeStep) {
+      // Step ID mismatch — fall back to computed next step
+      const nextStep = getNextStep(procedure, completedIds, unableIds);
+      if (!nextStep) {
+        return buildAllCompleteContext(procedure, doneCount, totalSteps);
+      }
+      return buildActiveStepContext(procedure, nextStep, doneCount, totalSteps, options);
+    }
+    return buildActiveStepContext(procedure, activeStep, doneCount, totalSteps, options);
+  }
+
+  // --- No active step: check if all done ---
+  const nextStep = getNextStep(procedure, completedIds, unableIds);
+  if (!nextStep) {
+    return buildAllCompleteContext(procedure, doneCount, totalSteps);
+  }
+
+  // Fallback: show the computed next step (should not happen in authoritative mode)
+  return buildActiveStepContext(procedure, nextStep, doneCount, totalSteps, options);
+}
+
+function buildActiveStepContext(
+  procedure: DiagnosticProcedure,
+  step: DiagnosticStep,
+  doneCount: number,
+  totalSteps: number,
+  options?: { howToCheckRequested?: boolean },
+): string {
   const lines: string[] = [
     `ACTIVE DIAGNOSTIC PROCEDURE: ${procedure.displayName} (${procedure.variant})`,
-    `System complexity: ${procedure.complex ? "COMPLEX — thorough diagnosis required" : "NON-COMPLEX"}`,
     `Progress: ${doneCount}/${totalSteps} steps completed`,
     "",
+    `CURRENT STEP: ${step.id}`,
+    `Ask EXACTLY: "${step.question}"`,
   ];
 
-  // Show completed steps
-  if (completedIds.size > 0) {
-    lines.push("COMPLETED STEPS (do NOT ask again):");
-    for (const step of procedure.steps) {
-      if (completedIds.has(step.id)) {
-        lines.push(`  [DONE] ${step.id}: ${step.question}`);
-      }
-    }
+  // If technician asked "how to check?" — provide the instruction and re-ask
+  if (options?.howToCheckRequested && step.howToCheck) {
     lines.push("");
+    lines.push("HOW-TO-CHECK INSTRUCTION (technician asked for guidance):");
+    lines.push(step.howToCheck);
+    lines.push("");
+    lines.push("After providing this instruction, re-ask the SAME step for the result.");
+    lines.push("Do NOT close this step. Do NOT advance to the next step.");
   }
 
-  // Show unable-to-verify steps
-  if (unableIds.size > 0) {
-    lines.push("UNABLE TO VERIFY (closed — skip):");
-    for (const step of procedure.steps) {
-      if (unableIds.has(step.id)) {
-        lines.push(`  [SKIP] ${step.id}: ${step.question}`);
-      }
-    }
-    lines.push("");
-  }
+  lines.push("");
+  lines.push("RULES:");
+  lines.push("- Ask ONLY the question above. Do NOT skip ahead or go back.");
+  lines.push("- Do NOT invent diagnostic steps outside this procedure.");
+  lines.push("- Do NOT list completed steps or remaining steps.");
+  lines.push("- Do NOT ask about systems other than " + procedure.displayName + ".");
+  lines.push("- Render the question in the session language. Do NOT switch languages.");
 
-  // Show next step
-  if (nextStep) {
-    lines.push(`NEXT REQUIRED STEP: ${nextStep.id}`);
-    lines.push(`Ask EXACTLY: "${nextStep.question}"`);
+  return lines.join("\n");
+}
 
-    // If technician asked "how to check?" — provide the instruction and re-ask
-    if (options?.howToCheckRequested && nextStep.howToCheck) {
-      lines.push("");
-      lines.push("HOW-TO-CHECK INSTRUCTION (technician asked for guidance):");
-      lines.push(nextStep.howToCheck);
-      lines.push("");
-      lines.push("After providing this instruction, re-ask the SAME step for the result (Yes/No/value).");
-      lines.push("Do NOT close this step. Do NOT advance to the next step.");
-    }
-
-    lines.push("");
-    lines.push("RULES:");
-    lines.push("- Ask ONLY this question. Do NOT skip ahead.");
-    lines.push("- Do NOT invent diagnostic steps outside this procedure.");
-    lines.push("- Do NOT ask about systems other than " + procedure.displayName + ".");
-  } else {
-    lines.push("ALL STEPS COMPLETE.");
-    lines.push("Summarize findings and ask: 'Ready to generate final report? Send START FINAL REPORT when ready.'");
-    lines.push("Do NOT generate the report. Do NOT declare isolation complete. Wait for explicit command.");
-  }
-
+function buildAllCompleteContext(
+  procedure: DiagnosticProcedure,
+  doneCount: number,
+  totalSteps: number,
+): string {
+  const lines: string[] = [
+    `ACTIVE DIAGNOSTIC PROCEDURE: ${procedure.displayName} (${procedure.variant})`,
+    `Progress: ${doneCount}/${totalSteps} steps completed`,
+    "",
+    "ALL STEPS COMPLETE.",
+    "Summarize findings and ask: 'Ready to generate final report? Send START FINAL REPORT when ready.'",
+    "Do NOT generate the report. Do NOT declare isolation complete. Wait for explicit command.",
+  ];
   return lines.join("\n");
 }
