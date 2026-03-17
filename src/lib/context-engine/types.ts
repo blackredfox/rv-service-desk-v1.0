@@ -105,6 +105,12 @@ export type LaborState = {
 
 // ── Diagnostic Context ──────────────────────────────────────────────
 
+export type EquipmentIdentity = {
+  manufacturer: string | null;
+  model: string | null;
+  year: number | null;
+};
+
 export type DiagnosticContext = {
   // Case identification
   caseId: string;
@@ -129,6 +135,9 @@ export type DiagnosticContext = {
   completedSteps: Set<string>;
   unableSteps: Set<string>;
   askedSteps: Set<string>;
+  
+  // Equipment identity (extracted from technician dialogue)
+  equipmentIdentity: EquipmentIdentity;
   
   // Evidence tracking
   facts: Fact[];

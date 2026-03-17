@@ -30,6 +30,7 @@ import {
   initializeCase,
   buildRegistryContext,
 } from "@/lib/diagnostic-registry";
+import { getStepEnrichment } from "@/lib/retrieval-enrichment";
 import {
   processMessage as processContextMessage,
   recordAgentAction,
@@ -301,6 +302,18 @@ export async function POST(req: Request) {
     ].filter(Boolean).join("\n\n");
 
     procedureContext = buildRegistryContext(ensuredCase.id, engineResult?.context.activeStepId);
+    
+    // ── RETRIEVAL ENRICHMENT (optional, additive only) ──────────────
+    if (engineResult?.context.activeStepId && engineResult.context.primarySystem) {
+      const enrichment = getStepEnrichment(
+        engineResult.context.activeStepId,
+        engineResult.context.primarySystem,
+        engineResult.context.equipmentIdentity,
+      );
+      if (enrichment) {
+        procedureContext += `\n\nEQUIPMENT-SPECIFIC NOTE (${enrichment.source}):\n${enrichment.hint}`;
+      }
+    }
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────

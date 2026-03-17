@@ -20,6 +20,7 @@ export type {
   LaborMode,
   LaborState,
   DiagnosticContext,
+  EquipmentIdentity,
   LoopCheckResult,
   ReplanResult,
   ContextEngineResult,
@@ -62,6 +63,9 @@ export {
   // Mode management
   setMode,
   getMode,
+  
+  // Equipment identity
+  extractEquipmentIdentity,
 } from "./context-engine";
 
 // Intent router

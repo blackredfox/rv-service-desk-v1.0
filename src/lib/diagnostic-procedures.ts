@@ -333,6 +333,50 @@ reg({
       ],
       howToCheck: "Find the small red reset button on the gas valve assembly. Press firmly. If it clicks, the ECO had tripped.",
     },
+    // Step 13: LP inlet pressure at water heater (upstream gas restriction branch)
+    {
+      id: "wh_13",
+      question: "Measure LP inlet pressure at the water heater gas connection. What is the manometer/gauge reading?",
+      prerequisites: ["wh_8"],
+      matchPatterns: [
+        /(?:inlet|lp|gas).*(?:pressure|psi|wc|inch|reading|gauge|manometer|\d+)/i,
+        /(?:давлен|манометр|вход).*(?:\d+|норм|низк|0)/i,
+      ],
+      howToCheck: "Connect a manometer to the test port on the gas line entering the water heater. With other appliances off, expected reading is 11\" WC (± 0.5). Below 10\" WC indicates upstream restriction.",
+    },
+    // Step 14: Regulator output pressure verification
+    {
+      id: "wh_14",
+      question: "Check LP regulator output pressure at the regulator test port. Reading? (Expected: 11\" WC ± 0.5)",
+      prerequisites: ["wh_13"],
+      matchPatterns: [
+        /(?:regulator|регулятор).*(?:pressure|output|reading|\d+|wc|inch|psi)/i,
+        /(?:давлен|выход).*(?:регулятор|\d+|норм|низк)/i,
+      ],
+      howToCheck: "Locate the test port on the LP regulator (near the tanks). Connect manometer. Normal: 11\" WC. If low here, suspect tank/regulator issue.",
+    },
+    // Step 15: Hose routing inspection
+    {
+      id: "wh_15",
+      question: "Inspect LP hose routing from regulator to water heater. Any sharp bends, pinch points, or contact with frame/undercarriage?",
+      prerequisites: ["wh_13"],
+      matchPatterns: [
+        /(?:hose|line|routing|шланг|трубк).*(?:bend|pinch|contact|sharp|kink|ok|good|clear|damage|перегиб|зажат|норм)/i,
+        /(?:routing|трасс|маршрут).*(?:ok|good|clear|problem|issue|проблем|норм)/i,
+      ],
+      howToCheck: "Visually trace the LP hose from the regulator to the water heater. Look for: sharp 90° bends, hose pinched against frame, rubbing on sharp edges, UV damage to rubber.",
+    },
+    // Step 16: Hose kink or blockage check
+    {
+      id: "wh_16",
+      question: "Any kink, collapse, or internal blockage in the LP line? Disconnect and blow through if safe to do so.",
+      prerequisites: ["wh_15"],
+      matchPatterns: [
+        /(?:kink|collapse|block|blockage|restriction|перегиб|засор|блок).*(?:yes|no|found|none|clear|да|нет)/i,
+        /(?:продул|blow|air).*(?:through|clear|ok)/i,
+      ],
+      howToCheck: "SAFETY: Ensure LP is OFF and line is depressurized. Disconnect the line at the water heater. Low-pressure air test or visual inspection for collapsed inner lining. Kinked copper can be felt by hand.",
+    },
   ],
 });
 
