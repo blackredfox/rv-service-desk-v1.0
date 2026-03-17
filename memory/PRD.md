@@ -26,36 +26,34 @@ A Next.js diagnostic assistant for RV technicians. The system helps technicians 
 - ADR: `docs/adr/001-chat-module-decomposition.md`
 
 ### Bug Fixes (DONE)
-- Removed auto-transition to final report (LLM-driven `[TRANSITION: FINAL_REPORT]` removed)
+- Removed auto-transition to final report
 - Added validator to block LLM from declaring "isolation complete"
 - Added language consistency validation
 - Created structured water heater procedure (12 steps)
 
 ### Authoritative Step Progression (DONE - Feb 2026)
-Three corrections implemented:
-1. **Server determines next step**: After step completion, engine immediately assigns next step via `registryGetNextStepId()` — never resets to null
-2. **Active-step-only matching**: Step completion runs only against `activeStepId`, not all procedure steps
-3. **LLM sees only active step**: `buildProcedureContext` outputs only `CURRENT STEP: <id>` + question — no completed/unable step listings
-
-Fixed bug: `getNextStepId()` was returning full `DiagnosticStep` object instead of string ID.
+1. Server determines next step via `registryGetNextStepId()` — never resets to null
+2. Active-step-only matching — completion runs only against `activeStepId`
+3. `buildProcedureContext` outputs only `CURRENT STEP` — no completed/unable listings
+4. Fixed `getNextStepId()` returning full object instead of string ID
 
 ### Test Suite Cleanup (DONE - Feb 2026)
-- Replaced 5 stale `output-validator.validateResponse()` tests in `prompt-enforcement.test.ts`
-- New tests target the real runtime validators: `validateDiagnosticOutput`, `validateLanguageConsistency`, `validateFinalReportOutput` from `mode-validators.ts`
-- Dead code path (`output-validator.ts`) no longer tested
-- Test failures reduced: 17 → 12
+- Replaced 5 stale `output-validator.validateResponse()` tests → now test runtime `mode-validators.ts`
+- Fixed `getSafeFallback` test: unknown language returns language choice prompt, not EN fallback
+- **Failures reduced: 17 → 11** (stable), auth tests are flaky (+/- 2)
+- 666 tests passing
 
-### Terminal-Style Output Confirmation (Feb 2026)
-Confirmed: the structured diagnostic output (System, Classification, Mode, Status, Step IDs) is 100% **prompt-driven** via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Changing the voice requires only prompt edits — no engine changes needed.
+### Terminal-Style Output (Confirmed Feb 2026)
+Prompt-driven via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Voice redesign = prompt edit only.
 
 ## Current Test Status
-- **665 passed, 12 failed** (down from 17)
-- Remaining failures are pre-existing in:
+- **666 passed, 11 stable failures**
+- Remaining:
   - `input-language-lock.test.ts` (6) — stale test assumptions
   - `retention.test.ts` (5) — storage API mismatch
-  - `mode-validators.test.ts` (1) — edge case
+  - `b2b-billing.test.ts` / `org-activity.test.ts` — flaky auth (intermittent)
 
 ## Upcoming Tasks
-- **(P1)** Fix remaining 12 pre-existing test failures
-- **(Future)** Task 03 — details TBD by user
-- **(Future)** Diagnostic voice redesign — remove terminal-style headers from prompt
+- **(P1)** Fix remaining 11 stable test failures
+- **(Future)** Task 03 — TBD by user
+- **(Future)** Diagnostic voice redesign (prompt-only)
