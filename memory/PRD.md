@@ -1,68 +1,62 @@
-# PRD — Language Stability Fix + First-Token Latency Investigation (Follow-up)
+# RV Service Desk — Product Requirements Document
 
-## Original User Report
-1) Language switched incorrectly in the same Spanish diagnostic thread (`"Sí"` caused ES → EN).
-2) First-token latency still ~20s; continue investigation with actionable logs.
+## Original Problem Statement
+A Next.js diagnostic assistant for RV technicians. The system helps technicians diagnose problems with RV systems (water heaters, water pumps, furnaces, AC, etc.) through a structured step-by-step diagnostic procedure.
 
-## Scope Applied
-- Updated only:
-  - `src/app/api/chat/route.ts`
-  - `src/lib/lang.ts`
-  - `tests/chat-route.test.ts`
-  - `tests/lang-spanish-detection.test.ts`
-- No SSE event schema changes.
-- No UI contract changes.
+## Core Architecture
+- **Next.js + TypeScript + Vitest**
+- Single API endpoint: `POST /api/chat`
+- Diagnostic engine: `context-engine` (state machine) + `diagnostic-registry` (step tracking) + `diagnostic-procedures` (procedure definitions)
+- LLM (OpenAI) renders questions; the engine controls the flow
 
-## What Was Implemented
+## Key Architectural Principle
+**The diagnostic procedure engine is the single source of authority for step progression.**
+- The registry defines procedures with ordered steps and prerequisites
+- The context engine tracks state (active step, completed steps, unable steps)
+- The LLM receives ONLY the current active step question — it does NOT decide which step comes next
 
-### A) Language detection stability fix (Spanish thread)
-- In `route.ts`, dialogue language switching for existing cases is now **guarded**:
-  - Keeps previous case language on short acknowledgements (`Sí`, `ok`, `yes`, etc.)
-  - Auto-switches only on strong detection confidence (>= 0.85) and non-ack turns
-  - Explicit forced language commands still override immediately
-- In `lang.ts`, expanded explicit English switch detection to include Spanish phrasing:
-  - `en inglés` now maps to forced `EN`
+## Completed Tasks
 
-### B) Latency investigation resumed with deeper timing
-- Added `openAiStartMs` to each OpenAI call log (offset from request start), in addition to:
-  - `openAiFirstTokenMs`
-  - `openAiMs`
-- Existing key timing/flow logs preserved and now form full chain:
-  - `loadHistoryMs`
-  - `composePromptMs`
-  - `openAiStartMs`
-  - `openAiFirstTokenMs`
-  - `validateMs`
-  - `totalMs`
-  - `sse_first_token`
-- Repair path observability retained:
-  - `validation_failed`
-  - `retry_triggered`
-  - `safe_fallback_used`
+### Task 01: Rollback & Baseline (DONE)
+- Established baseline: 588+ passed, ~17 known failures
+- Report: `reports/baseline-report.md`
 
-## Why this helps
-- Language bug: prevents accidental ES→EN drift on short user confirmations in active Spanish sessions.
-- Latency: logs now clearly separate:
-  - pre-OpenAI delay (`openAiStartMs`)
-  - upstream first-token delay (`openAiFirstTokenMs`)
-  - server-to-client first token emission (`sse_first_token`)
-  This pinpoints whether 20s silence is upstream model latency or internal buffering/prework.
+### Task 02: Route Decomposition (DONE)
+- Refactored `app/api/chat/route.ts` into modules under `src/lib/chat/`
+- ADR: `docs/adr/001-chat-module-decomposition.md`
 
-## Validation
-- Passed:
-  - `yarn test tests/lang-spanish-detection.test.ts tests/chat-route.test.ts tests/chat-transition-final-report.test.ts`
+### Bug Fixes (DONE)
+- Removed auto-transition to final report (LLM-driven `[TRANSITION: FINAL_REPORT]` removed)
+- Added validator to block LLM from declaring "isolation complete"
+- Added language consistency validation
+- Created structured water heater procedure (12 steps)
 
-## Prioritized Backlog
-### P0
-- Collect 5–10 real request log samples and compare `openAiStartMs` vs `openAiFirstTokenMs`.
+### Authoritative Step Progression (DONE - Feb 2026)
+Three corrections implemented:
+1. **Server determines next step**: After step completion, engine immediately assigns next step via `registryGetNextStepId()` — never resets to null
+2. **Active-step-only matching**: Step completion runs only against `activeStepId`, not all procedure steps
+3. **LLM sees only active step**: `buildProcedureContext` outputs only `CURRENT STEP: <id>` + question — no completed/unable step listings
 
-### P1
-- Add percentile summary logging (p50/p95) for first-token latency.
+Files changed:
+- `src/lib/context-engine/context-engine.ts`
+- `src/lib/diagnostic-procedures.ts`
+- `src/lib/diagnostic-registry.ts`
+- `src/app/api/chat/route.ts`
+- `tests/water-heater-diagnostic.test.ts`
+- `tests/diagnostic-procedures.test.ts`
+- `tests/diagnostic-how-to-check.test.ts`
 
-### P2
-- Add similar acknowledgement-lock behavior for RU/EN if needed.
+Test results: 655 passed, 17 known pre-existing failures (unchanged)
 
-## Next Tasks
-1. Run one real request and capture timing lines for diagnosis.
-2. If `openAiFirstTokenMs` dominates, optimize model/Prompt size path; if `openAiStartMs` dominates, optimize pre-call stages.
-3. Keep streaming/validation contract unchanged while tuning latency.
+## Known Pre-existing Test Failures (P2)
+17 failures in:
+- `b2b-billing.test.ts` (auth mocking)
+- `input-language-lock.test.ts` (6 failures)
+- `retention.test.ts` (5 failures)
+- `mode-validators.test.ts` (1 failure)
+- `prompt-enforcement.test.ts` (5 failures)
+
+## Upcoming Tasks
+- **(P0)** User manual testing of water heater scenario to confirm all bugs resolved
+- **(P1)** Fix ~17 pre-existing test failures
+- **(Future)** Task 03 — details TBD by user
