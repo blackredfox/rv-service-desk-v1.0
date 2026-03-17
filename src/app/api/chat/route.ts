@@ -38,6 +38,9 @@ import {
   markStepCompleted as registryMarkStepCompleted,
   markStepUnable as registryMarkStepUnable,
   getNextStepId,
+  processResponseForBranch,
+  getBranchState,
+  exitBranch,
 } from "@/lib/diagnostic-registry";
 import {
   processMessage as processContextMessage,
@@ -353,13 +356,52 @@ export async function POST(req: Request) {
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
         console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match)`);
         
-        // Advance to next step
+        // ── BRANCH TRIGGER CHECK (P1.5) ──────────────────────────────────
+        // Check if this response triggers a branch entry
+        const branchResult = processResponseForBranch(ensuredCase.id, currentActiveStep, message);
+        if (branchResult.branchEntered) {
+          console.log(`[Chat API v2] Branch entered: ${branchResult.branchEntered.id} (locked out: ${branchResult.lockedOut.join(", ") || "none"})`);
+          // Sync branch state to context engine
+          if (engineResult.context.branchState) {
+            engineResult.context.branchState.activeBranchId = branchResult.branchEntered.id;
+            engineResult.context.branchState.decisionPath.push({
+              stepId: currentActiveStep,
+              branchId: branchResult.branchEntered.id,
+              reason: `Triggered by technician response`,
+              timestamp: new Date().toISOString(),
+            });
+            for (const lockedBranch of branchResult.lockedOut) {
+              engineResult.context.branchState.lockedOutBranches.add(lockedBranch);
+            }
+          }
+        }
+        
+        // Advance to next step (now branch-aware)
         const nextStep = getNextStepId(ensuredCase.id);
         if (nextStep) {
           engineResult.context.activeStepId = nextStep;
           console.log(`[Chat API v2] Advanced to step ${nextStep}`);
         } else {
-          console.log(`[Chat API v2] All procedure steps complete`);
+          // Check if we need to exit branch and continue main flow
+          const branchState = getBranchState(ensuredCase.id);
+          if (branchState.activeBranchId) {
+            exitBranch(ensuredCase.id, "Branch steps exhausted");
+            console.log(`[Chat API v2] Exited branch ${branchState.activeBranchId}, checking main flow`);
+            // Sync to context
+            if (engineResult.context.branchState) {
+              engineResult.context.branchState.activeBranchId = null;
+            }
+            // Try to get next main-flow step
+            const mainFlowNext = getNextStepId(ensuredCase.id);
+            if (mainFlowNext) {
+              engineResult.context.activeStepId = mainFlowNext;
+              console.log(`[Chat API v2] Resumed main flow at step ${mainFlowNext}`);
+            } else {
+              console.log(`[Chat API v2] All procedure steps complete`);
+            }
+          } else {
+            console.log(`[Chat API v2] All procedure steps complete`);
+          }
         }
       }
     }

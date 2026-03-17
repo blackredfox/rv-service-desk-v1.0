@@ -113,8 +113,23 @@ Fixed flat step list treating parallel branches as simultaneous.
 
 **ADR:** `docs/ADR-BRANCH-AWARE-RESOLUTION.md`
 
+### P1.5b: Branch Runtime Integration (DONE - Jan 2026)
+Integrated branch processing into route.ts runtime path.
+
+**Problem Found:**
+- Branch infrastructure was built but NOT integrated into runtime
+- `processResponseForBranch()` was never called after step completion
+- Steps stayed on same ID (`wh_7`) while asking different semantic questions
+
+**Fix Applied:**
+- `route.ts` now calls `processResponseForBranch()` after `markStepCompleted()`
+- Branch trigger check syncs state to context engine
+- Auto branch exit when branch steps exhausted (returns to main flow)
+- Added locked-out branch check in `processResponseForBranch()`
+
+**Tests:** 670 passing (+ 5 new branch-runtime-integration tests)
+
 ## Upcoming Tasks
-- **(P2)** Route integration for branch processing
 - **(P2)** Add branches to furnace, roof AC procedures
-- **(P3)** Fix remaining 11 stable test failures
+- **(P3)** Fix remaining stable test failures (Prisma issues)
 - **(Future)** Diagnostic voice redesign (prompt-only)

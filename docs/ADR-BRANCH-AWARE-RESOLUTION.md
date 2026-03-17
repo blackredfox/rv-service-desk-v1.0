@@ -208,12 +208,55 @@ Test coverage:
 
 ---
 
-## 9. Next Steps
+## 9. Runtime Integration Fix (P1.5b)
 
-1. **Route integration:** Update `route.ts` to call `processResponseForBranch()` after step completion
-2. **Auto-exit:** Implement automatic branch exit when branch steps are exhausted
-3. **Sync branch state:** Sync registry branch state with context-engine `branchState`
-4. **Other procedures:** Add branch definitions to furnace, roof AC, etc.
+**Issue Identified:**
+The branch-aware infrastructure was built but NOT integrated into the runtime path (`route.ts`). Steps remained on the same ID (`wh_7`) while asking different semantic questions.
+
+**Missing Integration Point:**
+After step completion in `route.ts`, `processResponseForBranch()` was never called.
+
+**Fix Applied (route.ts lines 345-405):**
+
+```typescript
+// After marking step complete:
+registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
+
+// ── BRANCH TRIGGER CHECK (P1.5) ──────────────────────────────────
+const branchResult = processResponseForBranch(ensuredCase.id, currentActiveStep, message);
+if (branchResult.branchEntered) {
+  console.log(`[Chat API v2] Branch entered: ${branchResult.branchEntered.id}`);
+  // Sync branch state to context engine
+  engineResult.context.branchState.activeBranchId = branchResult.branchEntered.id;
+  // ... update decision path and locked branches
+}
+
+// Advance to next step (now branch-aware via getNextStepId)
+const nextStep = getNextStepId(ensuredCase.id);
+if (nextStep) {
+  engineResult.context.activeStepId = nextStep;
+} else {
+  // Check if we need to exit branch
+  const branchState = getBranchState(ensuredCase.id);
+  if (branchState.activeBranchId) {
+    exitBranch(ensuredCase.id, "Branch steps exhausted");
+    // Try main flow again
+    const mainFlowNext = getNextStepId(ensuredCase.id);
+    if (mainFlowNext) {
+      engineResult.context.activeStepId = mainFlowNext;
+    }
+  }
+}
+```
+
+**Additional Fix (processResponseForBranch):**
+Added check for locked-out branches before entering:
+```typescript
+if (entry.lockedOutBranches.has(triggeredBranch.id)) {
+  console.log(`[DiagnosticRegistry] Branch ${triggeredBranch.id} is locked out, not entering`);
+  return { branchEntered: null, lockedOut: [] };
+}
+```
 
 ---
 
@@ -226,3 +269,13 @@ Branch-aware step resolution ensures:
 - ✅ Same step ID = same semantic meaning
 - ✅ Linear progression with clear branching
 - ✅ Registry = passive storage (no inference)
+- ✅ **Runtime integration complete** — branch triggers checked after step completion
+- ✅ **Auto branch exit** — when branch steps exhausted, returns to main flow
+- ✅ **Locked-out branch enforcement** — cannot enter locked branches
+
+---
+
+## 11. Remaining Work
+
+1. Add branch definitions to furnace, roof AC, refrigerator procedures
+2. Consider adding branch state to response metadata for UI display

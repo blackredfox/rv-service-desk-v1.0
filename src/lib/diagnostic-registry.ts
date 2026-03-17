@@ -497,6 +497,12 @@ export function processResponseForBranch(
     return { branchEntered: null, lockedOut: [] };
   }
   
+  // Check if this branch is locked out (mutual exclusivity)
+  if (entry.lockedOutBranches.has(triggeredBranch.id)) {
+    console.log(`[DiagnosticRegistry] Branch ${triggeredBranch.id} is locked out, not entering`);
+    return { branchEntered: null, lockedOut: [] };
+  }
+  
   // Enter the branch
   entry.activeBranchId = triggeredBranch.id;
   entry.decisionPath.push({

@@ -34,6 +34,9 @@ vi.mock("@/lib/diagnostic-registry", () => ({
   markStepCompleted: vi.fn(),
   markStepUnable: vi.fn(),
   getNextStepId: vi.fn(() => null),
+  processResponseForBranch: vi.fn(() => ({ branchEntered: null, lockedOut: [] })),
+  getBranchState: vi.fn(() => ({ activeBranchId: null, decisionPath: [], lockedOutBranches: [] })),
+  exitBranch: vi.fn(),
 }));
 
 vi.mock("@/lib/context-engine", () => ({
