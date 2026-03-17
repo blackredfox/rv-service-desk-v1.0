@@ -79,6 +79,23 @@ Created framework documentation and TypeScript schema for systematic procedure d
 5. Refrigerator (P4)
 6. Slide/Leveling (P5)
 
+### P1: Engine Execution Authority Fix (DONE - Jan 2026)
+Fixed the architectural gap where Context Engine was advisory-only, not truly authoritative.
+
+**Root Cause:**
+- Engine computed `activeStepId` correctly, but it was passed to LLM as prompt text only
+- No validation that LLM output matched the active step
+- Loop recovery was detected but never applied
+
+**Changes:**
+- **Step Compliance Validation** (`mode-validators.ts`) — `validateStepCompliance()` checks LLM output matches active step
+- **Contextual Completion** — `isStepAnswered()` accepts short answers ("yes", "12V", "да")
+- **Loop Recovery Enforcement** (`route.ts`) — Now applies recovery, force-completes stuck steps
+- **Authoritative Fallback** (`output-policy.ts`) — When LLM fails, returns exact step question
+- **Registry Extensions** — `getActiveStepMetadata()`, `forceStepComplete()`, `isProcedureFullyComplete()`
+
+**ADR:** `docs/ADR-ENGINE-EXECUTION-AUTHORITY.md`
+
 ## Upcoming Tasks
 - **(P0-Next)** Water heater procedure rewrite using new framework
 - **(P1)** Fix remaining 11 stable test failures

@@ -24,11 +24,20 @@ import {
   buildCorrectionInstruction,
   logValidation,
   validateLanguageConsistency,
+  validateStepCompliance,
+  isStepAnswered,
 } from "@/lib/mode-validators";
 import { validateLaborSum } from "@/lib/labor-store";
 import {
   initializeCase,
   buildRegistryContext,
+  getActiveStepQuestion,
+  getActiveStepMetadata,
+  forceStepComplete,
+  isProcedureFullyComplete,
+  markStepCompleted as registryMarkStepCompleted,
+  markStepUnable as registryMarkStepUnable,
+  getNextStepId,
 } from "@/lib/diagnostic-registry";
 import {
   processMessage as processContextMessage,
@@ -43,6 +52,8 @@ import {
   popTopic,
   updateContext,
   isFallbackResponse,
+  checkLoopViolation,
+  suggestLoopRecovery,
   markStepCompleted as markContextStepCompleted,
   type ContextEngineResult,
   type DiagnosticContext,
@@ -70,6 +81,7 @@ import {
   applyDiagnosticModeValidationGuard,
   buildDiagnosticDriftCorrectionInstruction,
   buildDiagnosticDriftFallback,
+  buildAuthoritativeStepFallback,
   buildLaborOverrideConstraints,
   buildLaborOverrideRequest,
   logTiming,
@@ -238,6 +250,7 @@ export async function POST(req: Request) {
   let procedureContext = "";
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
+  let activeStepMetadata: ReturnType<typeof getActiveStepMetadata> = null;
 
   if (currentMode === "diagnostic") {
     if (!STRICT_CONTEXT_ENGINE) {
@@ -288,6 +301,73 @@ export async function POST(req: Request) {
     // Log isolation state for diagnostics (but do NOT trigger auto-transition)
     if (engineResult.context.isolationComplete && engineResult.context.isolationFinding) {
       console.log(`[Chat API v2] Context Engine isolation state: "${engineResult.context.isolationFinding}" (no auto-transition — explicit command required)`);
+    }
+
+    // ── LOOP RECOVERY ENFORCEMENT ──────────────────────────────────────
+    // Check if the active step would violate loop rules, and if so, apply recovery
+    const activeStepId = engineResult.context.activeStepId;
+    if (activeStepId) {
+      const loopCheck = checkLoopViolation(
+        { type: "question", content: "", stepId: activeStepId, timestamp: new Date().toISOString() },
+        engineResult.context,
+        DEFAULT_CONFIG
+      );
+      
+      if (loopCheck.violation) {
+        console.log(`[Chat API v2] Loop violation detected: ${loopCheck.reason}`);
+        const recovery = suggestLoopRecovery(engineResult.context, loopCheck.reason || "");
+        console.log(`[Chat API v2] Loop recovery action: ${recovery.action} — ${recovery.reason}`);
+        
+        // Apply recovery
+        if (recovery.action.startsWith("mark_unable:")) {
+          const stepToMark = recovery.action.split(":")[1];
+          forceStepComplete(ensuredCase.id, stepToMark, "loop_recovery");
+          registryMarkStepUnable(ensuredCase.id, stepToMark);
+          // Get new next step after recovery
+          const newNextStep = getNextStepId(ensuredCase.id);
+          if (newNextStep) {
+            engineResult.context.activeStepId = newNextStep;
+            console.log(`[Chat API v2] Loop recovery: advanced to step ${newNextStep}`);
+          }
+        } else if (recovery.action === "force_next_step" || recovery.action === "force_forward") {
+          // Mark current step unable and move on
+          forceStepComplete(ensuredCase.id, activeStepId, "loop_recovery");
+          registryMarkStepUnable(ensuredCase.id, activeStepId);
+          const newNextStep = getNextStepId(ensuredCase.id);
+          if (newNextStep) {
+            engineResult.context.activeStepId = newNextStep;
+            console.log(`[Chat API v2] Loop recovery: forced advance to step ${newNextStep}`);
+          }
+        }
+      }
+    }
+
+    // ── STEP COMPLETION HARDENING ──────────────────────────────────────
+    // Check if technician's message answers the active step (contextual completion)
+    const currentActiveStep = engineResult.context.activeStepId;
+    if (currentActiveStep && !initResult.preCompletedSteps.includes(currentActiveStep)) {
+      const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
+      if (isStepAnswered(message, stepQuestion)) {
+        // Technician's message answers the step — mark it complete
+        registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
+        markContextStepCompleted(ensuredCase.id, currentActiveStep);
+        console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match)`);
+        
+        // Advance to next step
+        const nextStep = getNextStepId(ensuredCase.id);
+        if (nextStep) {
+          engineResult.context.activeStepId = nextStep;
+          console.log(`[Chat API v2] Advanced to step ${nextStep}`);
+        } else {
+          console.log(`[Chat API v2] All procedure steps complete`);
+        }
+      }
+    }
+
+    // Get active step metadata for authoritative rendering
+    activeStepMetadata = getActiveStepMetadata(ensuredCase.id, engineResult.context.activeStepId);
+    if (activeStepMetadata) {
+      console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
     }
 
     const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);
@@ -678,6 +758,24 @@ export async function POST(req: Request) {
               violations: [...validation.violations, ...langValidation.violations],
             };
           }
+          
+          // ── STEP COMPLIANCE VALIDATION ──────────────────────────────────
+          // Validate that LLM response matches the engine-selected active step
+          if (activeStepMetadata) {
+            const stepValidation = validateStepCompliance(
+              result.response,
+              activeStepMetadata.id,
+              activeStepMetadata.question
+            );
+            if (!stepValidation.valid) {
+              console.log(`[Chat API v2] Step compliance violation: ${stepValidation.violations.join(", ")}`);
+              validation = {
+                ...validation,
+                valid: false,
+                violations: [...validation.violations, ...stepValidation.violations],
+              };
+            }
+          }
         }
         
         logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
@@ -700,10 +798,16 @@ export async function POST(req: Request) {
           const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
           
           // Add drift correction for ANY diagnostic drift violation
-          if (isDiagnosticDriftViolation(validation.violations)) {
+          if (isDiagnosticDriftViolation(validation.violations) || validation.violations.some(v => v.includes("STEP_COMPLIANCE"))) {
             correctionInstructionParts.push(
               buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId ?? undefined)
             );
+            // Add explicit step question for step compliance violations
+            if (activeStepMetadata) {
+              correctionInstructionParts.push(
+                `MANDATORY: Ask this EXACT question (paraphrased naturally): "${activeStepMetadata.question}"`
+              );
+            }
           }
           const correctionInstruction = correctionInstructionParts.join("\n");
 
@@ -757,11 +861,15 @@ export async function POST(req: Request) {
             });
             console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
             
-            // Use diagnostic drift fallback for ANY diagnostic drift violation
+            // Use diagnostic drift fallback for ANY diagnostic drift or step compliance violation
             // NEVER use final report fallback when in diagnostic mode
+            const hasDriftOrStepViolation = 
+              isDiagnosticDriftViolation(validation.violations) ||
+              validation.violations.some(v => v.includes("STEP_COMPLIANCE"));
+              
             result.response =
-              currentMode === "diagnostic" && isDiagnosticDriftViolation(validation.violations)
-                ? buildDiagnosticDriftFallback(engineResult?.context.activeStepId ?? undefined)
+              currentMode === "diagnostic" && hasDriftOrStepViolation
+                ? buildAuthoritativeStepFallback(activeStepMetadata, engineResult?.context.activeStepId ?? undefined)
                 : currentMode === "diagnostic"
                 ? getSafeFallback(currentMode, outputPolicy.effective)
                 : currentMode === "final_report"

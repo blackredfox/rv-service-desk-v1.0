@@ -459,3 +459,80 @@ export function getActiveProcedure(caseId: string): DiagnosticProcedure | null {
   const entry = registry.get(caseId);
   return entry?.procedure ?? null;
 }
+
+/**
+ * Get the active step's question text for authoritative rendering.
+ * Returns null if no active step.
+ */
+export function getActiveStepQuestion(caseId: string, activeStepId: string | null): string | null {
+  if (!activeStepId) return null;
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return null;
+  const step = entry.procedure.steps.find(s => s.id === activeStepId);
+  return step?.question ?? null;
+}
+
+/**
+ * Get complete step metadata for authoritative rendering.
+ */
+export function getActiveStepMetadata(caseId: string, activeStepId: string | null): {
+  id: string;
+  question: string;
+  howToCheck: string | null;
+  procedureName: string;
+  progress: { completed: number; total: number };
+} | null {
+  if (!activeStepId) return null;
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return null;
+  const step = entry.procedure.steps.find(s => s.id === activeStepId);
+  if (!step) return null;
+  return {
+    id: step.id,
+    question: step.question,
+    howToCheck: step.howToCheck ?? null,
+    procedureName: entry.procedure.displayName,
+    progress: {
+      completed: entry.completedStepIds.size + entry.unableStepIds.size,
+      total: entry.procedure.steps.length,
+    },
+  };
+}
+
+/**
+ * Count how many times a step has been asked in recent history.
+ * Used for loop detection and recovery.
+ */
+export function getStepAskCount(caseId: string, stepId: string): number {
+  const entry = registry.get(caseId);
+  if (!entry) return 0;
+  // Count from askedStepIds — each ask is tracked
+  // For more granular tracking, we'd need a history array
+  return entry.askedStepIds.has(stepId) ? 1 : 0;
+}
+
+/**
+ * Force-complete a step when loop recovery is needed.
+ * Marks the step as "unable to verify" to allow forward progress.
+ */
+export function forceStepComplete(caseId: string, stepId: string, reason: "loop_recovery" | "unable"): void {
+  const entry = ensureEntry(caseId);
+  if (reason === "loop_recovery") {
+    // Mark as unable rather than completed — preserves diagnostic accuracy
+    entry.unableStepIds.add(stepId);
+  } else {
+    entry.unableStepIds.add(stepId);
+  }
+  entry.askedStepIds.add(stepId);
+  console.log(`[DiagnosticRegistry] Force-completed step ${stepId} (reason: ${reason})`);
+}
+
+/**
+ * Check if procedure is complete (all steps done or unable).
+ */
+export function isProcedureFullyComplete(caseId: string): boolean {
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return false;
+  const nextStep = getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
+  return nextStep === null;
+}

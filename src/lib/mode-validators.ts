@@ -521,3 +521,127 @@ export function logValidation(
     );
   }
 }
+
+// ── Step Compliance Validation ──────────────────────────────────────────
+
+/**
+ * Validate that the LLM response corresponds to the active step.
+ * This is the key architectural enforcement — the LLM can only render
+ * the server-selected step, not choose its own.
+ * 
+ * @param responseText - The LLM-generated response
+ * @param activeStepId - The engine-selected step ID
+ * @param activeStepQuestion - The exact question that should be asked
+ * @returns Validation result with specific violation if step mismatch
+ */
+export function validateStepCompliance(
+  responseText: string,
+  activeStepId: string | null,
+  activeStepQuestion: string | null,
+): ValidationResult {
+  const violations: string[] = [];
+  
+  // If no active step, can't validate compliance
+  if (!activeStepId || !activeStepQuestion) {
+    return { valid: true, violations: [] };
+  }
+  
+  const responseLower = responseText.toLowerCase();
+  const questionLower = activeStepQuestion.toLowerCase();
+  
+  // Extract key terms from the expected question (3+ char words)
+  const questionKeyTerms = questionLower
+    .split(/[\s\?\.,;:]+/)
+    .filter(w => w.length >= 3)
+    .filter(w => !["the", "and", "for", "are", "any", "does", "when", "what", "how", "you", "can", "has", "have", "this", "that", "with"].includes(w));
+  
+  // Check if response contains enough key terms from the expected question
+  const matchedTerms = questionKeyTerms.filter(term => responseLower.includes(term));
+  const matchRatio = questionKeyTerms.length > 0 ? matchedTerms.length / questionKeyTerms.length : 1;
+  
+  // Allow some flexibility — at least 40% of key terms should be present
+  // This allows natural paraphrasing while catching complete drift
+  if (matchRatio < 0.4 && questionKeyTerms.length >= 3) {
+    violations.push(
+      `STEP_COMPLIANCE: Response does not match active step ${activeStepId}. ` +
+      `Expected question about: ${questionKeyTerms.slice(0, 5).join(", ")}`
+    );
+  }
+  
+  // Check for explicit step ID references that don't match
+  const stepIdPattern = /\b(wh|wp|furn|ac|ref|so|lv|ic|e12|eac|lpg|awn|ca)_\w+\b/gi;
+  const mentionedSteps = responseText.match(stepIdPattern) || [];
+  const wrongSteps = mentionedSteps.filter(s => s.toLowerCase() !== activeStepId.toLowerCase());
+  
+  if (wrongSteps.length > 0) {
+    violations.push(
+      `STEP_COMPLIANCE: Response references wrong step(s): ${wrongSteps.join(", ")}. ` +
+      `Active step is ${activeStepId}.`
+    );
+  }
+  
+  return {
+    valid: violations.length === 0,
+    violations,
+    suggestion: violations.length > 0
+      ? `Render ONLY the active step (${activeStepId}): "${activeStepQuestion}"`
+      : undefined,
+  };
+}
+
+/**
+ * Check if a response indicates the step was answered (contextual completion).
+ * More lenient than regex patterns — accepts short answers in context.
+ * 
+ * @param responseText - Technician's message
+ * @param activeStepQuestion - The question that was asked
+ * @returns Whether the response likely answers the question
+ */
+export function isStepAnswered(
+  responseText: string,
+  activeStepQuestion: string | null,
+): boolean {
+  if (!activeStepQuestion) return false;
+  
+  const text = responseText.trim().toLowerCase();
+  
+  // Very short responses are likely answers to a yes/no or value question
+  if (text.length <= 20) {
+    // Common affirmative/negative patterns
+    if (/^(?:yes|no|yeah|yep|nope|si|да|нет|ok|okay|good|bad|none|zero|0|nothing)$/i.test(text)) {
+      return true;
+    }
+    // Measurement values
+    if (/^\d+(?:\.\d+)?(?:\s*(?:v|volts?|mv|millivolts?|ohms?|amps?|psi|wc))?$/i.test(text)) {
+      return true;
+    }
+    // Simple state responses
+    if (/^(?:open|closed|on|off|full|empty|present|absent|running|dead|working|not working)$/i.test(text)) {
+      return true;
+    }
+  }
+  
+  // Medium responses that describe a finding
+  if (text.length >= 5 && text.length <= 200) {
+    // Contains a conclusion indicator
+    if (/(?:found|checked|verified|confirmed|measured|tested|looks|appears|seems|shows|reading|got)/i.test(text)) {
+      return true;
+    }
+    // Contains a value or state
+    if (/(?:\d+(?:\.\d+)?|yes|no|good|bad|ok|damaged|burnt|blocked|clean|dirty|open|closed)/i.test(text)) {
+      return true;
+    }
+  }
+  
+  // "Already checked" patterns
+  if (/(?:already|told you|mentioned|said|checked that|did that|done)/i.test(text)) {
+    return true;
+  }
+  
+  // "Unable to check" patterns
+  if (/(?:can'?t|cannot|unable|don'?t know|no way|no tool|no access)/i.test(text)) {
+    return true;
+  }
+  
+  return false;
+}

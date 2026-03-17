@@ -191,3 +191,28 @@ export function buildDiagnosticDriftFallback(activeStepId?: string): string {
   const stepLabel = activeStepId ? ` (${activeStepId})` : "";
   return `Guided Diagnostics${stepLabel}: What is the observed result for this active diagnostic step?`;
 }
+
+/**
+ * Build an authoritative step fallback that includes the exact step question.
+ * Used when LLM fails to render the correct step after retry.
+ */
+export function buildAuthoritativeStepFallback(
+  stepMetadata: { id: string; question: string; procedureName: string; progress: { completed: number; total: number } } | null,
+  fallbackStepId?: string
+): string {
+  if (!stepMetadata) {
+    // No metadata available — use generic fallback
+    const stepLabel = fallbackStepId ? ` (${fallbackStepId})` : "";
+    return `Guided Diagnostics${stepLabel}: What is the observed result for this active diagnostic step?`;
+  }
+  
+  // Build authoritative response with exact step question
+  const lines = [
+    `${stepMetadata.procedureName} — Guided Diagnostics`,
+    `Progress: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} steps completed`,
+    ``,
+    `Step ${stepMetadata.id}: ${stepMetadata.question}`,
+  ];
+  
+  return lines.join("\n");
+}

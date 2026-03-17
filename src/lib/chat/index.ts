@@ -52,6 +52,7 @@ export {
   applyDiagnosticModeValidationGuard,
   buildDiagnosticDriftCorrectionInstruction,
   buildDiagnosticDriftFallback,
+  buildAuthoritativeStepFallback,
 } from "./output-policy";
 
 // Final report service

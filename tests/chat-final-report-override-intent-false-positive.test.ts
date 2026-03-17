@@ -27,6 +27,13 @@ vi.mock("@/lib/diagnostic-registry", () => ({
     preCompletedSteps: [],
   })),
   buildRegistryContext: vi.fn(() => ""),
+  getActiveStepQuestion: vi.fn(() => null),
+  getActiveStepMetadata: vi.fn(() => null),
+  forceStepComplete: vi.fn(),
+  isProcedureFullyComplete: vi.fn(() => false),
+  markStepCompleted: vi.fn(),
+  markStepUnable: vi.fn(),
+  getNextStepId: vi.fn(() => null),
 }));
 
 vi.mock("@/lib/context-engine", () => ({
@@ -59,6 +66,8 @@ vi.mock("@/lib/context-engine", () => ({
   updateContext: vi.fn(),
   isFallbackResponse: vi.fn(() => false),
   markStepCompleted: vi.fn(),
+  checkLoopViolation: vi.fn(() => ({ violation: false })),
+  suggestLoopRecovery: vi.fn(() => ({ action: "none", reason: "" })),
   DEFAULT_CONFIG: {},
 }));
 
