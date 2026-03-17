@@ -12,9 +12,13 @@ import {
   detectSystem,
   getProcedure,
   getNextStep,
+  getNextStepBranchAware,
+  detectBranchTrigger,
+  getMutuallyExclusiveBranches,
   mapInitialMessageToSteps,
   buildProcedureContext,
   type DiagnosticProcedure,
+  type ProcedureBranch,
 } from "./diagnostic-procedures";
 
 type DiagnosticEntry = {
@@ -38,6 +42,12 @@ type DiagnosticEntry = {
   keyFindings: string[];
   /** Whether initial message has been processed */
   initialized: boolean;
+  /** P1.5: Active branch ID (null = main flow) */
+  activeBranchId: string | null;
+  /** P1.5: Decision path history */
+  decisionPath: Array<{ stepId: string; branchId: string | null; reason: string; timestamp: string }>;
+  /** P1.5: Branches that are locked out */
+  lockedOutBranches: Set<string>;
 };
 
 const registry = new Map<string, DiagnosticEntry>();
@@ -56,6 +66,10 @@ function ensureEntry(caseId: string): DiagnosticEntry {
       unableToVerifyKeys: new Set(),
       keyFindings: [],
       initialized: false,
+      // P1.5: Branch state
+      activeBranchId: null,
+      decisionPath: [],
+      lockedOutBranches: new Set(),
     };
     registry.set(caseId, entry);
   }
@@ -443,13 +457,121 @@ export function markStepUnable(caseId: string, stepId: string): void {
 
 /**
  * Get the next available step ID for this case.
+ * Uses branch-aware resolution (P1.5).
  * Returns null if all steps complete or no procedure.
  */
 export function getNextStepId(caseId: string): string | null {
   const entry = registry.get(caseId);
   if (!entry?.procedure) return null;
-  const step = getNextStep(entry.procedure, entry.completedStepIds, entry.unableStepIds);
+  
+  // Use branch-aware step resolution
+  const step = getNextStepBranchAware(
+    entry.procedure,
+    entry.completedStepIds,
+    entry.unableStepIds,
+    entry.activeBranchId,
+    entry.lockedOutBranches,
+  );
   return step?.id ?? null;
+}
+
+/**
+ * Process technician response and check for branch triggers.
+ * If a branch is triggered, updates the branch state and returns the new branch info.
+ */
+export function processResponseForBranch(
+  caseId: string,
+  stepId: string,
+  technicianResponse: string,
+): { branchEntered: ProcedureBranch | null; lockedOut: string[] } {
+  const entry = registry.get(caseId);
+  if (!entry?.procedure) return { branchEntered: null, lockedOut: [] };
+  
+  // Only check for branch triggers from main flow
+  if (entry.activeBranchId !== null) {
+    return { branchEntered: null, lockedOut: [] };
+  }
+  
+  const triggeredBranch = detectBranchTrigger(entry.procedure, stepId, technicianResponse);
+  if (!triggeredBranch) {
+    return { branchEntered: null, lockedOut: [] };
+  }
+  
+  // Enter the branch
+  entry.activeBranchId = triggeredBranch.id;
+  entry.decisionPath.push({
+    stepId,
+    branchId: triggeredBranch.id,
+    reason: `Triggered by response pattern at ${stepId}`,
+    timestamp: new Date().toISOString(),
+  });
+  
+  // Lock out mutually exclusive branches
+  const lockedOut = getMutuallyExclusiveBranches(entry.procedure, triggeredBranch.id);
+  for (const lockedBranchId of lockedOut) {
+    entry.lockedOutBranches.add(lockedBranchId);
+  }
+  
+  console.log(`[DiagnosticRegistry] Branch entered: ${triggeredBranch.id}, locked out: ${lockedOut.join(", ") || "none"}`);
+  
+  return { branchEntered: triggeredBranch, lockedOut };
+}
+
+/**
+ * Get current branch state for a case.
+ */
+export function getBranchState(caseId: string): {
+  activeBranchId: string | null;
+  decisionPath: Array<{ stepId: string; branchId: string | null; reason: string }>;
+  lockedOutBranches: string[];
+} {
+  const entry = registry.get(caseId);
+  if (!entry) {
+    return { activeBranchId: null, decisionPath: [], lockedOutBranches: [] };
+  }
+  return {
+    activeBranchId: entry.activeBranchId,
+    decisionPath: entry.decisionPath.map(d => ({
+      stepId: d.stepId,
+      branchId: d.branchId,
+      reason: d.reason,
+    })),
+    lockedOutBranches: [...entry.lockedOutBranches],
+  };
+}
+
+/**
+ * Manually set the active branch (used by context engine for replan).
+ */
+export function setActiveBranch(caseId: string, branchId: string | null, reason: string): void {
+  const entry = ensureEntry(caseId);
+  const previousBranch = entry.activeBranchId;
+  entry.activeBranchId = branchId;
+  entry.decisionPath.push({
+    stepId: "manual",
+    branchId,
+    reason,
+    timestamp: new Date().toISOString(),
+  });
+  console.log(`[DiagnosticRegistry] Branch changed: ${previousBranch} → ${branchId} (${reason})`);
+}
+
+/**
+ * Exit the current branch and return to main flow.
+ */
+export function exitBranch(caseId: string, reason: string): void {
+  const entry = registry.get(caseId);
+  if (!entry || entry.activeBranchId === null) return;
+  
+  const exitedBranch = entry.activeBranchId;
+  entry.activeBranchId = null;
+  entry.decisionPath.push({
+    stepId: "exit",
+    branchId: null,
+    reason: `Exited ${exitedBranch}: ${reason}`,
+    timestamp: new Date().toISOString(),
+  });
+  console.log(`[DiagnosticRegistry] Exited branch: ${exitedBranch} (${reason})`);
 }
 
 /**

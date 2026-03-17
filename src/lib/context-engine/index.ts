@@ -25,6 +25,9 @@ export type {
   ContextEngineResult,
   ResponseInstructions,
   ContextEngineConfig,
+  BranchDefinition,
+  BranchState,
+  BranchDecision,
 } from "./types";
 
 export { DEFAULT_CONFIG } from "./types";

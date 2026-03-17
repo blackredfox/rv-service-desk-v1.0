@@ -23,6 +23,27 @@ export type DiagnosticStep = {
   matchPatterns: RegExp[];
   /** How-to-check instruction returned when the technician asks for guidance */
   howToCheck?: string;
+  /** Branch ID this step belongs to (null = main flow) */
+  branchId?: string;
+};
+
+/**
+ * Branch definition for conditional diagnostic paths.
+ * A branch is entered based on technician response and is mutually exclusive with other branches.
+ */
+export type ProcedureBranch = {
+  /** Unique branch ID (e.g., "no_ignition", "flame_failure") */
+  id: string;
+  /** Human-readable name */
+  displayName: string;
+  /** Step that can trigger entry to this branch */
+  triggerStepId: string;
+  /** Pattern in technician response that triggers this branch */
+  triggerPattern: RegExp;
+  /** First step when entering this branch */
+  entryStepId: string;
+  /** Branch IDs that cannot be active simultaneously */
+  mutuallyExclusive: string[];
 };
 
 export type DiagnosticProcedure = {
@@ -36,6 +57,8 @@ export type DiagnosticProcedure = {
   variant: "MANUFACTURER" | "STANDARD";
   /** Ordered steps */
   steps: DiagnosticStep[];
+  /** Branch definitions (P1.5) */
+  branches?: ProcedureBranch[];
 };
 
 // ── System Detection ────────────────────────────────────────────────
@@ -251,7 +274,7 @@ reg({
       ],
       howToCheck: "With multimeter set to DC volts, measure across the 12V input terminals on the control board. Should read 11.5-13.5V.",
     },
-    // Step 6: Ignition attempt
+    // Step 6: Ignition attempt (BRANCH TRIGGER STEP)
     {
       id: "wh_6",
       question: "When water heater is turned ON: Do you hear clicking/sparking from the igniter? For glow plug models: does it glow orange?",
@@ -263,7 +286,7 @@ reg({
       ],
       howToCheck: "Turn the water heater switch ON. Listen near the burner for clicking (spark ignition) or look for orange glow (hot surface igniter).",
     },
-    // Step 7: Flame presence
+    // Step 7: Flame presence (BRANCH TRIGGER STEP)
     {
       id: "wh_7",
       question: "Does the burner flame light and stay lit? Color: blue, yellow, or no flame?",
@@ -275,7 +298,109 @@ reg({
       ],
       howToCheck: "Look through the burner access window. A healthy flame is mostly blue with slight yellow tips.",
     },
-    // Step 8: Gas at valve outlet
+    // === NO IGNITION BRANCH (wh_6 → no spark/click) ===
+    {
+      id: "wh_6a",
+      question: "No ignition branch: Is 12V present at the igniter module terminals when attempting ignition?",
+      prerequisites: ["wh_6"],
+      branchId: "no_ignition",
+      matchPatterns: [
+        /(?:12v|voltage).*(?:igniter|module|terminal)/i,
+        /(?:no|yes)\s*(?:12v|voltage|power)/i,
+      ],
+      howToCheck: "Measure DC voltage at igniter module while switch is ON. Should see 12V during ignition attempt.",
+    },
+    {
+      id: "wh_6b",
+      question: "No ignition branch: Check spark electrode gap and condition. Gap 1/8\" (3mm), clean tip, no cracks?",
+      prerequisites: ["wh_6a"],
+      branchId: "no_ignition",
+      matchPatterns: [
+        /(?:electrode|spark|gap).*(?:ok|good|clean|dirty|cracked|worn)/i,
+        /(?:\d+(?:\/\d+)?)\s*(?:inch|mm|"|'')/i,
+      ],
+      howToCheck: "Remove electrode. Check tip for buildup or damage. Gap should be 1/8\" from burner tube.",
+    },
+    {
+      id: "wh_6c",
+      question: "No ignition branch: Igniter module ground connection secure? Continuity from module to chassis?",
+      prerequisites: ["wh_6a"],
+      branchId: "no_ignition",
+      matchPatterns: [
+        /(?:ground|continuity).*(?:ok|good|bad|loose)/i,
+        /(?:no|yes)\s*(?:ground|continuity)/i,
+      ],
+      howToCheck: "Check wire connection and measure continuity to chassis ground.",
+    },
+    // === FLAME FAILURE BRANCH (wh_7 → flame goes out) ===
+    {
+      id: "wh_7a",
+      question: "Flame failure branch: How long does flame stay lit before going out? (seconds)",
+      prerequisites: ["wh_7"],
+      branchId: "flame_failure",
+      matchPatterns: [
+        /(?:\d+)\s*(?:sec|second)/i,
+        /(?:instant|immediate|few|several)/i,
+      ],
+      howToCheck: "Time from flame ignition to lockout. <10 sec often = flame sensor. >30 sec often = gas supply.",
+    },
+    {
+      id: "wh_7b",
+      question: "Flame failure branch: Thermocouple/flame sensor millivolt reading when flame is present?",
+      prerequisites: ["wh_7a"],
+      branchId: "flame_failure",
+      matchPatterns: [
+        /(?:\d+)\s*(?:mv|millivolt)/i,
+        /(?:no|unable|can't)\s*(?:measure|read)/i,
+      ],
+      howToCheck: "Measure DC mV across thermocouple leads with flame lit. Need 20-30mV minimum to hold gas valve.",
+    },
+    {
+      id: "wh_7c",
+      question: "Flame failure branch: Thermocouple positioning — tip centered in flame path? Not touching burner metal?",
+      prerequisites: ["wh_7a"],
+      branchId: "flame_failure",
+      matchPatterns: [
+        /(?:position|centered|tip).*(?:ok|good|yes|no|off|touching)/i,
+      ],
+      howToCheck: "Thermocouple tip should be in hottest part of flame (1/2\" above burner). Not touching any metal.",
+    },
+    // === GAS FLOW BRANCH (wh_8 → no gas) ===
+    {
+      id: "wh_8a",
+      question: "No gas flow branch: Is 12V present at gas valve solenoid coil when attempting ignition?",
+      prerequisites: ["wh_5"],
+      branchId: "no_gas",
+      matchPatterns: [
+        /(?:12v|voltage).*(?:solenoid|coil|valve)/i,
+        /(?:no|yes)\s*(?:12v|voltage|power)/i,
+      ],
+      howToCheck: "Measure DC voltage across solenoid coil terminals during ignition cycle.",
+    },
+    {
+      id: "wh_8b",
+      question: "No gas flow branch: Gas valve solenoid coil resistance? (should be 30-200 ohms)",
+      prerequisites: ["wh_8a"],
+      branchId: "no_gas",
+      matchPatterns: [
+        /(?:\d+)\s*(?:ohm|Ω)/i,
+        /(?:open|short|infinite|ol)/i,
+      ],
+      howToCheck: "Disconnect coil wires. Measure resistance across coil terminals. OL = open coil = replace valve.",
+    },
+    {
+      id: "wh_8c",
+      question: "No gas flow branch: Manual valve assembly — any debris visible in inlet screen?",
+      prerequisites: ["wh_4"],
+      branchId: "no_gas",
+      matchPatterns: [
+        /(?:debris|screen|inlet).*(?:clean|blocked|dirty|clear)/i,
+        /(?:no|yes)\s*(?:debris|blockage)/i,
+      ],
+      howToCheck: "Disconnect gas line at valve inlet. Check inlet screen for debris or corrosion.",
+    },
+    // === MAIN FLOW CONTINUES (only if branches not triggered) ===
+    // Step 8: Gas at valve outlet (triggers no_gas branch)
     {
       id: "wh_8",
       question: "With 12V confirmed at the gas valve solenoid: is gas flowing through? (Brief smell test at burner tube, or manometer reading)",
@@ -332,6 +457,33 @@ reg({
         /(?:кнопк|сброс).*(?:нажа|провер|да|нет)/i,
       ],
       howToCheck: "Find the small red reset button on the gas valve assembly. Press firmly. If it clicks, the ECO had tripped.",
+    },
+  ],
+  // P1.5: Branch definitions
+  branches: [
+    {
+      id: "no_ignition",
+      displayName: "No Ignition / No Spark",
+      triggerStepId: "wh_6",
+      triggerPattern: /(?:no|nothing|none|didn't|doesn't|not).*(?:click|spark|glow|ignit)/i,
+      entryStepId: "wh_6a",
+      mutuallyExclusive: ["flame_failure"], // Can't have flame failure if no ignition
+    },
+    {
+      id: "flame_failure",
+      displayName: "Flame Lights Then Fails",
+      triggerStepId: "wh_7",
+      triggerPattern: /(?:flame|fire).*(?:goes?\s*out|drops?\s*out|dies|fails?|shuts?\s*off|won't\s*stay)/i,
+      entryStepId: "wh_7a",
+      mutuallyExclusive: ["no_ignition"], // Can't have no ignition if flame lights
+    },
+    {
+      id: "no_gas",
+      displayName: "No Gas Flow",
+      triggerStepId: "wh_8",
+      triggerPattern: /(?:no|none|nothing|can't\s*smell).*(?:gas|flow|smell|odor)/i,
+      entryStepId: "wh_8a",
+      mutuallyExclusive: [], // Can coexist with other branches
     },
   ],
 });
@@ -774,6 +926,9 @@ export function getRegisteredSystems(): string[] {
 /**
  * Get the next valid step in a procedure, considering completed and unable-to-verify steps.
  * Returns null if all steps are done or unreachable.
+ * 
+ * IMPORTANT: This is the LEGACY flat function. For branch-aware step resolution,
+ * use getNextStepBranchAware() which considers active branch state.
  */
 export function getNextStep(
   procedure: DiagnosticProcedure,
@@ -791,6 +946,92 @@ export function getNextStep(
   }
 
   return null;
+}
+
+/**
+ * Branch-aware step resolution (P1.5)
+ * 
+ * Rules:
+ * 1. If activeBranchId is set, ONLY steps in that branch are considered
+ * 2. If no active branch, only main-flow steps (branchId undefined) are considered
+ * 3. Locked-out branches are excluded entirely
+ * 4. Prerequisites must still be met
+ * 
+ * @param procedure - The diagnostic procedure
+ * @param completedIds - Steps that have been completed
+ * @param unableIds - Steps that cannot be verified
+ * @param activeBranchId - Currently active branch (null = main flow)
+ * @param lockedOutBranches - Branches that can no longer be entered
+ */
+export function getNextStepBranchAware(
+  procedure: DiagnosticProcedure,
+  completedIds: Set<string>,
+  unableIds: Set<string>,
+  activeBranchId: string | null,
+  lockedOutBranches: Set<string>,
+): DiagnosticStep | null {
+  const doneOrSkipped = new Set([...completedIds, ...unableIds]);
+
+  for (const step of procedure.steps) {
+    if (doneOrSkipped.has(step.id)) continue;
+
+    // Branch filtering
+    const stepBranch = step.branchId ?? null;
+    
+    if (activeBranchId !== null) {
+      // We're in a branch — only consider steps in THIS branch
+      if (stepBranch !== activeBranchId) continue;
+    } else {
+      // We're in main flow — only consider main-flow steps OR unlocked branch entry points
+      if (stepBranch !== null) {
+        // This step belongs to a branch
+        // Skip if it's a locked-out branch
+        if (lockedOutBranches.has(stepBranch)) continue;
+        // Skip non-entry branch steps when in main flow
+        const branch = procedure.branches?.find(b => b.id === stepBranch);
+        if (!branch || branch.entryStepId !== step.id) continue;
+      }
+    }
+
+    // Check prerequisites: all must be completed or unable-to-verify
+    const prereqsMet = step.prerequisites.every((p) => doneOrSkipped.has(p));
+    if (prereqsMet) return step;
+  }
+
+  return null;
+}
+
+/**
+ * Detect if a technician response triggers a branch.
+ * 
+ * @returns The branch to enter, or null if no branch is triggered
+ */
+export function detectBranchTrigger(
+  procedure: DiagnosticProcedure,
+  stepId: string,
+  technicianResponse: string,
+): ProcedureBranch | null {
+  if (!procedure.branches) return null;
+  
+  for (const branch of procedure.branches) {
+    if (branch.triggerStepId !== stepId) continue;
+    if (branch.triggerPattern.test(technicianResponse)) {
+      return branch;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Get branches that would be locked out if a given branch is entered.
+ */
+export function getMutuallyExclusiveBranches(
+  procedure: DiagnosticProcedure,
+  branchId: string,
+): string[] {
+  const branch = procedure.branches?.find(b => b.id === branchId);
+  return branch?.mutuallyExclusive ?? [];
 }
 
 /**

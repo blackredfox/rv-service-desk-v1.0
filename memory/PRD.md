@@ -96,7 +96,25 @@ Fixed the architectural gap where Context Engine was advisory-only, not truly au
 
 **ADR:** `docs/ADR-ENGINE-EXECUTION-AUTHORITY.md`
 
+### P1.5: Branch-Aware Step Resolution (DONE - Jan 2026)
+Fixed flat step list treating parallel branches as simultaneous.
+
+**Problem:**
+- `getNextStep()` operated on `completedStepIds + unableStepIds` WITHOUT branch constraints
+- No concept of active branch, decision tree, or path locking
+- Same step ID could have different meanings in different contexts
+
+**Solution:**
+- **Branch State Tracking** — `activeBranchId`, `decisionPath`, `lockedOutBranches` in registry
+- **Branch-Aware Resolution** — `getNextStepBranchAware()` considers active branch
+- **Mutual Exclusivity** — Entering `no_ignition` locks out `flame_failure` and vice versa
+- **Branch Trigger Detection** — `detectBranchTrigger()` identifies when to enter a branch
+- **Water Heater Branches** — Added 3 branches: `no_ignition`, `flame_failure`, `no_gas`
+
+**ADR:** `docs/ADR-BRANCH-AWARE-RESOLUTION.md`
+
 ## Upcoming Tasks
-- **(P0-Next)** Water heater procedure rewrite using new framework
-- **(P1)** Fix remaining 11 stable test failures
+- **(P2)** Route integration for branch processing
+- **(P2)** Add branches to furnace, roof AC procedures
+- **(P3)** Fix remaining 11 stable test failures
 - **(Future)** Diagnostic voice redesign (prompt-only)

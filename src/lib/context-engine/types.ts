@@ -16,6 +16,41 @@ export type Submode =
   | "replan"         // Triggered by new evidence
   | "loop_break";    // Forced forward progress
 
+// ── Branch Types ────────────────────────────────────────────────────
+
+/**
+ * Branch definition for conditional diagnostic paths.
+ * A branch is a sequence of steps triggered by a specific finding.
+ */
+export type BranchDefinition = {
+  id: string;                    // e.g., "flame_failure", "no_ignition"
+  displayName: string;           // Human-readable name
+  triggerStepId: string;         // Step that can trigger this branch
+  triggerPattern: RegExp;        // Pattern in response that activates branch
+  entryStepId: string;           // First step when entering this branch
+  stepIds: string[];             // All steps in this branch
+  mutuallyExclusive: string[];   // Branch IDs that cannot be active simultaneously
+};
+
+/**
+ * Branch state tracks which branch is active and the decision path taken.
+ */
+export type BranchState = {
+  activeBranchId: string | null;        // Currently active branch (null = main flow)
+  decisionPath: BranchDecision[];       // History of branch decisions
+  lockedOutBranches: Set<string>;       // Branches that can no longer be entered
+};
+
+/**
+ * A single branch decision recorded in the decision path.
+ */
+export type BranchDecision = {
+  stepId: string;                       // Step where decision was made
+  branchId: string | null;              // Branch entered (null = stayed in main flow)
+  reason: string;                       // Why this branch was chosen
+  timestamp: string;
+};
+
 // ── Intent Types ────────────────────────────────────────────────────
 
 export type Intent =
@@ -129,6 +164,9 @@ export type DiagnosticContext = {
   completedSteps: Set<string>;
   unableSteps: Set<string>;
   askedSteps: Set<string>;
+  
+  // Branch state (P1.5: Branch-aware step resolution)
+  branchState: BranchState;
   
   // Evidence tracking
   facts: Fact[];

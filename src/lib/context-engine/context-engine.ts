@@ -60,6 +60,12 @@ export function createContext(
     completedSteps: new Set(),
     unableSteps: new Set(),
     askedSteps: new Set(),
+    // P1.5: Branch state initialization
+    branchState: {
+      activeBranchId: null,
+      decisionPath: [],
+      lockedOutBranches: new Set(),
+    },
     facts: [],
     hypotheses: [],
     contradictions: [],
