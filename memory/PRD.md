@@ -53,7 +53,33 @@ Prompt-driven via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Voice redesign 
   - `retention.test.ts` (5) — storage API mismatch
   - `b2b-billing.test.ts` / `org-activity.test.ts` — flaky auth (intermittent)
 
+### P0: Procedure Catalog Framework (DONE - Jan 2026)
+Created framework documentation and TypeScript schema for systematic procedure development:
+
+**Files Created:**
+- `docs/PROCEDURE_CATALOG_FRAMEWORK.md` — Schema, subtype handling, branching, completion criteria
+- `docs/PROCEDURE_AUTHORING_STANDARD.md` — Naming conventions, step writing rules, review checklist
+- `docs/PROCEDURE_ROLLOUT_PLAN.md` — Phased rollout plan for 6 equipment families
+- `src/lib/procedures/procedure-schema.ts` — TypeScript type definitions (non-breaking)
+- `src/lib/procedures/index.ts` — Module exports
+
+**Key Framework Features:**
+- 3-level subtype hierarchy (primary → secondary → tertiary) with gating
+- Step categories (default/advanced/expert) for realistic flow
+- Branch definitions with mutual exclusivity
+- Completion criteria with key finding shortcuts
+- Retrieval boundary enforcement (retrieval enriches, never controls)
+- Destructive finding documentation
+
+**Priority Rollout Order:**
+1. Water Heater (P0 — first full rewrite)
+2. Water Pump (P1 — reference baseline)
+3. Furnace (P2)
+4. Roof AC (P3)
+5. Refrigerator (P4)
+6. Slide/Leveling (P5)
+
 ## Upcoming Tasks
+- **(P0-Next)** Water heater procedure rewrite using new framework
 - **(P1)** Fix remaining 11 stable test failures
-- **(Future)** Task 03 — TBD by user
 - **(Future)** Diagnostic voice redesign (prompt-only)
