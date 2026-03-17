@@ -1,54 +1,37 @@
 # RV Service Desk — Product Requirements Document
 
 ## Original Problem Statement
-A Next.js diagnostic assistant for RV technicians. The system helps technicians diagnose problems with RV systems (water heaters, water pumps, furnaces, AC, etc.) through a structured step-by-step diagnostic procedure.
+A Next.js diagnostic assistant for RV technicians. Structured step-by-step diagnostic procedure engine with LLM rendering.
 
 ## Core Architecture
 - **Next.js + TypeScript + Vitest**
 - Single API endpoint: `POST /api/chat`
-- Diagnostic engine: `context-engine` (state machine) + `diagnostic-registry` (step tracking) + `diagnostic-procedures` (procedure definitions)
-- LLM (OpenAI) renders questions; the engine controls the flow
-- Retrieval enrichment: optional, additive-only, failure-tolerant manufacturer-specific hints
-
-## Key Architectural Principle
-**The diagnostic procedure engine is the single source of authority for step progression.**
-- The registry defines procedures with ordered steps and prerequisites
-- The context engine tracks state (active step, completed steps, unable steps, equipment identity)
-- The LLM receives ONLY the current active step question — it does NOT decide which step comes next
-- Retrieval enrichment may add specificity but CANNOT alter the step sequence
+- Diagnostic engine: `context-engine` + `diagnostic-registry` + `diagnostic-procedures`
+- Retrieval enrichment: optional, additive-only
+- **Engine selects step. LLM renders question. No dual authority.**
 
 ## Completed Tasks
 
-### Task 01: Rollback & Baseline (DONE)
-### Task 02: Route Decomposition (DONE)
+### Task 01-02: Baseline & Decomposition (DONE)
+### Task 03: Diagnostic Authority & Retrieval (DONE)
 
-### Task 03: Diagnostic Authority and Model/Manufacturer Retrieval (DONE - Feb 2026)
-- Part A: Backward drift prevention, "problem not found" resume, clarification safety
-- Part B: Water heater gas branch (wh_13–wh_16)
-- Part C: Equipment identity extraction in context engine
-- Part D: Retrieval enrichment layer
-- Part E: Prompt contract alignment
+### Critical Bug Fix: LP Step Loop (DONE - Feb 2026)
+**Root cause**: `processMessage()` synced `activeProcedureId` using `registryProcedure.id` — but `DiagnosticProcedure` has no `id` field, only `system`. Result: `activeProcedureId` was always `undefined`, `activeStepId` was never assigned, engine had zero authority. The LLM drove every step.
 
-### Post-Task 03 Fixes (DONE - Feb 2026)
-**Issue 1 — Terminal-style output removed:**
-- Removed CRITICAL OUTPUT RULES block (System/Classification/Mode/Status headers)
-- Removed RESPONSE FORMAT with `Step [N]:` template
-- Replaced with natural shop-style conversational format
-- Removed "Copy." from acknowledgment list
+**Fix**: `registryProcedure.id` → `registryProcedure.system` in `context-engine.ts` step 0 sync.
 
-**Issue 2 — "Detected RU · Reply RU":**
-- Confirmed UI/test harness label, NOT model output. No changes needed.
+**Regression tests**: 2 tests in `tests/lp-loop-regression.test.ts`:
+1. "газовый Suburban → Баллон полный" → LP tank step does NOT repeat
+2. After answering LP appliances → system does NOT return to LP tank step
 
-**Issue 3 — wh_9 procedure realism:**
-- Default question changed to practical visual/tactile check: "clean, free of soot, sitting in flame path?"
-- mV measurement removed from default question
-- mV noted as "Advanced" optional info in howToCheck only
-- Not required for branch completion in normal shop workflow
-- Retrieval enrichment updated to match (Suburban: carbon buildup focus; Atwood: position/cleaning focus)
+### Post-Task 03: Voice & Procedure Fixes (DONE - Feb 2026)
+- Removed terminal-style headers from prompt
+- Fixed wh_9 thermocouple step to be realistic visual check
+- Removed "Copy." from acknowledgments
 
 ## Current Test Status
-- **689 passed, 13 pre-existing failures** (input-language-lock: 6, retention: 5, b2b/org-activity: 2 flaky)
+- **693 passed, 11 pre-existing failures** (input-language-lock: 6, retention: 5)
 
 ## Upcoming Tasks
-- **(P1)** Fix remaining pre-existing test failures
+- **(P1)** Fix remaining 11 pre-existing test failures
 - **(Future)** Task 04+ — TBD by user

@@ -27,6 +27,7 @@ import {
   markStepCompleted as registryMarkStepCompleted, 
   markStepUnable as registryMarkStepUnable,
   getNextStepId as registryGetNextStepId,
+  getActiveProcedure as registryGetActiveProcedure,
 } from "../diagnostic-registry";
 
 // Re-export config
@@ -146,6 +147,21 @@ export function processMessage(
   const notices: string[] = [];
   let stateChanged = false;
   
+  // 0. Sync activeProcedureId from registry if context doesn't have one
+  //    This bridges the gap: initializeCase sets up the registry,
+  //    but the context needs to know a procedure is active.
+  if (!context.activeProcedureId) {
+    const registryProcedure = registryGetActiveProcedure(caseId);
+    if (registryProcedure) {
+      context.activeProcedureId = registryProcedure.system;
+      if (!context.primarySystem) {
+        context.primarySystem = registryProcedure.system;
+      }
+      notices.push(`Procedure synced from registry: ${registryProcedure.displayName}`);
+      stateChanged = true;
+    }
+  }
+
   // 1. Detect intent
   const intent = detectIntent(message);
   console.log(`[ContextEngine] Intent: ${describeIntent(intent)}`);
