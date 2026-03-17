@@ -147,7 +147,7 @@ describe("Water Heater Diagnostic Procedure", () => {
       expect(context).not.toContain("[DONE]");
       
       // Should show progress
-      expect(context).toContain("2/12");
+      expect(context).toContain("2/16");
     });
 
     it("should show ALL STEPS COMPLETE when procedure finished", async () => {

@@ -16,6 +16,7 @@ import type {
   Submode,
   Mode,
   LaborState,
+  EquipmentIdentity,
 } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import { detectIntent, describeIntent, isClarificationRequest } from "./intent-router";
@@ -26,6 +27,7 @@ import {
   markStepCompleted as registryMarkStepCompleted, 
   markStepUnable as registryMarkStepUnable,
   getNextStepId as registryGetNextStepId,
+  getActiveProcedure as registryGetActiveProcedure,
 } from "../diagnostic-registry";
 
 // Re-export config
@@ -60,6 +62,7 @@ export function createContext(
     completedSteps: new Set(),
     unableSteps: new Set(),
     askedSteps: new Set(),
+    equipmentIdentity: { manufacturer: null, model: null, year: null },
     facts: [],
     hypotheses: [],
     contradictions: [],
@@ -144,10 +147,42 @@ export function processMessage(
   const notices: string[] = [];
   let stateChanged = false;
   
+  // 0. Sync activeProcedureId from registry if context doesn't have one
+  //    This bridges the gap: initializeCase sets up the registry,
+  //    but the context needs to know a procedure is active.
+  if (!context.activeProcedureId) {
+    const registryProcedure = registryGetActiveProcedure(caseId);
+    if (registryProcedure) {
+      context.activeProcedureId = registryProcedure.system;
+      if (!context.primarySystem) {
+        context.primarySystem = registryProcedure.system;
+      }
+      notices.push(`Procedure synced from registry: ${registryProcedure.displayName}`);
+      stateChanged = true;
+    }
+  }
+
   // 1. Detect intent
   const intent = detectIntent(message);
   console.log(`[ContextEngine] Intent: ${describeIntent(intent)}`);
   
+  // 1b. Extract equipment identity from technician message
+  const extractedIdentity = extractEquipmentIdentity(message);
+  if (extractedIdentity.manufacturer || extractedIdentity.model || extractedIdentity.year) {
+    if (extractedIdentity.manufacturer && !context.equipmentIdentity.manufacturer) {
+      context.equipmentIdentity.manufacturer = extractedIdentity.manufacturer;
+      notices.push(`Equipment manufacturer identified: ${extractedIdentity.manufacturer}`);
+    }
+    if (extractedIdentity.model && !context.equipmentIdentity.model) {
+      context.equipmentIdentity.model = extractedIdentity.model;
+      notices.push(`Equipment model identified: ${extractedIdentity.model}`);
+    }
+    if (extractedIdentity.year && !context.equipmentIdentity.year) {
+      context.equipmentIdentity.year = extractedIdentity.year;
+      notices.push(`Equipment year identified: ${extractedIdentity.year}`);
+    }
+    stateChanged = true;
+  }
   // 2. Check for replan triggers (only if isolation was complete)
   if (config.enableReplan && context.isolationComplete) {
     const replanResult = shouldReplan(message, context);
@@ -226,13 +261,22 @@ export function processMessage(
   }
   
   // 6. Ensure active step is always assigned when a procedure is active
+  //    DRIFT GUARD: never assign a completed or closed step
   if (!context.activeStepId && context.activeProcedureId) {
     const nextId = registryGetNextStepId(caseId);
-    if (nextId) {
+    if (nextId && !isStepClosed(context, nextId)) {
       context.activeStepId = nextId;
       notices.push(`Active step initialized: ${nextId}`);
       stateChanged = true;
     }
+  }
+  
+  // 7. Final drift guard: if activeStepId somehow points to a closed step, reassign
+  if (context.activeStepId && isStepClosed(context, context.activeStepId)) {
+    notices.push(`Drift guard: step ${context.activeStepId} is closed, reassigning`);
+    const safeNextId = registryGetNextStepId(caseId);
+    context.activeStepId = safeNextId;
+    stateChanged = true;
   }
   
   // 7. Build response instructions
@@ -510,6 +554,81 @@ export function setMode(caseId: string, mode: Mode): void {
  */
 export function getMode(caseId: string): Mode | undefined {
   return getContext(caseId)?.mode;
+}
+
+// ── Drift Guard Helper ──────────────────────────────────────────────
+
+/**
+ * Check if a step is closed (completed or unable).
+ * The engine must never assign a closed step as activeStepId.
+ */
+function isStepClosed(context: DiagnosticContext, stepId: string): boolean {
+  return context.completedSteps.has(stepId) || context.unableSteps.has(stepId);
+}
+
+// ── Equipment Identity Extraction ───────────────────────────────────
+
+const MANUFACTURER_PATTERNS: Array<{ manufacturer: string; patterns: RegExp[] }> = [
+  { manufacturer: "Suburban", patterns: [/\bsuburban\b/i, /(?:^|\s)субурбан(?:\s|,|$)/i] },
+  { manufacturer: "Atwood", patterns: [/\batwood\b/i, /(?:^|\s)(?:этвуд|атвуд)(?:\s|,|$)/i] },
+  { manufacturer: "Dometic", patterns: [/\bdometic\b/i, /(?:^|\s)(?:дометик|доместик)(?:\s|,|$)/i] },
+  { manufacturer: "Girard", patterns: [/\bgirard\b/i, /(?:^|\s)(?:жирар|жирард)(?:\s|,|$)/i] },
+  { manufacturer: "Norcold", patterns: [/\bnorcold\b/i, /(?:^|\s)(?:норкольд|норколд)(?:\s|,|$)/i] },
+  { manufacturer: "Coleman", patterns: [/\bcoleman\b/i, /(?:^|\s)(?:колеман|колман)(?:\s|,|$)/i] },
+  { manufacturer: "Lippert", patterns: [/\blippert\b/i, /(?:^|\s)(?:липперт|липерт)(?:\s|,|$)/i] },
+  { manufacturer: "Carefree", patterns: [/\bcarefree\b/i] },
+  { manufacturer: "Duo-Therm", patterns: [/\bduo[\s-]?therm\b/i] },
+  { manufacturer: "Hydroflame", patterns: [/\bhydroflame\b/i, /\bhydro[\s-]?flame\b/i] },
+  { manufacturer: "Whale", patterns: [/\bwhale\b/i] },
+  { manufacturer: "Shurflo", patterns: [/\bshurflo\b/i] },
+  { manufacturer: "Truma", patterns: [/\btruma\b/i] },
+];
+
+const MODEL_PATTERNS: RegExp[] = [
+  // Suburban water heater models: SW6DE, SW10DE, SW16DE, SW6P, SW12DE, etc.
+  /\b(SW\d{1,2}[A-Z]{0,3})\b/i,
+  // Atwood water heater models: G6A-8E, G10-2, GC6AA-10E, GC10A-4E, etc.
+  /\b(GC?\d{1,2}A{0,2}-?\d{0,2}[A-Z]{0,2})\b/,
+  // Atwood with hyphen: G6A-8E
+  /\b(G\d{1,2}[A-Z]-\d[A-Z]?)\b/,
+  // Generic alphanumeric model patterns (e.g., "model 6941", "RM2652")
+  /\bmodel\s+([A-Z0-9][-A-Z0-9]{2,12})\b/i,
+  /\b(RM\d{3,5}[A-Z]?)\b/i, // Norcold/Dometic fridge models
+  /\b(NXA?\d{3,4}[A-Z]?)\b/i, // Dometic AC models
+  // Russian: "модель X"
+  /\bмодель\s+([A-Za-z0-9][-A-Za-z0-9]{2,12})\b/i,
+];
+
+const YEAR_PATTERN = /\b(19[89]\d|20[012]\d)\b/;
+
+/**
+ * Extract equipment identity (manufacturer, model, year) from a technician message.
+ * Returns partial identity — only fields that were found.
+ */
+export function extractEquipmentIdentity(message: string): EquipmentIdentity {
+  const identity: EquipmentIdentity = { manufacturer: null, model: null, year: null };
+
+  for (const { manufacturer, patterns } of MANUFACTURER_PATTERNS) {
+    if (patterns.some(p => p.test(message))) {
+      identity.manufacturer = manufacturer;
+      break;
+    }
+  }
+
+  for (const pattern of MODEL_PATTERNS) {
+    const match = message.match(pattern);
+    if (match?.[1]) {
+      identity.model = match[1].toUpperCase();
+      break;
+    }
+  }
+
+  const yearMatch = message.match(YEAR_PATTERN);
+  if (yearMatch) {
+    identity.year = parseInt(yearMatch[1], 10);
+  }
+
+  return identity;
 }
 
 // ── Exports ─────────────────────────────────────────────────────────
