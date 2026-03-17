@@ -176,134 +176,177 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
   });
 });
 
-describe("Output Validator", () => {
-  describe("validateResponse - DIAGNOSTICS state", () => {
-    it("should detect English during Russian diagnostics", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+describe("Runtime Output Validators (mode-validators.ts)", () => {
+  describe("validateDiagnosticOutput", () => {
+    it("should detect final-report drift during diagnostics", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "Please check the water pump pressure and verify the connections.",
-        currentState: "DIAGNOSTICS",
-        dialogueLanguage: "RU",
-      });
+      const result = validateDiagnosticOutput(
+        "Complaint: Water pump not operating.\nVerified Condition: No pressure.\nRecommended Corrective Action: Replace pump."
+      );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("LANG_VIOLATION"))).toBe(true);
+      expect(result.violations.some(v => v.includes("DIAGNOSTIC_DRIFT"))).toBe(true);
     });
 
-    it("should allow Russian during Russian diagnostics", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+    it("should detect isolation-complete language", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "Проверьте давление в системе водяного насоса?",
-        currentState: "DIAGNOSTICS",
-        dialogueLanguage: "RU",
-      });
-
-      expect(result.valid).toBe(true);
-      expect(result.violations).toHaveLength(0);
-    });
-
-    it("should detect translation separator during diagnostics", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
-
-      const result = validateResponse({
-        response: "Проверьте насос.\n\n--- TRANSLATION ---\n\nCheck the pump.",
-        currentState: "DIAGNOSTICS",
-        dialogueLanguage: "RU",
-      });
+      const result = validateDiagnosticOutput(
+        "The isolation is complete. All conditions are met. Ready to transition to final report?"
+      );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("TRANSLATION_VIOLATION"))).toBe(true);
+      expect(result.violations.some(v => v.includes("ISOLATION_DECLARATION_BLOCKED"))).toBe(true);
     });
 
-    it("should detect multiple questions", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+    it("should detect translation separator in diagnostic mode", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "Насос работает? Какое давление? Есть ли утечки?",
-        currentState: "DIAGNOSTICS",
-        dialogueLanguage: "RU",
-      });
+      const result = validateDiagnosticOutput(
+        "Проверьте насос.\n\n--- TRANSLATION ---\n\nCheck the pump."
+      );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("QUESTION_VIOLATION"))).toBe(true);
+      expect(result.violations.some(v => v.includes("DIAGNOSTIC_DRIFT"))).toBe(true);
     });
 
-    it("should allow single question", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+    it("should detect too many questions (>2)", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "¿Funciona la bomba de agua?",
-        currentState: "DIAGNOSTICS",
-        dialogueLanguage: "ES",
-      });
+      const result = validateDiagnosticOutput(
+        "Насос работает? Какое давление? Есть ли утечки?"
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("DIAGNOSTIC_QUESTION"))).toBe(true);
+    });
+
+    it("should allow valid single-question diagnostic output", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
+
+      const result = validateDiagnosticOutput(
+        "¿Funciona la bomba de agua?"
+      );
 
       expect(result.valid).toBe(true);
     });
 
-    it("should allow English during English diagnostics", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+    it("should allow valid English diagnostic output", async () => {
+      const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "Is the water pump making any noise when activated?",
-        currentState: "DIAGNOSTICS",
-        dialogueLanguage: "EN",
-      });
+      const result = validateDiagnosticOutput(
+        "Is the water pump making any noise when activated?"
+      );
 
       expect(result.valid).toBe(true);
     });
   });
 
-  describe("validateResponse - CAUSE_OUTPUT state", () => {
-    it("should detect missing translation separator", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+  describe("validateLanguageConsistency", () => {
+    it("should detect English output during Russian session", async () => {
+      const { validateLanguageConsistency } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "Water pump not operating per spec. Replace pump. Labor: 1.5 hours.",
-        currentState: "CAUSE_OUTPUT",
-        dialogueLanguage: "RU",
-      });
+      const result = validateLanguageConsistency(
+        "Please check the water pump pressure and verify the connections are secure.",
+        "RU"
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("LANGUAGE_MISMATCH"))).toBe(true);
+    });
+
+    it("should allow Russian output during Russian session", async () => {
+      const { validateLanguageConsistency } = await import("@/lib/mode-validators");
+
+      const result = validateLanguageConsistency(
+        "Проверьте давление в системе водяного насоса?",
+        "RU"
+      );
+
+      expect(result.valid).toBe(true);
+    });
+
+    it("should detect Cyrillic in English session", async () => {
+      const { validateLanguageConsistency } = await import("@/lib/mode-validators");
+
+      const result = validateLanguageConsistency(
+        "Проверьте насос и давление.",
+        "EN"
+      );
+
+      expect(result.valid).toBe(false);
+    });
+  });
+
+  describe("validateFinalReportOutput", () => {
+    it("should detect missing translation separator when required", async () => {
+      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
+
+      const result = validateFinalReportOutput(
+        "Water pump not operating per spec. Replace pump. Labor: 1.5 hours.",
+        true,
+        "RU"
+      );
 
       expect(result.valid).toBe(false);
       expect(result.violations.some(v => v.includes("Missing '--- TRANSLATION ---'"))).toBe(true);
     });
 
-    it("should detect numbered lists in Cause output", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+    it("should detect numbered lists in final report", async () => {
+      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: "1. Water pump not operating.\n2. Replace pump.\n\n--- TRANSLATION ---\n\n1. Насос не работает.",
-        currentState: "CAUSE_OUTPUT",
-        dialogueLanguage: "RU",
-      });
+      const result = validateFinalReportOutput(
+        "1. Water pump not operating.\n2. Replace pump.\n\n--- TRANSLATION ---\n\n1. Насос не работает.",
+        true,
+        "RU"
+      );
 
       expect(result.valid).toBe(false);
       expect(result.violations.some(v => v.includes("numbered lists"))).toBe(true);
     });
 
-    it("should allow proper Cause format", async () => {
-      const { validateResponse } = await import("@/lib/output-validator");
+    it("should allow proper final report format", async () => {
+      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
 
-      const result = validateResponse({
-        response: `Water pump not operating per spec when activated. Verified no pressure at outlet with system energized. Pump motor runs but no water flow detected.
-
-Recommend replacement of water pump assembly. P/N TBD.
-
-Labor: Remove and replace water pump - 1.5 hours. Total labor: 1.5 hours.
+      const result = validateFinalReportOutput(
+        `Complaint: Water pump not operating per spec when activated.
+Diagnostic Procedure: Verified no pressure at outlet with system energized.
+Verified Condition: Pump motor runs but no water flow detected.
+Recommended Corrective Action: Replace water pump assembly.
+Estimated Labor: Remove and replace water pump - 1.5 hours. Total labor: 1.5 hours.
+Required Parts: Water pump assembly P/N TBD.
 
 --- TRANSLATION ---
 
-Водяной насос не работает согласно спецификации при активации. Подтверждено отсутствие давления на выходе при включённой системе. Двигатель насоса работает, но поток воды не обнаружен.
-
-Рекомендуется замена узла водяного насоса. Номер детали уточняется.
-
-Работа: Снятие и замена водяного насоса - 1.5 часа. Общее время работы: 1.5 часа.`,
-        currentState: "CAUSE_OUTPUT",
-        dialogueLanguage: "RU",
-      });
+Жалоба: Водяной насос не работает согласно спецификации при активации.
+Процедура диагностики: Подтверждено отсутствие давления на выходе.
+Подтверждённое состояние: Двигатель насоса работает, но поток воды не обнаружен.
+Рекомендуемое корректирующее действие: Замена узла водяного насоса.
+Расчётное время работы: Снятие и замена водяного насоса - 1.5 часа. Общее время: 1.5 часа.
+Необходимые запчасти: Узел водяного насоса.`,
+        true,
+        "RU"
+      );
 
       expect(result.valid).toBe(true);
+    });
+  });
+
+  describe("validateOutput dispatcher", () => {
+    it("should route diagnostic mode to validateDiagnosticOutput", async () => {
+      const { validateOutput } = await import("@/lib/mode-validators");
+
+      const result = validateOutput("Is the pump working?", "diagnostic");
+      expect(result.valid).toBe(true);
+    });
+
+    it("should reject empty output", async () => {
+      const { validateOutput } = await import("@/lib/mode-validators");
+
+      const result = validateOutput("", "diagnostic");
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("EMPTY_OUTPUT"))).toBe(true);
     });
   });
 });

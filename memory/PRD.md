@@ -37,26 +37,25 @@ Three corrections implemented:
 2. **Active-step-only matching**: Step completion runs only against `activeStepId`, not all procedure steps
 3. **LLM sees only active step**: `buildProcedureContext` outputs only `CURRENT STEP: <id>` + question — no completed/unable step listings
 
-Files changed:
-- `src/lib/context-engine/context-engine.ts`
-- `src/lib/diagnostic-procedures.ts`
-- `src/lib/diagnostic-registry.ts`
-- `src/app/api/chat/route.ts`
-- `tests/water-heater-diagnostic.test.ts`
-- `tests/diagnostic-procedures.test.ts`
-- `tests/diagnostic-how-to-check.test.ts`
+Fixed bug: `getNextStepId()` was returning full `DiagnosticStep` object instead of string ID.
 
-Test results: 655 passed, 17 known pre-existing failures (unchanged)
+### Test Suite Cleanup (DONE - Feb 2026)
+- Replaced 5 stale `output-validator.validateResponse()` tests in `prompt-enforcement.test.ts`
+- New tests target the real runtime validators: `validateDiagnosticOutput`, `validateLanguageConsistency`, `validateFinalReportOutput` from `mode-validators.ts`
+- Dead code path (`output-validator.ts`) no longer tested
+- Test failures reduced: 17 → 12
 
-## Known Pre-existing Test Failures (P2)
-17 failures in:
-- `b2b-billing.test.ts` (auth mocking)
-- `input-language-lock.test.ts` (6 failures)
-- `retention.test.ts` (5 failures)
-- `mode-validators.test.ts` (1 failure)
-- `prompt-enforcement.test.ts` (5 failures)
+### Terminal-Style Output Confirmation (Feb 2026)
+Confirmed: the structured diagnostic output (System, Classification, Mode, Status, Step IDs) is 100% **prompt-driven** via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Changing the voice requires only prompt edits — no engine changes needed.
+
+## Current Test Status
+- **665 passed, 12 failed** (down from 17)
+- Remaining failures are pre-existing in:
+  - `input-language-lock.test.ts` (6) — stale test assumptions
+  - `retention.test.ts` (5) — storage API mismatch
+  - `mode-validators.test.ts` (1) — edge case
 
 ## Upcoming Tasks
-- **(P0)** User manual testing of water heater scenario to confirm all bugs resolved
-- **(P1)** Fix ~17 pre-existing test failures
+- **(P1)** Fix remaining 12 pre-existing test failures
 - **(Future)** Task 03 — details TBD by user
+- **(Future)** Diagnostic voice redesign — remove terminal-style headers from prompt
