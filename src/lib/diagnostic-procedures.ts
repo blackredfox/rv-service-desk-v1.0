@@ -172,9 +172,9 @@ reg({
     },
     {
       id: "lpg_7",
-      question: "Flame sensor / thermocouple — clean and positioned in flame path? Voltage reading?",
+      question: "Flame sensor or thermocouple — clean, free of soot, and sitting in the flame path? Any visible damage?",
       prerequisites: ["lpg_6"],
-      matchPatterns: [/(?:flame\s*sensor|thermocouple).*(?:clean|dirty|position|mv|millivolt|\d+)/i],
+      matchPatterns: [/(?:flame\s*sensor|thermocouple).*(?:clean|dirty|position|damage|ok|good|yes|no)/i],
     },
     {
       id: "lpg_8",
@@ -287,16 +287,18 @@ reg({
       ],
       howToCheck: "SAFETY: Brief sniff only. If 12V is at valve but no gas flows, valve solenoid may be stuck or failed.",
     },
-    // Step 9: Thermocouple/ECO check
+    // Step 9: Flame sensor / thermocouple — visual and position check
     {
       id: "wh_9",
-      question: "Thermocouple / flame sensor: Clean and properly positioned in flame path? Millivolt reading when flame present?",
+      question: "Flame sensor or thermocouple — is it clean, free of soot/corrosion, and sitting in the flame path? Any visible damage or displacement?",
       prerequisites: ["wh_7"],
       matchPatterns: [
-        /(?:thermocouple|flame\s*sensor|eco).*(?:clean|dirty|position|mv|millivolt|\d+)/i,
-        /(?:термопар|датчик).*(?:чист|грязн|позиц|\d+)/i,
+        /(?:thermocouple|flame\s*sensor|eco).*(?:clean|dirty|position|damage|corroded|bent|ok|good|yes|no)/i,
+        /(?:термопар|датчик).*(?:чист|грязн|позиц|повреж|ок|да|нет|норм)/i,
+        /(?:clean|dirty|corroded|bent|ok|good|soot|carbon)/i,
+        /(?:чист|грязн|нагар|сажа|коррозия|норм)/i,
       ],
-      howToCheck: "With flame present, measure DC millivolts across thermocouple leads. Should be 20-30mV minimum.",
+      howToCheck: "Look at the sensor probe inside the burner area. It should sit directly in the flame path, not bent away. Clean carbon/soot with fine emery cloth. If visibly cracked or broken, replace. Advanced: if you have a meter, thermocouple output should be 20-30mV in flame — but visual check and cleaning solve most issues.",
     },
     // Step 10: Burner/orifice inspection
     {
