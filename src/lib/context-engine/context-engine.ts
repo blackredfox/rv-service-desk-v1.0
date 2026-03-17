@@ -26,6 +26,8 @@ import {
   markStepCompleted as registryMarkStepCompleted, 
   markStepUnable as registryMarkStepUnable,
   getNextStepId as registryGetNextStepId,
+  processResponseForBranch as registryProcessResponseForBranch,
+  exitBranch as registryExitBranch,
 } from "../diagnostic-registry";
 
 // Re-export config
@@ -174,9 +176,22 @@ export function processMessage(
   }
   
   // 4. Handle step completion signals
-  if (intent.type === "MAIN_DIAGNOSTIC" || intent.type === "ALREADY_ANSWERED" || intent.type === "UNABLE_TO_VERIFY") {
+  // NOTE: CONFIRMATION in diagnostic mode with an active step is treated as MAIN_DIAGNOSTIC
+  // (e.g. Russian "да" / "нет" answers to diagnostic questions should advance steps, not
+  //  be misrouted as labor confirmations)
+  const isConfirmationAsDiagnostic =
+    intent.type === "CONFIRMATION" &&
+    context.mode === "diagnostic" &&
+    context.activeStepId !== null;
+
+  if (
+    intent.type === "MAIN_DIAGNOSTIC" ||
+    intent.type === "ALREADY_ANSWERED" ||
+    intent.type === "UNABLE_TO_VERIFY" ||
+    isConfirmationAsDiagnostic
+  ) {
     // If we're in a clarification subflow and got a diagnostic response, pop back
-    if (isInClarificationSubflow(context) && intent.type === "MAIN_DIAGNOSTIC") {
+    if (isInClarificationSubflow(context) && (intent.type === "MAIN_DIAGNOSTIC" || isConfirmationAsDiagnostic)) {
       context = popTopic(context);
       stateChanged = true;
     }
@@ -184,30 +199,70 @@ export function processMessage(
     // Mark current step as completed or unable based on intent
     if (context.activeStepId) {
       if (intent.type === "UNABLE_TO_VERIFY") {
-        context.unableSteps.add(context.activeStepId);
-        registryMarkStepUnable(caseId, context.activeStepId); // Sync to registry
-        notices.push(`Step ${context.activeStepId} marked as UNABLE`);
-        // Immediately assign next step from registry
+        const completedStepId = context.activeStepId;
+        context.unableSteps.add(completedStepId);
+        registryMarkStepUnable(caseId, completedStepId); // Sync to registry
+        notices.push(`Step ${completedStepId} marked as UNABLE`);
+        // Note: unable-to-verify typically does not trigger branches (no positive finding)
+        // Get next step (branch-aware)
         const nextId = registryGetNextStepId(caseId);
-        context.activeStepId = nextId;
-        if (nextId) {
-          notices.push(`Next step assigned: ${nextId}`);
+        // Handle branch exit if all branch steps are exhausted
+        if (nextId === null && context.branchState.activeBranchId !== null) {
+          registryExitBranch(caseId, "Branch steps exhausted after UNABLE");
+          context.branchState.activeBranchId = null;
+          notices.push(`Branch exhausted (unable) — returning to main flow`);
+          const mainFlowNext = registryGetNextStepId(caseId);
+          context.activeStepId = mainFlowNext;
+          if (mainFlowNext) notices.push(`Main flow resumed: ${mainFlowNext}`);
+          else notices.push(`All procedure steps complete`);
         } else {
-          notices.push(`All procedure steps complete`);
+          context.activeStepId = nextId;
+          if (nextId) notices.push(`Next step assigned: ${nextId}`);
+          else notices.push(`All procedure steps complete`);
         }
         stateChanged = true;
-      } else if (intent.type === "MAIN_DIAGNOSTIC" || intent.type === "ALREADY_ANSWERED") {
+      } else {
+        // MAIN_DIAGNOSTIC, ALREADY_ANSWERED, or diagnostic-context CONFIRMATION
         // Technician answered the current step — mark it complete
-        context.completedSteps.add(context.activeStepId);
-        registryMarkStepCompleted(caseId, context.activeStepId); // Sync to registry
-        notices.push(`Step ${context.activeStepId} marked as COMPLETED`);
-        // Immediately assign next step from registry
+        const completedStepId = context.activeStepId;
+        context.completedSteps.add(completedStepId);
+        registryMarkStepCompleted(caseId, completedStepId); // Sync to registry
+        notices.push(`Step ${completedStepId} marked as COMPLETED`);
+
+        // ── P1.5: Branch trigger check ─────────────────────────────
+        // MUST happen BEFORE getNextStepId so the registry's activeBranchId is
+        // updated when the next step is resolved.
+        const branchResult = registryProcessResponseForBranch(caseId, completedStepId, message);
+        if (branchResult.branchEntered) {
+          notices.push(`Branch entered: ${branchResult.branchEntered.id}`);
+          // Sync branch state to context engine state
+          context.branchState.activeBranchId = branchResult.branchEntered.id;
+          context.branchState.decisionPath.push({
+            stepId: completedStepId,
+            branchId: branchResult.branchEntered.id,
+            reason: "Triggered by technician response",
+            timestamp: new Date().toISOString(),
+          });
+          for (const lockedBranch of branchResult.lockedOut) {
+            context.branchState.lockedOutBranches.add(lockedBranch);
+          }
+        }
+
+        // Now resolve next step — branch-aware because registry.activeBranchId is updated
         const nextId = registryGetNextStepId(caseId);
-        context.activeStepId = nextId;
-        if (nextId) {
-          notices.push(`Next step assigned: ${nextId}`);
+        // Handle branch exit if all branch steps are exhausted
+        if (nextId === null && context.branchState.activeBranchId !== null) {
+          registryExitBranch(caseId, "Branch steps exhausted");
+          context.branchState.activeBranchId = null;
+          notices.push(`Branch exhausted — returning to main flow`);
+          const mainFlowNext = registryGetNextStepId(caseId);
+          context.activeStepId = mainFlowNext;
+          if (mainFlowNext) notices.push(`Main flow resumed: ${mainFlowNext}`);
+          else notices.push(`All procedure steps complete`);
         } else {
-          notices.push(`All procedure steps complete`);
+          context.activeStepId = nextId;
+          if (nextId) notices.push(`Next step assigned: ${nextId}`);
+          else notices.push(`All procedure steps complete`);
         }
         stateChanged = true;
       }

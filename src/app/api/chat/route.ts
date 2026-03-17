@@ -270,6 +270,10 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Procedure catalog: ${initResult.system}`);
     }
 
+    // Save the active step ID BEFORE context engine processes the message.
+    // Used by STEP COMPLETION HARDENING to determine if the engine already advanced the step.
+    const stepIdBeforeProcessing = getOrCreateContext(ensuredCase.id)?.activeStepId ?? null;
+
     engineResult = processContextMessage(ensuredCase.id, message, DEFAULT_CONFIG);
 
     if (!engineResult || !engineResult.context) {
@@ -346,28 +350,37 @@ export async function POST(req: Request) {
     }
 
     // ── STEP COMPLETION HARDENING ──────────────────────────────────────
-    // Check if technician's message answers the active step (contextual completion)
+    // Backup path: if context engine did NOT advance the step (intent detection failed),
+    // check whether the message semantically answers the current step and advance it here.
+    //
+    // IMPORTANT: if context engine already advanced the step (stepIdBeforeProcessing ≠
+    // activeStepId), skip this block entirely — the engine handled completion AND called
+    // processResponseForBranch. Running this block again on the advanced step would
+    // prematurely complete the NEXT question using the current (unrelated) message.
     const currentActiveStep = engineResult.context.activeStepId;
-    if (currentActiveStep && !initResult.preCompletedSteps.includes(currentActiveStep)) {
+    const contextEngineAdvancedStep = stepIdBeforeProcessing !== currentActiveStep;
+
+    if (!contextEngineAdvancedStep && currentActiveStep && !initResult.preCompletedSteps.includes(currentActiveStep)) {
       const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
       if (isStepAnswered(message, stepQuestion)) {
         // Technician's message answers the step — mark it complete
         registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
-        console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match)`);
+        console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match, hardening backup)`);
         
-        // ── BRANCH TRIGGER CHECK (P1.5) ──────────────────────────────────
-        // Check if this response triggers a branch entry
+        // ── BRANCH TRIGGER CHECK (P1.5 backup) ───────────────────────────
+        // Context engine didn't advance, so check branch trigger here.
+        // processResponseForBranch was NOT called by the engine for this step.
         const branchResult = processResponseForBranch(ensuredCase.id, currentActiveStep, message);
         if (branchResult.branchEntered) {
-          console.log(`[Chat API v2] Branch entered: ${branchResult.branchEntered.id} (locked out: ${branchResult.lockedOut.join(", ") || "none"})`);
+          console.log(`[Chat API v2] Branch entered (hardening backup): ${branchResult.branchEntered.id} (locked out: ${branchResult.lockedOut.join(", ") || "none"})`);
           // Sync branch state to context engine
           if (engineResult.context.branchState) {
             engineResult.context.branchState.activeBranchId = branchResult.branchEntered.id;
             engineResult.context.branchState.decisionPath.push({
               stepId: currentActiveStep,
               branchId: branchResult.branchEntered.id,
-              reason: `Triggered by technician response`,
+              reason: `Triggered by technician response (hardening backup)`,
               timestamp: new Date().toISOString(),
             });
             for (const lockedBranch of branchResult.lockedOut) {
@@ -376,11 +389,11 @@ export async function POST(req: Request) {
           }
         }
         
-        // Advance to next step (now branch-aware)
+        // Advance to next step (branch-aware)
         const nextStep = getNextStepId(ensuredCase.id);
         if (nextStep) {
           engineResult.context.activeStepId = nextStep;
-          console.log(`[Chat API v2] Advanced to step ${nextStep}`);
+          console.log(`[Chat API v2] Advanced to step ${nextStep} (hardening backup)`);
         } else {
           // Check if we need to exit branch and continue main flow
           const branchState = getBranchState(ensuredCase.id);

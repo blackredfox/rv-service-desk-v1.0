@@ -465,7 +465,8 @@ reg({
       id: "no_ignition",
       displayName: "No Ignition / No Spark",
       triggerStepId: "wh_6",
-      triggerPattern: /(?:no|nothing|none|didn't|doesn't|not).*(?:click|spark|glow|ignit)/i,
+      // English + Russian (нет щелчка/искры/свечения) + Spanish (sin clic/chispa)
+      triggerPattern: /(?:no|nothing|none|didn't|doesn't|not|нет|не\s*(?:слышно|слышал|вижу|было|работает|щёлк|щелч|искр|свеч)|sin|no\s+hay).*(?:click|spark|glow|ignit|щелч|искр|свеч|clic|chispa|encend|зажига|розжи|поджи)|(?:не\s+щёлк|не\s+щелч|не\s+искр|не\s+свет|не\s+зажига|не\s+работает\s+поджи)/i,
       entryStepId: "wh_6a",
       mutuallyExclusive: ["flame_failure"], // Can't have flame failure if no ignition
     },
@@ -473,7 +474,8 @@ reg({
       id: "flame_failure",
       displayName: "Flame Lights Then Fails",
       triggerStepId: "wh_7",
-      triggerPattern: /(?:flame|fire).*(?:goes?\s*out|drops?\s*out|dies|fails?|shuts?\s*off|won't\s*stay)/i,
+      // English + Russian (пламя гаснет/тухнет) + Spanish (llama se apaga)
+      triggerPattern: /(?:flame|fire|пламя|огонь|llama|fuego).*(?:goes?\s*out|drops?\s*out|dies|fails?|shuts?\s*off|won'?t\s*stay|гаснет|тухнет|не\s*держится|не\s*горит|гасн|se\s*apaga|se\s*va|apag)|(?:гаснет|тухнет|гасн\w+)\s*(?:пламя|огонь)?/i,
       entryStepId: "wh_7a",
       mutuallyExclusive: ["no_ignition"], // Can't have no ignition if flame lights
     },
@@ -481,7 +483,8 @@ reg({
       id: "no_gas",
       displayName: "No Gas Flow",
       triggerStepId: "wh_8",
-      triggerPattern: /(?:no|none|nothing|can't\s*smell).*(?:gas|flow|smell|odor)/i,
+      // English + Russian (нет газа/запаха) + Spanish (sin gas)
+      triggerPattern: /(?:no|none|nothing|can'?t\s*smell|нет|не\s*(?:чувств|слышно|идёт|идет|запах)|no\s+hay|sin).*(?:gas|flow|smell|odor|газ|запах|течёт|течет|поступ)|(?:газ\s*не\s*(?:идёт|идет|поступает|чувствуется))/i,
       entryStepId: "wh_8a",
       mutuallyExclusive: [], // Can coexist with other branches
     },
@@ -982,15 +985,11 @@ export function getNextStepBranchAware(
       // We're in a branch — only consider steps in THIS branch
       if (stepBranch !== activeBranchId) continue;
     } else {
-      // We're in main flow — only consider main-flow steps OR unlocked branch entry points
-      if (stepBranch !== null) {
-        // This step belongs to a branch
-        // Skip if it's a locked-out branch
-        if (lockedOutBranches.has(stepBranch)) continue;
-        // Skip non-entry branch steps when in main flow
-        const branch = procedure.branches?.find(b => b.id === stepBranch);
-        if (!branch || branch.entryStepId !== step.id) continue;
-      }
+      // We're in main flow — ONLY consider main-flow steps.
+      // Branch steps are entered EXCLUSIVELY via processResponseForBranch() trigger,
+      // never by falling through from step eligibility alone.
+      // This prevents accidental branch entry and ensures distinct step-ID identity.
+      if (stepBranch !== null) continue;
     }
 
     // Check prerequisites: all must be completed or unable-to-verify

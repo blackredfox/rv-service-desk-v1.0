@@ -47,7 +47,43 @@ A Next.js diagnostic assistant for RV technicians. The system helps technicians 
 Prompt-driven via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Voice redesign = prompt edit only.
 
 ## Current Test Status
-- **666 passed, 11 stable failures**
+- **713 passed, 11 stable pre-existing failures** (Prisma client / input-language-lock, unrelated to engine)
+
+### P1.5 — Branch Execution Runtime Integration (DONE - Feb 2026)
+Fixed the full runtime path so branches are actually entered, traversed with distinct step IDs, and exited.
+
+**Root Causes Fixed:**
+
+**1. Missing `processResponseForBranch()` call in `context-engine.ts`** _(the exact missing integration point)_
+- File: `src/lib/context-engine/context-engine.ts`
+- `processMessage()` was marking a step complete and calling `registryGetNextStepId()` WITHOUT first calling `processResponseForBranch()`. Branch state was never updated before next-step resolution. Fix: added call between `registryMarkStepCompleted()` and `registryGetNextStepId()`, syncing resulting branch state to `context.branchState`.
+
+**2. `getNextStepBranchAware()` allowing branch entry from main flow** _(the step identity bug)_
+- File: `src/lib/diagnostic-procedures.ts`
+- When `activeBranchId = null`, the function was returning branch entry steps (wh_6a, wh_7a) if their prerequisites were met, even without a trigger. This caused the system to advance into branch territory without activation, creating the wh_7 / wh_7 / wh_7 repeat pattern. Fix: when in main flow, skip ALL branch steps unconditionally; branches are entered exclusively via `processResponseForBranch()`.
+
+**3. `CONFIRMATION` intent misrouting Russian diagnostic answers** _(loop amplifier)_
+- File: `src/lib/context-engine/context-engine.ts`
+- Russian short answers like "да"/"нет" were classified as `CONFIRMATION` (labor), not `MAIN_DIAGNOSTIC`. `processContextMessage()` never advanced the step, so `activeStepId` stayed stuck at wh_7 indefinitely. Fix: when `intent.type === "CONFIRMATION"` AND `context.mode === "diagnostic"` AND `context.activeStepId` is set, treat as `MAIN_DIAGNOSTIC`.
+
+**4. STEP COMPLETION HARDENING double-advancing steps** _(secondary amplifier)_
+- File: `src/app/api/chat/route.ts`
+- After context engine correctly advanced from step X to step Y, the hardening block still ran `isStepAnswered(message_for_X, Y_question)`. Since `isStepAnswered` is lenient (short "да" matches any question), this prematurely marked step Y complete with the wrong message. Fix: saved `stepIdBeforeProcessing` before calling `processContextMessage()`; hardening block is skipped when context engine already advanced the step (`contextEngineAdvanced` guard). Keeps it as a valid backup path only for intent-detection failures.
+
+**5. Branch trigger patterns English-only** _(multilingual block)_
+- File: `src/lib/diagnostic-procedures.ts`
+- `no_ignition`, `flame_failure`, and `no_gas` trigger patterns matched only English phrases. Russian/Spanish technicians could never enter branches. Fix: added Russian Cyrillic and Spanish pattern alternations to all three branch trigger regexes.
+
+**6. Branch exit in `processContextMessage()`**
+- File: `src/lib/context-engine/context-engine.ts`
+- After all branch steps exhausted, `getNextStepId()` returns null. Previously `context.activeStepId` was set to null (no completion reachable). Fix: detect `nextId === null && context.branchState.activeBranchId !== null`, call `registryExitBranch()`, reset `activeBranchId`, retry `getNextStepId()` for main-flow continuation.
+
+**New test file:** `tests/p1-5-branch-runtime-integration.test.ts` — 10 tests, all passing:
+- Fix 1: No branch entry steps from main flow
+- Fix 2: processResponseForBranch called before next-step resolution
+- Fix 3: Branch exit and main-flow continuation
+- Fix 4: Russian/Spanish branch triggers (нет щелчка, пламя гаснет, sin chispa)
+- Fix 5: Distinct step IDs, no repeat of wh_7
 - Remaining:
   - `input-language-lock.test.ts` (6) — stale test assumptions
   - `retention.test.ts` (5) — storage API mismatch
