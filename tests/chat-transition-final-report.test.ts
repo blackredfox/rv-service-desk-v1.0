@@ -98,6 +98,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
         activeStepId: "wp_3",
         isolationComplete: false,
         isolationFinding: null,
+        terminalState: { phase: "normal", faultIdentified: null, correctiveAction: null, restorationConfirmed: null },
       },
       intent: { type: "MAIN_DIAGNOSTIC" },
       responseInstructions: {
@@ -149,6 +150,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
         activeStepId: "wp_4",
         isolationComplete: true,  // This should be tracked but NOT trigger transition
         isolationFinding: "Pump non-responsive under direct 12V",
+        terminalState: { phase: "terminal", faultIdentified: { text: "Pump non-responsive", detectedAt: new Date().toISOString() }, correctiveAction: null, restorationConfirmed: null },
       },
       intent: { type: "MAIN_DIAGNOSTIC" },
       responseInstructions: {
@@ -255,6 +257,7 @@ describe("Chat final_report labor override (explicit mode only)", () => {
         activeStepId: null,
         isolationComplete: true,
         isolationFinding: "Pump non-responsive",
+        terminalState: { phase: "terminal", faultIdentified: { text: "Pump non-responsive", detectedAt: new Date().toISOString() }, correctiveAction: null, restorationConfirmed: null },
       },
       intent: { type: "MAIN_DIAGNOSTIC" },
       responseInstructions: {

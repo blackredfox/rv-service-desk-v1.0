@@ -196,3 +196,38 @@ Integrated branch processing into route.ts runtime path.
 - Validator allows no `?` when response includes "START FINAL REPORT"
 - Prompt updated: replaced contradictory "ASK THE NEXT STEP" rule with explicit OFFER_COMPLETION instructions
 - Mode transition remains explicit-only — no auto-switch to final_report
+
+
+### P1.7 — Terminal-State Behavior Contract Correction (Feb 2026)
+
+**Problem**: System continued asking diagnostic questions after technician identified fault, performed repair, and confirmed restoration. The flat `detectCompletionSignal` approach treated fault and restoration as independent completion triggers instead of progressive conditions.
+
+**Solution**: Three-phase progressive terminal-state model:
+
+| Phase | Meaning | `isolationComplete` | `activeStepId` |
+|---|---|---|---|
+| `normal` | Diagnostic in progress | `false` | assigned |
+| `fault_candidate` | Strong fault found, ONE restoration check allowed | `false` | `null` |
+| `terminal` | Fault + restoration confirmed | `true` | `null` |
+
+**Runtime law enforced**: `fault identified + corrective action + restoration = terminal`
+
+Key design decisions:
+1. `RESTORATION_PATTERNS` (repair+working) → terminal immediately (all 3 conditions implied)
+2. `FAULT_PATTERNS` alone → `fault_candidate` (asks ONE restoration check, no step expansion)
+3. `SIMPLE_RESTORATION_PATTERNS` (only in fault_candidate) catch "да"/"works" confirmations
+4. `NEGATIVE_RESTORATION` patterns prevent false terminal on "нет, не работает"
+5. Terminal state enforced at END of both `processMessage()` and `route.ts` — dominates all step assignment
+6. Terminal state blocks replan from resetting `isolationComplete`
+
+**Files changed:**
+- `src/lib/context-engine/types.ts` — Added `TerminalPhase`, `TerminalState`, `ask_restoration_check` action
+- `src/lib/context-engine/context-engine.ts` — Replaced `detectCompletionSignal` with `updateTerminalState`
+- `src/lib/context-engine/index.ts` — Exported new types
+- `src/app/api/chat/route.ts` — Added terminal enforcement + fault_candidate directive injection
+- `tests/p1.7-terminal-state.test.ts` — 20 new integration tests (all passing)
+- `tests/completion-detection.test.ts` — Updated 24 tests for new 3-phase model (all passing)
+- `tests/chat-labor-override-drift-guard.test.ts` — Added terminalState to mocks
+- `tests/chat-transition-final-report.test.ts` — Added terminalState to mocks
+
+**Test results:** 755 passing (44 P1.7-related), 13 pre-existing failures (Prisma, language-lock, billing, org-activity). Zero new regressions.

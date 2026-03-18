@@ -96,6 +96,7 @@ describe("Labor override detection + diagnostic drift guard", () => {
         activeStepId: "wp_7",
         isolationComplete: false,
         isolationFinding: null,
+        terminalState: { phase: "normal", faultIdentified: null, correctiveAction: null, restorationConfirmed: null },
       },
       intent: { type: "MAIN_DIAGNOSTIC" },
       responseInstructions: {

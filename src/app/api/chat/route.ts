@@ -351,6 +351,32 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Completion offer directive injected`);
     }
 
+    // ── P1.7 FAULT CANDIDATE DIRECTIVE ────────────────────────────────
+    // When a strong fault is identified but restoration is not yet confirmed,
+    // inject a directive that limits the LLM to ONE restoration check question.
+    // No further diagnostic expansion is allowed.
+    if (engineResult.context.terminalState?.phase === "fault_candidate" && 
+        engineResult.context.terminalState.faultIdentified &&
+        !engineResult.context.isolationComplete) {
+      const faultDirective = [
+        "── STRONG FAULT IDENTIFIED (P1.7) ──",
+        `Fault: ${engineResult.context.terminalState.faultIdentified.text}`,
+        "",
+        "MANDATORY RESPONSE:",
+        "1. Acknowledge the fault finding briefly.",
+        "2. Ask ONE question: confirm whether the repair was done and the system is operational.",
+        "",
+        "CRITICAL RULES:",
+        "- Do NOT ask any other diagnostic question.",
+        "- Do NOT continue with further procedure steps.",
+        "- Do NOT expand into other diagnostic branches.",
+        "- This is the ONLY allowed follow-up: restoration confirmation.",
+      ].join("\n");
+
+      contextEngineDirectives = [contextEngineDirectives, faultDirective].filter(Boolean).join("\n\n");
+      console.log(`[Chat API v2] Fault candidate directive injected (awaiting restoration)`);
+    }
+
     // ── LOOP RECOVERY ENFORCEMENT ──────────────────────────────────────
     // Check if the active step would violate loop rules, and if so, apply recovery.
     // Do NOT run if isolation is complete — loop recovery would re-assign activeStepId
@@ -466,6 +492,21 @@ export async function POST(req: Request) {
     activeStepMetadata = getActiveStepMetadata(ensuredCase.id, engineResult.context.activeStepId);
     if (activeStepMetadata) {
       console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
+    }
+
+    // ── P1.7 TERMINAL STATE ENFORCEMENT ─────────────────────────────────
+    // This is the DOMINANT rule that runs AFTER all step-assignment code paths.
+    // No loop recovery, no step completion hardening, no registry fallback can
+    // override a non-normal terminal phase. activeStepId must stay null.
+    if (engineResult.context.terminalState?.phase !== "normal") {
+      if (engineResult.context.activeStepId !== null) {
+        console.log(`[Chat API v2] P1.7 TERMINAL ENFORCEMENT: clearing activeStepId=${engineResult.context.activeStepId} (phase=${engineResult.context.terminalState.phase})`);
+        engineResult.context.activeStepId = null;
+        activeStepMetadata = null;
+      }
+      if (engineResult.context.terminalState.phase === "terminal") {
+        engineResult.context.isolationComplete = true;
+      }
     }
 
     const antiLoopDirectives = generateAntiLoopDirectives(engineResult.context);

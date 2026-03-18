@@ -33,20 +33,22 @@ import {
 // Re-export config
 export { DEFAULT_CONFIG } from "./types";
 
-// ── Completion Detection (P1.6) ───────────────────────────────────────
+// ── Terminal-State Engine (P1.7) ───────────────────────────────────────
 //
-// Two completion classes:
-//   "verified_restoration" — repair performed AND system confirmed operational
-//   "verified_fault"       — definitive destructive/failure finding confirmed
+// Three-phase progressive model:
+//   Phase "normal"          — diagnostic in progress
+//   Phase "fault_candidate" — strong fault identified, ONE restoration check allowed
+//   Phase "terminal"        — fault + restoration confirmed → hard stop
 //
-// Conservative: requires MIN_STEPS_FOR_COMPLETION and high-confidence pattern.
+// RESTORATION_PATTERNS require repair + working → proves all 3 conditions in one message.
+// FAULT_PATTERNS identify a concrete fault → moves to fault_candidate.
+// SIMPLE_RESTORATION_PATTERNS (used ONLY in fault_candidate) catch simple confirmations.
+//
+// Terminal state DOMINATES all step assignment. No code path may override it.
+
+import type { TerminalPhase, TerminalState } from "./types";
 
 const MIN_STEPS_FOR_COMPLETION = 1;
-
-type CompletionClass = "verified_fault" | "verified_restoration";
-type CompletionSignalResult =
-  | { detected: false }
-  | { detected: true; class: CompletionClass; finding: string };
 
 const RESTORATION_PATTERNS: RegExp[] = [
   // English: "after [repair] ... works/running/operational"
@@ -95,49 +97,128 @@ const FAULT_PATTERNS: RegExp[] = [
   /\b(?:quemado|fundido|dañado|cortocircuito)\b.{0,60}\b(?:placa|motor|relé|válvula|bomba|módulo|condensador)\b/i,
 ];
 
-function detectCompletionSignal(
+// Used ONLY in fault_candidate phase — simpler patterns for restoration confirmation
+// after the system asked "Is the system working now?"
+const SIMPLE_RESTORATION_PATTERNS: RegExp[] = [
+  // English: positive working confirmation
+  /\b(?:work(?:ing|s)|operational|functional|running|heating|started|back\s+up|fixed|resolved)\b/i,
+  // Russian: positive working confirmation
+  /(?:работает|заработал|функционирует|запустился|включается|нагревает|исправен|починен|устранено|устранил)/i,
+  // Spanish: positive working confirmation
+  /(?:funciona|opera|trabaja|arreglado|resuelto|reparado)/i,
+  // Simple affirmative when restoration check was explicitly asked
+  // Allows prefix: "да, подтверждаю" (yes, I confirm), "yes, confirmed" etc.
+  /^(?:да|yes|sí|si|yep|yup|ага|угу|correct|верно|точно|exactly|подтверждаю|confirmed|confirmo)/i,
+];
+
+// Negative restoration patterns — prevent false terminal state on denial
+const NEGATIVE_RESTORATION: RegExp[] = [
+  /(?:not|don'?t|doesn'?t|won'?t|can'?t|still\s+(?:not|doesn'?t|won'?t))\s+(?:work|run|start|heat|function|operat)/i,
+  /(?:не\s+работает|не\s+запускается|не\s+включается|не\s+нагревает|всё\s+ещё\s+не|по-прежнему\s+не)/i,
+  /(?:no\s+funciona|no\s+trabaja|no\s+opera|sigue\s+sin)/i,
+  /^(?:нет|no|nope|nah)$/i,
+];
+
+type TerminalStateUpdate = {
+  changed: boolean;
+  previousPhase: TerminalPhase;
+  newPhase: TerminalPhase;
+};
+
+/**
+ * P1.7 — Progressive terminal-state update.
+ *
+ * Checks each message against three conditions and accumulates them:
+ *  1. RESTORATION_PATTERNS (repair + working) → proves all 3 in one message
+ *  2. FAULT_PATTERNS → records fault, moves to fault_candidate
+ *  3. SIMPLE_RESTORATION_PATTERNS (only in fault_candidate) → confirms restoration
+ *
+ * Once all 3 conditions are met, phase becomes "terminal".
+ */
+function updateTerminalState(
   message: string,
   context: DiagnosticContext,
-): CompletionSignalResult {
-  // Already marked — don't re-detect
-  if (context.isolationComplete) return { detected: false };
+): TerminalStateUpdate {
+  const ts = context.terminalState;
+  const previousPhase = ts.phase;
 
-  // Require minimum diagnostic work before considering completion.
-  // Use the union of context-engine and registry counts — in live runtime the
-  // context-engine completedSteps may be empty if activeProcedureId was not synced,
-  // so we need at least some signal of diagnostic depth.
-  // NOTE: activeProcedureId guard is intentionally removed — it is unreliable in
-  // live runtime because route.ts did not always sync it to the context engine.
+  // Already terminal — nothing to do
+  if (ts.phase === "terminal") {
+    return { changed: false, previousPhase, newPhase: "terminal" };
+  }
+
+  // Require minimum diagnostic work before considering terminal conditions
   const totalDone = context.completedSteps.size + context.unableSteps.size;
-  if (totalDone < MIN_STEPS_FOR_COMPLETION) return { detected: false };
+  if (totalDone < MIN_STEPS_FOR_COMPLETION) {
+    return { changed: false, previousPhase, newPhase: ts.phase };
+  }
 
-  // Verified Restoration (primary — TestCase11 scenario)
-  for (const pattern of RESTORATION_PATTERNS) {
-    if (pattern.test(message)) {
-      const systemDisplay = (context.primarySystem ?? "system").replace(/_/g, " ");
-      const trimmed = message.slice(0, 120).replace(/\s+/g, " ").trim();
-      return {
-        detected: true,
-        class: "verified_restoration",
-        finding: `Verified restoration — ${systemDisplay}: ${trimmed}`,
-      };
+  const now = new Date().toISOString();
+  let changed = false;
+
+  // ── Phase 1: Check full RESTORATION_PATTERNS ───────────────────────
+  // These require repair action + operational confirmation → all 3 conditions implied
+  if (!ts.restorationConfirmed) {
+    for (const pattern of RESTORATION_PATTERNS) {
+      if (pattern.test(message)) {
+        const text = message.slice(0, 120).replace(/\s+/g, " ").trim();
+        ts.correctiveAction = ts.correctiveAction || { text, detectedAt: now };
+        ts.restorationConfirmed = { text, detectedAt: now };
+        // Infer fault — you don't repair without one
+        if (!ts.faultIdentified) {
+          ts.faultIdentified = { text: `Inferred from repair: ${text}`, detectedAt: now };
+        }
+        changed = true;
+        break;
+      }
     }
   }
 
-  // Verified Fault (secondary — destructive finding)
-  for (const pattern of FAULT_PATTERNS) {
-    if (pattern.test(message)) {
-      const systemDisplay = (context.primarySystem ?? "system").replace(/_/g, " ");
-      const trimmed = message.slice(0, 120).replace(/\s+/g, " ").trim();
-      return {
-        detected: true,
-        class: "verified_fault",
-        finding: `Verified fault — ${systemDisplay}: ${trimmed}`,
-      };
+  // ── Phase 2: Check FAULT_PATTERNS ─────────────────────────────────
+  // Records fault, moves to fault_candidate (ONE restoration check allowed)
+  if (!ts.faultIdentified) {
+    for (const pattern of FAULT_PATTERNS) {
+      if (pattern.test(message)) {
+        ts.faultIdentified = {
+          text: message.slice(0, 120).replace(/\s+/g, " ").trim(),
+          detectedAt: now,
+        };
+        changed = true;
+        break;
+      }
     }
   }
 
-  return { detected: false };
+  // ── Phase 3: Simple restoration check (fault_candidate only) ──────
+  // When a fault was already identified and system asked one restoration check,
+  // simpler patterns like "works" or "да" confirm restoration.
+  if (ts.phase === "fault_candidate" && ts.faultIdentified && !ts.restorationConfirmed) {
+    const isNegative = NEGATIVE_RESTORATION.some(p => p.test(message));
+    if (!isNegative) {
+      for (const pattern of SIMPLE_RESTORATION_PATTERNS) {
+        if (pattern.test(message)) {
+          const text = message.slice(0, 120).replace(/\s+/g, " ").trim();
+          ts.correctiveAction = ts.correctiveAction || { text, detectedAt: now };
+          ts.restorationConfirmed = { text, detectedAt: now };
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Determine phase ───────────────────────────────────────────────
+  if (ts.faultIdentified && ts.restorationConfirmed) {
+    ts.phase = "terminal";
+  } else if (ts.faultIdentified && ts.phase === "normal") {
+    ts.phase = "fault_candidate";
+  }
+
+  return {
+    changed: changed || ts.phase !== previousPhase,
+    previousPhase,
+    newPhase: ts.phase,
+  };
 }
 
 // ── Context Store ───────────────────────────────────────────────────
@@ -175,6 +256,13 @@ export function createContext(
       decisionPath: [],
       lockedOutBranches: new Set(),
     },
+    // P1.7: Terminal state initialization
+    terminalState: {
+      phase: "normal",
+      faultIdentified: null,
+      correctiveAction: null,
+      restorationConfirmed: null,
+    },
     facts: [],
     hypotheses: [],
     contradictions: [],
@@ -209,6 +297,15 @@ export function getOrCreateContext(
 ): DiagnosticContext {
   const existing = contextStore.get(caseId);
   if (existing) {
+    // P1.7: Ensure terminalState exists (hot-reload migration safety)
+    if (!existing.terminalState) {
+      existing.terminalState = {
+        phase: "normal",
+        faultIdentified: null,
+        correctiveAction: null,
+        restorationConfirmed: null,
+      };
+    }
     // Update system/classification if provided and not already set
     if (initialSystem && !existing.primarySystem) {
       existing.primarySystem = initialSystem;
@@ -263,8 +360,9 @@ export function processMessage(
   const intent = detectIntent(message);
   console.log(`[ContextEngine] Intent: ${describeIntent(intent)}`);
   
-  // 2. Check for replan triggers (only if isolation was complete)
-  if (config.enableReplan && context.isolationComplete) {
+  // 2. Check for replan triggers (only if isolation was complete AND not terminal)
+  // P1.7: Terminal state must not be undone by replan
+  if (config.enableReplan && context.isolationComplete && context.terminalState.phase !== "terminal") {
     const replanResult = shouldReplan(message, context);
     if (replanResult.shouldReplan) {
       console.log(`[ContextEngine] Replan triggered: ${replanResult.reason}`);
@@ -381,17 +479,25 @@ export function processMessage(
     }
   }
   
-  // 4.5. P1.6 — Detect diagnostic isolation completion
+  // 4.5. P1.7 — Terminal-state progression
   // Runs after step completion so completedSteps count is up-to-date.
-  // Sets isolationComplete + clears activeStepId so the LLM offers report command
-  // instead of asking the next step.
-  if (!context.isolationComplete && context.activeProcedureId) {
-    const completionSignal = detectCompletionSignal(message, context);
-    if (completionSignal.detected) {
+  // Progressive: accumulates fault/restoration across messages.
+  // When terminal: sets isolationComplete + clears activeStepId.
+  // When fault_candidate: clears activeStepId (no more diagnostic steps, ask restoration check).
+  const tsUpdate = updateTerminalState(message, context);
+  if (tsUpdate.changed) {
+    if (context.terminalState.phase === "terminal") {
       context.isolationComplete = true;
-      context.isolationFinding = completionSignal.finding;
-      context.activeStepId = null; // Stop step progression — offer completion instead
-      notices.push(`Isolation complete (${completionSignal.class}): ${completionSignal.finding}`);
+      const systemDisplay = (context.primarySystem ?? "system").replace(/_/g, " ");
+      const restorationText = context.terminalState.restorationConfirmed?.text ?? message.slice(0, 120);
+      context.isolationFinding = `Verified restoration — ${systemDisplay}: ${restorationText}`;
+      context.activeStepId = null;
+      notices.push(`TERMINAL STATE reached: ${context.isolationFinding}`);
+      stateChanged = true;
+    } else if (context.terminalState.phase === "fault_candidate" && tsUpdate.previousPhase === "normal") {
+      // Just entered fault_candidate — stop step progression, await restoration
+      context.activeStepId = null;
+      notices.push(`Strong fault identified: ${context.terminalState.faultIdentified!.text} — awaiting restoration confirmation`);
       stateChanged = true;
     }
   }
@@ -409,13 +515,24 @@ export function processMessage(
   }
   
   // 6. Ensure active step is always assigned when a procedure is active
-  //    (but NOT when isolation is complete — we want no active step in that case)
-  if (!context.activeStepId && context.activeProcedureId && !context.isolationComplete) {
+  //    (but NOT when isolation is complete or terminal state is non-normal —
+  //     fault_candidate and terminal phases must never have a step assigned)
+  if (!context.activeStepId && context.activeProcedureId && !context.isolationComplete && context.terminalState.phase === "normal") {
     const nextId = registryGetNextStepId(caseId);
     if (nextId) {
       context.activeStepId = nextId;
       notices.push(`Active step initialized: ${nextId}`);
       stateChanged = true;
+    }
+  }
+  
+  // ── P1.7 TERMINAL STATE FINAL ENFORCEMENT ─────────────────────────
+  // This is the DOMINANT rule. No matter what steps 1-6 did above,
+  // terminal state wins. No code path may assign a step in non-normal phase.
+  if (context.terminalState.phase !== "normal") {
+    context.activeStepId = null;
+    if (context.terminalState.phase === "terminal") {
+      context.isolationComplete = true;
     }
   }
   
@@ -503,7 +620,7 @@ function buildResponseInstructions(
     };
   }
   
-  // Handle isolation complete — offer completion (P1.6)
+  // Handle isolation complete — offer completion (P1.6/P1.7 terminal)
   // Must NOT auto-transition. Must NOT generate report. Must offer explicit command.
   if (context.isolationComplete && context.isolationFinding) {
     return {
@@ -517,6 +634,26 @@ function buildResponseInstructions(
         "PROHIBITED: Do NOT include Complaint / Procedure / Verified Condition headers.",
         "PROHIBITED: Do NOT declare 'isolation complete' or 'conditions met'.",
         "PROHIBITED: Do NOT auto-transition modes.",
+      ],
+      antiLoopDirectives,
+    };
+  }
+
+  // Handle fault_candidate — ask ONE restoration check (P1.7)
+  // Fault identified but no restoration yet. No more diagnostic questions allowed.
+  if (context.terminalState.phase === "fault_candidate" && context.terminalState.faultIdentified) {
+    return {
+      action: "ask_restoration_check",
+      constraints: [
+        `FAULT IDENTIFIED: ${context.terminalState.faultIdentified.text}`,
+        "MANDATORY: Acknowledge the fault finding briefly.",
+        "MANDATORY: Ask ONE question to confirm if repair was done and system is now operational.",
+        "MANDATORY: This is the ONLY allowed question. Do NOT ask any other diagnostic question.",
+        "PROHIBITED: Do NOT continue with more procedure steps.",
+        "PROHIBITED: Do NOT expand into other diagnostic branches.",
+        "PROHIBITED: Do NOT ask unrelated diagnostic subquestions.",
+        "Example EN: 'Understood. Has the repair been completed? Is the system working now?'",
+        "Example RU: 'Принято. Ремонт выполнен? Система работает?'",
       ],
       antiLoopDirectives,
     };

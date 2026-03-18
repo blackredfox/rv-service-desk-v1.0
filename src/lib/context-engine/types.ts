@@ -51,6 +51,30 @@ export type BranchDecision = {
   timestamp: string;
 };
 
+// ── Terminal-State Types (P1.7) ─────────────────────────────────────
+
+/**
+ * Terminal state phases:
+ *  - "normal": diagnostic in progress, no terminal conditions met
+ *  - "fault_candidate": a strong fault identified, awaiting restoration confirmation
+ *  - "terminal": fault + restoration confirmed, no more diagnostic questions
+ */
+export type TerminalPhase = "normal" | "fault_candidate" | "terminal";
+
+/**
+ * Progressive terminal-state tracking.
+ * All 3 conditions must be met for terminal state:
+ *  1. faultIdentified — a concrete fault was found
+ *  2. correctiveAction — technician performed a repair
+ *  3. restorationConfirmed — system operation restored
+ */
+export type TerminalState = {
+  phase: TerminalPhase;
+  faultIdentified: { text: string; detectedAt: string } | null;
+  correctiveAction: { text: string; detectedAt: string } | null;
+  restorationConfirmed: { text: string; detectedAt: string } | null;
+};
+
 // ── Intent Types ────────────────────────────────────────────────────
 
 export type Intent =
@@ -168,6 +192,9 @@ export type DiagnosticContext = {
   // Branch state (P1.5: Branch-aware step resolution)
   branchState: BranchState;
   
+  // Terminal state (P1.7: Terminal-State Behavior Contract)
+  terminalState: TerminalState;
+  
   // Evidence tracking
   facts: Fact[];
   hypotheses: Hypothesis[];
@@ -230,7 +257,8 @@ export type ContextEngineResult = {
 export type ResponseInstructions = {
   // What the LLM should do
   action: "ask_step" | "provide_clarification" | "acknowledge_and_continue" | 
-          "replan_notice" | "transition" | "offer_completion" | "generate_labor" | "generate_report";
+          "replan_notice" | "transition" | "offer_completion" | "generate_labor" | "generate_report" |
+          "ask_restoration_check";
   
   // Step to ask (if action is ask_step)
   stepId?: string;

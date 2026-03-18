@@ -28,6 +28,8 @@ export type {
   BranchDefinition,
   BranchState,
   BranchDecision,
+  TerminalPhase,
+  TerminalState,
 } from "./types";
 
 export { DEFAULT_CONFIG } from "./types";

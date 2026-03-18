@@ -97,16 +97,21 @@ describe("P1.6 — Verified Restoration completion", () => {
 });
 
 // ── 2. Verified Fault Detection ────────────────────────────────────────
-describe("P1.6 — Verified Fault completion", () => {
-  it("English: 'burnt relay board confirmed' triggers fault completion", () => {
+// P1.7: Fault alone → fault_candidate, NOT isolationComplete.
+// Terminal state requires fault + restoration.
+describe("P1.6/P1.7 — Fault detection → fault_candidate phase", () => {
+  it("English: 'burnt relay board confirmed' → fault_candidate (not terminal)", () => {
     const caseId = buildCase([]);
     const result = processMessage(caseId, "the relay board is burnt, confirmed fault", DEFAULT_CONFIG);
 
-    expect(result.context.isolationComplete).toBe(true);
-    expect(result.context.isolationFinding).toContain("Verified fault");
+    expect(result.context.terminalState.phase).toBe("fault_candidate");
+    expect(result.context.terminalState.faultIdentified).not.toBeNull();
+    expect(result.context.isolationComplete).toBe(false); // P1.7: NOT terminal yet
+    expect(result.context.activeStepId).toBeNull();
+    expect(result.responseInstructions.action).toBe("ask_restoration_check");
   });
 
-  it("English: 'shorted motor, power present but nothing' triggers fault completion", () => {
+  it("English: 'shorted motor, power present but nothing' → fault_candidate", () => {
     const caseId = buildCase([]);
     const result = processMessage(
       caseId,
@@ -114,15 +119,17 @@ describe("P1.6 — Verified Fault completion", () => {
       DEFAULT_CONFIG
     );
 
-    expect(result.context.isolationComplete).toBe(true);
+    expect(result.context.terminalState.phase).toBe("fault_candidate");
+    expect(result.context.isolationComplete).toBe(false);
   });
 
-  it("Russian: 'сгорел мотор' triggers fault completion", () => {
+  it("Russian: 'сгорел мотор' → fault_candidate", () => {
     const caseId = buildCase([]);
     const result = processMessage(caseId, "сгорел мотор — двигатель полностью вышел из строя", DEFAULT_CONFIG);
 
-    expect(result.context.isolationComplete).toBe(true);
-    expect(result.context.isolationFinding).toContain("Verified fault");
+    expect(result.context.terminalState.phase).toBe("fault_candidate");
+    expect(result.context.terminalState.faultIdentified).not.toBeNull();
+    expect(result.context.isolationComplete).toBe(false);
   });
 });
 
@@ -259,8 +266,9 @@ describe("P1.6 — Validation guard compatibility", () => {
 });
 
 // ── 7. TestCase12 — Specific regression tests ─────────────────────────
-describe("P1.6 — TestCase12 regression: wiring short + restoration", () => {
-  it("Russian: 'короткое замыкание в проводке между модулем розжига и электродом' triggers fault completion", () => {
+// P1.7: Fault alone → fault_candidate. Terminal requires fault + restoration.
+describe("P1.7 — TestCase12 regression: wiring short + restoration", () => {
+  it("Russian: 'короткое замыкание' → fault_candidate (not terminal)", () => {
     const caseId = buildCase([]);
     const result = processMessage(
       caseId,
@@ -268,11 +276,13 @@ describe("P1.6 — TestCase12 regression: wiring short + restoration", () => {
       DEFAULT_CONFIG
     );
 
-    expect(result.context.isolationComplete).toBe(true);
-    expect(result.context.isolationFinding).toContain("Verified fault");
+    expect(result.context.terminalState.phase).toBe("fault_candidate");
+    expect(result.context.terminalState.faultIdentified).not.toBeNull();
+    expect(result.context.isolationComplete).toBe(false);
+    expect(result.context.activeStepId).toBeNull();
   });
 
-  it("Russian: 'я заменил проводку - водонагреватель работает' triggers restoration completion", () => {
+  it("Russian: 'я заменил проводку - водонагреватель работает' → terminal", () => {
     const caseId = buildCase([]);
     const result = processMessage(
       caseId,
@@ -280,47 +290,43 @@ describe("P1.6 — TestCase12 regression: wiring short + restoration", () => {
       DEFAULT_CONFIG
     );
 
+    // Single message with repair + works → terminal immediately
+    expect(result.context.terminalState.phase).toBe("terminal");
     expect(result.context.isolationComplete).toBe(true);
     expect(result.context.isolationFinding).toContain("Verified restoration");
   });
 
-  it("Russian: 'обрыв проводки' triggers fault completion", () => {
+  it("Russian: 'обрыв проводки' → fault_candidate", () => {
     const caseId = buildCase([]);
     const result = processMessage(caseId, "обрыв проводки между панелью и модулем", DEFAULT_CONFIG);
 
-    expect(result.context.isolationComplete).toBe(true);
-    expect(result.context.isolationFinding).toContain("Verified fault");
+    expect(result.context.terminalState.phase).toBe("fault_candidate");
+    expect(result.context.terminalState.faultIdentified).not.toBeNull();
+    expect(result.context.isolationComplete).toBe(false);
   });
 
-  it("completion state is NOT overwritten after it is set", () => {
+  it("completion state is NOT overwritten after terminal is reached", () => {
     const caseId = buildCase([]);
 
-    // First trigger: fault detection
-    const r1 = processMessage(
-      caseId,
-      "короткое замыкание в проводке",
-      DEFAULT_CONFIG
-    );
-    expect(r1.context.isolationComplete).toBe(true);
-    const initialFinding = r1.context.isolationFinding;
+    // First: fault detection → fault_candidate
+    const r1 = processMessage(caseId, "короткое замыкание в проводке", DEFAULT_CONFIG);
+    expect(r1.context.terminalState.phase).toBe("fault_candidate");
+    expect(r1.context.isolationComplete).toBe(false);
 
-    // Second message: should NOT re-trigger or overwrite
+    // Second: simple confirmation → terminal (fault_candidate + "да" = terminal)
     const r2 = processMessage(caseId, "да, подтверждаю", DEFAULT_CONFIG);
+    expect(r2.context.terminalState.phase).toBe("terminal");
     expect(r2.context.isolationComplete).toBe(true);
-    expect(r2.context.isolationFinding).toBe(initialFinding);
+    const finding = r2.context.isolationFinding;
 
-    // Third message: restoration message — state stays set, finding stays original
-    const r3 = processMessage(
-      caseId,
-      "я заменил проводку - водонагреватель работает",
-      DEFAULT_CONFIG
-    );
+    // Third: restoration message — state stays terminal, finding preserved
+    const r3 = processMessage(caseId, "я заменил проводку - водонагреватель работает", DEFAULT_CONFIG);
+    expect(r3.context.terminalState.phase).toBe("terminal");
     expect(r3.context.isolationComplete).toBe(true);
-    // Finding should not change (first detection wins)
-    expect(r3.context.isolationFinding).toBe(initialFinding);
+    expect(r3.context.isolationFinding).toBe(finding); // first finding wins
   });
 
-  it("activeStepId stays null after completion (no loop recovery overwrite)", () => {
+  it("activeStepId stays null after terminal state", () => {
     const caseId = buildCase([]);
     const r = processMessage(
       caseId,
@@ -328,11 +334,12 @@ describe("P1.6 — TestCase12 regression: wiring short + restoration", () => {
       DEFAULT_CONFIG
     );
 
+    expect(r.context.terminalState.phase).toBe("terminal");
     expect(r.context.isolationComplete).toBe(true);
     expect(r.context.activeStepId).toBeNull();
   });
 
-  it("mode stays 'diagnostic' after wiring fault detection", () => {
+  it("mode stays 'diagnostic' after fault detection", () => {
     const caseId = buildCase([]);
     const r = processMessage(
       caseId,
@@ -340,7 +347,7 @@ describe("P1.6 — TestCase12 regression: wiring short + restoration", () => {
       DEFAULT_CONFIG
     );
 
-    expect(r.context.isolationComplete).toBe(true);
+    expect(r.context.terminalState.phase).toBe("fault_candidate");
     expect(r.context.mode).toBe("diagnostic");
   });
 });
