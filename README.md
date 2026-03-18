@@ -1,474 +1,290 @@
 # RV Service Desk
 
-**Version:** 1.x
-**Type:** Multi-Tenant B2B SaaS
-**Domain:** RV Service Operations / Warranty Authorization
+## AI Diagnostic & Authorization Assistant for RV Technicians
 
-RV Service Desk is a **procedure-driven diagnostic and documentation engine** for RV service businesses in the United States.
-
-It helps technicians produce **authorization-safe documentation** while maintaining disciplined diagnostics.
-
-The system is designed for **real shop workflows**, not conversational AI.
+RV Service Desk is an AI-powered assistant designed to help RV technicians perform structured diagnostics and generate approval-safe documentation for warranty, insurance, and customer-pay repairs.
 
 ---
 
-# Product Positioning
+# 1. What This Product Is (And Is Not)
 
-RV Service Desk is:
+## This IS:
+- A **diagnostic workflow engine**
+- A **documentation standardization tool**
+- A **senior-tech assistant** that enforces procedure discipline
 
-* NOT a chatbot
-* NOT an autopilot mechanic
-* NOT a repair decision system
+## This is NOT:
+- A generic chatbot
+- An autopilot mechanic
+- A system that makes repair decisions instead of the technician
 
-It is a **controlled diagnostic + documentation platform**.
-
-The technician always makes the **final diagnostic and repair decision**.
-
-The platform focuses on:
-
-* procedure-driven diagnostics
-* authorization-safe wording
-* documentation completeness
-* claim denial reduction
-* consistent shop documentation
+> The technician is always the decision-maker.  
+> The system enforces structure, logic, and documentation quality.
 
 ---
 
-# Key Principles
+# 2. Core Product Behavior (Updated)
 
-The platform is built around several strict principles.
+## 2.1 Procedure-Driven, Not Chat-Driven
 
-**Procedure over conversation**
+The system does NOT behave like a free-form conversation.
 
-Diagnostics follow structured procedures.
+Instead:
+> Diagnostics are governed by **explicit procedures**.
 
-**Determinism over creativity**
+However:
 
-The system prioritizes predictable behavior over flexible responses.
+### Critical clarification
+A procedure is **NOT** a dumb linear checklist.
 
-**Server enforcement over model trust**
+A valid procedure includes:
+- ordered steps,
+- prerequisites,
+- abnormal-condition branches,
+- signal-based overrides,
+- return-to-main flow,
+- terminal states.
 
-AI outputs are validated and controlled by server logic.
-
-**Explicit state over inference**
-
-Modes and transitions are explicit and validated.
-
----
-
-# Core Capabilities
-
-## Procedure-Driven Diagnostics
-
-Each RV system is governed by a structured procedure.
-
-Procedures enforce:
-
-* strict step ordering
-* prerequisite validation
-* controlled diagnostic flow
-* recognition of steps already completed
-
-If a technician asks:
-
-> "How do I check that?"
-
-The system may provide **short, safe instructions aligned with the active procedure**.
-
-Principle:
-
-**Procedure is law.**
+This means:
+- the assistant does NOT blindly follow “next step by number”
+- the assistant follows **causal diagnostic logic within the procedure**
 
 ---
 
-## Mode-Based AI Enforcement
+## 2.2 Signal-Aware Diagnostics
 
-The system operates in three internal modes.
+The system reacts to technician input as **diagnostic signals**, not just answers.
 
-Modes are **not exposed in the UI** and cannot change implicitly.
+If a technician reveals a critical condition (example: “no 12V present”):
+- the system must prioritize diagnosing that condition,
+- even if the original checklist had other next questions.
 
-Mode transitions occur **only through explicit technician commands**:
-
-```
-START AUTHORIZATION REQUEST
-START FINAL REPORT
-```
-
-Modes:
-
-| Mode          | Purpose                             |
-| ------------- | ----------------------------------- |
-| diagnostic    | guided diagnostic workflow          |
-| authorization | generate authorization request text |
-| final_report  | produce final shop-style report     |
-
-The server validates all mode transitions.
+> The assistant must never ignore a critical abnormal condition.
 
 ---
 
-## Complex System Gating
+## 2.3 Branch Priority (Causal Logic)
 
-Major RV systems require full diagnostic isolation before authorization output.
+When multiple next steps are possible:
 
-Complex systems include:
+> The system chooses the step that is most causally relevant to the current problem.
 
-* roof AC
-* furnaces
-* refrigerators
-* slide systems
-* leveling systems
-* inverters / converters
-* major electrical systems
+Not:
+- “next in list”
 
-Rules:
-
-* no portal cause before isolation
-* no labor estimate before validation
-* no repair recommendation before rule confirmation
-
-Additional guardrails:
-
-* post-repair fallback to diagnostics
-* mechanical protection (motor replacement blocked if direct power proves operation)
-* consumer appliance replacement logic
+But:
+- “most relevant to the failure just discovered”
 
 ---
 
-## Language Enforcement
+## 2.4 Step Discipline
 
-Dialogue language:
+The system enforces:
+- one question at a time,
+- no skipping required steps,
+- no duplication,
+- correct ordering.
 
-```
-Auto / EN / RU / ES
-```
-
-Final outputs follow a strict contract:
-
-```
-English output block
---- TRANSLATION ---
-Full translation
-```
-
-The server validates translation presence and retries if necessary.
-
-Language metadata is stored per:
-
-* case
-* message
+A step is only complete when:
+- the required fact is explicitly obtained,
+- not inferred or guessed.
 
 ---
 
-# Architecture Overview
+## 2.5 Terminal Behavior
 
-The platform is built as a **server-controlled AI orchestration system**.
+The system knows when to stop diagnostics.
 
-## Frontend
+Once:
+- the fault is localized, OR
+- all required branches are exhausted,
 
-Technology:
+the assistant must:
+- stop routine questioning,
+- move toward next valid action.
 
-* Next.js (App Router)
-* React
-* responsive chat UI
-
-Features:
-
-* case sidebar
-* chat interface
-* language selector
-* voice input (STT)
-* session photo attach
-* terms acceptance gate
-* light / dark theme
+> Continuing unnecessary questions after completion is a system error.
 
 ---
 
-## Backend
+## 2.6 Report Suggestion (No Auto-Switch)
 
-Technology stack:
+The system can recognize when:
+- diagnostics are complete,
+- repair is done,
+- report can be generated.
 
-* Next.js API routes
-* Node.js runtime
-* Prisma ORM
-* PostgreSQL
-* Stripe billing
-* structured logging
+But:
 
-Key backend modules:
+> The system NEVER switches modes automatically.
 
-* diagnostic-procedures
-* diagnostic-registry
-* mode-validators
-* output-validator
-* retention
-* billing / seat control
+Instead, it:
+- suggests next action,
+- provides explicit command instructions:
+  - `START AUTHORIZATION REQUEST`
+  - `START FINAL REPORT`
 
 ---
 
-# AI Runtime Architecture
+## 2.7 Assistant as Pro-Tech Support (Bounded)
 
-The AI system is **not autonomous**.
-All AI behavior is orchestrated by the server.
+The assistant can help the technician with:
 
-Runtime pipeline:
+- how to perform a diagnostic check,
+- where a component is located,
+- what result to expect,
+- clarification of current step.
 
-```
-Client
-  → API
-  → Context Engine
-  → Prompt Builder
-  → LLM
-  → Output Validator
-  → Response
-```
+BUT ONLY:
+- within the active procedure,
+- within the current step or branch.
 
 ---
 
-## Context Engine
+### Hard boundaries
+The assistant must NOT:
+- invent new steps,
+- provide off-procedure guidance,
+- act as a DIY tutorial system,
+- drift into generic advice.
 
-The Context Engine is the **single authority** controlling diagnostic flow.
-
-It determines:
-
-* procedure selection
-* next diagnostic step
-* diagnostic branching
-* isolation completion
-* authorization eligibility
-
-No other system component may determine the next diagnostic step.
+After any explanation:
+> The assistant MUST return to the diagnostic flow.
 
 ---
 
-## LLM Responsibilities
+## 2.8 Mode System (Invisible to User)
 
-The LLM is used strictly for:
+The system operates internally in modes:
 
-* generating technician-readable language
-* translation
-* structured output formatting
+- Diagnostic Mode
+- Authorization Mode
+- Final Report Mode
 
-The LLM does **not** decide:
-
-* diagnostic steps
-* isolation completeness
-* authorization readiness
+Mode transitions:
+- only via explicit commands
+- never inferred from conversation meaning
 
 ---
 
-## Server Responsibilities
+## 2.9 Language Behavior
 
-The server enforces:
-
-* mode transitions
-* output format validation
-* translation guarantees
-* diagnostic gating
-* security boundaries
-
-The server never replaces diagnostic logic with heuristics.
+- Technician speaks in their language (EN/RU/ES)
+- Diagnostic dialogue follows technician language
+- Final outputs are:
+  - English first
+  - then full translation
 
 ---
 
-# Architecture Rules
+# 3. Output Types
 
-The project enforces strict architecture invariants to prevent diagnostic drift.
-
-Diagnostic step flow must remain under **Context Engine control only**.
-
-Detailed engineering rules and PR review gates are defined in:
-
-```
-ARCHITECTURE_RULES.md
-```
-
-All changes affecting diagnostic flow must comply with these rules.
+## 3.1 Diagnostic Interaction
+- One question at a time
+- Structured progression
+- No conclusions until allowed
 
 ---
 
-# Multi-Tenant B2B Platform
-
-The system supports service organizations.
-
-Capabilities include:
-
-* organizations
-* members
-* seat limits
-* Stripe subscriptions
-* webhook-driven seat synchronization
-* member invitations
-
-Seat enforcement occurs at the API layer.
+## 3.2 Authorization Text
+- Approval-safe wording
+- Conservative technical phrasing
+- No guarantee language
 
 ---
 
-# Data Boundaries
-
-Stored data:
-
-* cases
-* messages
-* final outputs
-
-Not stored:
-
-* images
-* audio
-* files
-
-Media attachments are **session-only artifacts**.
+## 3.3 Final Report
+Structured output:
+- Complaint
+- Diagnostic Procedure
+- Verified Condition
+- Recommended Corrective Action
+- Estimated Labor
+- Required Parts
 
 ---
 
-# Case Retention
+# 4. Safety & Reliability Principles
 
-Cases follow a retention policy.
-
-Retention metadata is refreshed when cases are accessed.
-
-Cleanup jobs remove expired cases.
-
----
-
-# API Surface
-
-Primary endpoint:
-
-```
-POST /api/chat
-```
-
-Supporting endpoints:
-
-```
-/api/cases
-/api/stt/transcribe
-/api/billing/*
-/api/org/*
-/api/search
-/api/analytics/event
-```
-
-Mode transitions are enforced server-side.
-
-The complete API contract is defined in:
-
-```
-API_SCHEMA.md
-```
+- No invented facts
+- No unsafe wording
+- No premature conclusions
+- No skipping diagnostic gates
+- No automatic mode transitions
 
 ---
 
-# Database
+# 5. Architecture Overview (High-Level)
 
-The system uses Prisma with PostgreSQL.
+The system is built around:
 
-The schema supports:
+### Context Engine (Core)
+- controls diagnostic flow
+- determines next step
+- tracks state
+- enforces procedure
 
-* case metadata
-* language tracking
-* message persistence
-* migration history
+### Validation Layer
+- enforces output format
+- enforces language rules
+- prevents unsafe behavior
 
----
+### Route Layer (API)
+- handles transport
+- does NOT control diagnostic logic
 
-# Testing Strategy
-
-Unit and component tests run in deterministic mode.
-
-```
-yarn test
-```
-
-Tests cover:
-
-* diagnostic gating
-* mode validation
-* output validation
-* Stripe webhooks
-* seat synchronization
-* translation enforcement
-
-Database connections are disabled during default tests.
+> There must be a single flow authority (Context Engine).
 
 ---
 
-# Environment Setup
+# 6. Mobile-First Reality (Important)
 
-Requirements:
+The product is designed primarily for:
+> technicians working in real environments on mobile devices.
 
-* Node.js 18+
-* Yarn
-* PostgreSQL
+Implications:
+- fast interaction
+- minimal friction
+- clear next action
+- no UI complexity
 
----
-
-## Install
-
-```
-yarn install
-```
-
----
-
-## Prisma
-
-```
-npx prisma generate
-npx prisma db push
-```
+Future UI direction:
+- step-focused screens
+- minimal text overload
+- large touch targets
 
 ---
 
-## Run Development Server
+# 7. Why This Matters
 
-```
-yarn dev
-```
+Most AI tools fail in this space because they:
+- behave like chatbots,
+- skip structure,
+- produce inconsistent documentation.
 
----
+RV Service Desk is different:
 
-## Run Tests
-
-```
-yarn test
-```
+> It enforces **structure, causality, and approval-safe communication**.
 
 ---
 
-# Security & Compliance
+# 8. Development Philosophy
 
-The system enforces several safety boundaries:
-
-* no approval guarantees
-* no repair decision authority
-* no stored media artifacts
-* no exposure of secrets to the client
-* rate limiting on sensitive endpoints
-* server validation of AI outputs
+- Contracts over prompts
+- Determinism over “AI intuition”
+- Validation over trust
+- Benchmark over assumptions
 
 ---
 
-# Product Philosophy
+# 9. Current Focus
 
-RV Service Desk prioritizes **safe documentation over conversational flexibility**.
-
-Guiding rules:
-
-* procedure over conversation
-* determinism over creativity
-* explicit state over inference
-* server enforcement over model trust
+- stabilize diagnostic logic
+- introduce benchmark system
+- enhance context engine (signal-aware)
+- safely decompose route layer
+- improve mobile usability
 
 ---
 
-# Project Status
-
-The platform currently operates as:
-
-* multi-tenant SaaS
-* seat-controlled subscription system
-* procedure-driven diagnostic engine
-* server-orchestrated AI platform
-* test-covered authorization workflow
+End of file
