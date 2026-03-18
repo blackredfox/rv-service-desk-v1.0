@@ -1,0 +1,614 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="230" failures="0" errors="0" time="2.082887033">
+    <testsuite name="tests/integration/diagnostic-how-to-check.test.ts" timestamp="2026-03-18T23:23:47.706Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="29" failures="0" errors="0" skipped="0" time="0.071089751">
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;how to check?&quot; as how-to-check" time="0.001384035">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;How do I test that?&quot; as how-to-check" time="0.000213235">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;how can I measure voltage&quot; as how-to-check" time="0.000092157">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;how should I verify the ground&quot; as how-to-check" time="0.00019805">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;как проверить&quot; as how-to-check" time="0.000560188">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;как мне протестировать&quot; as how-to-check" time="0.00035167">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;cómo puedo verificar&quot; as how-to-check" time="0.000278597">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;explain how to do that&quot; as how-to-check" time="0.000072383">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; detects &quot;tell me how&quot; as how-to-check" time="0.000288329">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; does NOT detect &quot;fuse is blown&quot; as how-to-check" time="0.000287254">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; does NOT detect &quot;12.6 volts&quot; as how-to-check" time="0.000196067">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; does NOT detect &quot;yes ground is good&quot; as how-to-check" time="0.00008111">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; does NOT detect &quot;already checked&quot; as how-to-check" time="0.00005707">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check detection &gt; does NOT detect &quot;I can&apos;t check that&quot; as how-to-check" time="0.000336944">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check handling in processUserMessage &gt; returns howToCheckRequested=true and does NOT close any step" time="0.003743947">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check handling in processUserMessage &gt; includes HOW-TO-CHECK INSTRUCTION in registry context" time="0.058336293">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="how-to-check handling in processUserMessage &gt; clears howToCheckRequested on the next normal message" time="0.000462793">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="getStepHowToCheck &gt; returns instruction for a valid step" time="0.000209317">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="getStepHowToCheck &gt; returns null for step without instruction" time="0.000092506">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="step de-dupe guard &gt; markStepAsked returns true for first ask, false for duplicate" time="0.000355056">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="step de-dupe guard &gt; isStepAlreadyAsked tracks correctly" time="0.000176052">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="awning procedure order &gt; exists and has correct step ordering" time="0.000174041">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="awning procedure order &gt; asks supply and fuse BEFORE motor direct power test" time="0.000151695">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="awning procedure order &gt; motor direct test (awn_6) requires motor voltage (awn_5) as prerequisite" time="0.000591472">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="awning procedure order &gt; awning fuse step is asked before switch step" time="0.000197379">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="electrical_12v procedure order &gt; has supply and fuse/CB steps before direct power test" time="0.000148336">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="electrical_12v procedure order &gt; direct power test requires voltage step as prerequisite" time="0.000114189">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="portal-cause correctness &gt; when fuse is blown, context does NOT skip to motor steps" time="0.000203456">
+        </testcase>
+        <testcase classname="tests/integration/diagnostic-how-to-check.test.ts" name="portal-cause correctness &gt; key finding &apos;blown fuse&apos; triggers pivot (immediate isolation)" time="0.000233551">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/prompts/prompt-composer.test.ts" timestamp="2026-03-18T23:23:47.709Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="16" failures="0" errors="0" skipped="0" time="0.172248633">
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Files &gt; should have SYSTEM_PROMPT_BASE.txt" time="0.001595991">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Files &gt; should have MODE_PROMPT_DIAGNOSTIC.txt" time="0.000333775">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Files &gt; should have MODE_PROMPT_AUTHORIZATION.txt" time="0.000324475">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Files &gt; should have MODE_PROMPT_FINAL_REPORT.txt" time="0.000225855">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; composePrompt &gt; should compose diagnostic mode prompt" time="0.098852089">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; composePrompt &gt; should compose authorization mode prompt" time="0.001181832">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; composePrompt &gt; should compose final_report mode prompt" time="0.00098471">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; composePrompt &gt; should include additional constraints when provided" time="0.000753953">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; detectModeCommand &gt; should detect final report aliases (exact match)" time="0.000934057">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; detectModeCommand &gt; should detect authorization aliases (exact match)" time="0.000602271">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; detectModeCommand &gt; should be case-insensitive and whitespace tolerant" time="0.000636496">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; detectModeCommand &gt; should return null for non-exact matches" time="0.000445432">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; buildMessagesWithMemory &gt; should build messages with memory window" time="0.061215554">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; buildMessagesWithMemory &gt; should truncate history to memory window" time="0.000692524">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; Constants &gt; should export PROHIBITED_WORDS" time="0.001464591">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-composer.test.ts" name="Prompt Composer &gt; Constants &gt; should export DEFAULT_MEMORY_WINDOW" time="0.00057466">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/prompts/prompt-enforcement.test.ts" timestamp="2026-03-18T23:23:47.711Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="42" failures="0" errors="0" skipped="0" time="0.17571057">
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; composePrompt (from prompt-composer) &gt; should include dialogue language in context" time="0.087779481">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; composePrompt (from prompt-composer) &gt; should include diagnostic mode content" time="0.001221208">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; composePrompt (from prompt-composer) &gt; should include final_report mode content" time="0.001013854">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; SYSTEM_PROMPT_BASE.txt content &gt; should contain LANGUAGE RULES section" time="0.000292079">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; SYSTEM_PROMPT_BASE.txt content &gt; should contain WORDING SAFETY section" time="0.000295498">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; SYSTEM_PROMPT_BASE.txt content &gt; should contain BEHAVIOR RULES section" time="0.000174934">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; SYSTEM_PROMPT_BASE.txt content &gt; should contain FORMAT RULES section" time="0.000135824">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; SYSTEM_PROMPT_BASE.txt content &gt; should NOT be a chatbot" time="0.000209732">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should list complex equipment" time="0.0002917">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should enforce step-by-step procedure rule" time="0.000263749">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should prohibit unauthorized actions in diagnostic mode" time="0.000220596">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should contain POST-REPAIR RULE" time="0.000170808">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should contain MECHANICAL SYSTEM RULE" time="0.000271802">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should contain CONSUMER APPLIANCE RULE" time="0.000221828">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should enforce RV terminology and battery-type question" time="0.000265807">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_DIAGNOSTIC.txt content &gt; should limit non-complex unit teardown" time="0.00016316">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_FINAL_REPORT.txt content &gt; should require translation separator" time="0.000092014">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_FINAL_REPORT.txt content &gt; should specify required section headers" time="0.0001478">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_FINAL_REPORT.txt content &gt; should require labor breakdown" time="0.000072714">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime System Prompt (SYSTEM_PROMPT_BASE.txt) &gt; MODE_PROMPT_FINAL_REPORT.txt content &gt; should enforce plain format" time="0.000202011">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateDiagnosticOutput &gt; should detect final-report drift during diagnostics" time="0.074351746">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateDiagnosticOutput &gt; should detect isolation-complete language" time="0.000767178">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateDiagnosticOutput &gt; should detect translation separator in diagnostic mode" time="0.000953588">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateDiagnosticOutput &gt; should detect too many questions (&gt;2)" time="0.000179937">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateDiagnosticOutput &gt; should allow valid single-question diagnostic output" time="0.000478335">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateDiagnosticOutput &gt; should allow valid English diagnostic output" time="0.000170563">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateLanguageConsistency &gt; should detect English output during Russian session" time="0.000286698">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateLanguageConsistency &gt; should allow Russian output during Russian session" time="0.000141555">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateLanguageConsistency &gt; should detect Cyrillic in English session" time="0.000087479">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateFinalReportOutput &gt; should detect missing translation separator when required" time="0.000350149">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateFinalReportOutput &gt; should detect numbered lists in final report" time="0.000738793">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateFinalReportOutput &gt; should allow proper final report format" time="0.000494047">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateOutput dispatcher &gt; should route diagnostic mode to validateDiagnosticOutput" time="0.000177303">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Runtime Output Validators (mode-validators.ts) &gt; validateOutput dispatcher &gt; should reject empty output" time="0.00011536">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="API Contract &gt; State inference from history &gt; should default to DIAGNOSTICS for empty history" time="0.000177182">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="API Contract &gt; State inference from history &gt; should detect CAUSE_OUTPUT from history with translation" time="0.000103639">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="API Contract &gt; Language parameter handling &gt; should accept explicit dialogueLanguage" time="0.000075964">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="API Contract &gt; Language parameter handling &gt; should fallback to inferred language when not provided" time="0.000055389">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="API Contract &gt; State parameter handling &gt; should accept explicit currentState" time="0.000051797">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="API Contract &gt; State parameter handling &gt; should fallback to inferred state when not provided" time="0.000052762">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Complex Equipment Classification (from MODE_PROMPT_DIAGNOSTIC) &gt; should list all complex equipment types" time="0.0001676">
+        </testcase>
+        <testcase classname="tests/prompts/prompt-enforcement.test.ts" name="Complex Equipment Classification (from MODE_PROMPT_DIAGNOSTIC) &gt; should list water pump as NON-complex equipment" time="0.000066928">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/prompts/tone-adjustment.test.ts" timestamp="2026-03-18T23:23:47.714Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="10" failures="0" errors="0" skipped="0" time="0.007486142">
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; SYSTEM_PROMPT_BASE: no default &apos;Thank you&apos; instruction" time="0.002163042">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; SYSTEM_PROMPT_BASE: has professional tone instructions" time="0.000623296">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; MODE_PROMPT_DIAGNOSTIC: no &apos;Thank you&apos; default" time="0.000630988">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; MODE_PROMPT_DIAGNOSTIC: has procedure and registry rules" time="0.000575196">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; MODE_PROMPT_DIAGNOSTIC: has key findings rules (acknowledge but continue)" time="0.000717229">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; MODE_PROMPT_DIAGNOSTIC: enforces explicit-only mode transitions" time="0.000516892">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Prompt Files &gt; MODE_PROMPT_DIAGNOSTIC: allows at most one-word acknowledgment" time="0.000405096">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Behavior &gt; SYSTEM_PROMPT_BASE: prohibits repeating technician statements" time="0.000210909">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Behavior &gt; SYSTEM_PROMPT_BASE: prohibits filler phrases" time="0.000397433">
+        </testcase>
+        <testcase classname="tests/prompts/tone-adjustment.test.ts" name="Tone Adjustment - Behavior &gt; SYSTEM_PROMPT_BASE: prohibits inventing facts" time="0.000188675">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/chat-module-extraction.test.ts" timestamp="2026-03-18T23:23:47.715Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="30" failures="0" errors="0" skipped="0" time="0.016666778">
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; SSE Encoding &gt; should encode data as SSE format" time="0.001422201">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; SSE Encoding &gt; should create case event" time="0.000263294">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; SSE Encoding &gt; should create done event" time="0.000415454">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should build messages with system and history" time="0.00083328">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should build messages with image attachments" time="0.000567195">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should extract chunk content from OpenAI response" time="0.000209352">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should handle empty/missing content" time="0.000301785">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should accept empty attachments" time="0.000191064">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should reject too many attachments" time="0.000359384">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should filter valid attachments" time="0.000451609">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should build vision instruction" time="0.000303276">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should parse labor hours from message" time="0.000498119">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should detect labor override intent" time="0.001002548">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should normalize and format labor hours" time="0.003823682">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should check canonical total labor line" time="0.000445159">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should compute labor override request" time="0.000287523">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should detect final report format" time="0.00021533">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should enforce language policy by stripping translation" time="0.000125366">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should extract primary report block" time="0.000092927">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build final report fallback" time="0.000339865">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build final report fallback with complaint context" time="0.000119685">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build final report fallback with translation" time="0.000089117">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should apply diagnostic mode guard" time="0.000345763">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build diagnostic drift correction instruction" time="0.000106614">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build diagnostic drift fallback" time="0.00009679">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Final Report Service &gt; should build translation instruction" time="0.000228531">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Final Report Service &gt; should build final report request" time="0.000115125">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Final Report Service &gt; should build transition constraints" time="0.000084505">
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Logging &gt; should log timing without throwing" time="0.001207812">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;test&quot;,&quot;value&quot;:123}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Logging &gt; should log flow without throwing" time="0.000266878">
+            <system-out>
+[Chat API v2][flow] {&quot;stage&quot;:&quot;test&quot;,&quot;step&quot;:&quot;init&quot;}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/chat-openai-execution-service.test.ts" timestamp="2026-03-18T23:23:47.718Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="2" failures="0" errors="0" skipped="0" time="0.072143129">
+        <testcase classname="tests/unit/chat-openai-execution-service.test.ts" name="OpenAI Execution Service &gt; retries invalid diagnostic output and falls back to the authoritative step" time="0.068118962">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:0,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:146}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:8}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;violations&quot;:4}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;openAiStartMs&quot;:9,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;validateMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;reason&quot;:&quot;validation_after_retry_failed&quot;}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_1, mode=diagnostic): [
+  [32m&apos;DIAGNOSTIC_DRIFT: Output looks like a final report while in diagnostic mode. Diagnostic mode must ask questions, not generate reports.&apos;[39m,
+  [32m&apos;DIAGNOSTIC_QUESTION: Output does not contain a question&apos;[39m,
+  [32m&apos;DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format&apos;[39m,
+  [32m&apos;STEP_COMPLIANCE: Response does not match active step wp_2. Expected question about: voltage, measure, water, pump, input&apos;[39m
+]
+
+[ModeValidator] Violations (case=case_1, mode=diagnostic): [
+  [32m&apos;DIAGNOSTIC_DRIFT: Output looks like a final report while in diagnostic mode. Diagnostic mode must ask questions, not generate reports.&apos;[39m,
+  [32m&apos;DIAGNOSTIC_QUESTION: Output does not contain a question&apos;[39m,
+  [32m&apos;DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format&apos;[39m,
+  [32m&apos;STEP_COMPLIANCE: Response does not match active step wp_2. Expected question about: voltage, measure, water, pump, input&apos;[39m
+]
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/chat-openai-execution-service.test.ts" name="OpenAI Execution Service &gt; returns a valid labor override response without introducing flow logic" time="0.003026395">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;openAiStartMs&quot;:0,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:245}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;validateMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;violations&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_retry&quot;,&quot;openAiStartMs&quot;:1,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_retry&quot;,&quot;validateMs&quot;:0}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_post&quot;,&quot;validateMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_post&quot;,&quot;reason&quot;:&quot;validation_after_retry_failed&quot;}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_1, mode=final_report): [
+  [32m&apos;PROHIBITED_WORDS: English section contains denial-trigger words: failed&apos;[39m
+]
+
+[ModeValidator] Violations (case=case_1, mode=final_report): [
+  [32m&apos;PROHIBITED_WORDS: English section contains denial-trigger words: failed&apos;[39m
+]
+
+            </system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/chat-route-decomposition-services.test.ts" timestamp="2026-03-18T23:23:47.718Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="12" failures="0" errors="0" skipped="0" time="0.014335557">
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; parses request bodies and trims the message" time="0.003813752">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; validates attachment bundles without hidden flow logic" time="0.000538859">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; keeps prior language on short acknowledgements" time="0.000871675">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; auto-switches tracked language only on strong non-ack evidence" time="0.000249657">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; ensures the case with explicit language source resolution" time="0.001904172">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; resolves stored mode normalization without semantic inference" time="0.000428597">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; changes modes only on explicit commands" time="0.000325739">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; builds bounded prompt constraints and preserves vision instruction" time="0.000569646">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; validates primary responses and builds authoritative correction/fallback text" time="0.001597217">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; validates labor override outputs and builds retry instructions" time="0.001157074">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; builds the labor override execution plan with explicit final-report transport" time="0.000373336">
+        </testcase>
+        <testcase classname="tests/unit/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; persists messages and diagnostic cleanup through the bounded service" time="0.001493334">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/diagnostic-procedures.test.ts" timestamp="2026-03-18T23:23:47.720Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="35" failures="0" errors="0" skipped="0" time="0.306548125">
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects water pump" time="0.116526993">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects furnace" time="0.001170294">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects roof AC" time="0.001000074">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects LP gas" time="0.000711085">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects refrigerator" time="0.001044098">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects slide-out" time="0.000690806">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects leveling system" time="0.000724118">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects inverter/converter" time="0.000691446">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; detects consumer appliance" time="0.001140513">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="detectSystem &gt; returns null for unknown system" time="0.001166342">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getProcedure &gt; returns water_pump procedure" time="0.000856322">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getProcedure &gt; returns lp_gas procedure with correct step order" time="0.000726939">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getProcedure &gt; returns null for unknown system" time="0.000672974">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getProcedure &gt; all procedures have unique step IDs" time="0.000849716">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getNextStep &gt; returns first step when nothing completed" time="0.000736984">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getNextStep &gt; skips completed steps" time="0.000634843">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getNextStep &gt; skips unable-to-verify steps" time="0.000545887">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getNextStep &gt; respects prerequisites" time="0.000478168">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getNextStep &gt; LP gas: pressure test before ignition" time="0.000543163">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="getNextStep &gt; returns null when all steps done" time="0.000661001">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="mapInitialMessageToSteps &gt; maps voltage reading to completed step" time="0.001380409">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="mapInitialMessageToSteps &gt; does not map ambiguous messages" time="0.00107">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="mapInitialMessageToSteps &gt; maps multiple LP gas steps from detailed initial message" time="0.000978279">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="buildProcedureContext &gt; shows next step when nothing completed" time="0.000684955">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="buildProcedureContext &gt; shows active step only (authoritative mode)" time="0.000567772">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="buildProcedureContext &gt; handles unable-to-verify in progress count" time="0.000637842">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="buildProcedureContext &gt; shows &apos;ALL STEPS COMPLETE&apos; when done (no auto-transition)" time="0.000703508">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="buildProcedureContext &gt; prevents cross-system questions" time="0.000483384">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Integration: procedure-aware registry &gt; initializes case with procedure from first message" time="0.089750738">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Integration: procedure-aware registry &gt; pre-completes steps from initial message" time="0.000852296">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Integration: procedure-aware registry &gt; buildRegistryContext uses procedure context when available" time="0.001206799">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Integration: procedure-aware registry &gt; falls back to legacy context when no procedure" time="0.002984085">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Integration: procedure-aware registry &gt; does not re-initialize on second message" time="0.00094034">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Confusing input handling &gt; cross-system bait: procedure context restricts to active system" time="0.00082672">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-procedures.test.ts" name="Confusing input handling &gt; unknown manufacturer: standard procedure used" time="0.001267396">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/diagnostic-registry.test.ts" timestamp="2026-03-18T23:23:47.722Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="30" failures="0" errors="0" skipped="0" time="0.182662085">
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectAlreadyAnswered &gt; detects &apos;already checked&apos;" time="0.036531616">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectAlreadyAnswered &gt; detects &apos;already told you&apos;" time="0.001121931">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectAlreadyAnswered &gt; detects &apos;already answered&apos;" time="0.001210633">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectAlreadyAnswered &gt; detects &apos;I already verified&apos;" time="0.00110764">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectAlreadyAnswered &gt; detects Russian &apos;уже проверил&apos;" time="0.001620155">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectAlreadyAnswered &gt; returns false for normal message" time="0.001282985">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; detects &apos;don&apos;t know&apos;" time="0.001110134">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; detects &apos;can&apos;t check&apos;" time="0.000985597">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; detects &apos;unable to verify&apos;" time="0.001129736">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; detects &apos;can&apos;t see&apos;" time="0.000932693">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; detects &apos;no tool to check&apos;" time="0.001250719">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; detects Russian &apos;не могу проверить&apos;" time="0.001138842">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectUnableToVerify &gt; returns false for normal message" time="0.050348802">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="extractTopics &gt; extracts voltage topic" time="0.008232275">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="extractTopics &gt; extracts ground topic" time="0.001588705">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="extractTopics &gt; extracts pump noise topic" time="0.001019655">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="extractTopics &gt; extracts multiple topics" time="0.000868562">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="extractTopics &gt; returns empty for unrelated message" time="0.001140906">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectKeyFinding &gt; detects missing fan blade" time="0.000917725">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectKeyFinding &gt; detects blower wheel damage" time="0.000999738">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectKeyFinding &gt; detects seized motor" time="0.001189845">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectKeyFinding &gt; detects zero current draw" time="0.001414639">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectKeyFinding &gt; detects cracked housing" time="0.00095202">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="detectKeyFinding &gt; returns null for normal diagnostic message" time="0.001291533">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="processUserMessage – procedure-aware &gt; tracks completed steps when procedure is active" time="0.002580836">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="processUserMessage – procedure-aware &gt; tracks unable-to-verify steps" time="0.001410727">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="processUserMessage – procedure-aware &gt; still tracks legacy topics" time="0.000867061">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="processUserMessage – procedure-aware &gt; detects key findings" time="0.001792585">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="shouldPivot &gt; returns false when no key findings" time="0.000865607">
+        </testcase>
+        <testcase classname="tests/unit/diagnostic-registry.test.ts" name="shouldPivot &gt; returns true when key finding is detected" time="0.001891688">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" timestamp="2026-03-18T23:23:47.725Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="9" failures="0" errors="0" skipped="0" time="0.004844705">
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/chat-request-preparer.ts does not import diagnostic authority modules" time="0.00156535">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/chat-mode-resolver.ts does not import diagnostic authority modules" time="0.000254586">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/prompt-context-builder.ts does not import diagnostic authority modules" time="0.000347587">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/response-validation-service.ts does not import diagnostic authority modules" time="0.000202804">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/final-report-flow-service.ts does not import diagnostic authority modules" time="0.000280879">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/openai-execution-service.ts does not import diagnostic authority modules" time="0.000200884">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; mode resolver refuses semantic mode inference" time="0.000252574">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; fallback rendering only mirrors supplied authoritative step metadata" time="0.000391009">
+        </testcase>
+        <testcase classname="tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; route remains the boundary that invokes Context Engine directly" time="0.000378361">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/architecture/route-wiring/chat-route-wiring.test.ts" timestamp="2026-03-18T23:23:47.727Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="2" failures="0" errors="0" skipped="0" time="0.571804344">
+        <testcase classname="tests/architecture/route-wiring/chat-route-wiring.test.ts" name="Chat Route Wiring &gt; emits SSE success lifecycle once without duplicate done events" time="0.498492247">
+            <system-out>
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=EN, forcedOutput=none, Output: mode=AUTO, effective=EN, strategy=auto, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;firstSseTokenMs&quot;:8}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:7,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:46}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;totalMs&quot;:10,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/route-wiring/chat-route-wiring.test.ts" name="Chat Route Wiring &gt; emits error and done once on upstream failure" time="0.072215322">
+            <system-out>
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=EN, forcedOutput=none, Output: mode=AUTO, effective=EN, strategy=auto, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:3,&quot;openAiMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;totalMs&quot;:67,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/architecture/strictness/route-strictness.test.ts" timestamp="2026-03-18T23:23:47.728Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="13" failures="0" errors="0" skipped="0" time="0.487347214">
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; STRICT_CONTEXT_ENGINE is enabled by default" time="0.405882923">
+            <system-out>
+[ContextEngine] Intent: Locate request: &quot;capacitor&quot;
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; Context Engine processMessage is always called in diagnostic mode" time="0.010099257">
+            <system-out>
+[ContextEngine] Intent: Diagnostic response
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; legacy shouldPivot is NOT used for flow decisions" time="0.055177817">
+            <system-out>
+[ContextEngine] Intent: Diagnostic response
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; replan is handled ONLY by Context Engine" time="0.007433606">
+            <system-out>
+[ContextEngine] Intent: New evidence (physical_damage): &quot;wait, I found a refrigerant leak on the condenser...&quot;
+[ContextEngine] Replan triggered: New physical_damage evidence after isolation: wait, I found a refrigerant leak on the condenser
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; clarification is handled ONLY by Context Engine topic stack" time="0.000558062">
+            <system-out>
+[ContextEngine] Intent: How-to request: &quot;capacitor&quot;
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; no dual-authority: isolation + new evidence = replan (not dual pivot)" time="0.000792212">
+            <system-out>
+[ContextEngine] Intent: New evidence (physical_damage): &quot;Actually, I just noticed there&apos;s a hole in the eva...&quot;
+[ContextEngine] Replan triggered: New physical_damage evidence after isolation: Actually, I just noticed there&apos;s a hole in the evaporator coil
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; loop guard prevents legacy-style fallback loops" time="0.000596499">
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; step completion is synced from registry to Context Engine" time="0.000239445">
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; anti-loop directives are generated by Context Engine" time="0.00070682">
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; Context Engine result has valid structure for route consumption" time="0.000730558">
+            <system-out>
+[ContextEngine] Intent: Diagnostic response
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; Context Engine handles invalid/missing context gracefully" time="0.000266337">
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Data Provider Isolation — Registry as Read-Only &gt; buildRegistryContext returns step metadata (data only)" time="0.001642342">
+        </testcase>
+        <testcase classname="tests/architecture/strictness/route-strictness.test.ts" name="Data Provider Isolation — Registry as Read-Only &gt; initializeCase provides procedure catalog (data only)" time="0.001946181">
+        </testcase>
+    </testsuite>
+</testsuites>

@@ -116,7 +116,7 @@ Tests are organized to prevent regression:
 
 1. **Unit Tests** (`tests/context-engine.test.ts`): 26 tests for engine internals
 2. **Integration Tests** (`tests/context-engine-integration.test.ts`): 9 tests for route wiring
-3. **Strictness Tests** (`tests/route-strictness.test.ts`): 12 tests ensuring:
+3. **Strictness Tests** (`tests/architecture/strictness/route-strictness.test.ts`): 12 tests ensuring:
    - Context Engine is always used
    - Legacy flow is not called
    - No dual-authority paths

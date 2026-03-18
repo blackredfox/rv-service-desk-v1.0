@@ -1,0 +1,49 @@
+{
+  "summary": "Backend-only verification completed for test-layout cleanup and prompt-test modernization scope. Full Vitest discovery passes after canonical moves, targeted prompt/contract suites pass, and no regression found in active automated tests.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/prompts/prompt-enforcement.test.ts",
+    "/app/tests/prompts/prompt-composer.test.ts",
+    "/app/tests/prompts/tone-adjustment.test.ts",
+    "/app/tests/architecture/route-wiring/chat-route-wiring.test.ts",
+    "/app/tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts",
+    "/app/tests/architecture/strictness/route-strictness.test.ts",
+    "/app/tests/unit/diagnostic-procedures.test.ts",
+    "/app/tests/unit/diagnostic-registry.test.ts",
+    "/app/tests/integration/diagnostic-how-to-check.test.ts",
+    "/app/tests/unit/chat-route-decomposition-services.test.ts",
+    "/app/tests/unit/chat-openai-execution-service.test.ts",
+    "/app/tests/unit/chat-module-extraction.test.ts",
+    "/app/test_reports/pytest/iteration_26_targeted.junit.xml",
+    "/app/test_reports/pytest/iteration_26_full.junit.xml"
+  ],
+  "action_items": [
+    "Optional cleanup later: keep Python harnesses under tests/helpers/legacy quarantined; they are stale by design (old fixed test counts/path assumptions) but no longer affect active discovery.",
+    "If legacy helpers are revived, update them to yarn + current tests/** paths and current suite count (793)."
+  ],
+  "critical_code_review_comments": [
+    "Vitest discovery remains correctly scoped to tests/**/*.test.ts and tests/**/*.test.tsx via /app/vitest.config.ts include rules.",
+    "Strong contract suites stayed intact after path updates: procedure, registry, how-to-check, route wiring, no-hidden-authority, and strictness all pass.",
+    "Prompt-related suites in tests/prompts pass under current contracts; modernization did not reduce strict behavioral assertions in critical guardrails."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_26.json"
+  ],
+  "success_rate": {
+    "backend": "100% (793/793 full suite; 230/230 targeted scope)",
+    "frontend": "N/A (skipped by request)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Validated requested cleanup outcomes: no active root-level *.test.* files at /app root depth, active suites run from /app/tests, legacy Python harnesses are under /app/tests/helpers/legacy. This run used existing MOCKED OpenAI/auth/storage/context-engine boundaries inside relevant Vitest suites as intended.",
+  "rca of the issue": "No defect reproduced in this scope. Regression risk from test relocation was mitigated by full-suite run with zero failures and stable discovery patterns."
+}
