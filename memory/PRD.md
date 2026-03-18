@@ -45,3 +45,6 @@ Safe maintainability refactor of `src/app/api/chat/route.ts` so it becomes a thi
 ## Next Tasks
 - If requested, do a separate Context Engine task focused only on the active signal/branch defect.
 - If requested, continue shrinking `route.ts` only around non-authoritative transport/persistence concerns.
+
+## Recent Follow-up Change
+- Replaced `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt` with the user-provided prompt file content exactly as requested.
