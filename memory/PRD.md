@@ -1,233 +1,47 @@
-# RV Service Desk — Product Requirements Document
+# NEO TASK — Safe `route.ts` Decomposition (Boundary-First, No Hidden Authority)
 
 ## Original Problem Statement
-A Next.js diagnostic assistant for RV technicians. The system helps technicians diagnose problems with RV systems (water heaters, water pumps, furnaces, AC, etc.) through a structured step-by-step diagnostic procedure.
+Safe maintainability refactor of `src/app/api/chat/route.ts` so it becomes a thinner orchestration boundary without introducing hidden diagnostic authority outside Context Engine. Preserve runtime behavior, do not mix in diagnostic logic fixes, and add direct tests for route wiring, no hidden authority, extracted modules, and strictness.
 
-## Core Architecture
-- **Next.js + TypeScript + Vitest**
-- Single API endpoint: `POST /api/chat`
-- Diagnostic engine: `context-engine` (state machine) + `diagnostic-registry` (step tracking) + `diagnostic-procedures` (procedure definitions)
-- LLM (OpenAI) renders questions; the engine controls the flow
+## Architecture Decisions
+- Kept Context Engine as the sole diagnostic flow authority; route still invokes `processContextMessage(...)` directly.
+- Extracted bounded chat services only for request preparation, explicit mode resolution, prompt assembly, OpenAI execution, response validation, final-report transport setup, and persistence side effects.
+- Left diagnostic step/branch/terminal orchestration inside `route.ts` rather than moving it into helpers, to avoid creating a second controller.
+- Preserved explicit-only mode transitions and existing validation / fallback behavior.
 
-## Key Architectural Principle
-**The diagnostic procedure engine is the single source of authority for step progression.**
-- The registry defines procedures with ordered steps and prerequisites
-- The context engine tracks state (active step, completed steps, unable steps)
-- The LLM receives ONLY the current active step question — it does NOT decide which step comes next
+## What's Implemented
+- Reduced `src/app/api/chat/route.ts` from 1128 lines pre-refactor to 661 lines while keeping HTTP/SSE orchestration at the boundary.
+- Added bounded modules:
+  - `src/lib/chat/chat-request-preparer.ts`
+  - `src/lib/chat/chat-mode-resolver.ts`
+  - `src/lib/chat/prompt-context-builder.ts`
+  - `src/lib/chat/response-validation-service.ts`
+  - `src/lib/chat/final-report-flow-service.ts`
+  - `src/lib/chat/openai-execution-service.ts`
+  - `src/lib/chat/chat-persistence-service.ts`
+- Added/updated direct tests for extracted modules, no-hidden-authority guardrails, execution services, and route wiring.
+- Verified focused suite passes:
+  - `tests/chat-route-decomposition-services.test.ts`
+  - `tests/chat-openai-execution-service.test.ts`
+  - `tests/chat-no-hidden-authority.test.ts`
+  - `tests/chat-route-wiring.test.ts`
+  - `tests/chat-module-extraction.test.ts`
+  - `tests/route-strictness.test.ts`
+  - `tests/chat-route.test.ts`
 
-## Completed Tasks
+## Prioritized Backlog
+### P0
+- Separate targeted fix for the known water-heater / “no 12V” branch-handling defect inside Context Engine behavior.
+- Reduce remaining route-owned diagnostic glue only if it can be moved without fragmenting authority.
 
-### Task 01: Rollback & Baseline (DONE)
-- Established baseline: 588+ passed, ~17 known failures
-- Report: `reports/baseline-report.md`
+### P1
+- Consolidate existing route comments and historical patch notes into architecture-safe inline docs or ADR references.
+- Add broader integration safety coverage around labor override and diagnostic validation paths.
 
-### Task 02: Route Decomposition (DONE)
-- Refactored `app/api/chat/route.ts` into modules under `src/lib/chat/`
-- ADR: `docs/adr/001-chat-module-decomposition.md`
+### P2
+- Improve logging consistency for extracted persistence-side-effect helpers.
+- Tighten prompt/validator fixtures used in service-level tests.
 
-### Bug Fixes (DONE)
-- Removed auto-transition to final report
-- Added validator to block LLM from declaring "isolation complete"
-- Added language consistency validation
-- Created structured water heater procedure (12 steps)
-
-### Authoritative Step Progression (DONE - Feb 2026)
-1. Server determines next step via `registryGetNextStepId()` — never resets to null
-2. Active-step-only matching — completion runs only against `activeStepId`
-3. `buildProcedureContext` outputs only `CURRENT STEP` — no completed/unable listings
-4. Fixed `getNextStepId()` returning full object instead of string ID
-
-### Test Suite Cleanup (DONE - Feb 2026)
-- Replaced 5 stale `output-validator.validateResponse()` tests → now test runtime `mode-validators.ts`
-- Fixed `getSafeFallback` test: unknown language returns language choice prompt, not EN fallback
-- **Failures reduced: 17 → 11** (stable), auth tests are flaky (+/- 2)
-- 666 tests passing
-
-### Terminal-Style Output (Confirmed Feb 2026)
-Prompt-driven via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Voice redesign = prompt edit only.
-
-## Current Test Status
-- **736 passed, 11 stable pre-existing failures** (Prisma client / input-language-lock)
-- 2-3 flaky HTTP API tests (`org-activity`, `b2b-billing`) — pre-existing, not related to engine
-
-### P1.5 — Branch Execution Runtime Integration (DONE - Feb 2026)
-Fixed the full runtime path so branches are actually entered, traversed with distinct step IDs, and exited.
-
-**Root Causes Fixed:**
-
-**1. Missing `processResponseForBranch()` call in `context-engine.ts`** _(the exact missing integration point)_
-- File: `src/lib/context-engine/context-engine.ts`
-- `processMessage()` was marking a step complete and calling `registryGetNextStepId()` WITHOUT first calling `processResponseForBranch()`. Branch state was never updated before next-step resolution. Fix: added call between `registryMarkStepCompleted()` and `registryGetNextStepId()`, syncing resulting branch state to `context.branchState`.
-
-**2. `getNextStepBranchAware()` allowing branch entry from main flow** _(the step identity bug)_
-- File: `src/lib/diagnostic-procedures.ts`
-- When `activeBranchId = null`, the function was returning branch entry steps (wh_6a, wh_7a) if their prerequisites were met, even without a trigger. This caused the system to advance into branch territory without activation, creating the wh_7 / wh_7 / wh_7 repeat pattern. Fix: when in main flow, skip ALL branch steps unconditionally; branches are entered exclusively via `processResponseForBranch()`.
-
-**3. `CONFIRMATION` intent misrouting Russian diagnostic answers** _(loop amplifier)_
-- File: `src/lib/context-engine/context-engine.ts`
-- Russian short answers like "да"/"нет" were classified as `CONFIRMATION` (labor), not `MAIN_DIAGNOSTIC`. `processContextMessage()` never advanced the step, so `activeStepId` stayed stuck at wh_7 indefinitely. Fix: when `intent.type === "CONFIRMATION"` AND `context.mode === "diagnostic"` AND `context.activeStepId` is set, treat as `MAIN_DIAGNOSTIC`.
-
-**4. STEP COMPLETION HARDENING double-advancing steps** _(secondary amplifier)_
-- File: `src/app/api/chat/route.ts`
-- After context engine correctly advanced from step X to step Y, the hardening block still ran `isStepAnswered(message_for_X, Y_question)`. Since `isStepAnswered` is lenient (short "да" matches any question), this prematurely marked step Y complete with the wrong message. Fix: saved `stepIdBeforeProcessing` before calling `processContextMessage()`; hardening block is skipped when context engine already advanced the step (`contextEngineAdvanced` guard). Keeps it as a valid backup path only for intent-detection failures.
-
-**5. Branch trigger patterns English-only** _(multilingual block)_
-- File: `src/lib/diagnostic-procedures.ts`
-- `no_ignition`, `flame_failure`, and `no_gas` trigger patterns matched only English phrases. Russian/Spanish technicians could never enter branches. Fix: added Russian Cyrillic and Spanish pattern alternations to all three branch trigger regexes.
-
-**6. Branch exit in `processContextMessage()`**
-- File: `src/lib/context-engine/context-engine.ts`
-- After all branch steps exhausted, `getNextStepId()` returns null. Previously `context.activeStepId` was set to null (no completion reachable). Fix: detect `nextId === null && context.branchState.activeBranchId !== null`, call `registryExitBranch()`, reset `activeBranchId`, retry `getNextStepId()` for main-flow continuation.
-
-**New test file:** `tests/p1-5-branch-runtime-integration.test.ts` — 10 tests, all passing:
-- Fix 1: No branch entry steps from main flow
-- Fix 2: processResponseForBranch called before next-step resolution
-- Fix 3: Branch exit and main-flow continuation
-- Fix 4: Russian/Spanish branch triggers (нет щелчка, пламя гаснет, sin chispa)
-- Fix 5: Distinct step IDs, no repeat of wh_7
-- Remaining:
-  - `input-language-lock.test.ts` (6) — stale test assumptions
-  - `retention.test.ts` (5) — storage API mismatch
-  - `b2b-billing.test.ts` / `org-activity.test.ts` — flaky auth (intermittent)
-
-### P0: Procedure Catalog Framework (DONE - Jan 2026)
-Created framework documentation and TypeScript schema for systematic procedure development:
-
-**Files Created:**
-- `docs/PROCEDURE_CATALOG_FRAMEWORK.md` — Schema, subtype handling, branching, completion criteria
-- `docs/PROCEDURE_AUTHORING_STANDARD.md` — Naming conventions, step writing rules, review checklist
-- `docs/PROCEDURE_ROLLOUT_PLAN.md` — Phased rollout plan for 6 equipment families
-- `src/lib/procedures/procedure-schema.ts` — TypeScript type definitions (non-breaking)
-- `src/lib/procedures/index.ts` — Module exports
-
-**Key Framework Features:**
-- 3-level subtype hierarchy (primary → secondary → tertiary) with gating
-- Step categories (default/advanced/expert) for realistic flow
-- Branch definitions with mutual exclusivity
-- Completion criteria with key finding shortcuts
-- Retrieval boundary enforcement (retrieval enriches, never controls)
-- Destructive finding documentation
-
-**Priority Rollout Order:**
-1. Water Heater (P0 — first full rewrite)
-2. Water Pump (P1 — reference baseline)
-3. Furnace (P2)
-4. Roof AC (P3)
-5. Refrigerator (P4)
-6. Slide/Leveling (P5)
-
-### P1: Engine Execution Authority Fix (DONE - Jan 2026)
-Fixed the architectural gap where Context Engine was advisory-only, not truly authoritative.
-
-**Root Cause:**
-- Engine computed `activeStepId` correctly, but it was passed to LLM as prompt text only
-- No validation that LLM output matched the active step
-- Loop recovery was detected but never applied
-
-**Changes:**
-- **Step Compliance Validation** (`mode-validators.ts`) — `validateStepCompliance()` checks LLM output matches active step
-- **Contextual Completion** — `isStepAnswered()` accepts short answers ("yes", "12V", "да")
-- **Loop Recovery Enforcement** (`route.ts`) — Now applies recovery, force-completes stuck steps
-- **Authoritative Fallback** (`output-policy.ts`) — When LLM fails, returns exact step question
-- **Registry Extensions** — `getActiveStepMetadata()`, `forceStepComplete()`, `isProcedureFullyComplete()`
-
-**ADR:** `docs/ADR-ENGINE-EXECUTION-AUTHORITY.md`
-
-### P1.5: Branch-Aware Step Resolution (DONE - Jan 2026)
-Fixed flat step list treating parallel branches as simultaneous.
-
-**Problem:**
-- `getNextStep()` operated on `completedStepIds + unableStepIds` WITHOUT branch constraints
-- No concept of active branch, decision tree, or path locking
-- Same step ID could have different meanings in different contexts
-
-**Solution:**
-- **Branch State Tracking** — `activeBranchId`, `decisionPath`, `lockedOutBranches` in registry
-- **Branch-Aware Resolution** — `getNextStepBranchAware()` considers active branch
-- **Mutual Exclusivity** — Entering `no_ignition` locks out `flame_failure` and vice versa
-- **Branch Trigger Detection** — `detectBranchTrigger()` identifies when to enter a branch
-- **Water Heater Branches** — Added 3 branches: `no_ignition`, `flame_failure`, `no_gas`
-
-**ADR:** `docs/ADR-BRANCH-AWARE-RESOLUTION.md`
-
-### P1.5b: Branch Runtime Integration (DONE - Jan 2026)
-Integrated branch processing into route.ts runtime path.
-
-**Problem Found:**
-- Branch infrastructure was built but NOT integrated into runtime
-- `processResponseForBranch()` was never called after step completion
-- Steps stayed on same ID (`wh_7`) while asking different semantic questions
-
-**Fix Applied:**
-- `route.ts` now calls `processResponseForBranch()` after `markStepCompleted()`
-- Branch trigger check syncs state to context engine
-- Auto branch exit when branch steps exhausted (returns to main flow)
-- Added locked-out branch check in `processResponseForBranch()`
-
-**Tests:** 670 passing (+ 5 new branch-runtime-integration tests)
-
-## Upcoming Tasks
-- **(P2)** Add branches to furnace, roof AC procedures
-- **(P3)** Fix remaining stable test failures (Prisma issues)
-- **(Future)** Diagnostic voice redesign (prompt-only)
-
-### TestCase12 / P1.6.1 — Completion Detection Runtime Fix (DONE - Feb 2026)
-**Files changed:** `context-engine.ts` (3 changes), `route.ts` (2 changes)
-**6 new tests in completion-detection.test.ts, all passing. 736 total passing.**
-
-**Exact missing completion criteria & runtime overwrite points:**
-
-1. `context.activeProcedureId` was NEVER synced from route.ts to context engine. `detectCompletionSignal()` had a guard `if (!context.activeProcedureId) return { detected: false }` — this ALWAYS fired in live runtime, making completion detection a no-op. Fix: (a) removed the guard; (b) route.ts now syncs `activeProcedureId` after `initializeCase()`.
-
-2. `MIN_STEPS_FOR_COMPLETION` lowered from 3 → 1. In live runtime, context-engine's `completedSteps` count was unreliable; 1 is sufficient since pattern matching is the real safety net.
-
-3. Wiring fault patterns missing: `короткое замыкание` (short circuit), `обрыв проводки` (wiring break), `разрыв проводки`, `повреждение проводки`, `open circuit`, `short circuit` added to `FAULT_PATTERNS`.
-
-4. Wiring restoration pattern added: `заменил проводку ... работает` explicit pattern added to `RESTORATION_PATTERNS`.
-
-5. Loop recovery guard: `if (activeStepId && !engineResult.context.isolationComplete)` — loop recovery now skips when isolation is complete, preventing it from re-assigning `activeStepId = null`.
-
-
-**Files changed:** `context-engine.ts`, `types.ts`, `route.ts`, `mode-validators.ts`, `MODE_PROMPT_DIAGNOSTIC.txt`
-**18 new tests, all passing.** 731 total passing.
-- Added `detectCompletionSignal()`: verified_restoration + verified_fault, multilingual (EN/RU/ES)
-- `isolationComplete = true` clears `activeStepId`, sets `isolationFinding`
-- Route injects `── DIAGNOSTIC ISOLATION CONFIRMED ──` directive → LLM summarizes + offers `START FINAL REPORT`
-- Validator allows no `?` when response includes "START FINAL REPORT"
-- Prompt updated: replaced contradictory "ASK THE NEXT STEP" rule with explicit OFFER_COMPLETION instructions
-- Mode transition remains explicit-only — no auto-switch to final_report
-
-
-### P1.7 — Terminal-State Behavior Contract Correction (Feb 2026)
-
-**Problem**: System continued asking diagnostic questions after technician identified fault, performed repair, and confirmed restoration. The flat `detectCompletionSignal` approach treated fault and restoration as independent completion triggers instead of progressive conditions.
-
-**Solution**: Three-phase progressive terminal-state model:
-
-| Phase | Meaning | `isolationComplete` | `activeStepId` |
-|---|---|---|---|
-| `normal` | Diagnostic in progress | `false` | assigned |
-| `fault_candidate` | Strong fault found, ONE restoration check allowed | `false` | `null` |
-| `terminal` | Fault + restoration confirmed | `true` | `null` |
-
-**Runtime law enforced**: `fault identified + corrective action + restoration = terminal`
-
-Key design decisions:
-1. `RESTORATION_PATTERNS` (repair+working) → terminal immediately (all 3 conditions implied)
-2. `FAULT_PATTERNS` alone → `fault_candidate` (asks ONE restoration check, no step expansion)
-3. `SIMPLE_RESTORATION_PATTERNS` (only in fault_candidate) catch "да"/"works" confirmations
-4. `NEGATIVE_RESTORATION` patterns prevent false terminal on "нет, не работает"
-5. Terminal state enforced at END of both `processMessage()` and `route.ts` — dominates all step assignment
-6. Terminal state blocks replan from resetting `isolationComplete`
-
-**Files changed:**
-- `src/lib/context-engine/types.ts` — Added `TerminalPhase`, `TerminalState`, `ask_restoration_check` action
-- `src/lib/context-engine/context-engine.ts` — Replaced `detectCompletionSignal` with `updateTerminalState`
-- `src/lib/context-engine/index.ts` — Exported new types
-- `src/app/api/chat/route.ts` — Added terminal enforcement + fault_candidate directive injection
-- `tests/p1.7-terminal-state.test.ts` — 20 new integration tests (all passing)
-- `tests/completion-detection.test.ts` — Updated 24 tests for new 3-phase model (all passing)
-- `tests/chat-labor-override-drift-guard.test.ts` — Added terminalState to mocks
-- `tests/chat-transition-final-report.test.ts` — Added terminalState to mocks
-
-**Test results:** 755 passing (44 P1.7-related), 13 pre-existing failures (Prisma, language-lock, billing, org-activity). Zero new regressions.
+## Next Tasks
+- If requested, do a separate Context Engine task focused only on the active signal/branch defect.
+- If requested, continue shrinking `route.ts` only around non-authoritative transport/persistence concerns.

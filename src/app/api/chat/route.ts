@@ -1,40 +1,17 @@
-import {
-  normalizeLanguageMode,
-  detectInputLanguageV2,
-  detectForcedOutputLanguage,
-  computeOutputPolicy,
-  resolveLanguagePolicy,
-  type LanguageMode,
-  type Language,
-  type InputLanguageV2,
-  type OutputLanguagePolicyV2,
-  type LanguagePolicy,
-} from "@/lib/lang";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  composePromptV2,
-  detectModeCommand,
   type CaseMode,
-  DEFAULT_MEMORY_WINDOW,
 } from "@/lib/prompt-composer";
 import {
-  validateOutput,
-  getSafeFallback,
-  buildCorrectionInstruction,
-  logValidation,
-  validateLanguageConsistency,
-  validateStepCompliance,
   isStepAnswered,
 } from "@/lib/mode-validators";
-import { validateLaborSum } from "@/lib/labor-store";
 import {
   initializeCase,
   buildRegistryContext,
   getActiveStepQuestion,
   getActiveStepMetadata,
   forceStepComplete,
-  isProcedureFullyComplete,
   markStepCompleted as registryMarkStepCompleted,
   markStepUnable as registryMarkStepUnable,
   getNextStepId,
@@ -44,17 +21,13 @@ import {
 } from "@/lib/diagnostic-registry";
 import {
   processMessage as processContextMessage,
-  recordAgentAction,
   getOrCreateContext,
   isInReplanState,
-  clearReplanState,
   generateAntiLoopDirectives,
   buildReplanNotice,
   isInClarificationSubflow,
   buildReturnToMainInstruction,
-  popTopic,
   updateContext,
-  isFallbackResponse,
   checkLoopViolation,
   suggestLoopRecovery,
   markStepCompleted as markContextStepCompleted,
@@ -67,28 +40,25 @@ import { buildFactLockConstraint } from "@/lib/fact-pack";
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
   sseEncode,
-  callOpenAI,
-  buildOpenAiMessages,
-  validateAttachments,
-  filterValidAttachments,
-  buildVisionInstruction,
-  type Attachment,
   computeLaborOverrideRequest,
   formatLaborHours,
-  hasCanonicalTotalLaborLine,
-  enforceLanguagePolicy,
-  extractPrimaryReportBlock,
-  buildFinalReportFallback,
-  DIAGNOSTIC_MODE_GUARD_VIOLATION,
-  isDiagnosticDriftViolation,
   applyDiagnosticModeValidationGuard,
-  buildDiagnosticDriftCorrectionInstruction,
-  buildDiagnosticDriftFallback,
-  buildAuthoritativeStepFallback,
-  buildLaborOverrideConstraints,
-  buildLaborOverrideRequest,
   logTiming,
-  logFlow,
+  parseChatRequest,
+  prepareAttachmentBundle,
+  resolveLanguageContext,
+  ensureChatCase,
+  resolveStoredCaseMode,
+  resolveExplicitModeChange,
+  getModelForMode,
+  buildChatSystemPrompt,
+  executePrimaryChatCompletion,
+  executeLaborOverrideCompletion,
+  appendUserChatMessage,
+  appendAssistantChatMessage,
+  loadChatHistory,
+  finalizeDiagnosticPersistence,
+  type ActiveStepMetadata,
   // Re-export for tests
   parseRequestedLaborHours,
   detectLaborOverrideIntent,
@@ -100,32 +70,6 @@ import {
 const STRICT_CONTEXT_ENGINE = true;
 
 export const runtime = "nodejs";
-
-const MODELS = {
-  diagnostic: "gpt-5-mini-2025-08-07",
-  final: "gpt-5.2-2025-12-11",
-} as const;
-
-function getModelForMode(mode: CaseMode): string {
-  return mode === "final_report" || mode === "authorization"
-    ? MODELS.final
-    : MODELS.diagnostic;
-}
-
-/**
- * Payload v2 request body
- */
-type ChatBodyV2 = {
-  v?: 2;
-  caseId?: string;
-  message: string;
-  output?: {
-    mode?: LanguageMode;
-  };
-  languageMode?: LanguageMode;
-  dialogueLanguage?: Language;
-  attachments?: Attachment[];
-};
 
 export async function POST(req: Request) {
   const requestStartedAt = Date.now();
@@ -139,8 +83,7 @@ export async function POST(req: Request) {
 
   const user = await getCurrentUser();
 
-  const body = (await req.json().catch(() => null)) as ChatBodyV2 | null;
-  const message = (body?.message ?? "").trim();
+  const { body, message } = await parseChatRequest(req);
   if (!message) {
     return new Response(
       JSON.stringify({ error: "Missing message" }),
@@ -149,111 +92,73 @@ export async function POST(req: Request) {
   }
 
   // ── ATTACHMENT VALIDATION ─────────────────────────────────────────
-  const rawAttachments = filterValidAttachments(body?.attachments);
-  const attachmentValidation = validateAttachments(rawAttachments);
-  if (!attachmentValidation.valid) {
+  const attachmentBundleResult = prepareAttachmentBundle(body);
+  if (!attachmentBundleResult.valid) {
     return new Response(
-      JSON.stringify({ error: attachmentValidation.error }),
+      JSON.stringify({ error: attachmentBundleResult.error }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const attachments = rawAttachments;
-  const attachmentCount = attachments?.length ?? 0;
+  const { attachments, attachmentCount, totalBytes } = attachmentBundleResult.value;
 
   if (attachmentCount > 0) {
-    console.log(`[Chat API v2] Attachments: count=${attachmentCount}, totalBytes=${attachmentValidation.totalBytes}`);
+    console.log(`[Chat API v2] Attachments: count=${attachmentCount}, totalBytes=${totalBytes}`);
   }
 
   // ── LANGUAGE DETECTION & POLICY ───────────────────────────────────
-  const detectedInputLanguage: InputLanguageV2 = detectInputLanguageV2(message);
-  const forcedOutputLanguage = detectForcedOutputLanguage(message);
-
-  let trackedInputLanguage: Language = detectedInputLanguage.detected;
-  if (body?.caseId) {
-    const existing = await storage.getCase(body.caseId, user?.id);
-    const previousLanguage = existing.case?.inputLanguage;
-    if (previousLanguage) {
-      trackedInputLanguage = previousLanguage;
-
-      const compactMessage = message.trim();
-      const isShortAck =
-        compactMessage.length <= 4 ||
-        /^(?:ok|okay|yes|y|no|n|sí|si|да|нет)$/i.test(compactMessage);
-
-      const shouldAutoSwitch =
-        !forcedOutputLanguage &&
-        previousLanguage !== detectedInputLanguage.detected &&
-        (detectedInputLanguage.confidence ?? 0) >= 0.85 &&
-        !isShortAck;
-
-      if (shouldAutoSwitch) {
-        trackedInputLanguage = detectedInputLanguage.detected;
-        console.log(
-          `[Chat API v2] Language switch detected: ${previousLanguage} → ${detectedInputLanguage.detected}`
-        );
-      }
-    }
-  }
-
-  const requestedOutputMode: LanguageMode = normalizeLanguageMode(
-    body?.output?.mode ?? body?.languageMode
-  );
-  const outputMode: LanguageMode = forcedOutputLanguage ?? requestedOutputMode;
-
-  if (forcedOutputLanguage) {
-    trackedInputLanguage = forcedOutputLanguage;
-  }
-
-  const outputPolicy: OutputLanguagePolicyV2 = computeOutputPolicy(outputMode, trackedInputLanguage);
-  const langPolicy: LanguagePolicy = resolveLanguagePolicy(outputMode, trackedInputLanguage);
-  const translationLanguage = langPolicy.includeTranslation ? trackedInputLanguage : undefined;
+  const {
+    detectedInputLanguage,
+    forcedOutputLanguage,
+    trackedInputLanguage,
+    outputPolicy,
+    langPolicy,
+    translationLanguage,
+  } = await resolveLanguageContext({
+    body,
+    message,
+    userId: user?.id,
+  });
 
   console.log(`[Chat API v2] Input: detected=${detectedInputLanguage.detected} (${detectedInputLanguage.reason}), dialogue=${trackedInputLanguage}, forcedOutput=${forcedOutputLanguage ?? "none"}, Output: mode=${outputPolicy.mode}, effective=${outputPolicy.effective}, strategy=${outputPolicy.strategy}, includeTranslation=${langPolicy.includeTranslation}, translationLanguage=${translationLanguage ?? "none"}`);
 
   // ── CASE MANAGEMENT ───────────────────────────────────────────────
-  const ensuredCase = await storage.ensureCase({
-    caseId: body?.caseId,
-    titleSeed: message,
-    inputLanguage: trackedInputLanguage,
-    languageSource: outputPolicy.strategy === "auto" ? "AUTO" : "MANUAL",
+  const ensuredCase = await ensureChatCase({
+    body,
+    message,
+    trackedInputLanguage,
+    outputPolicy,
     userId: user?.id,
   });
 
-  let currentMode: CaseMode = ensuredCase.mode || "diagnostic";
+  const storedMode = ensuredCase.mode ?? "diagnostic";
+  let currentMode: CaseMode = resolveStoredCaseMode(ensuredCase.mode);
 
-  if (currentMode === "labor_confirmation") {
-    currentMode = "final_report";
+  if (currentMode !== storedMode) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
-  const commandMode = detectModeCommand(message);
-  if (commandMode && commandMode !== currentMode) {
-    console.log(`[Chat API v2] Mode transition: ${currentMode} → ${commandMode} (explicit command)`);
-    currentMode = commandMode;
+  const modeResolution = resolveExplicitModeChange(currentMode, message);
+  if (modeResolution.changed) {
+    console.log(`[Chat API v2] Mode transition: ${modeResolution.currentMode} → ${modeResolution.nextMode} (explicit command)`);
+    currentMode = modeResolution.nextMode;
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
-  await storage.appendMessage({
+  await appendUserChatMessage({
     caseId: ensuredCase.id,
-    role: "user",
-    content: message,
+    message,
     language: detectedInputLanguage.detected,
     userId: user?.id,
   });
 
-  const historyLoadStart = Date.now();
-  const history = await storage.listMessagesForContext(ensuredCase.id, DEFAULT_MEMORY_WINDOW);
-  logTiming("load_history", {
-    caseId: ensuredCase.id,
-    loadHistoryMs: Date.now() - historyLoadStart,
-  });
+  const history = await loadChatHistory(ensuredCase.id);
 
   // ── CONTEXT ENGINE: SINGLE FLOW AUTHORITY ─────────────────────────
   let procedureContext = "";
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
-  let activeStepMetadata: ReturnType<typeof getActiveStepMetadata> = null;
+  let activeStepMetadata: ActiveStepMetadata = null;
 
   if (currentMode === "diagnostic") {
     if (!STRICT_CONTEXT_ENGINE) {
@@ -535,27 +440,23 @@ export async function POST(req: Request) {
     requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
 
   // ── COMPOSE SYSTEM PROMPT ─────────────────────────────────────────
-  const additionalConstraints = [contextEngineDirectives, procedureContext, factLockConstraint]
-    .filter(Boolean)
-    .join("\n\n") || undefined;
-
   const composePromptStart = Date.now();
-  const baseSystemPrompt = composePromptV2({
+  const { systemPrompt } = buildChatSystemPrompt({
     mode: currentMode,
-    inputDetected: trackedInputLanguage,
-    outputEffective: outputPolicy.effective,
-    includeTranslation: langPolicy.includeTranslation,
+    trackedInputLanguage,
+    outputPolicy,
+    langPolicy,
     translationLanguage,
-    additionalConstraints,
+    contextEngineDirectives,
+    procedureContext,
+    factLockConstraint,
+    attachmentCount,
   });
   logTiming("compose_prompt", {
     caseId: ensuredCase.id,
     mode: currentMode,
     composePromptMs: Date.now() - composePromptStart,
   });
-
-  const visionInstruction = buildVisionInstruction(attachmentCount);
-  const systemPrompt = baseSystemPrompt + visionInstruction;
 
   // ── STREAMING RESPONSE ────────────────────────────────────────────
   const encoder = new TextEncoder();
@@ -604,240 +505,30 @@ export async function POST(req: Request) {
           console.log(
             `[Chat API v2] Final report labor override requested: total=${requestedLaborHoursText} hr`
           );
-
-          const overrideConstraints = buildLaborOverrideConstraints(requestedLaborHoursText, factLockConstraint);
-
-          const overrideComposeStart = Date.now();
-          const overridePrompt = composePromptV2({
-            mode: "final_report",
-            inputDetected: trackedInputLanguage,
-            outputEffective: outputPolicy.effective,
-            includeTranslation: langPolicy.includeTranslation,
+          const overrideResult = await executeLaborOverrideCompletion({
+            apiKey,
+            caseId: ensuredCase.id,
+            factLockConstraint,
+            trackedInputLanguage,
+            outputLanguage: outputPolicy.effective,
+            langPolicy,
             translationLanguage,
-            additionalConstraints: overrideConstraints,
-          });
-          logTiming("compose_prompt", {
-            caseId: ensuredCase.id,
-            mode: "final_report",
-            path: "labor_override",
-            composePromptMs: Date.now() - overrideComposeStart,
-          });
-
-          const overrideRequest = buildLaborOverrideRequest(
+            history,
+            requestedLaborHours,
             requestedLaborHoursText,
-            langPolicy.includeTranslation,
-            translationLanguage
-          );
-
-          const overrideBody = {
-            model: getModelForMode("final_report"),
-            messages: buildOpenAiMessages({
-              system: overridePrompt,
-              history,
-              userMessage: overrideRequest,
-              attachments: undefined,
-            }),
-          };
-
-          const overrideFirstStart = Date.now();
-          let overrideResult = await callOpenAI(apiKey, overrideBody, ac.signal, emitToken);
-          logTiming("openai_call", {
-            caseId: ensuredCase.id,
-            mode: "final_report",
-            path: "labor_override_first",
-            openAiStartMs: overrideFirstStart - requestStartedAt,
-            openAiMs: overrideResult.durationMs,
-            openAiFirstTokenMs: overrideResult.firstTokenMs,
+            signal: ac.signal,
+            emitToken,
+            isAborted: () => aborted,
+            requestStartedAt,
           });
-          let overrideContent = overrideResult.response;
 
-          const validateLaborOverride = (text: string) => {
-            const primary = extractPrimaryReportBlock(text);
-            const sumValidation = validateLaborSum(primary, requestedLaborHours);
-            const hasCanonicalTotal = hasCanonicalTotalLaborLine(primary, requestedLaborHoursText);
-            const violations = [
-              ...sumValidation.violations,
-              ...(hasCanonicalTotal
-                ? []
-                : [
-                    `LABOR_TOTAL_FORMAT: Final report must include "Total labor: ${requestedLaborHoursText} hr" in canonical one-decimal format`,
-                  ]),
-            ];
-            return {
-              valid: violations.length === 0,
-              violations,
-            };
-          };
-
-          if (!overrideResult.error && overrideContent.trim()) {
-            logFlow("validation_post_stream", {
+          if (!aborted && overrideResult.response.trim()) {
+            await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              mode: "final_report",
-              path: "labor_override_first",
-              openAiFirstTokenMs: overrideResult.firstTokenMs,
-              responseChars: overrideContent.length,
+              content: overrideResult.response,
+              language: outputPolicy.effective,
+              userId: user?.id,
             });
-            const validateStart = Date.now();
-            let modeValidation = validateOutput(
-              overrideContent,
-              "final_report",
-              langPolicy.includeTranslation,
-              translationLanguage
-            );
-            modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
-            logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
-            let laborValidation = validateLaborOverride(overrideContent);
-            logTiming("validate_output", {
-              caseId: ensuredCase.id,
-              mode: "final_report",
-              path: "labor_override_first",
-              validateMs: Date.now() - validateStart,
-            });
-
-            if ((!modeValidation.valid || !laborValidation.valid) && !aborted) {
-              logFlow("validation_failed", {
-                caseId: ensuredCase.id,
-                mode: "final_report",
-                path: "labor_override_first",
-                violations: modeValidation.violations.length + laborValidation.violations.length,
-              });
-              emitToken("\n\n[System] Repairing output...\n\n");
-              const correctionViolations = [
-                ...modeValidation.violations,
-                ...laborValidation.violations,
-              ];
-              const correctionInstruction = [
-                buildCorrectionInstruction(correctionViolations),
-                `Regenerate in FINAL_REPORT mode only.`,
-                `Do NOT output diagnostic steps or step IDs (no "Step", no "wp_").`,
-                `Keep all sections except Estimated Labor semantically unchanged.`,
-                `Estimated Labor must sum to exactly ${requestedLaborHoursText} hr and end with "Total labor: ${requestedLaborHoursText} hr".`,
-                `Do NOT ask labor confirmation. Do NOT ask follow-up questions.`,
-              ].join("\n");
-
-              const retryBody = {
-                ...overrideBody,
-                messages: buildOpenAiMessages({
-                  system: overridePrompt,
-                  history,
-                  userMessage: overrideRequest,
-                  attachments: undefined,
-                  correctionInstruction,
-                }),
-              };
-
-              logFlow("retry_triggered", {
-                caseId: ensuredCase.id,
-                mode: "final_report",
-                path: "labor_override_retry",
-              });
-
-              const overrideRetryStart = Date.now();
-              overrideResult = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
-              logTiming("openai_call", {
-                caseId: ensuredCase.id,
-                mode: "final_report",
-                path: "labor_override_retry",
-                openAiStartMs: overrideRetryStart - requestStartedAt,
-                openAiMs: overrideResult.durationMs,
-                openAiFirstTokenMs: overrideResult.firstTokenMs,
-              });
-              if (!overrideResult.error) {
-                overrideContent = overrideResult.response;
-                const retryValidateStart = Date.now();
-                modeValidation = validateOutput(
-                  overrideContent,
-                  "final_report",
-                  langPolicy.includeTranslation,
-                  translationLanguage
-                );
-                modeValidation = applyDiagnosticModeValidationGuard(modeValidation, "final_report", overrideContent);
-                logValidation(modeValidation, { caseId: ensuredCase.id, mode: "final_report" });
-                laborValidation = validateLaborOverride(overrideContent);
-                logTiming("validate_output", {
-                  caseId: ensuredCase.id,
-                  mode: "final_report",
-                  path: "labor_override_retry",
-                  validateMs: Date.now() - retryValidateStart,
-                });
-              }
-            }
-
-            overrideContent = enforceLanguagePolicy(overrideContent, langPolicy);
-
-            const postValidateStart = Date.now();
-            const postModeValidation = validateOutput(
-              overrideContent,
-              "final_report",
-              langPolicy.includeTranslation,
-              translationLanguage
-            );
-            const guardedPostModeValidation = applyDiagnosticModeValidationGuard(
-              postModeValidation,
-              "final_report",
-              overrideContent
-            );
-            const postLaborValidation = validateLaborOverride(overrideContent);
-            logTiming("validate_output", {
-              caseId: ensuredCase.id,
-              mode: "final_report",
-              path: "labor_override_post",
-              validateMs: Date.now() - postValidateStart,
-            });
-
-            if (!guardedPostModeValidation.valid || !postLaborValidation.valid) {
-              logFlow("safe_fallback_used", {
-                caseId: ensuredCase.id,
-                mode: "final_report",
-                path: "labor_override_post",
-                reason: "validation_after_retry_failed",
-              });
-              console.warn(
-                `[Chat API v2] Labor override response invalid after retry, using fallback for ${requestedLaborHoursText} hr`
-              );
-              overrideContent = buildFinalReportFallback({
-                policy: langPolicy,
-                translationLanguage,
-                laborHours: requestedLaborHours,
-              });
-              emitToken(overrideContent);
-            }
-
-            if (!aborted && overrideContent.trim()) {
-              await storage.appendMessage({
-                caseId: ensuredCase.id,
-                role: "assistant",
-                content: overrideContent,
-                language: outputPolicy.effective,
-                userId: user?.id,
-              });
-            }
-          } else {
-            logFlow("safe_fallback_used", {
-              caseId: ensuredCase.id,
-              mode: "final_report",
-              path: "labor_override_first",
-              reason: "upstream_error_or_empty",
-            });
-            console.error(
-              `[Chat API v2] Labor override generation error: ${overrideResult.error || "empty response"}`
-            );
-            const fallback = buildFinalReportFallback({
-              policy: langPolicy,
-              translationLanguage,
-              laborHours: requestedLaborHours,
-            });
-            emitToken(fallback);
-
-            if (!aborted) {
-              await storage.appendMessage({
-                caseId: ensuredCase.id,
-                role: "assistant",
-                content: fallback,
-                language: outputPolicy.effective,
-                userId: user?.id,
-              });
-            }
           }
 
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
@@ -846,215 +537,45 @@ export async function POST(req: Request) {
         }
 
         // ── PRIMARY REQUEST PATH ────────────────────────────────────
-        const openAiBody = {
-          model: getModelForMode(currentMode),
-          messages: buildOpenAiMessages({
-            system: systemPrompt,
-            history,
-            userMessage: message,
-            attachments,
-          }),
-        };
-
-        const primaryFirstStart = Date.now();
-        let result = await callOpenAI(apiKey, openAiBody, ac.signal, emitToken);
-        logTiming("openai_call", {
+        const result = await executePrimaryChatCompletion({
+          apiKey,
           caseId: ensuredCase.id,
           mode: currentMode,
-          path: "primary_first",
-          openAiStartMs: primaryFirstStart - requestStartedAt,
-          openAiMs: result.durationMs,
-          openAiFirstTokenMs: result.firstTokenMs,
+          systemPrompt,
+          history,
+          message,
+          attachments,
+          signal: ac.signal,
+          emitToken,
+          isAborted: () => aborted,
+          trackedInputLanguage,
+          outputLanguage: outputPolicy.effective,
+          langPolicy,
+          translationLanguage,
+          activeStepMetadata,
+          activeStepId: engineResult?.context.activeStepId ?? undefined,
+          model: getModelForMode(currentMode),
+          requestStartedAt,
         });
 
-        if (result.error) {
+        if (result.upstreamError) {
           controller.enqueue(
-            encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.error }))
+            encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.upstreamError }))
           );
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
-
-        logFlow("validation_post_stream", {
-          caseId: ensuredCase.id,
-          mode: currentMode,
-          path: "primary_first",
-          openAiFirstTokenMs: result.firstTokenMs,
-          responseChars: result.response.length,
-        });
-        const validateStart = Date.now();
-        let validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
-        validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
-        
-        // Also validate language consistency for diagnostic mode
-        if (currentMode === "diagnostic") {
-          const langValidation = validateLanguageConsistency(result.response, trackedInputLanguage);
-          if (!langValidation.valid) {
-            validation = {
-              ...validation,
-              valid: false,
-              violations: [...validation.violations, ...langValidation.violations],
-            };
-          }
-          
-          // ── STEP COMPLIANCE VALIDATION ──────────────────────────────────
-          // Validate that LLM response matches the engine-selected active step
-          if (activeStepMetadata) {
-            const stepValidation = validateStepCompliance(
-              result.response,
-              activeStepMetadata.id,
-              activeStepMetadata.question
-            );
-            if (!stepValidation.valid) {
-              console.log(`[Chat API v2] Step compliance violation: ${stepValidation.violations.join(", ")}`);
-              validation = {
-                ...validation,
-                valid: false,
-                violations: [...validation.violations, ...stepValidation.violations],
-              };
-            }
-          }
-        }
-        
-        logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
-        logTiming("validate_output", {
-          caseId: ensuredCase.id,
-          mode: currentMode,
-          path: "primary_first",
-          validateMs: Date.now() - validateStart,
-        });
-
-        if (!validation.valid && !aborted) {
-          logFlow("validation_failed", {
-            caseId: ensuredCase.id,
-            mode: currentMode,
-            path: "primary_first",
-            violations: validation.violations.length,
-          });
-          console.log(`[Chat API v2] Validation failed, retrying with correction...`);
-          emitToken("\n\n[System] Repairing output...\n\n");
-          const correctionInstructionParts = [buildCorrectionInstruction(validation.violations)];
-          
-          // Add drift correction for ANY diagnostic drift violation
-          if (isDiagnosticDriftViolation(validation.violations) || validation.violations.some(v => v.includes("STEP_COMPLIANCE"))) {
-            correctionInstructionParts.push(
-              buildDiagnosticDriftCorrectionInstruction(engineResult?.context.activeStepId ?? undefined)
-            );
-            // Add explicit step question for step compliance violations
-            if (activeStepMetadata) {
-              correctionInstructionParts.push(
-                `MANDATORY: Ask this EXACT question (paraphrased naturally): "${activeStepMetadata.question}"`
-              );
-            }
-          }
-          const correctionInstruction = correctionInstructionParts.join("\n");
-
-          const retryBody = {
-            ...openAiBody,
-            messages: buildOpenAiMessages({
-              system: systemPrompt,
-              history,
-              userMessage: message,
-              attachments,
-              correctionInstruction,
-            }),
-          };
-
-          logFlow("retry_triggered", {
-            caseId: ensuredCase.id,
-            mode: currentMode,
-            path: "primary_retry",
-          });
-
-          const primaryRetryStart = Date.now();
-          result = await callOpenAI(apiKey, retryBody, ac.signal, emitToken);
-          logTiming("openai_call", {
-            caseId: ensuredCase.id,
-            mode: currentMode,
-            path: "primary_retry",
-            openAiStartMs: primaryRetryStart - requestStartedAt,
-            openAiMs: result.durationMs,
-            openAiFirstTokenMs: result.firstTokenMs,
-          });
-
-          if (!result.error) {
-            const retryValidateStart = Date.now();
-            validation = validateOutput(result.response, currentMode, langPolicy.includeTranslation, translationLanguage);
-            validation = applyDiagnosticModeValidationGuard(validation, currentMode, result.response);
-            logValidation(validation, { caseId: ensuredCase.id, mode: currentMode });
-            logTiming("validate_output", {
-              caseId: ensuredCase.id,
-              mode: currentMode,
-              path: "primary_retry",
-              validateMs: Date.now() - retryValidateStart,
-            });
-          }
-
-          if (!validation.valid || result.error) {
-            logFlow("safe_fallback_used", {
-              caseId: ensuredCase.id,
-              mode: currentMode,
-              path: "primary_retry",
-              reason: result.error ? "upstream_error_on_retry" : "validation_after_retry_failed",
-            });
-            console.log(`[Chat API v2] Retry failed, using safe fallback in ${outputPolicy.effective}`);
-            
-            // Use diagnostic drift fallback for ANY diagnostic drift or step compliance violation
-            // NEVER use final report fallback when in diagnostic mode
-            const hasDriftOrStepViolation = 
-              isDiagnosticDriftViolation(validation.violations) ||
-              validation.violations.some(v => v.includes("STEP_COMPLIANCE"));
-              
-            result.response =
-              currentMode === "diagnostic" && hasDriftOrStepViolation
-                ? buildAuthoritativeStepFallback(activeStepMetadata, engineResult?.context.activeStepId ?? undefined)
-                : currentMode === "diagnostic"
-                ? getSafeFallback(currentMode, outputPolicy.effective)
-                : currentMode === "final_report"
-                ? buildFinalReportFallback({
-                    policy: langPolicy,
-                    translationLanguage,
-                  })
-                : getSafeFallback(currentMode, outputPolicy.effective);
-            emitToken(result.response);
-
-            controller.enqueue(
-              encoder.encode(sseEncode({
-                type: "validation_fallback",
-                violations: validation.violations
-              }))
-            );
-          }
-        }
-
         full = result.response;
 
         // ── CONTEXT ENGINE: Record agent action ─────────────────────
         if (currentMode === "diagnostic" && engineResult) {
-          const actionType = isFallbackResponse(full) ? "fallback" :
-                            engineResult.context.submode !== "main" ? "clarification" : "question";
-
-          recordAgentAction(ensuredCase.id, {
-            type: actionType,
-            content: full.slice(0, 200),
-            stepId: engineResult.context.activeStepId || undefined,
-            submode: engineResult.context.submode,
-          }, DEFAULT_CONFIG);
-
-          console.log(`[Chat API v2] Context Engine: recorded action type=${actionType}`);
-
-          if (isInReplanState(engineResult.context)) {
-            const updatedCtx = clearReplanState(engineResult.context);
-            updateContext(updatedCtx);
-            console.log(`[Chat API v2] Context Engine: cleared replan state`);
-          }
-
-          if (isInClarificationSubflow(engineResult.context)) {
-            const updatedCtx = popTopic(engineResult.context);
-            updateContext(updatedCtx);
-            console.log(`[Chat API v2] Context Engine: popped clarification topic, returning to main`);
-          }
+          finalizeDiagnosticPersistence({
+            caseId: ensuredCase.id,
+            mode: currentMode,
+            engineResult,
+            responseText: full,
+          });
         }
 
         // ── AUTO-TRANSITION DISABLED (Explicit Command Required) ────────
@@ -1063,18 +584,24 @@ export async function POST(req: Request) {
         // This preserves the architecture rule: explicit-only mode transitions
 
         // ── NO TRANSITION ───────────────────────────────────────────
-        full = enforceLanguagePolicy(full, langPolicy);
-
-        if (!validation.valid) {
+        if (result.emittedValidationFallback) {
           controller.enqueue(
-            encoder.encode(sseEncode({ type: "validation", valid: false, violations: validation.violations }))
+            encoder.encode(sseEncode({
+              type: "validation_fallback",
+              violations: result.validation.violations,
+            }))
+          );
+        }
+
+        if (!result.validation.valid) {
+          controller.enqueue(
+            encoder.encode(sseEncode({ type: "validation", valid: false, violations: result.validation.violations }))
           );
         }
 
         if (!aborted && full.trim()) {
-          await storage.appendMessage({
+          await appendAssistantChatMessage({
             caseId: ensuredCase.id,
-            role: "assistant",
             content: full,
             language: outputPolicy.effective,
             userId: user?.id,

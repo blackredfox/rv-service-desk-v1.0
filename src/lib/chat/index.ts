@@ -66,5 +66,53 @@ export {
   buildFinalReportCorrectionInstruction,
 } from "./final-report-service";
 
+// Route decomposition services
+export {
+  resolveStoredCaseMode,
+  resolveExplicitModeChange,
+  getModelForMode,
+} from "./chat-mode-resolver";
+
+export {
+  parseChatRequest,
+  prepareAttachmentBundle,
+  resolveLanguageContext,
+  ensureChatCase,
+  type ChatBodyV2,
+} from "./chat-request-preparer";
+
+export {
+  buildAdditionalConstraints,
+  buildChatSystemPrompt,
+} from "./prompt-context-builder";
+
+export {
+  validatePrimaryResponse,
+  buildPrimaryCorrectionInstruction,
+  buildPrimaryFallbackResponse,
+  validateLaborOverrideResponse,
+  buildLaborOverrideRetryInstruction,
+  type ValidationResult,
+  type ActiveStepMetadata,
+} from "./response-validation-service";
+
+export {
+  buildLaborOverridePlan,
+  buildLaborOverrideRetryBody,
+} from "./final-report-flow-service";
+
+export {
+  executePrimaryChatCompletion,
+  executeLaborOverrideCompletion,
+  type PrimaryChatExecutionResult,
+} from "./openai-execution-service";
+
+export {
+  appendUserChatMessage,
+  appendAssistantChatMessage,
+  loadChatHistory,
+  finalizeDiagnosticPersistence,
+} from "./chat-persistence-service";
+
 // Logging
 export { logTiming, logFlow } from "./logging";

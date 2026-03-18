@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="77" failures="0" errors="0" time="1.795806889">
+    <testsuite name="tests/chat-module-extraction.test.ts" timestamp="2026-03-18T21:29:03.902Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="30" failures="0" errors="0" skipped="0" time="0.074541455">
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; SSE Encoding &gt; should encode data as SSE format" time="0.001212438">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; SSE Encoding &gt; should create case event" time="0.000241311">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; SSE Encoding &gt; should create done event" time="0.000306896">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should build messages with system and history" time="0.000739483">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should build messages with image attachments" time="0.000424823">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should extract chunk content from OpenAI response" time="0.00017091">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; OpenAI Client Helpers &gt; should handle empty/missing content" time="0.000101596">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should accept empty attachments" time="0.000175459">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should reject too many attachments" time="0.000309758">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should filter valid attachments" time="0.000292921">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Attachment Validation &gt; should build vision instruction" time="0.000268993">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should parse labor hours from message" time="0.000290498">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should detect labor override intent" time="0.000986117">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should normalize and format labor hours" time="0.000409489">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should check canonical total labor line" time="0.000399011">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should compute labor override request" time="0.00024448">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Labor Override &gt; should detect final report format" time="0.00020928">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should enforce language policy by stripping translation" time="0.000145436">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should extract primary report block" time="0.000094519">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build final report fallback" time="0.000339318">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build final report fallback with complaint context" time="0.000103072">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build final report fallback with translation" time="0.000082934">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should apply diagnostic mode guard" time="0.000375675">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build diagnostic drift correction instruction" time="0.0001196">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Output Policy &gt; should build diagnostic drift fallback" time="0.000092375">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Final Report Service &gt; should build translation instruction" time="0.000233418">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Final Report Service &gt; should build final report request" time="0.000120242">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Final Report Service &gt; should build transition constraints" time="0.000083446">
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Logging &gt; should log timing without throwing" time="0.063897165">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;test&quot;,&quot;value&quot;:123}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/chat-module-extraction.test.ts" name="Chat Module Extractions &gt; Logging &gt; should log flow without throwing" time="0.000332622">
+            <system-out>
+[Chat API v2][flow] {&quot;stage&quot;:&quot;test&quot;,&quot;step&quot;:&quot;init&quot;}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/chat-no-hidden-authority.test.ts" timestamp="2026-03-18T21:29:03.906Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="9" failures="0" errors="0" skipped="0" time="0.004567522">
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/chat-request-preparer.ts does not import diagnostic authority modules" time="0.001475752">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/chat-mode-resolver.ts does not import diagnostic authority modules" time="0.000249711">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/prompt-context-builder.ts does not import diagnostic authority modules" time="0.000295886">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/response-validation-service.ts does not import diagnostic authority modules" time="0.000176252">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/final-report-flow-service.ts does not import diagnostic authority modules" time="0.000260025">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; src/lib/chat/openai-execution-service.ts does not import diagnostic authority modules" time="0.000190574">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; mode resolver refuses semantic mode inference" time="0.000240324">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; fallback rendering only mirrors supplied authoritative step metadata" time="0.000349046">
+        </testcase>
+        <testcase classname="tests/chat-no-hidden-authority.test.ts" name="No Hidden Authority — Route Decomposition &gt; route remains the boundary that invokes Context Engine directly" time="0.000363921">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/chat-openai-execution-service.test.ts" timestamp="2026-03-18T21:29:03.907Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="2" failures="0" errors="0" skipped="0" time="0.085052267">
+        <testcase classname="tests/chat-openai-execution-service.test.ts" name="OpenAI Execution Service &gt; retries invalid diagnostic output and falls back to the authoritative step" time="0.080259659">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:0,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:146}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:76}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;violations&quot;:4}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;openAiStartMs&quot;:77,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;validateMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;reason&quot;:&quot;validation_after_retry_failed&quot;}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_1, mode=diagnostic): [
+  [32m&apos;DIAGNOSTIC_DRIFT: Output looks like a final report while in diagnostic mode. Diagnostic mode must ask questions, not generate reports.&apos;[39m,
+  [32m&apos;DIAGNOSTIC_QUESTION: Output does not contain a question&apos;[39m,
+  [32m&apos;DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format&apos;[39m,
+  [32m&apos;STEP_COMPLIANCE: Response does not match active step wp_2. Expected question about: voltage, measure, water, pump, input&apos;[39m
+]
+
+[ModeValidator] Violations (case=case_1, mode=diagnostic): [
+  [32m&apos;DIAGNOSTIC_DRIFT: Output looks like a final report while in diagnostic mode. Diagnostic mode must ask questions, not generate reports.&apos;[39m,
+  [32m&apos;DIAGNOSTIC_QUESTION: Output does not contain a question&apos;[39m,
+  [32m&apos;DIAGNOSTIC_MODE_GUARD: Diagnostic mode output must not use final report section format&apos;[39m,
+  [32m&apos;STEP_COMPLIANCE: Response does not match active step wp_2. Expected question about: voltage, measure, water, pump, input&apos;[39m
+]
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/chat-openai-execution-service.test.ts" name="OpenAI Execution Service &gt; returns a valid labor override response without introducing flow logic" time="0.003566688">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override&quot;,&quot;composePromptMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;openAiStartMs&quot;:1,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:245}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;validateMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_first&quot;,&quot;violations&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_retry&quot;,&quot;openAiStartMs&quot;:2,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_retry&quot;,&quot;validateMs&quot;:0}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_post&quot;,&quot;validateMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;final_report&quot;,&quot;path&quot;:&quot;labor_override_post&quot;,&quot;reason&quot;:&quot;validation_after_retry_failed&quot;}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_1, mode=final_report): [
+  [32m&apos;PROHIBITED_WORDS: English section contains denial-trigger words: failed&apos;[39m
+]
+
+[ModeValidator] Violations (case=case_1, mode=final_report): [
+  [32m&apos;PROHIBITED_WORDS: English section contains denial-trigger words: failed&apos;[39m
+]
+
+            </system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/chat-route-decomposition-services.test.ts" timestamp="2026-03-18T21:29:03.909Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="12" failures="0" errors="0" skipped="0" time="0.082292685">
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; parses request bodies and trims the message" time="0.00420648">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; validates attachment bundles without hidden flow logic" time="0.000597782">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; keeps prior language on short acknowledgements" time="0.00091689">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; auto-switches tracked language only on strong non-ack evidence" time="0.000266787">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; ensures the case with explicit language source resolution" time="0.001856705">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; resolves stored mode normalization without semantic inference" time="0.000392583">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; changes modes only on explicit commands" time="0.066677434">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; builds bounded prompt constraints and preserves vision instruction" time="0.000680697">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; validates primary responses and builds authoritative correction/fallback text" time="0.001744061">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; validates labor override outputs and builds retry instructions" time="0.001240775">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; builds the labor override execution plan with explicit final-report transport" time="0.000378343">
+        </testcase>
+        <testcase classname="tests/chat-route-decomposition-services.test.ts" name="Chat Route Decomposition Services &gt; persists messages and diagnostic cleanup through the bounded service" time="0.002276629">
+            <system-out>
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/chat-route-wiring.test.ts" timestamp="2026-03-18T21:29:03.910Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="2" failures="0" errors="0" skipped="0" time="0.617268082">
+        <testcase classname="tests/chat-route-wiring.test.ts" name="Chat Route Wiring &gt; emits SSE success lifecycle once without duplicate done events" time="0.603792398">
+            <system-out>
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=EN, forcedOutput=none, Output: mode=AUTO, effective=EN, strategy=auto, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;firstSseTokenMs&quot;:67}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:66,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:46}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;totalMs&quot;:69,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/chat-route-wiring.test.ts" name="Chat Route Wiring &gt; emits error and done once on upstream failure" time="0.012342845">
+            <system-out>
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=EN, forcedOutput=none, Output: mode=AUTO, effective=EN, strategy=auto, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:4,&quot;openAiMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_1&quot;,&quot;totalMs&quot;:4,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/chat-route.test.ts" timestamp="2026-03-18T21:29:03.911Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="9" failures="0" errors="0" skipped="0" time="0.607696581">
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should return 500 when OPENAI_API_KEY is missing" time="0.427471513">
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should return 400 when message is missing" time="0.061891742">
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should process chat with mocked OpenAI response" time="0.013200251">
+            <system-out>
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=EN, forcedOutput=none, Output: mode=AUTO, effective=EN, strategy=auto, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;firstSseTokenMs&quot;:8}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:6,&quot;openAiMs&quot;:2,&quot;openAiFirstTokenMs&quot;:2}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:2,&quot;responseChars&quot;:8}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;violations&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;openAiStartMs&quot;:11,&quot;openAiMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;reason&quot;:&quot;upstream_error_on_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;totalMs&quot;:12,&quot;aborted&quot;:false}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_123, mode=diagnostic): [ [32m&apos;DIAGNOSTIC_QUESTION: Output does not contain a question&apos;[39m ]
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should handle session-only image attachments" time="0.006994178">
+            <system-out>
+[Chat API v2] Attachments: count=1, totalBytes=9
+
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=EN, forcedOutput=none, Output: mode=AUTO, effective=EN, strategy=auto, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;firstSseTokenMs&quot;:4}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:4,&quot;openAiMs&quot;:0,&quot;openAiFirstTokenMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:0,&quot;responseChars&quot;:8}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;violations&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;openAiStartMs&quot;:5,&quot;openAiMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;reason&quot;:&quot;upstream_error_on_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_123&quot;,&quot;totalMs&quot;:6,&quot;aborted&quot;:false}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_123, mode=diagnostic): [ [32m&apos;DIAGNOSTIC_QUESTION: Output does not contain a question&apos;[39m ]
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should detect Spanish RV diagnostic input and keep diagnostic dialogue in Spanish" time="0.006482235">
+            <system-out>
+[Chat API v2] Input: detected=ES (heuristic-spanish-rv-keywords), dialogue=ES, forcedOutput=none, Output: mode=AUTO, effective=ES, strategy=auto, includeTranslation=true, translationLanguage=ES
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[Chat API v2] Procedure catalog: water_pump
+[Chat API v2] Context engine: activeProcedureId synced to &apos;water_pump&apos;
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=true
+[Chat API v2] Context Engine notices: Active step initialized: wp_1
+[Chat API v2] Active step: wp_1 (0/5)
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;firstSseTokenMs&quot;:1}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:1,&quot;openAiMs&quot;:0,&quot;openAiFirstTokenMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:0,&quot;responseChars&quot;:38}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_failed&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;violations&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;retry_triggered&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;openAiStartMs&quot;:2,&quot;openAiMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;safe_fallback_used&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_retry&quot;,&quot;reason&quot;:&quot;upstream_error_on_retry&quot;}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_es_1&quot;,&quot;totalMs&quot;:5,&quot;aborted&quot;:false}
+
+            </system-out>
+            <system-err>
+[ModeValidator] Violations (case=case_es_1, mode=diagnostic): [
+  [32m&apos;STEP_COMPLIANCE: Response does not match active step wp_1. Expected question about: pump, attempt, run, faucet, opened&apos;[39m
+]
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should keep existing Spanish dialogue language on short acknowledgment" time="0.074217655">
+            <system-out>
+[Chat API v2] Input: detected=EN (heuristic-default), dialogue=ES, forcedOutput=none, Output: mode=AUTO, effective=ES, strategy=auto, includeTranslation=true, translationLanguage=ES
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;firstSseTokenMs&quot;:73}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:72,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:1}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:1,&quot;responseChars&quot;:54}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_es_existing&quot;,&quot;totalMs&quot;:73,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should force Spanish output when message explicitly requests Spanish" time="0.006153487">
+            <system-out>
+[Chat API v2] Input: detected=ES (explicit-spanish-request), dialogue=ES, forcedOutput=ES, Output: mode=ES, effective=ES, strategy=forced, includeTranslation=true, translationLanguage=ES
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;firstSseTokenMs&quot;:2}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:2,&quot;openAiMs&quot;:0,&quot;openAiFirstTokenMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:0,&quot;responseChars&quot;:31}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_es_2&quot;,&quot;totalMs&quot;:4,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should force Russian output when message explicitly requests Russian" time="0.008044415">
+            <system-out>
+[Chat API v2] Input: detected=RU (explicit-russian-request), dialogue=RU, forcedOutput=RU, Output: mode=RU, effective=RU, strategy=forced, includeTranslation=true, translationLanguage=RU
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;firstSseTokenMs&quot;:5}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:5,&quot;openAiMs&quot;:1,&quot;openAiFirstTokenMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:0,&quot;responseChars&quot;:35}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_ru_1&quot;,&quot;totalMs&quot;:7,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/chat-route.test.ts" name="Chat API Route &gt; POST /api/chat &gt; should force English output when message explicitly requests English" time="0.001913688">
+            <system-out>
+[Chat API v2] Input: detected=EN (explicit-english-request), dialogue=EN, forcedOutput=EN, Output: mode=EN, effective=EN, strategy=forced, includeTranslation=false, translationLanguage=none
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;load_history&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;loadHistoryMs&quot;:0}
+
+[ContextEngine] Intent: Diagnostic response
+[Chat API v2] Context Engine: intent=MAIN_DIAGNOSTIC, submode=main, stateChanged=false
+[Chat API v2][timing] {&quot;stage&quot;:&quot;compose_prompt&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;composePromptMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;sse_first_token&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;firstSseTokenMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;openai_call&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiStartMs&quot;:0,&quot;openAiMs&quot;:0,&quot;openAiFirstTokenMs&quot;:0}
+[Chat API v2][flow] {&quot;stage&quot;:&quot;validation_post_stream&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;openAiFirstTokenMs&quot;:0,&quot;responseChars&quot;:52}
+[Chat API v2][timing] {&quot;stage&quot;:&quot;validate_output&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;mode&quot;:&quot;diagnostic&quot;,&quot;path&quot;:&quot;primary_first&quot;,&quot;validateMs&quot;:0}
+
+[Chat API v2][timing] {&quot;stage&quot;:&quot;request_total&quot;,&quot;caseId&quot;:&quot;case_en_1&quot;,&quot;totalMs&quot;:1,&quot;aborted&quot;:false}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/route-strictness.test.ts" timestamp="2026-03-18T21:29:03.913Z" hostname="agent-env-1cb0b3e9-d306-43ff-a0c9-322439ab1ebc" tests="13" failures="0" errors="0" skipped="0" time="0.324388297">
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; STRICT_CONTEXT_ENGINE is enabled by default" time="0.305101589">
+            <system-out>
+[ContextEngine] Intent: Locate request: &quot;capacitor&quot;
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; Context Engine processMessage is always called in diagnostic mode" time="0.007391701">
+            <system-out>
+[ContextEngine] Intent: Diagnostic response
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; legacy shouldPivot is NOT used for flow decisions" time="0.002648126">
+            <system-out>
+[ContextEngine] Intent: Diagnostic response
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; replan is handled ONLY by Context Engine" time="0.001120744">
+            <system-out>
+[ContextEngine] Intent: New evidence (physical_damage): &quot;wait, I found a refrigerant leak on the condenser...&quot;
+[ContextEngine] Replan triggered: New physical_damage evidence after isolation: wait, I found a refrigerant leak on the condenser
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; clarification is handled ONLY by Context Engine topic stack" time="0.000530617">
+            <system-out>
+[ContextEngine] Intent: How-to request: &quot;capacitor&quot;
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; no dual-authority: isolation + new evidence = replan (not dual pivot)" time="0.000748428">
+            <system-out>
+[ContextEngine] Intent: New evidence (physical_damage): &quot;Actually, I just noticed there&apos;s a hole in the eva...&quot;
+[ContextEngine] Replan triggered: New physical_damage evidence after isolation: Actually, I just noticed there&apos;s a hole in the evaporator coil
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; loop guard prevents legacy-style fallback loops" time="0.000541445">
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; step completion is synced from registry to Context Engine" time="0.000211631">
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; anti-loop directives are generated by Context Engine" time="0.000648164">
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; Context Engine result has valid structure for route consumption" time="0.000715021">
+            <system-out>
+[ContextEngine] Intent: Diagnostic response
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Route Strictness — Context Engine Only &gt; Context Engine handles invalid/missing context gracefully" time="0.000238882">
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Data Provider Isolation — Registry as Read-Only &gt; buildRegistryContext returns step metadata (data only)" time="0.00152348">
+        </testcase>
+        <testcase classname="tests/route-strictness.test.ts" name="Data Provider Isolation — Registry as Read-Only &gt; initializeCase provides procedure catalog (data only)" time="0.001835101">
+        </testcase>
+    </testsuite>
+</testsuites>
