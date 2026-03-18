@@ -21,12 +21,12 @@ Safe maintainability refactor of `src/app/api/chat/route.ts` so it becomes a thi
   - `src/lib/chat/chat-persistence-service.ts`
 - Added/updated direct tests for extracted modules, no-hidden-authority guardrails, execution services, and route wiring.
 - Verified focused suite passes:
-  - `tests/chat-route-decomposition-services.test.ts`
-  - `tests/chat-openai-execution-service.test.ts`
-  - `tests/chat-no-hidden-authority.test.ts`
-  - `tests/chat-route-wiring.test.ts`
-  - `tests/chat-module-extraction.test.ts`
-  - `tests/route-strictness.test.ts`
+  - `tests/unit/chat-route-decomposition-services.test.ts`
+  - `tests/unit/chat-openai-execution-service.test.ts`
+  - `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts`
+  - `tests/architecture/route-wiring/chat-route-wiring.test.ts`
+  - `tests/unit/chat-module-extraction.test.ts`
+  - `tests/architecture/strictness/route-strictness.test.ts`
   - `tests/chat-route.test.ts`
 
 ## Prioritized Backlog
@@ -45,3 +45,11 @@ Safe maintainability refactor of `src/app/api/chat/route.ts` so it becomes a thi
 ## Next Tasks
 - If requested, do a separate Context Engine task focused only on the active signal/branch defect.
 - If requested, continue shrinking `route.ts` only around non-authoritative transport/persistence concerns.
+
+## Recent Follow-up Change
+- Replaced `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt` with the user-provided prompt file content exactly as requested.
+
+## Recent Test Alignment Change
+- Built a full test inventory seed expansion, moved selected active Vitest suites into canonical `tests/unit`, `tests/integration`, `tests/prompts`, and `tests/architecture/*` folders, and relocated root-level Python test harnesses into `tests/helpers/legacy/`.
+- Rewrote brittle prompt assertions in prompt-related suites to enforce contract-shape instead of historical wording.
+- Verified the full Vitest suite passes after cleanup (`yarn test` → 793/793).

@@ -60,8 +60,9 @@ describe("Tone Adjustment - Prompt Files", () => {
     const content = readFileSync(join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
 
     expect(content).toContain("KEY FINDINGS");
-    expect(content).toContain("IMMEDIATELY acknowledge");
-    expect(content).toContain("CONTINUE with remaining diagnostic steps");
+    expect(content).toContain("Acknowledge it");
+    expect(content).toContain("Note significance");
+    expect(content).toContain("CONTINUE diagnostics to rule out other issues");
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: enforces explicit-only mode transitions", async () => {

@@ -44,8 +44,10 @@ describe("Prompt Files", () => {
     
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("AUTHORIZATION MODE");
-    expect(content).toContain("authorization-ready text");
-    expect(content).toContain("conservative, warranty-safe language");
+    expect(content).toContain("authorization-ready");
+    expect(content).toContain("warranty-safe");
+    expect(content).toContain("Verified Condition");
+    expect(content).toContain("Estimated Labor");
   });
 
   it("should have MODE_PROMPT_FINAL_REPORT.txt", () => {

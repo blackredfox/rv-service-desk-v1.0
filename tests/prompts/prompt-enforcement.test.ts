@@ -111,24 +111,27 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should enforce step-by-step procedure rule", () => {
-      expect(MODE_DIAGNOSTIC).toContain("EXACT question from the active procedure");
+      expect(MODE_DIAGNOSTIC).toContain("PROCEDURE IS LAW");
+      expect(MODE_DIAGNOSTIC).toContain("You may ONLY ask questions that exist as steps in the active procedure");
+      expect(MODE_DIAGNOSTIC).toContain("Steps MUST be followed in order");
     });
 
     it("should prohibit unauthorized actions in diagnostic mode", () => {
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT generate the report yourself");
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT invent diagnostic steps");
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT skip ahead");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT invent diagnostic steps outside the procedure");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT ask about systems other than the one being diagnosed");
+      expect(MODE_DIAGNOSTIC).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
+      expect(MODE_DIAGNOSTIC).toContain("Do NOT auto-switch modes");
     });
 
     it("should contain POST-REPAIR RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("POST-REPAIR RULE");
-      expect(MODE_DIAGNOSTIC).toContain("Return to Guided Diagnostics");
+      expect(MODE_DIAGNOSTIC).toContain("return to diagnostics");
     });
 
     it("should contain MECHANICAL SYSTEM RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("MECHANICAL SYSTEM RULE");
-      expect(MODE_DIAGNOSTIC).toContain("motor operates when powered directly");
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT recommend motor replacement");
+      expect(MODE_DIAGNOSTIC).toContain("Direct power works");
+      expect(MODE_DIAGNOSTIC).toContain("motor OK");
     });
 
     it("should contain CONSUMER APPLIANCE RULE", () => {
