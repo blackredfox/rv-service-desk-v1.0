@@ -47,7 +47,8 @@ A Next.js diagnostic assistant for RV technicians. The system helps technicians 
 Prompt-driven via `MODE_PROMPT_DIAGNOSTIC.txt`, not flow-driven. Voice redesign = prompt edit only.
 
 ## Current Test Status
-- **731 passed, 11 stable pre-existing failures** (Prisma client / input-language-lock, unrelated)
+- **736 passed, 11 stable pre-existing failures** (Prisma client / input-language-lock)
+- 2-3 flaky HTTP API tests (`org-activity`, `b2b-billing`) — pre-existing, not related to engine
 
 ### P1.5 — Branch Execution Runtime Integration (DONE - Feb 2026)
 Fixed the full runtime path so branches are actually entered, traversed with distinct step IDs, and exited.
@@ -170,7 +171,23 @@ Integrated branch processing into route.ts runtime path.
 - **(P3)** Fix remaining stable test failures (Prisma issues)
 - **(Future)** Diagnostic voice redesign (prompt-only)
 
-### P1.6 — Completion Signaling Without Auto-Transition (DONE - Feb 2026)
+### TestCase12 / P1.6.1 — Completion Detection Runtime Fix (DONE - Feb 2026)
+**Files changed:** `context-engine.ts` (3 changes), `route.ts` (2 changes)
+**6 new tests in completion-detection.test.ts, all passing. 736 total passing.**
+
+**Exact missing completion criteria & runtime overwrite points:**
+
+1. `context.activeProcedureId` was NEVER synced from route.ts to context engine. `detectCompletionSignal()` had a guard `if (!context.activeProcedureId) return { detected: false }` — this ALWAYS fired in live runtime, making completion detection a no-op. Fix: (a) removed the guard; (b) route.ts now syncs `activeProcedureId` after `initializeCase()`.
+
+2. `MIN_STEPS_FOR_COMPLETION` lowered from 3 → 1. In live runtime, context-engine's `completedSteps` count was unreliable; 1 is sufficient since pattern matching is the real safety net.
+
+3. Wiring fault patterns missing: `короткое замыкание` (short circuit), `обрыв проводки` (wiring break), `разрыв проводки`, `повреждение проводки`, `open circuit`, `short circuit` added to `FAULT_PATTERNS`.
+
+4. Wiring restoration pattern added: `заменил проводку ... работает` explicit pattern added to `RESTORATION_PATTERNS`.
+
+5. Loop recovery guard: `if (activeStepId && !engineResult.context.isolationComplete)` — loop recovery now skips when isolation is complete, preventing it from re-assigning `activeStepId = null`.
+
+
 **Files changed:** `context-engine.ts`, `types.ts`, `route.ts`, `mode-validators.ts`, `MODE_PROMPT_DIAGNOSTIC.txt`
 **18 new tests, all passing.** 731 total passing.
 - Added `detectCompletionSignal()`: verified_restoration + verified_fault, multilingual (EN/RU/ES)

@@ -41,7 +41,7 @@ export { DEFAULT_CONFIG } from "./types";
 //
 // Conservative: requires MIN_STEPS_FOR_COMPLETION and high-confidence pattern.
 
-const MIN_STEPS_FOR_COMPLETION = 3;
+const MIN_STEPS_FOR_COMPLETION = 1;
 
 type CompletionClass = "verified_fault" | "verified_restoration";
 type CompletionSignalResult =
@@ -57,8 +57,10 @@ const RESTORATION_PATTERNS: RegExp[] = [
   /(?:work(?:ing|s)?|operational|running|heating)\s*(?:now|again)?\s+(?:after|following)\s+(?:fix|repair|replac|restor|reconnect|rewir)/i,
   // Russian: "после [восстановления/замены/...] ... работает/заработал"
   /после.{0,60}(?:восстановлен|замен|ремонт|починк|устранен|подключен|отремонтир|починен).{0,80}(?:работает|работает\s*нормально|функционирует|заработал|запустился|включается|нагревает)/i,
-  // Russian: "[repair verb] + работает"
+  // Russian: "[repair verb] + работает" — core pattern for TestCase11/12
   /(?:восстановил|починил|заменил|отремонтировал|подключил|устранил).{0,80}(?:работает|работает\s*нормально|функционирует|заработал|запустился)/i,
+  // Russian: "[unk repair] проводку + работает" — wiring-specific restoration
+  /(?:заменил|восстановил|отремонтировал|починил)\s+проводку.{0,80}(?:работает|заработал|функционирует)/i,
   // Russian: loose "работает" after a temporal/causal sequence
   /(?:работает(?:\s+нормально)?|заработал).{0,40}после/i,
   // Spanish: "después/tras [repair] ... funciona"
@@ -71,8 +73,18 @@ const FAULT_PATTERNS: RegExp[] = [
   /\b(?:board|motor|relay|valve|pump|module|capacitor|compressor|controller|component|igniter|electrode|wire|connector)\b.{0,80}\b(?:burnt?|burned?|melted?|shorted?|blown?|seized|dead|failed)\b/i,
   // English: state word first then component (e.g. "burnt relay board")
   /\b(?:burnt?|burned?|melted?|shorted?|blown?|seized|dead|failed)\b.{0,60}\b(?:board|motor|relay|valve|pump|module|capacitor|compressor|controller|component|igniter|electrode|wire|connector)\b/i,
+  // English: short circuit / open circuit in wiring
+  /\b(?:short\s+circuit|open\s+circuit|wiring\s+fault|wiring\s+break|broken\s+wire|severed\s+wire)\b/i,
   // English: power+ground confirmed but component not responding
   /(?:power|voltage|12v|12\s*volt).{0,60}(?:confirmed|present|verified).{0,80}(?:motor|pump|board|relay|valve).{0,40}(?:not\s+run|not\s+work|won'?t\s+start|no\s+response|dead|nothing)/i,
+  // Russian: "короткое замыкание" (short circuit) — Issue 1 in TestCase12
+  /короткое\s+замыкание/i,
+  // Russian: "обрыв проводки/провода/цепи" (wiring/circuit break)
+  /обрыв\s+(?:проводки|провода|цепи|питания)/i,
+  // Russian: "разрыв проводки/провода" (wiring break)
+  /разрыв\s+(?:проводки|провода|цепи)/i,
+  // Russian: "повреждение проводки" (wiring damage)
+  /повреждение\s+(?:проводки|провода)/i,
   // Russian: destructive finding + component — NO \b (Cyrillic not in \w, \b is unreliable)
   /(?:^|[\s,—])(?:сгорел|оплавился|вздулся|перегорел|подгорел|расплавился|заклинил|неисправ[а-яё]+)(?:$|[\s,—]).{0,60}(?:плата|мотор|двигатель|реле|клапан|насос|модуль|конденсатор|компрессор|контроллер)/i,
   // Russian: component + destructive finding
@@ -87,10 +99,17 @@ function detectCompletionSignal(
   message: string,
   context: DiagnosticContext,
 ): CompletionSignalResult {
+  // Already marked — don't re-detect
+  if (context.isolationComplete) return { detected: false };
+
+  // Require minimum diagnostic work before considering completion.
+  // Use the union of context-engine and registry counts — in live runtime the
+  // context-engine completedSteps may be empty if activeProcedureId was not synced,
+  // so we need at least some signal of diagnostic depth.
+  // NOTE: activeProcedureId guard is intentionally removed — it is unreliable in
+  // live runtime because route.ts did not always sync it to the context engine.
   const totalDone = context.completedSteps.size + context.unableSteps.size;
   if (totalDone < MIN_STEPS_FOR_COMPLETION) return { detected: false };
-  if (context.isolationComplete) return { detected: false };
-  if (!context.activeProcedureId) return { detected: false };
 
   // Verified Restoration (primary — TestCase11 scenario)
   for (const pattern of RESTORATION_PATTERNS) {

@@ -270,6 +270,21 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Procedure catalog: ${initResult.system}`);
     }
 
+    // ── Sync detected procedure to context engine (P1.6 fix) ──────────
+    // route.ts identified the procedure via initializeCase() but the context engine's
+    // activeProcedureId and primarySystem were never set — completion detection and
+    // step 6 initialization both depend on activeProcedureId being non-null.
+    const detectedSystemId = initResult.procedure?.system ?? initResult.system ?? null;
+    if (detectedSystemId) {
+      const ctxForSync = getOrCreateContext(ensuredCase.id);
+      if (!ctxForSync.activeProcedureId) {
+        ctxForSync.activeProcedureId = detectedSystemId;
+        ctxForSync.primarySystem = detectedSystemId;
+        updateContext(ctxForSync);
+        console.log(`[Chat API v2] Context engine: activeProcedureId synced to '${detectedSystemId}'`);
+      }
+    }
+
     // Save the active step ID BEFORE context engine processes the message.
     // Used by STEP COMPLETION HARDENING to determine if the engine already advanced the step.
     const stepIdBeforeProcessing = getOrCreateContext(ensuredCase.id)?.activeStepId ?? null;
@@ -337,9 +352,11 @@ export async function POST(req: Request) {
     }
 
     // ── LOOP RECOVERY ENFORCEMENT ──────────────────────────────────────
-    // Check if the active step would violate loop rules, and if so, apply recovery
+    // Check if the active step would violate loop rules, and if so, apply recovery.
+    // Do NOT run if isolation is complete — loop recovery would re-assign activeStepId
+    // and undo the completion detection that cleared it.
     const activeStepId = engineResult.context.activeStepId;
-    if (activeStepId) {
+    if (activeStepId && !engineResult.context.isolationComplete) {
       const loopCheck = checkLoopViolation(
         { type: "question", content: "", stepId: activeStepId, timestamp: new Date().toISOString() },
         engineResult.context,

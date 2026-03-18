@@ -258,21 +258,99 @@ describe("P1.6 — Validation guard compatibility", () => {
   });
 });
 
+// ── 7. TestCase12 — Specific regression tests ─────────────────────────
+describe("P1.6 — TestCase12 regression: wiring short + restoration", () => {
+  it("Russian: 'короткое замыкание в проводке между модулем розжига и электродом' triggers fault completion", () => {
+    const caseId = buildCase([]);
+    const result = processMessage(
+      caseId,
+      "короткое замыкание в проводке между модулем розжига и электродом",
+      DEFAULT_CONFIG
+    );
+
+    expect(result.context.isolationComplete).toBe(true);
+    expect(result.context.isolationFinding).toContain("Verified fault");
+  });
+
+  it("Russian: 'я заменил проводку - водонагреватель работает' triggers restoration completion", () => {
+    const caseId = buildCase([]);
+    const result = processMessage(
+      caseId,
+      "я заменил проводку - водонагреватель работает",
+      DEFAULT_CONFIG
+    );
+
+    expect(result.context.isolationComplete).toBe(true);
+    expect(result.context.isolationFinding).toContain("Verified restoration");
+  });
+
+  it("Russian: 'обрыв проводки' triggers fault completion", () => {
+    const caseId = buildCase([]);
+    const result = processMessage(caseId, "обрыв проводки между панелью и модулем", DEFAULT_CONFIG);
+
+    expect(result.context.isolationComplete).toBe(true);
+    expect(result.context.isolationFinding).toContain("Verified fault");
+  });
+
+  it("completion state is NOT overwritten after it is set", () => {
+    const caseId = buildCase([]);
+
+    // First trigger: fault detection
+    const r1 = processMessage(
+      caseId,
+      "короткое замыкание в проводке",
+      DEFAULT_CONFIG
+    );
+    expect(r1.context.isolationComplete).toBe(true);
+    const initialFinding = r1.context.isolationFinding;
+
+    // Second message: should NOT re-trigger or overwrite
+    const r2 = processMessage(caseId, "да, подтверждаю", DEFAULT_CONFIG);
+    expect(r2.context.isolationComplete).toBe(true);
+    expect(r2.context.isolationFinding).toBe(initialFinding);
+
+    // Third message: restoration message — state stays set, finding stays original
+    const r3 = processMessage(
+      caseId,
+      "я заменил проводку - водонагреватель работает",
+      DEFAULT_CONFIG
+    );
+    expect(r3.context.isolationComplete).toBe(true);
+    // Finding should not change (first detection wins)
+    expect(r3.context.isolationFinding).toBe(initialFinding);
+  });
+
+  it("activeStepId stays null after completion (no loop recovery overwrite)", () => {
+    const caseId = buildCase([]);
+    const r = processMessage(
+      caseId,
+      "я заменил проводку - водонагреватель работает",
+      DEFAULT_CONFIG
+    );
+
+    expect(r.context.isolationComplete).toBe(true);
+    expect(r.context.activeStepId).toBeNull();
+  });
+
+  it("mode stays 'diagnostic' after wiring fault detection", () => {
+    const caseId = buildCase([]);
+    const r = processMessage(
+      caseId,
+      "короткое замыкание в проводке между модулем розжига и электродом",
+      DEFAULT_CONFIG
+    );
+
+    expect(r.context.isolationComplete).toBe(true);
+    expect(r.context.mode).toBe("diagnostic");
+  });
+});
+
 // ── 6. No completion before minimum steps ──────────────────────────────
-describe("P1.6 — Minimum steps guard", () => {
-  it("does NOT detect completion if fewer than 3 steps completed", () => {
+describe("P1.6 — Minimum steps guard (threshold = 1)", () => {
+  it("does NOT detect completion if zero steps completed and no prior context", () => {
     const caseId = `min_steps_${Date.now()}`;
     initializeCase(caseId, "water heater test");
-
-    // Complete only 2 steps (below threshold)
-    markStepCompleted(caseId, "wh_1");
-    markStepCompleted(caseId, "wh_2");
-    const ctx = getOrCreateContext(caseId);
-    ctx.completedSteps.add("wh_1");
-    ctx.completedSteps.add("wh_2");
-    ctx.primarySystem = "water_heater";
-    ctx.activeProcedureId = "water_heater";
-    updateContext(ctx);
+    // DO NOT seed any completed steps
 
     const result = processMessage(
       caseId,
@@ -280,7 +358,7 @@ describe("P1.6 — Minimum steps guard", () => {
       DEFAULT_CONFIG
     );
 
-    // Should NOT trigger completion — not enough diagnostic work done
+    // No steps completed → completedSteps.size = 0 < MIN_STEPS_FOR_COMPLETION (1) → no trigger
     expect(result.context.isolationComplete).toBe(false);
   });
 });
