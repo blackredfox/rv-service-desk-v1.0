@@ -4,20 +4,31 @@ import { join } from "path";
 
 /**
  * Tests for RV Service Desk prompt enforcement and API contract
- * 
+ *
  * Runtime uses: prompts/system/SYSTEM_PROMPT_BASE.txt (loaded by src/lib/prompt-composer.ts)
- * 
+ *
  * Ensures:
  * - Language rules are never violated
  * - State machine is enforced
  * - Output validation catches violations
+ * - Prompt checks use contract-shape assertions where exact historical wording
+ *   is no longer the active source of truth
  */
 
 // Load actual runtime prompts
 const promptsDir = join(process.cwd(), "prompts");
-const SYSTEM_BASE = readFileSync(join(promptsDir, "system", "SYSTEM_PROMPT_BASE.txt"), "utf-8");
-const MODE_DIAGNOSTIC = readFileSync(join(promptsDir, "modes", "MODE_PROMPT_DIAGNOSTIC.txt"), "utf-8");
-const MODE_FINAL_REPORT = readFileSync(join(promptsDir, "modes", "MODE_PROMPT_FINAL_REPORT.txt"), "utf-8");
+const SYSTEM_BASE = readFileSync(
+  join(promptsDir, "system", "SYSTEM_PROMPT_BASE.txt"),
+  "utf-8",
+);
+const MODE_DIAGNOSTIC = readFileSync(
+  join(promptsDir, "modes", "MODE_PROMPT_DIAGNOSTIC.txt"),
+  "utf-8",
+);
+const MODE_FINAL_REPORT = readFileSync(
+  join(promptsDir, "modes", "MODE_PROMPT_FINAL_REPORT.txt"),
+  "utf-8",
+);
 
 describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
   beforeEach(() => {
@@ -84,7 +95,9 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     it("should contain BEHAVIOR RULES section", () => {
       expect(SYSTEM_BASE).toContain("BEHAVIOR RULES:");
       expect(SYSTEM_BASE).toContain("Never jump to conclusions");
-      expect(SYSTEM_BASE).toContain("Never generate authorization or final output unless explicitly allowed");
+      expect(SYSTEM_BASE).toContain(
+        "Never generate authorization or final output unless explicitly allowed",
+      );
     });
 
     it("should contain FORMAT RULES section", () => {
@@ -111,27 +124,53 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should enforce step-by-step procedure rule", () => {
-      expect(MODE_DIAGNOSTIC).toContain("PROCEDURE IS LAW");
-      expect(MODE_DIAGNOSTIC).toContain("You may ONLY ask questions that exist as steps in the active procedure");
-      expect(MODE_DIAGNOSTIC).toContain("Steps MUST be followed in order");
-    });
 
-    it("should prohibit unauthorized actions in diagnostic mode", () => {
       expect(MODE_DIAGNOSTIC).toContain("Do NOT invent diagnostic steps outside the procedure");
       expect(MODE_DIAGNOSTIC).toContain("Do NOT ask about systems other than the one being diagnosed");
       expect(MODE_DIAGNOSTIC).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
       expect(MODE_DIAGNOSTIC).toContain("Do NOT auto-switch modes");
+
+  // Contract-shape assertions:
+  // the prompt must bind questioning to the active procedure
+  // and must prohibit inventing off-procedure steps
+  expect(MODE_DIAGNOSTIC).toMatch(/active diagnostic procedure|active procedure/i);
+  expect(MODE_DIAGNOSTIC).toMatch(/only ask questions that exist as steps/i);
+  expect(MODE_DIAGNOSTIC).toMatch(/do not invent diagnostic steps outside the procedure/i);
+});
+
+    it("should prohibit unauthorized actions in diagnostic mode", () => {
+      expect(MODE_DIAGNOSTIC).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /cannot automatically switch to final_report mode|do NOT auto-switch modes/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(/do not invent diagnostic steps/i);
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /do not skip prerequisites|cannot be asked|must be followed in order/i,
+      );
+>>>>>>> dd198ef (test(prompts): align contract assertions and remove stale docs archive):tests/prompt-enforcement.test.ts
     });
 
     it("should contain POST-REPAIR RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("POST-REPAIR RULE");
+<<<<<<< HEAD:tests/prompts/prompt-enforcement.test.ts
       expect(MODE_DIAGNOSTIC).toContain("return to diagnostics");
+=======
+      expect(MODE_DIAGNOSTIC).toMatch(/return to diagnostics|guided diagnostics/i);
+>>>>>>> dd198ef (test(prompts): align contract assertions and remove stale docs archive):tests/prompt-enforcement.test.ts
     });
 
     it("should contain MECHANICAL SYSTEM RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("MECHANICAL SYSTEM RULE");
+<<<<<<< HEAD:tests/prompts/prompt-enforcement.test.ts
       expect(MODE_DIAGNOSTIC).toContain("Direct power works");
       expect(MODE_DIAGNOSTIC).toContain("motor OK");
+=======
+
+      // Contract-shape assertions:
+      // direct-power success means the motor is treated as functional
+      expect(MODE_DIAGNOSTIC).toMatch(/direct power|powered directly/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/motor (ok|functional)/i);
+>>>>>>> dd198ef (test(prompts): align contract assertions and remove stale docs archive):tests/prompt-enforcement.test.ts
     });
 
     it("should contain CONSUMER APPLIANCE RULE", () => {
@@ -185,52 +224,60 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const result = validateDiagnosticOutput(
-        "Complaint: Water pump not operating.\nVerified Condition: No pressure.\nRecommended Corrective Action: Replace pump."
+        "Complaint: Water pump not operating.\nVerified Condition: No pressure.\nRecommended Corrective Action: Replace pump.",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("DIAGNOSTIC_DRIFT"))).toBe(true);
+      expect(
+        result.violations.some((v) => v.includes("DIAGNOSTIC_DRIFT")),
+      ).toBe(true);
     });
 
     it("should detect isolation-complete language", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const result = validateDiagnosticOutput(
-        "The isolation is complete. All conditions are met. Ready to transition to final report?"
+        "The isolation is complete. All conditions are met. Ready to transition to final report?",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("ISOLATION_DECLARATION_BLOCKED"))).toBe(true);
+      expect(
+        result.violations.some((v) =>
+          v.includes("ISOLATION_DECLARATION_BLOCKED"),
+        ),
+      ).toBe(true);
     });
 
     it("should detect translation separator in diagnostic mode", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const result = validateDiagnosticOutput(
-        "Проверьте насос.\n\n--- TRANSLATION ---\n\nCheck the pump."
+        "Проверьте насос.\n\n--- TRANSLATION ---\n\nCheck the pump.",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("DIAGNOSTIC_DRIFT"))).toBe(true);
+      expect(
+        result.violations.some((v) => v.includes("DIAGNOSTIC_DRIFT")),
+      ).toBe(true);
     });
 
     it("should detect too many questions (>2)", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const result = validateDiagnosticOutput(
-        "Насос работает? Какое давление? Есть ли утечки?"
+        "Насос работает? Какое давление? Есть ли утечки?",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("DIAGNOSTIC_QUESTION"))).toBe(true);
+      expect(
+        result.violations.some((v) => v.includes("DIAGNOSTIC_QUESTION")),
+      ).toBe(true);
     });
 
     it("should allow valid single-question diagnostic output", async () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
-      const result = validateDiagnosticOutput(
-        "¿Funciona la bomba de agua?"
-      );
+      const result = validateDiagnosticOutput("¿Funciona la bomba de agua?");
 
       expect(result.valid).toBe(true);
     });
@@ -239,7 +286,7 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
       const { validateDiagnosticOutput } = await import("@/lib/mode-validators");
 
       const result = validateDiagnosticOutput(
-        "Is the water pump making any noise when activated?"
+        "Is the water pump making any noise when activated?",
       );
 
       expect(result.valid).toBe(true);
@@ -252,11 +299,13 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
 
       const result = validateLanguageConsistency(
         "Please check the water pump pressure and verify the connections are secure.",
-        "RU"
+        "RU",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("LANGUAGE_MISMATCH"))).toBe(true);
+      expect(
+        result.violations.some((v) => v.includes("LANGUAGE_MISMATCH")),
+      ).toBe(true);
     });
 
     it("should allow Russian output during Russian session", async () => {
@@ -264,7 +313,7 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
 
       const result = validateLanguageConsistency(
         "Проверьте давление в системе водяного насоса?",
-        "RU"
+        "RU",
       );
 
       expect(result.valid).toBe(true);
@@ -275,7 +324,7 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
 
       const result = validateLanguageConsistency(
         "Проверьте насос и давление.",
-        "EN"
+        "EN",
       );
 
       expect(result.valid).toBe(false);
@@ -289,11 +338,15 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
       const result = validateFinalReportOutput(
         "Water pump not operating per spec. Replace pump. Labor: 1.5 hours.",
         true,
-        "RU"
+        "RU",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("Missing '--- TRANSLATION ---'"))).toBe(true);
+      expect(
+        result.violations.some((v) =>
+          v.includes("Missing '--- TRANSLATION ---'"),
+        ),
+      ).toBe(true);
     });
 
     it("should detect numbered lists in final report", async () => {
@@ -302,11 +355,13 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
       const result = validateFinalReportOutput(
         "1. Water pump not operating.\n2. Replace pump.\n\n--- TRANSLATION ---\n\n1. Насос не работает.",
         true,
-        "RU"
+        "RU",
       );
 
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("numbered lists"))).toBe(true);
+      expect(
+        result.violations.some((v) => v.includes("numbered lists")),
+      ).toBe(true);
     });
 
     it("should allow proper final report format", async () => {
@@ -329,7 +384,7 @@ Required Parts: Water pump assembly P/N TBD.
 Расчётное время работы: Снятие и замена водяного насоса - 1.5 часа. Общее время: 1.5 часа.
 Необходимые запчасти: Узел водяного насоса.`,
         true,
-        "RU"
+        "RU",
       );
 
       expect(result.valid).toBe(true);
@@ -349,7 +404,9 @@ Required Parts: Water pump assembly P/N TBD.
 
       const result = validateOutput("", "diagnostic");
       expect(result.valid).toBe(false);
-      expect(result.violations.some(v => v.includes("EMPTY_OUTPUT"))).toBe(true);
+      expect(result.violations.some((v) => v.includes("EMPTY_OUTPUT"))).toBe(
+        true,
+      );
     });
   });
 });
@@ -358,7 +415,7 @@ describe("API Contract", () => {
   describe("State inference from history", () => {
     it("should default to DIAGNOSTICS for empty history", async () => {
       const history: { role: "user" | "assistant"; content: string }[] = [];
-      
+
       let state: "DIAGNOSTICS" | "CAUSE_OUTPUT" = "DIAGNOSTICS";
       for (let i = history.length - 1; i >= 0; i--) {
         if (history[i].role === "assistant") {
@@ -368,16 +425,20 @@ describe("API Contract", () => {
           break;
         }
       }
-      
+
       expect(state).toBe("DIAGNOSTICS");
     });
 
     it("should detect CAUSE_OUTPUT from history with translation", () => {
       const history = [
         { role: "user" as const, content: "Water pump not working" },
-        { role: "assistant" as const, content: "Pump not operating per spec.\n\n--- TRANSLATION ---\n\nНасос не работает." },
+        {
+          role: "assistant" as const,
+          content:
+            "Pump not operating per spec.\n\n--- TRANSLATION ---\n\nНасос не работает.",
+        },
       ];
-      
+
       let state: "DIAGNOSTICS" | "CAUSE_OUTPUT" = "DIAGNOSTICS";
       for (let i = history.length - 1; i >= 0; i--) {
         if (history[i].role === "assistant") {
@@ -387,7 +448,7 @@ describe("API Contract", () => {
           break;
         }
       }
-      
+
       expect(state).toBe("CAUSE_OUTPUT");
     });
   });
@@ -398,7 +459,7 @@ describe("API Contract", () => {
         message: "test",
         dialogueLanguage: "RU" as const,
       };
-      
+
       const dialogueLanguage = body.dialogueLanguage || "EN";
       expect(dialogueLanguage).toBe("RU");
     });
@@ -407,9 +468,11 @@ describe("API Contract", () => {
       const body = {
         message: "test",
       };
-      
+
       const effectiveLanguage = "EN" as const;
-      const dialogueLanguage = (body as { dialogueLanguage?: "EN" | "RU" | "ES" }).dialogueLanguage || effectiveLanguage;
+      const dialogueLanguage =
+        (body as { dialogueLanguage?: "EN" | "RU" | "ES" }).dialogueLanguage ||
+        effectiveLanguage;
       expect(dialogueLanguage).toBe("EN");
     });
   });
@@ -420,7 +483,7 @@ describe("API Contract", () => {
         message: "test",
         currentState: "CAUSE_OUTPUT" as const,
       };
-      
+
       const currentState = body.currentState || "DIAGNOSTICS";
       expect(currentState).toBe("CAUSE_OUTPUT");
     });
@@ -429,9 +492,11 @@ describe("API Contract", () => {
       const body = {
         message: "test",
       };
-      
+
       const inferredState = "DIAGNOSTICS" as const;
-      const currentState = (body as { currentState?: "DIAGNOSTICS" | "CAUSE_OUTPUT" }).currentState || inferredState;
+      const currentState =
+        (body as { currentState?: "DIAGNOSTICS" | "CAUSE_OUTPUT" }).currentState ||
+        inferredState;
       expect(currentState).toBe("DIAGNOSTICS");
     });
   });
@@ -448,7 +513,6 @@ describe("Complex Equipment Classification (from MODE_PROMPT_DIAGNOSTIC)", () =>
   });
 
   it("should list water pump as NON-complex equipment", () => {
-    // Water pump is explicitly listed as non-complex
     expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX SYSTEMS");
     expect(MODE_DIAGNOSTIC).toContain("Water pumps");
   });

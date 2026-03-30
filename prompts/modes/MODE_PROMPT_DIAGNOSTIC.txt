@@ -161,6 +161,7 @@ CONSUMER APPLIANCE RULE:
   - If unit powers ON but has no output and basic checks fail:
     - Treat as non-repairable
     - Recommend replacement
+
     - Do NOT suggest board-level repair
 
 System: Converter/Charger
@@ -169,3 +170,5 @@ Mode: Guided Diagnostics
 Status: Isolation not completed
 
 Step 1: Verify the presence of AC input voltage at the converter/charger.
+
+
