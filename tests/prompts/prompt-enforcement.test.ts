@@ -124,22 +124,36 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
     });
 
     it("should enforce step-by-step procedure rule", () => {
-
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT invent diagnostic steps outside the procedure");
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT ask about systems other than the one being diagnosed");
-      expect(MODE_DIAGNOSTIC).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
+      expect(MODE_DIAGNOSTIC).toContain("PROCEDURE IS LAW");
+      expect(MODE_DIAGNOSTIC).toContain(
+        "Do NOT invent diagnostic steps outside the procedure",
+      );
+      expect(MODE_DIAGNOSTIC).toContain(
+        "Do NOT ask about systems other than the one being diagnosed",
+      );
+      expect(MODE_DIAGNOSTIC).toContain(
+        "MODE TRANSITION RULES (EXPLICIT ONLY)",
+      );
       expect(MODE_DIAGNOSTIC).toContain("Do NOT auto-switch modes");
 
-  // Contract-shape assertions:
-  // the prompt must bind questioning to the active procedure
-  // and must prohibit inventing off-procedure steps
-  expect(MODE_DIAGNOSTIC).toMatch(/active diagnostic procedure|active procedure/i);
-  expect(MODE_DIAGNOSTIC).toMatch(/only ask questions that exist as steps/i);
-  expect(MODE_DIAGNOSTIC).toMatch(/do not invent diagnostic steps outside the procedure/i);
-});
+      // Contract-shape assertions:
+      // the prompt must bind questioning to the active procedure
+      // and must prohibit inventing off-procedure steps
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /active diagnostic procedure|active procedure/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /only ask questions that exist as steps/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /do not invent diagnostic steps outside the procedure/i,
+      );
+    });
 
     it("should prohibit unauthorized actions in diagnostic mode", () => {
-      expect(MODE_DIAGNOSTIC).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
+      expect(MODE_DIAGNOSTIC).toContain(
+        "MODE TRANSITION RULES (EXPLICIT ONLY)",
+      );
       expect(MODE_DIAGNOSTIC).toMatch(
         /cannot automatically switch to final_report mode|do NOT auto-switch modes/i,
       );
@@ -147,30 +161,22 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       expect(MODE_DIAGNOSTIC).toMatch(
         /do not skip prerequisites|cannot be asked|must be followed in order/i,
       );
->>>>>>> dd198ef (test(prompts): align contract assertions and remove stale docs archive):tests/prompt-enforcement.test.ts
     });
 
     it("should contain POST-REPAIR RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("POST-REPAIR RULE");
-<<<<<<< HEAD:tests/prompts/prompt-enforcement.test.ts
-      expect(MODE_DIAGNOSTIC).toContain("return to diagnostics");
-=======
-      expect(MODE_DIAGNOSTIC).toMatch(/return to diagnostics|guided diagnostics/i);
->>>>>>> dd198ef (test(prompts): align contract assertions and remove stale docs archive):tests/prompt-enforcement.test.ts
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /return to diagnostics|guided diagnostics/i,
+      );
     });
 
     it("should contain MECHANICAL SYSTEM RULE", () => {
       expect(MODE_DIAGNOSTIC).toContain("MECHANICAL SYSTEM RULE");
-<<<<<<< HEAD:tests/prompts/prompt-enforcement.test.ts
-      expect(MODE_DIAGNOSTIC).toContain("Direct power works");
-      expect(MODE_DIAGNOSTIC).toContain("motor OK");
-=======
 
       // Contract-shape assertions:
       // direct-power success means the motor is treated as functional
       expect(MODE_DIAGNOSTIC).toMatch(/direct power|powered directly/i);
       expect(MODE_DIAGNOSTIC).toMatch(/motor (ok|functional)/i);
->>>>>>> dd198ef (test(prompts): align contract assertions and remove stale docs archive):tests/prompt-enforcement.test.ts
     });
 
     it("should contain CONSUMER APPLIANCE RULE", () => {
@@ -295,7 +301,9 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
 
   describe("validateLanguageConsistency", () => {
     it("should detect English output during Russian session", async () => {
-      const { validateLanguageConsistency } = await import("@/lib/mode-validators");
+      const { validateLanguageConsistency } = await import(
+        "@/lib/mode-validators"
+      );
 
       const result = validateLanguageConsistency(
         "Please check the water pump pressure and verify the connections are secure.",
@@ -309,7 +317,9 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
     });
 
     it("should allow Russian output during Russian session", async () => {
-      const { validateLanguageConsistency } = await import("@/lib/mode-validators");
+      const { validateLanguageConsistency } = await import(
+        "@/lib/mode-validators"
+      );
 
       const result = validateLanguageConsistency(
         "Проверьте давление в системе водяного насоса?",
@@ -320,7 +330,9 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
     });
 
     it("should detect Cyrillic in English session", async () => {
-      const { validateLanguageConsistency } = await import("@/lib/mode-validators");
+      const { validateLanguageConsistency } = await import(
+        "@/lib/mode-validators"
+      );
 
       const result = validateLanguageConsistency(
         "Проверьте насос и давление.",
@@ -333,7 +345,9 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
 
   describe("validateFinalReportOutput", () => {
     it("should detect missing translation separator when required", async () => {
-      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
+      const { validateFinalReportOutput } = await import(
+        "@/lib/mode-validators"
+      );
 
       const result = validateFinalReportOutput(
         "Water pump not operating per spec. Replace pump. Labor: 1.5 hours.",
@@ -350,7 +364,9 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
     });
 
     it("should detect numbered lists in final report", async () => {
-      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
+      const { validateFinalReportOutput } = await import(
+        "@/lib/mode-validators"
+      );
 
       const result = validateFinalReportOutput(
         "1. Water pump not operating.\n2. Replace pump.\n\n--- TRANSLATION ---\n\n1. Насос не работает.",
@@ -365,7 +381,9 @@ describe("Runtime Output Validators (mode-validators.ts)", () => {
     });
 
     it("should allow proper final report format", async () => {
-      const { validateFinalReportOutput } = await import("@/lib/mode-validators");
+      const { validateFinalReportOutput } = await import(
+        "@/lib/mode-validators"
+      );
 
       const result = validateFinalReportOutput(
         `Complaint: Water pump not operating per spec when activated.
