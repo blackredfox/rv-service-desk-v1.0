@@ -69,6 +69,17 @@ import {
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
 
+function isClarificationRequest(message: string): boolean {
+  const msg = message.toLowerCase();
+
+  const clarificationWords =
+    /(?:how|where|which|what|как|где|какой|какие|como|donde|cual|cu[aá]l|qu[eé])/i;
+  const diagnosticActionWords =
+    /(?:check|measure|test|verify|terminal|wire|probe|voltage|read|reading|провер|измер|клемм|провод|напряж|показан|medir|probar|verificar|terminal|cable|voltaje|lectura)/i;
+
+  return clarificationWords.test(msg) && diagnosticActionWords.test(msg);
+}
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
@@ -260,7 +271,7 @@ export async function POST(req: Request) {
     // When a strong fault is identified but restoration is not yet confirmed,
     // inject a directive that limits the LLM to ONE restoration check question.
     // No further diagnostic expansion is allowed.
-    if (engineResult.context.terminalState?.phase === "fault_candidate" && 
+    if (engineResult.context.terminalState?.phase === "fault_candidate" &&
         engineResult.context.terminalState.faultIdentified &&
         !engineResult.context.isolationComplete) {
       const faultDirective = [
@@ -293,12 +304,12 @@ export async function POST(req: Request) {
         engineResult.context,
         DEFAULT_CONFIG
       );
-      
+
       if (loopCheck.violation) {
         console.log(`[Chat API v2] Loop violation detected: ${loopCheck.reason}`);
         const recovery = suggestLoopRecovery(engineResult.context, loopCheck.reason || "");
         console.log(`[Chat API v2] Loop recovery action: ${recovery.action} — ${recovery.reason}`);
-        
+
         // Apply recovery
         if (recovery.action.startsWith("mark_unable:")) {
           const stepToMark = recovery.action.split(":")[1];
@@ -333,15 +344,25 @@ export async function POST(req: Request) {
     // prematurely complete the NEXT question using the current (unrelated) message.
     const currentActiveStep = engineResult.context.activeStepId;
     const contextEngineAdvancedStep = stepIdBeforeProcessing !== currentActiveStep;
+    const clarificationRequested = isClarificationRequest(message);
 
-    if (!contextEngineAdvancedStep && currentActiveStep && !initResult.preCompletedSteps.includes(currentActiveStep)) {
+    if (clarificationRequested && currentActiveStep) {
+      console.log(`[Chat API v2] Clarification detected — NOT completing step ${currentActiveStep}`);
+    }
+
+    if (
+      !clarificationRequested &&
+      !contextEngineAdvancedStep &&
+      currentActiveStep &&
+      !initResult.preCompletedSteps.includes(currentActiveStep)
+    ) {
       const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
       if (isStepAnswered(message, stepQuestion)) {
         // Technician's message answers the step — mark it complete
         registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
         console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match, hardening backup)`);
-        
+
         // ── BRANCH TRIGGER CHECK (P1.5 backup) ───────────────────────────
         // Context engine didn't advance, so check branch trigger here.
         // processResponseForBranch was NOT called by the engine for this step.
@@ -354,7 +375,7 @@ export async function POST(req: Request) {
             engineResult.context.branchState.decisionPath.push({
               stepId: currentActiveStep,
               branchId: branchResult.branchEntered.id,
-              reason: `Triggered by technician response (hardening backup)`,
+              reason: "Triggered by technician response (hardening backup)",
               timestamp: new Date().toISOString(),
             });
             for (const lockedBranch of branchResult.lockedOut) {
@@ -362,7 +383,7 @@ export async function POST(req: Request) {
             }
           }
         }
-        
+
         // Advance to next step (branch-aware)
         const nextStep = getNextStepId(ensuredCase.id);
         if (nextStep) {
