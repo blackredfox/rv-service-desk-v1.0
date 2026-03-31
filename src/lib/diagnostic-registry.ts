@@ -361,13 +361,21 @@ export function buildRegistryContext(
 
   // Procedure-aware context
   if (entry.procedure) {
+    const resolvedActiveStepId = activeStepId ?? getNextStepBranchAware(
+      entry.procedure,
+      entry.completedStepIds,
+      entry.unableStepIds,
+      entry.activeBranchId,
+      entry.lockedOutBranches,
+    )?.id;
+
     return buildProcedureContext(
       entry.procedure,
       entry.completedStepIds,
       entry.unableStepIds,
       {
         howToCheckRequested: entry.howToCheckRequested,
-        activeStepId: activeStepId ?? undefined,
+        activeStepId: resolvedActiveStepId ?? undefined,
         language,
       },
     );

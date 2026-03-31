@@ -786,7 +786,7 @@ reg({
       id: "no_12v_supply",
       displayName: "No 12V Supply",
       triggerStepId: "wh_5",
-      triggerPattern: /(?:\b(?:no|without)\b.{0,20}(?:12v|12\s*volt|voltage|dc\s*power|power)|\b0(?:\.0+)?\s*v(?:olts?|dc)?\b|(?:нет|отсутств(?:ует|уют)).{0,20}(?:12\s*в|12v|напряжени|питани)|(?:напряжени|питани).{0,20}(?:нет|отсутств))/i,
+      triggerPattern: /(?:\b(?:no|without)\b.{0,20}(?:12v|12\s*volt|voltage|dc\s*power|power)|\b0(?:\.0+)?\s*v(?:olts?|dc)?\b|(?:нет|отсутств(?:ует|уют)).{0,20}(?:12\s*в|12v|напряжени|питани)|(?:напряжени|питани).{0,20}(?:нет|отсутств)|^\s*(?:no|nope|nah|нет|неа)\s*[.!?]*\s*$)/i,
       entryStepId: "wh_5a",
       mutuallyExclusive: [],
     },
@@ -795,7 +795,7 @@ reg({
       displayName: "No Ignition / No Spark",
       triggerStepId: "wh_6",
       // English + Russian (нет щелчка/искры/свечения) + Spanish (sin clic/chispa)
-      triggerPattern: /(?:no|nothing|none|didn't|doesn't|not|нет|не\s*(?:слышно|слышал|вижу|было|работает|щёлк|щелч|искр|свеч)|sin|no\s+hay).*(?:click|spark|glow|ignit|щелч|искр|свеч|clic|chispa|encend|зажига|розжи|поджи)|(?:не\s+щёлк|не\s+щелч|не\s+искр|не\s+свет|не\s+зажига|не\s+работает\s+поджи)/i,
+      triggerPattern: /(?:no|nothing|none|didn't|doesn't|not|нет|не\s*(?:слышно|слышал|вижу|было|работает|щёлк|щелч|искр|свеч)|sin|no\s+hay).*(?:click|spark|glow|ignit|щелч|искр|свеч|clic|chispa|encend|зажига|розжи|поджи)|(?:не\s+щёлк|не\s+щелч|не\s+искр|не\s+свет|не\s+зажига|не\s+работает\s+поджи)|^\s*(?:no|nope|nah|нет|неа)\s*[.!?]*\s*$/i,
       entryStepId: "wh_6a",
       mutuallyExclusive: ["flame_failure"], // Can't have flame failure if no ignition
     },
@@ -1271,6 +1271,7 @@ export function getNextStep(
 
   for (const step of procedure.steps) {
     if (doneOrSkipped.has(step.id)) continue;
+    if (step.branchId) continue;
 
     // Check prerequisites: all must be completed or unable-to-verify
     const prereqsMet = step.prerequisites.every((p) => doneOrSkipped.has(p));
@@ -1426,7 +1427,7 @@ export function buildProcedureContext(
     return buildActiveStepContext(procedure, activeStep, doneCount, totalSteps, options);
   }
 
-  // --- No active step: check if all done ---
+  // --- No active step: check if all main-flow steps are done ---
   const nextStep = getNextStep(procedure, completedIds, unableIds);
   if (!nextStep) {
     return buildAllCompleteContext(procedure, doneCount, totalSteps, language);
