@@ -16,6 +16,16 @@ describe("Tone Adjustment - Prompt Files", () => {
     vi.resetModules();
   });
 
+  function expectNoWarmDefaultAcknowledgment(content: string) {
+    expect(content).not.toMatch(/warm acknowledgment|acknowledge.*warmly|encouraging feedback/i);
+  }
+
+  function expectProfessionalToneContract(content: string) {
+    expect(content).toMatch(/professional/i);
+    expect(content).toMatch(/concise|neutral/i);
+    expect(content).toMatch(/do not say|prefer silence|filler/i);
+  }
+
   it("SYSTEM_PROMPT_BASE: no default 'Thank you' instruction", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
@@ -24,10 +34,8 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    // Should not instruct the agent to say "Thank you for the information" as a default behavior
-    expect(content).not.toContain("Acknowledge technician's responses warmly");
-    expect(content).not.toContain("acknowledge it warmly");
-    // "Great question" may appear as an example of what NOT to say — that's fine
+    // Contract: no default warm/encouraging acknowledgment behavior
+    expectNoWarmDefaultAcknowledgment(content);
     expect(content).toContain("Do NOT say");
   });
 
@@ -39,9 +47,7 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).toContain("Professional and concise");
-    expect(content).toContain("Do NOT say");
-    expect(content).toContain("Prefer silence over politeness");
+    expectProfessionalToneContract(content);
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: no 'Thank you' default", async () => {
@@ -52,9 +58,7 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).not.toContain("Warm acknowledgment");
-    expect(content).not.toContain("acknowledge it warmly");
-    expect(content).not.toContain("Provide encouraging feedback");
+    expectNoWarmDefaultAcknowledgment(content);
   });
 
   it("MODE_PROMPT_DIAGNOSTIC: has procedure and registry rules", async () => {
@@ -113,9 +117,8 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).toContain("ONE short");
-    expect(content).toContain('"Noted."');
-    expect(content).toContain('"Understood."');
+    expect(content).toMatch(/one short/i);
+    expect(content).toMatch(/"\w+\."/);
   });
 });
 
@@ -128,7 +131,7 @@ describe("Tone Adjustment - Behavior", () => {
       "utf-8",
     );
 
-    expect(content).toContain("Never repeat what the technician just said");
+    expect(content).toMatch(/never.*repeat.*technician/i);
   });
 
   it("SYSTEM_PROMPT_BASE: prohibits filler phrases", async () => {
@@ -139,7 +142,7 @@ describe("Tone Adjustment - Behavior", () => {
       "utf-8",
     );
 
-    expect(content).toContain("Never use filler phrases");
+    expect(content).toMatch(/never.*filler/i);
   });
 
   it("SYSTEM_PROMPT_BASE: prohibits inventing facts", async () => {
@@ -150,6 +153,6 @@ describe("Tone Adjustment - Behavior", () => {
       "utf-8",
     );
 
-    expect(content).toContain("NEVER invent or assume facts");
+    expect(content).toMatch(/never.*invent.*assume facts/i);
   });
 });

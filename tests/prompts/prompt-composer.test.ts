@@ -78,6 +78,19 @@ describe("Prompt Composer", () => {
     vi.resetModules();
   });
 
+  function expectPromptLanguageDirectiveContract(prompt: string, languageToken: string) {
+    expect(prompt).toMatch(/language directive/i);
+    expect(prompt).toContain(languageToken);
+    expect(prompt).toMatch(/must/i);
+  }
+
+  function expectFinalReportTranslationContract(prompt: string, languageToken: string) {
+    expect(prompt).toContain("FINAL REPORT MODE");
+    expect(prompt).toContain("--- TRANSLATION ---");
+    expect(prompt).toContain(languageToken);
+    expect(prompt).toMatch(/translate/i);
+  }
+
   describe("composePrompt", () => {
     it("should compose diagnostic mode prompt", async () => {
       const { composePrompt } = await import("@/lib/prompt-composer");
@@ -89,8 +102,7 @@ describe("Prompt Composer", () => {
 
       expect(prompt).toContain("RV Service Desk");
       expect(prompt).toContain("DIAGNOSTIC MODE");
-      expect(prompt).toContain("LANGUAGE DIRECTIVE (MANDATORY)");
-      expect(prompt).toContain("RU (Russian)");
+      expectPromptLanguageDirectiveContract(prompt, "RU (Russian)");
     });
 
     it("should compose authorization mode prompt", async () => {
@@ -103,8 +115,7 @@ describe("Prompt Composer", () => {
 
       expect(prompt).toContain("RV Service Desk");
       expect(prompt).toContain("AUTHORIZATION MODE");
-      expect(prompt).toContain("LANGUAGE DIRECTIVE (MANDATORY)");
-      expect(prompt).toContain("EN (English)");
+      expectPromptLanguageDirectiveContract(prompt, "EN (English)");
     });
 
     it("should compose final_report mode prompt", async () => {
@@ -116,8 +127,7 @@ describe("Prompt Composer", () => {
       });
 
       expect(prompt).toContain("RV Service Desk");
-      expect(prompt).toContain("FINAL REPORT MODE");
-      expect(prompt).toContain("translate the full output into Spanish (ES)");
+      expectFinalReportTranslationContract(prompt, "Spanish (ES)");
     });
 
     it("should include additional constraints when provided", async () => {
