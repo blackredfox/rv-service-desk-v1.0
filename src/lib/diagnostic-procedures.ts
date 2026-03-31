@@ -167,6 +167,30 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
           RU: "Переключите мультиметр в режим DC volts и измерьте напряжение на входных клеммах 12V платы управления. Норма: 11.5–13.5 В.",
         },
       },
+      wh_5a: {
+        question: {
+          RU: "Ветка отсутствия 12 В: проверьте предохранитель/автомат водонагревателя, отключатель аккумулятора и цепь питания от внутреннего выключателя. Есть ли напряжение аккумулятора до платы управления?",
+        },
+        howToCheck: {
+          RU: "Измерьте DC-напряжение с обеих сторон предохранителя или автомата, затем на отключателе аккумулятора и на проводе питания от внутреннего выключателя. На каждой точке до платы должно быть напряжение аккумулятора.",
+        },
+      },
+      wh_5b: {
+        question: {
+          RU: "Ветка отсутствия 12 В: проверьте непрерывность массы и осмотрите проводку/разъёмы от цепи предохранителя и выключателя до платы управления. Есть ли обрыв, коррозия или ослабленное соединение?",
+        },
+        howToCheck: {
+          RU: "Проверьте непрерывность от массы платы до шасси, затем осмотрите жгут, разъёмы и соединения на коррозию, перегрев, обрыв или ослабление.",
+        },
+      },
+      wh_5c: {
+        question: {
+          RU: "Ветка отсутствия 12 В: после проверки или ремонта питающей цепи восстановились ли 12 В DC на плате управления водонагревателя? Точное значение?",
+        },
+        howToCheck: {
+          RU: "После устранения проблемы снова измерьте DC-напряжение прямо на входе 12V платы управления. Норма: 11.5–13.5 В.",
+        },
+      },
       wh_6: {
         question: {
           RU: "Когда водонагреватель включён: слышны ли щелчки/искрение от поджига? Для моделей со свечой накала — разогревается ли она до оранжевого цвета?",
@@ -721,9 +745,51 @@ reg({
       ],
       howToCheck: "Find the small red reset button on the gas valve assembly. Press firmly. If it clicks, the ECO had tripped.",
     },
+    // === NO 12V SUPPLY BRANCH (wh_5 → no board power) ===
+    {
+      id: "wh_5a",
+      question: "No 12V supply branch: Check the water heater fuse/breaker, battery disconnect, and interior ON/OFF feed. Is battery voltage available upstream of the control board?",
+      prerequisites: ["wh_5"],
+      branchId: "no_12v_supply",
+      matchPatterns: [
+        /(?:fuse|breaker|disconnect|switch|feed).*(?:12v|voltage|power|ok|good|bad|open|blown|present|missing)/i,
+        /(?:blown|tripped|open)\s*(?:fuse|breaker)/i,
+      ],
+      howToCheck: "Measure DC voltage on both sides of the water heater fuse/breaker, then at the battery disconnect and interior ON/OFF feed. Battery voltage should be present at each upstream point before the control board.",
+    },
+    {
+      id: "wh_5b",
+      question: "No 12V supply branch: Verify ground continuity and inspect wiring/connectors from the fuse/switch path to the control board. Any open, corrosion, or loose connection?",
+      prerequisites: ["wh_5a"],
+      branchId: "no_12v_supply",
+      matchPatterns: [
+        /(?:ground|continuity|wiring|wire|connector|splice|corrosion|loose|open).*(?:ok|good|bad|found|yes|no)/i,
+        /(?:open|loose|corrosion|burnt|damaged).*(?:wire|wiring|connector|ground|splice)/i,
+      ],
+      howToCheck: "Check continuity from the board ground to chassis, then inspect the harness, connectors, and splices for corrosion, heat damage, or looseness. Repair any open or high-resistance connection.",
+    },
+    {
+      id: "wh_5c",
+      question: "No 12V supply branch: After upstream feed checks or repair, is 12V DC now restored at the water heater control board? Exact reading?",
+      prerequisites: ["wh_5b"],
+      branchId: "no_12v_supply",
+      matchPatterns: [
+        /(?:\d+(?:\.\d+)?)\s*v(?:olts?|dc)?/i,
+        /(?:restored|back|present|still\s*(?:dead|missing|no)).*(?:12v|voltage|power)/i,
+      ],
+      howToCheck: "After correcting any fuse, switch, disconnect, ground, or wiring issue, re-measure DC voltage directly at the control-board 12V input. Voltage should be restored before continuing to ignition checks.",
+    },
   ],
   // P1.5: Branch definitions
   branches: [
+    {
+      id: "no_12v_supply",
+      displayName: "No 12V Supply",
+      triggerStepId: "wh_5",
+      triggerPattern: /(?:\b(?:no|without)\b.{0,20}(?:12v|12\s*volt|voltage|dc\s*power|power)|\b0(?:\.0+)?\s*v(?:olts?|dc)?\b|(?:нет|отсутств(?:ует|уют)).{0,20}(?:12\s*в|12v|напряжени|питани)|(?:напряжени|питани).{0,20}(?:нет|отсутств))/i,
+      entryStepId: "wh_5a",
+      mutuallyExclusive: [],
+    },
     {
       id: "no_ignition",
       displayName: "No Ignition / No Spark",

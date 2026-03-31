@@ -146,7 +146,7 @@ describe("Water Heater Diagnostic Procedure", () => {
       // Should NOT show completed steps list (authoritative mode)
       expect(context).not.toContain("[DONE]");
 
-      // Should show progress (now 21 steps with branch steps)
+      // Should show progress (water heater includes branch steps)
       expect(context).toMatch(/2\/\d+/);
     });
 
@@ -465,6 +465,87 @@ describe("Route-Level Clarification Hardening", () => {
 
     const nextStepAfter = getNextStepId("route_clarification_test");
     expect(nextStepAfter).toBe("wh_6");
+  });
+});
+
+describe("wh_5 dominant 12V supply routing", () => {
+  async function seedWh5Case(caseId: string) {
+    const { initializeCase, clearRegistry, markStepCompleted } = await import("@/lib/diagnostic-registry");
+    const { clearContext, getOrCreateContext, updateContext } = await import("@/lib/context-engine");
+
+    clearRegistry(caseId);
+    clearContext(caseId);
+    initializeCase(caseId, "gas water heater not working");
+
+    ["wh_1", "wh_2", "wh_3", "wh_4"].forEach((stepId) => {
+      markStepCompleted(caseId, stepId);
+    });
+
+    const context = getOrCreateContext(caseId);
+    context.primarySystem = "water_heater";
+    context.activeProcedureId = "water_heater";
+    context.activeStepId = "wh_5";
+    ["wh_1", "wh_2", "wh_3", "wh_4"].forEach((stepId) => {
+      context.completedSteps.add(stepId);
+    });
+    updateContext(context);
+  }
+
+  it("blocks downstream ignition steps when wh_5 confirms no 12V", async () => {
+    const { processMessage } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { getNextStepId, getBranchState } = await import("@/lib/diagnostic-registry");
+
+    await seedWh5Case("wh5_dominant_negative");
+
+    const result = processMessage(
+      "wh5_dominant_negative",
+      "No 12V DC at the control board, reading 0.0V",
+      DEFAULT_CONFIG,
+    );
+
+    expect(result.context.completedSteps.has("wh_5")).toBe(true);
+    expect(result.context.activeStepId).toBe("wh_5a");
+    expect(result.context.activeStepId).not.toBe("wh_6");
+    expect(getNextStepId("wh5_dominant_negative")).toBe("wh_5a");
+    expect(getBranchState("wh5_dominant_negative").activeBranchId).toBe("no_12v_supply");
+  });
+
+  it("keeps the normal ignition path when wh_5 confirms 12V is present", async () => {
+    const { processMessage } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { getBranchState } = await import("@/lib/diagnostic-registry");
+
+    await seedWh5Case("wh5_dominant_positive");
+
+    const result = processMessage(
+      "wh5_dominant_positive",
+      "12.6V DC is present at the control board",
+      DEFAULT_CONFIG,
+    );
+
+    expect(result.context.completedSteps.has("wh_5")).toBe(true);
+    expect(result.context.activeStepId).toBe("wh_6");
+    expect(getBranchState("wh5_dominant_positive").activeBranchId).toBeNull();
+  });
+
+  it("preserves wh_5 clarification behavior without triggering the dominance branch", async () => {
+    const { processMessage, isInClarificationSubflow } = await import("@/lib/context-engine");
+    const { DEFAULT_CONFIG } = await import("@/lib/context-engine/types");
+    const { getBranchState } = await import("@/lib/diagnostic-registry");
+
+    await seedWh5Case("wh5_dominant_clarification");
+
+    const result = processMessage(
+      "wh5_dominant_clarification",
+      "How do I check that voltage?",
+      DEFAULT_CONFIG,
+    );
+
+    expect(isInClarificationSubflow(result.context)).toBe(true);
+    expect(result.context.activeStepId).toBe("wh_5");
+    expect(result.context.completedSteps.has("wh_5")).toBe(false);
+    expect(getBranchState("wh5_dominant_clarification").activeBranchId).toBeNull();
   });
 });
 

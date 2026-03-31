@@ -36,7 +36,7 @@ describe("Diagnostic language lock regression", () => {
     const result = validatePrimaryResponse({
       response: [
         "Принято.",
-        "Progress: 1/21 steps completed",
+        "Progress: 1/24 steps completed",
         "",
         "Step wh_2: LP tank level — gauge reading or weight check? Main tank valve fully open?",
       ].join("\n"),
@@ -49,7 +49,7 @@ describe("Diagnostic language lock regression", () => {
         question:
           "Какой уровень в LP-баке — показание указателя или проверка по весу? Основной вентиль бака полностью открыт?",
         procedureName: "Водонагреватель (газовый/комбинированный)",
-        progress: { completed: 1, total: 21 },
+        progress: { completed: 1, total: 24 },
       },
     });
 
@@ -73,13 +73,13 @@ describe("Diagnostic language lock regression", () => {
         question:
           "Какой уровень в LP-баке — показание указателя или проверка по весу? Основной вентиль бака полностью открыт?",
         procedureName: "Водонагреватель (газовый/комбинированный)",
-        progress: { completed: 1, total: 21 },
+        progress: { completed: 1, total: 24 },
       },
       activeStepId: "wh_2",
     });
 
     expect(fallback).toContain("Водонагреватель (газовый/комбинированный) — Пошаговая диагностика");
-    expect(fallback).toContain("Прогресс: 1/21 шагов завершено");
+    expect(fallback).toContain("Прогресс: 1/24 шагов завершено");
     expect(fallback).toContain("Шаг wh_2:");
     expect(fallback).toContain("Какой уровень в LP-баке");
     expect(fallback).not.toMatch(/\b(Guided Diagnostics|Progress|Step)\b/);
