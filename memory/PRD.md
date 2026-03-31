@@ -49,6 +49,9 @@
 - Added route regressions proving:
   - the exact `wh_5a` Russian repair-complete transcript becomes terminal/isolation-complete with no further step injection
   - `START FINAL REPORT` after that transcript produces repaired/restored source-of-truth report content (failed fuse root cause, fuse replacement corrective action, water heater operational after repair)
+- Fixed the real stale server-output authority path in `src/app/api/chat/route.ts`: when diagnostic `offer_completion` is reached with `isolationComplete=true`, the route now bypasses the normal diagnostic LLM/prompt path entirely and streams a deterministic server-built completion response.
+- Root-cause documented: stale `Status: isolation not complete` / `Step 6` text was still coming from the standard diagnostic mode prompt path (`prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt`) because the route was still asking the model in diagnostic mode after terminal state had already latched.
+- Updated route tests to assert the completion turn makes **no** upstream LLM call (`fetchTriggered=false`) and emits no stale `Step 6` / `Status: Isolation not completed` text.
 - Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
 - Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
 - Added a dedicated RU explicit-command architecture assertion (`Напиши отчет`) so Russian natural-language report-mode switching is now locked alongside `Write report`.
@@ -65,10 +68,13 @@
 - `yarn vitest run tests/prompts/prompt-composer.test.ts tests/mode-validators.test.ts tests/unit/chat-route-decomposition-services.test.ts`
 - `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
 - `yarn vitest run tests/chat-route-water-heater-dominance.test.ts tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
+- `yarn vitest run tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
 - Testing agent report: `/app/test_reports/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
 - Testing agent report: `/app/test_reports/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
 - Testing agent report: `/app/test_reports/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
 - Testing agent report: `/app/test_reports/iteration_30.json` — 100% backend pass across 178 tests in 11 targeted files, including exact `wh_5a` repair transcript and repaired-state final-report authority regressions.
+- Testing agent report: `/app/test_reports/iteration_31.json` — 100% backend pass across 60 tests in 4 targeted files, confirming the route now bypasses the diagnostic LLM path on completion-offer turns and no longer emits stale `Status` / `Step` text.
 
 ## Dominance-rule expansion proposal (analysis only, not implemented)
 - Best next step: introduce a small procedure-level blocker metadata layer in `src/lib/diagnostic-procedures.ts` for prerequisite facts that should dominate downstream steps.
@@ -80,6 +86,7 @@
 - Runtime RCA from this fix confirms the general direction is still correct: blocker rules should normalize bare yes/no trigger replies and must be applied before any fallback next-step rendering.
 - Additional runtime RCA: explicit natural-language mode commands should be resolved before prompt generation, and terminal/isolation states must suppress any fallback step rendering.
 - Additional runtime RCA: final-report generation needs an authoritative latest-state overlay from terminal context/history so earlier pre-repair observations cannot override the repaired/restored final state.
+- Additional runtime RCA: suppressing stale `procedureContext` was not enough by itself; the route also needed a hard server-side short-circuit because the base diagnostic mode prompt still contained status/step rendering instructions that could leak into live output.
 
 ## Prioritized backlog
 ### P0
@@ -88,6 +95,7 @@
 - Review whether other branch trigger steps should accept bare yes/no confirmations in the real route flow, starting with LP/gas prerequisite checks.
 - Review whether other natural-language mode commands need the same explicit detection treatment (e.g. authorization phrasing) without broadening to fuzzy inference.
 - Generalize repaired-state authority facts beyond the fuse scenario so final reports in other procedures also prefer the latest restored state over stale pre-repair history.
+- Review whether other diagnostic terminal/fault-candidate turns also need hard route-level short-circuits instead of relying on prompt compliance.
 
 ### P1
 - Extend dominance-rule candidates to LP-supply and manual-valve blockers in water-heater and furnace procedures.
@@ -104,4 +112,5 @@
 - Extend chat-route coverage to the next blocker candidates beyond `wh_5`.
 - Add a small route-level regression pack for terminal/isolation states in other procedures so no fallback step leakage reappears outside water-heater.
 - Expand final-report authority fact extraction for other common repair outcomes (wiring, valves, boards, pumps) using the same runtime-source-of-truth pattern.
+- Audit other server-rendered diagnostic completion/fault-candidate responses for any remaining prompt-driven stale output paths.
 - Continue localization hardening for remaining diagnostic procedures.
