@@ -52,6 +52,7 @@
 - Fixed the real stale server-output authority path in `src/app/api/chat/route.ts`: when diagnostic `offer_completion` is reached with `isolationComplete=true`, the route now bypasses the normal diagnostic LLM/prompt path entirely and streams a deterministic server-built completion response.
 - Root-cause documented: stale `Status: isolation not complete` / `Step 6` text was still coming from the standard diagnostic mode prompt path (`prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt`) because the route was still asking the model in diagnostic mode after terminal state had already latched.
 - Updated route tests to assert the completion turn makes **no** upstream LLM call (`fetchTriggered=false`) and emits no stale `Step 6` / `Status: Isolation not completed` text.
+- Completed a root-level test hygiene cleanup PR: removed zero-byte root junk files, removed unused legacy `vitest.setup.ts`, archived root `test_reports/` to `docs/archive/test-reports/2026-03/`, and added root hygiene rules to docs + `.gitignore`.
 - Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
 - Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
 - Added a dedicated RU explicit-command architecture assertion (`Напиши отчет`) so Russian natural-language report-mode switching is now locked alongside `Write report`.
@@ -70,11 +71,14 @@
 - `yarn vitest run tests/chat-route-water-heater-dominance.test.ts tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
 - `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
 - `yarn vitest run tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
-- Testing agent report: `/app/test_reports/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
-- Testing agent report: `/app/test_reports/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
-- Testing agent report: `/app/test_reports/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
-- Testing agent report: `/app/test_reports/iteration_30.json` — 100% backend pass across 178 tests in 11 targeted files, including exact `wh_5a` repair transcript and repaired-state final-report authority regressions.
-- Testing agent report: `/app/test_reports/iteration_31.json` — 100% backend pass across 60 tests in 4 targeted files, confirming the route now bypasses the diagnostic LLM path on completion-offer turns and no longer emits stale `Status` / `Step` text.
+- `yarn vitest run tests/architecture`
+- `yarn test` (root hygiene PR validation attempt)
+- Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
+- Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
+- Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
+- Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_30.json` — 100% backend pass across 178 tests in 11 targeted files, including exact `wh_5a` repair transcript and repaired-state final-report authority regressions.
+- Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_31.json` — 100% backend pass across 60 tests in 4 targeted files, confirming the route now bypasses the diagnostic LLM path on completion-offer turns and no longer emits stale `Status` / `Step` text.
+- Root hygiene note: `yarn test` is currently blocked by unrelated pre-existing failures outside the hygiene scope (`tests/unit/chat-module-extraction.test.ts` Prisma client import, `tests/input-language-lock.test.ts`, `tests/retention.test.ts`, and `tests/org-activity.test.ts`).
 
 ## Dominance-rule expansion proposal (analysis only, not implemented)
 - Best next step: introduce a small procedure-level blocker metadata layer in `src/lib/diagnostic-procedures.ts` for prerequisite facts that should dominate downstream steps.

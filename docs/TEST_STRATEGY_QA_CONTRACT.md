@@ -255,6 +255,12 @@ The suite must include regression coverage for all major known failure types.
 
 ## 8) Test Environment Rules
 
+### 8.0 Root Hygiene Rule
+- active test files belong under `/tests`
+- repo root must not be used for scratch/ad hoc test files
+- generated test reports must not be stored in repo root
+- if report artifacts have historical/debug value, archive them under `docs/archive/test-reports/`
+
 ### 8.1 Determinism
 Unit/component tests must be deterministic.
 
