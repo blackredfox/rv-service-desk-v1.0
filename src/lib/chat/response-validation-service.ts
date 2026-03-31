@@ -18,6 +18,7 @@ import {
 } from "@/lib/chat/output-policy";
 import { hasCanonicalTotalLaborLine } from "@/lib/chat/labor-override";
 import { buildLaborOverrideCorrectionInstruction } from "@/lib/chat/final-report-service";
+import type { FinalReportAuthorityFacts } from "@/lib/fact-pack";
 
 export type ValidationResult = {
   valid: boolean;
@@ -143,6 +144,7 @@ export function buildPrimaryFallbackResponse(args: {
   translationLanguage?: Language;
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
+  finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
 }): string {
   const hasDriftOrStepViolation =
     isDiagnosticDriftViolation(args.validation.violations) ||
@@ -167,6 +169,11 @@ export function buildPrimaryFallbackResponse(args: {
     return buildFinalReportFallback({
       policy: args.langPolicy,
       translationLanguage: args.translationLanguage,
+      complaint: args.finalReportAuthorityFacts?.complaint,
+      diagnosticProcedure: args.finalReportAuthorityFacts?.diagnosticProcedure,
+      finding: args.finalReportAuthorityFacts?.verifiedCondition,
+      correctiveAction: args.finalReportAuthorityFacts?.correctiveAction,
+      requiredParts: args.finalReportAuthorityFacts?.requiredParts,
     });
   }
 

@@ -99,6 +99,8 @@ describe("/api/chat water-heater runtime dominance", () => {
       "route_wh5_terminal_completion",
       "route_wh5_report_ru",
       "route_report_en",
+      "route_wh5_terminal_completion_exact",
+      "route_wh5_final_report_restored",
     ].forEach((caseId) => {
       clearRegistry(caseId);
       clearContext(caseId);
@@ -220,6 +222,26 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(completionTurn.payload.messages[0].content).not.toContain("wh_5b");
   });
 
+  it("treats the exact wh_5a repair-complete transcript as authoritative terminal state", async () => {
+    const caseId = "route_wh5_terminal_completion_exact";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+
+    const completionTurn = await postChat(
+      caseId,
+      "Был неисправен предохранитель. Я заменил. Теперь водонагреватель работает. Проблема устранена",
+    );
+
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(context.activeStepId).toBeNull();
+    expect(context.isolationComplete).toBe(true);
+    expect(context.terminalState.phase).toBe("terminal");
+    expect(completionTurn.payload.messages[0].content).toContain("START FINAL REPORT");
+    expect(completionTurn.payload.messages[0].content).not.toContain("wh_5b");
+  });
+
   it("transitions to final_report for RU repair-complete + report-request runtime messages", async () => {
     const caseId = "route_wh5_report_ru";
     await advanceToWh5(caseId);
@@ -246,5 +268,24 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
     expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
+  });
+
+  it("uses repaired/restored terminal state as final-report source of truth after START FINAL REPORT", async () => {
+    const caseId = "route_wh5_final_report_restored";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+    await postChat(
+      caseId,
+      "Был неисправен предохранитель. Я заменил. Теперь водонагреватель работает. Проблема устранена",
+    );
+
+    fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("invalid final report output"));
+
+    const reportTurn = await postChat(caseId, "START FINAL REPORT");
+
+    expect(reportTurn.streamText).toContain("Complaint:");
+    expect(reportTurn.streamText).toContain("failed fuse");
+    expect(reportTurn.streamText).toContain("Replace failed fuse");
+    expect(reportTurn.streamText).toContain("operational after fuse replacement");
   });
 });

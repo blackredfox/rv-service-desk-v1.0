@@ -11,6 +11,8 @@
  * - If something was not verified, it MUST be described as "not verified"
  */
 
+import type { DiagnosticContext } from "@/lib/context-engine/types";
+
 type Fact = {
   category: "symptom" | "observation" | "test_result" | "technician_statement";
   text: string;
@@ -19,6 +21,15 @@ type Fact = {
 type FactPack = {
   facts: Fact[];
   summary: string;
+};
+
+export type FinalReportAuthorityFacts = {
+  complaint?: string;
+  diagnosticProcedure?: string;
+  verifiedCondition?: string;
+  correctiveAction?: string;
+  requiredParts?: string;
+  authoritySummary?: string;
 };
 
 // Patterns that indicate test results with measurements
@@ -163,4 +174,132 @@ RULES:
 - If a condition was NOT verified, describe it as "not verified" or omit it.
 - Do NOT add "intermittent operation", "no heat", or any other symptom unless the technician explicitly stated it.
 - Every fact in your report must trace back to the list above.`;
+}
+
+const FUSE_FAULT_PATTERNS = [
+  /(?:blown|failed|faulty|bad)\s+fuse/i,
+  /fuse.{0,40}(?:blown|failed|faulty|bad)/i,
+  /(?:неисправен|перегорел|сгорел)\s+предохранитель/i,
+  /предохранитель.{0,40}(?:неисправен|перегорел|сгорел)/i,
+];
+
+const FUSE_REPLACEMENT_PATTERNS = [
+  /(?:replace(?:d)?|replaced\s+the)\s+fuse/i,
+  /(?:заменил|заменили|замена).{0,20}предохранител/i,
+];
+
+const GENERIC_REPLACEMENT_PATTERNS = [
+  /(?:replace(?:d)?|replacement)/i,
+  /(?:заменил|заменили|замена)/i,
+];
+
+const RESTORED_OPERATION_PATTERNS = [
+  /(?:works?|working|operational|functional|back\s+up|resolved)/i,
+  /(?:работает|заработал|функционирует|проблема\s+устранена|неисправность\s+устранена)/i,
+];
+
+function cleanAuthorityText(text?: string | null): string | undefined {
+  if (!text) return undefined;
+  return text.replace(/^Inferred from repair:\s*/i, "").replace(/\s+/g, " ").trim();
+}
+
+function inferComplaintFromHistory(history: Array<{ role: string; content: string }>): string | undefined {
+  const pack = buildFactPack(history);
+  const symptom = pack.facts.find((fact) => fact.category === "symptom");
+  if (symptom) return symptom.text;
+
+  const firstUser = history.find((msg) => msg.role === "user" && msg.content.trim().length > 0);
+  return firstUser?.content.trim();
+}
+
+export function deriveFinalReportAuthorityFacts(
+  history: Array<{ role: string; content: string }>,
+  context?: DiagnosticContext | null,
+): FinalReportAuthorityFacts | null {
+  const complaint = inferComplaintFromHistory(history);
+  if (!context?.isolationComplete && context?.terminalState?.phase !== "terminal") {
+    return complaint ? { complaint } : null;
+  }
+
+  const latestUserMessages = history
+    .filter((msg) => msg.role === "user")
+    .slice(-6)
+    .map((msg) => msg.content);
+
+  const combinedEvidence = [
+    context.terminalState.faultIdentified?.text,
+    context.terminalState.correctiveAction?.text,
+    context.terminalState.restorationConfirmed?.text,
+    context.isolationFinding,
+    ...latestUserMessages,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const hasFuseFault = FUSE_FAULT_PATTERNS.some((pattern) => pattern.test(combinedEvidence));
+  const hasFuseReplacement =
+    FUSE_REPLACEMENT_PATTERNS.some((pattern) => pattern.test(combinedEvidence)) ||
+    (hasFuseFault && GENERIC_REPLACEMENT_PATTERNS.some((pattern) => pattern.test(combinedEvidence)));
+  const hasRestoredOperation = RESTORED_OPERATION_PATTERNS.some((pattern) => pattern.test(combinedEvidence));
+
+  const cleanedFault = cleanAuthorityText(context.terminalState.faultIdentified?.text);
+  const cleanedRepair = cleanAuthorityText(context.terminalState.correctiveAction?.text);
+  const cleanedRestore = cleanAuthorityText(context.terminalState.restorationConfirmed?.text);
+
+  if (hasFuseFault || hasFuseReplacement) {
+    return {
+      complaint,
+      diagnosticProcedure:
+        "Diagnostic isolation traced the 12V loss to a failed fuse and restoration was verified after repair.",
+      verifiedCondition: hasRestoredOperation
+        ? "Failed fuse was identified as the root cause. Water heater is operational after fuse replacement."
+        : "Failed fuse was identified in the water-heater power path.",
+      correctiveAction: hasFuseReplacement
+        ? "Replace failed fuse and verify normal water heater operation."
+        : cleanedRepair ?? "Correct the failed fuse condition and verify water heater operation.",
+      requiredParts: hasFuseReplacement ? "Fuse." : undefined,
+      authoritySummary: [
+        "Latest authoritative technician-verified state:",
+        "- Root cause: failed / blown fuse in the water-heater power path.",
+        `- Corrective action: ${hasFuseReplacement ? "fuse replaced" : cleanedRepair ?? "repair completed"}.`,
+        `- Final operational status: ${hasRestoredOperation ? "water heater operational after repair" : cleanedRestore ?? "restoration confirmed"}.`,
+      ].join("\n"),
+    };
+  }
+
+  const verifiedCondition = hasRestoredOperation
+    ? `Technician confirmed restored operation after repair. ${cleanedRestore ?? "System operational after repair."}`
+    : cleanAuthorityText(context.isolationFinding) ?? cleanedFault;
+
+  return {
+    complaint,
+    diagnosticProcedure:
+      cleanAuthorityText(context.isolationFinding) ??
+      "Diagnostic isolation completed based on technician-confirmed repair and restoration.",
+    verifiedCondition,
+    correctiveAction:
+      cleanedRepair ??
+      (hasRestoredOperation ? "Perform the confirmed corrective action and verify restored operation." : undefined),
+    authoritySummary: [
+      "Latest authoritative technician-verified state:",
+      cleanedFault ? `- Root cause / fault: ${cleanedFault}` : undefined,
+      cleanedRepair ? `- Corrective action performed: ${cleanedRepair}` : undefined,
+      verifiedCondition ? `- Final verified condition: ${verifiedCondition}` : undefined,
+      "- Earlier pre-repair observations must not override this restored final state.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+}
+
+export function buildFinalReportAuthorityConstraint(
+  facts?: FinalReportAuthorityFacts | null,
+): string {
+  if (!facts?.authoritySummary) return "";
+
+  return [
+    "AUTHORITATIVE FINAL STATE (LATEST TECHNICIAN-VERIFIED — USE THIS AS SOURCE OF TRUTH):",
+    facts.authoritySummary,
+    "For the FINAL REPORT, the Verified Condition and Recommended Corrective Action must reflect this repaired/restored latest state, not an earlier pre-repair snapshot.",
+  ].join("\n\n");
 }

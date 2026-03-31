@@ -40,20 +40,26 @@ export function buildFinalReportFallback(args: {
   translationLanguage?: Language;
   laborHours?: number;
   complaint?: string;
+  diagnosticProcedure?: string;
   finding?: string;
+  correctiveAction?: string;
+  requiredParts?: string;
 }): string {
   const totalLaborText = formatLaborHoursForFallback(args.laborHours ?? 1.0);
   
   // Use provided complaint or fallback to generic
   const complaintText = args.complaint?.trim() || "Complaint details pending verification.";
+  const procedureText = args.diagnosticProcedure?.trim() || "Diagnostic isolation completed based on available technician inputs.";
   const findingText = args.finding?.trim() || "Condition not operating per specification under reported test conditions.";
+  const correctiveActionText = args.correctiveAction?.trim() || "Perform unit-level corrective action aligned to verified condition.";
+  const requiredPartsText = args.requiredParts?.trim() || "Part number to be confirmed at service counter.";
   
   const englishReport = `Complaint: ${complaintText}
-Diagnostic Procedure: Diagnostic isolation completed based on available technician inputs.
+Diagnostic Procedure: ${procedureText}
 Verified Condition: ${findingText}
-Recommended Corrective Action: Perform unit-level corrective action aligned to verified condition.
+Recommended Corrective Action: ${correctiveActionText}
 Estimated Labor: System isolation and access - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
-Required Parts: Part number to be confirmed at service counter.`;
+Required Parts: ${requiredPartsText}`;
 
   if (!args.policy.includeTranslation || !args.translationLanguage || args.translationLanguage === "EN") {
     return englishReport;

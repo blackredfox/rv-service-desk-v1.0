@@ -23,6 +23,7 @@ import {
   validatePrimaryResponse,
 } from "@/lib/chat/response-validation-service";
 import { logFlow, logTiming } from "@/lib/chat/logging";
+import type { FinalReportAuthorityFacts } from "@/lib/fact-pack";
 
 type HistoryMessage = {
   role: "user" | "assistant";
@@ -58,6 +59,7 @@ export async function executePrimaryChatCompletion(args: {
   translationLanguage?: Language;
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
+  finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
   model: string;
   requestStartedAt: number;
 }): Promise<PrimaryChatExecutionResult> {
@@ -213,6 +215,7 @@ export async function executePrimaryChatCompletion(args: {
         translationLanguage: args.translationLanguage,
         activeStepMetadata: args.activeStepMetadata,
         activeStepId: args.activeStepId,
+        finalReportAuthorityFacts: args.finalReportAuthorityFacts,
       });
 
       args.emitToken(fallbackResponse);

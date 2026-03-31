@@ -35,7 +35,12 @@ import {
   type DiagnosticContext,
   DEFAULT_CONFIG,
 } from "@/lib/context-engine";
-import { buildFactLockConstraint } from "@/lib/fact-pack";
+import {
+  buildFactLockConstraint,
+  buildFinalReportAuthorityConstraint,
+  deriveFinalReportAuthorityFacts,
+  type FinalReportAuthorityFacts,
+} from "@/lib/fact-pack";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
@@ -170,6 +175,7 @@ export async function POST(req: Request) {
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
   let activeStepMetadata: ActiveStepMetadata = null;
+  let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
   if (currentMode === "diagnostic") {
     if (!STRICT_CONTEXT_ENGINE) {
@@ -465,7 +471,14 @@ export async function POST(req: Request) {
   // ── FACT LOCK ─────────────────────────────────────────────────────
   let factLockConstraint = "";
   if (currentMode === "final_report") {
-    factLockConstraint = buildFactLockConstraint(history);
+    const reportContext = getOrCreateContext(ensuredCase.id);
+    finalReportAuthorityFacts = deriveFinalReportAuthorityFacts(history, reportContext);
+    factLockConstraint = [
+      buildFinalReportAuthorityConstraint(finalReportAuthorityFacts),
+      buildFactLockConstraint(history),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
@@ -589,6 +602,7 @@ export async function POST(req: Request) {
           translationLanguage,
           activeStepMetadata,
           activeStepId: engineResult?.context.activeStepId ?? undefined,
+          finalReportAuthorityFacts,
           model: getModelForMode(currentMode),
           requestStartedAt,
         });
