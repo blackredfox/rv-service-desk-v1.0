@@ -1,11 +1,11 @@
 # RV Service Desk
 ## TEST_STRATEGY_QA_CONTRACT.md
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** Enforced QA / Testing Contract  
 **Purpose:** Define the required testing model for behavior correctness, architecture preservation, regression control, and safe route decomposition.
 
-**Last updated:** 2026-03-18
+**Last updated:** 2026-03-31
 
 ---
 
@@ -49,6 +49,45 @@ It operationalizes them into QA requirements.
 
 > A test suite is not only for output correctness.  
 > It is also for architecture preservation.
+
+### 3.1 Behavior-contract rule
+
+> Tests must validate **behavior contracts**, not incidental wording.
+
+In this repository, a good test protects what the product must do, not merely how one prompt phrased it on one day.
+
+Tests should prefer validating:
+- mode correctness
+- transition rules
+- prerequisite/order discipline
+- safety boundaries
+- output structure / shape
+- language policy
+- report shape
+- authoritative state usage
+
+Tests should avoid brittle exact-string assertions when the wording itself is not the contract.
+
+### 3.2 Exact wording boundary
+
+Exact wording assertions are allowed only when the wording itself is contract-critical, for example:
+- exact section headers
+- exact command tokens
+- exact separators
+- safety/compliance-critical mandated wording
+- intentionally fixed canonical templates
+
+If a phrase is not part of the actual product contract, the test should be rewritten to validate structure, markers, state, ordering, or policy instead.
+
+### 3.3 Tiny example
+
+Bad:
+- `expect(text).toContain("Please continue diagnostics with the next question")`
+
+Better:
+- assert the response stays in diagnostic mode
+- assert it asks the next-step question shape
+- assert it does not emit final-report structure
 
 For this project, a change is unsafe if it:
 - produces the right wording but breaks flow authority,
@@ -206,6 +245,37 @@ Must prove:
 
 These tests are blocking, not optional.
 
+### 6.5 Assertion taxonomy by product contract
+
+#### Diagnostic mode
+Prefer assertions that validate whether the system:
+- asks the correct next question shape
+- remains in diagnostic mode unless an explicit transition command is given
+- does not emit final report structure
+- does not declare completion when not allowed
+- respects ordering and prerequisites
+- respects language/output policy
+
+#### Final report mode
+Prefer assertions that validate whether the system:
+- includes required section headers
+- preserves required section order
+- follows translation/language policy
+- avoids prohibited denial wording
+- is built from authoritative facts/state
+
+#### Authorization mode
+Prefer assertions that validate whether the system:
+- stays in authorization output class
+- does not drift into final report format
+- avoids prohibited wording
+
+#### Transition rules
+Prefer assertions that validate whether the system:
+- transitions only via explicit command where required
+- does not let semantic completion alone force mode change
+- does not hide transition authority inside prompts/helpers
+
 ---
 
 ## 7) Behavior-Critical Regression Categories
@@ -313,6 +383,10 @@ A PR cannot be accepted because:
 - one happy-path case improved
 - output sounded more natural
 
+PRs must not be accepted solely because prompt wording was tuned until brittle tests passed.
+
+Tests should fail for real behavioral regressions, not because incidental wording changed while the contract stayed intact.
+
 A PR is acceptable only if:
 - required tests pass,
 - benchmark-relevant behavior does not regress,
@@ -345,6 +419,11 @@ must satisfy:
 - [ ] route wiring still covered
 - [ ] no-hidden-authority conditions still covered
 - [ ] strictness tests still pass
+
+### Assertion quality
+- [ ] this test protects a real product behavior boundary
+- [ ] if using an exact wording assertion, the wording is contract-critical
+- [ ] if wording is not contract-critical, the assertion is phrased as structure/marker/state/policy validation instead
 
 ### Refactor safety
 - [ ] no hidden flow logic introduced into helpers
@@ -477,6 +556,12 @@ it is unsafe.
 
 If the suite does not prove single-authority preservation,
 it does not protect the system.
+
+### Test author / reviewer checklist
+- Am I testing behavior or just wording?
+- Is this wording itself part of the contract?
+- Can this assertion be rewritten as structure/marker/state validation?
+- Does this test protect a real product behavior boundary?
 
 ---
 
