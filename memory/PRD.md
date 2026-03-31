@@ -59,6 +59,8 @@
 - Added `rvsd-contract-check` v1 as a small pure evaluation layer in `src/lib/eval/rvsd-contract-check.ts` with machine-readable output (`passed`, `violations`, `checks`, `summary`).
 - v1 contract checks cover: diagnostic drift/premature completion/question-shape boundaries, final-report shape + language-policy boundaries, authorization drift boundaries, and an explicit transition-doctrine helper (`semantic completion alone must not be treated as a valid mode switch`).
 - Added a tiny fixture set in `tests/fixtures/rvsd-contract-check.ts` and focused tests in `tests/eval/rvsd-contract-check.test.ts`.
+- Built benchmark pack v1 on top of the checker with 10 high-signal cases in `tests/fixtures/eval/rvsd-benchmark-pack.ts` and a single focused harness in `tests/eval/rvsd-benchmark-pack.test.ts`.
+- Benchmark mix covers: diagnostic drift, premature completion / semantic transition, forbidden translation separator, question-shape violation, final-report missing header, final-report language mismatch, final-report prohibited wording, authorization drift, plus valid diagnostic/final-report controls.
 - Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
 - Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
 - Added a dedicated RU explicit-command architecture assertion (`Напиши отчет`) so Russian natural-language report-mode switching is now locked alongside `Write report`.
@@ -85,6 +87,8 @@
 - `yarn vitest run tests/prompts/prompt-composer.test.ts`
 - `yarn vitest run tests/eval/rvsd-contract-check.test.ts`
 - `yarn vitest run tests/eval/rvsd-contract-check.test.ts tests/mode-validators.test.ts`
+- `yarn vitest run tests/eval/rvsd-benchmark-pack.test.ts tests/eval/rvsd-contract-check.test.ts`
+- `yarn vitest run tests/mode-validators.test.ts`
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
