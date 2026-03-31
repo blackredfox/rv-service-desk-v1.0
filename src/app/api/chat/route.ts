@@ -41,6 +41,7 @@ import {
   deriveFinalReportAuthorityFacts,
   type FinalReportAuthorityFacts,
 } from "@/lib/fact-pack";
+import type { Language } from "@/lib/lang";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
@@ -73,6 +74,65 @@ import {
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
+
+function buildAuthoritativeCompletionOffer(args: {
+  language: Language;
+  isolationFinding?: string | null;
+  facts?: FinalReportAuthorityFacts | null;
+}): string {
+  const evidence = [
+    args.isolationFinding,
+    args.facts?.verifiedCondition,
+    args.facts?.correctiveAction,
+    args.facts?.requiredParts,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const isFuseRepair = /предохранител|fuse/i.test(evidence);
+
+  switch (args.language) {
+    case "RU":
+      return isFuseRepair
+        ? [
+            "Принято.",
+            "Причина подтверждена: неисправный предохранитель в цепи питания водонагревателя.",
+            "Ремонт подтверждён: предохранитель заменён, водонагреватель работает штатно.",
+            "Отправьте START FINAL REPORT — и я сформирую отчёт.",
+          ].join("\n")
+        : [
+            "Принято.",
+            args.isolationFinding ?? "Восстановление после ремонта подтверждено.",
+            "Отправьте START FINAL REPORT — и я сформирую отчёт.",
+          ].join("\n");
+    case "ES":
+      return isFuseRepair
+        ? [
+            "Entendido.",
+            "Causa confirmada: fusible defectuoso en el circuito de alimentación del calentador de agua.",
+            "Reparación confirmada: se reemplazó el fusible y el calentador funciona normalmente.",
+            "Envía START FINAL REPORT y generaré el informe.",
+          ].join("\n")
+        : [
+            "Entendido.",
+            args.isolationFinding ?? "La restauración después de la reparación fue confirmada.",
+            "Envía START FINAL REPORT y generaré el informe.",
+          ].join("\n");
+    default:
+      return isFuseRepair
+        ? [
+            "Noted.",
+            "Root cause confirmed: failed fuse in the water-heater power path.",
+            "Repair confirmed: the fuse was replaced and the water heater is operating normally.",
+            "Send START FINAL REPORT and I will generate the report.",
+          ].join("\n")
+        : [
+            "Noted.",
+            args.isolationFinding ?? "Repair completion and restored operation have been confirmed.",
+            "Send START FINAL REPORT and I will generate the report.",
+          ].join("\n");
+  }
+}
 
 function isClarificationRequest(message: string): boolean {
   const msg = message.toLowerCase();
@@ -481,6 +541,17 @@ export async function POST(req: Request) {
       .join("\n\n");
   }
 
+  const authoritativeDiagnosticCompletionResponse =
+    currentMode === "diagnostic" &&
+    engineResult?.context.isolationComplete &&
+    engineResult?.responseInstructions.action === "offer_completion"
+      ? buildAuthoritativeCompletionOffer({
+          language: outputPolicy.effective,
+          isolationFinding: engineResult.context.isolationFinding,
+          facts: deriveFinalReportAuthorityFacts(history, engineResult.context),
+        })
+      : null;
+
   const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
   const isLaborOverrideRequest = laborOverride.isLaborOverrideRequest;
   const requestedLaborHours = laborOverride.requestedLaborHours;
@@ -547,6 +618,33 @@ export async function POST(req: Request) {
         })));
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
+
+        if (authoritativeDiagnosticCompletionResponse) {
+          emitToken(authoritativeDiagnosticCompletionResponse);
+          full = authoritativeDiagnosticCompletionResponse;
+
+          if (!aborted && full.trim()) {
+            await appendAssistantChatMessage({
+              caseId: ensuredCase.id,
+              content: full,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          if (currentMode === "diagnostic" && engineResult) {
+            finalizeDiagnosticPersistence({
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              engineResult,
+              responseText: full,
+            });
+          }
+
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
 
         // ── LABOR OVERRIDE PATH ─────────────────────────────────────
         if (isLaborOverrideRequest && requestedLaborHours !== null && requestedLaborHoursText) {

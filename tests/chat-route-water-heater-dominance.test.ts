@@ -109,6 +109,7 @@ describe("/api/chat water-heater runtime dominance", () => {
 
   async function postChat(caseId: string, message: string) {
     const { POST } = await import("@/app/api/chat/route");
+    const fetchCallCountBefore = fetchMock.mock.calls.length;
 
     const response = await POST(
       new Request("http://localhost/api/chat", {
@@ -119,10 +120,11 @@ describe("/api/chat water-heater runtime dominance", () => {
     );
 
     const streamText = await response.text();
-    const lastFetchCall = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
-    const payload = JSON.parse(lastFetchCall.body as string);
+    const fetchTriggered = fetchMock.mock.calls.length > fetchCallCountBefore;
+    const lastFetchCall = fetchTriggered ? (fetchMock.mock.calls.at(-1)?.[1] as RequestInit) : null;
+    const payload = lastFetchCall?.body ? JSON.parse(lastFetchCall.body as string) : null;
 
-    return { response, streamText, payload };
+    return { response, streamText, payload, fetchTriggered };
   }
 
   async function advanceToWh5(caseId: string) {
@@ -218,8 +220,11 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.activeStepId).toBeNull();
     expect(context.isolationComplete).toBe(true);
     expect(context.terminalState.phase).toBe("terminal");
-    expect(completionTurn.payload.messages[0].content).toContain("START FINAL REPORT");
-    expect(completionTurn.payload.messages[0].content).not.toContain("wh_5b");
+    expect(completionTurn.fetchTriggered).toBe(false);
+    expect(completionTurn.streamText).toContain("START FINAL REPORT");
+    expect(completionTurn.streamText).not.toContain("wh_5b");
+    expect(completionTurn.streamText).not.toContain("Step 6");
+    expect(completionTurn.streamText).not.toContain("Status: Isolation not completed");
   });
 
   it("treats the exact wh_5a repair-complete transcript as authoritative terminal state", async () => {
@@ -238,8 +243,11 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.activeStepId).toBeNull();
     expect(context.isolationComplete).toBe(true);
     expect(context.terminalState.phase).toBe("terminal");
-    expect(completionTurn.payload.messages[0].content).toContain("START FINAL REPORT");
-    expect(completionTurn.payload.messages[0].content).not.toContain("wh_5b");
+    expect(completionTurn.fetchTriggered).toBe(false);
+    expect(completionTurn.streamText).toContain("START FINAL REPORT");
+    expect(completionTurn.streamText).not.toContain("wh_5b");
+    expect(completionTurn.streamText).not.toContain("Step 6");
+    expect(completionTurn.streamText).not.toContain("Status: Isolation not completed");
   });
 
   it("transitions to final_report for RU repair-complete + report-request runtime messages", async () => {
