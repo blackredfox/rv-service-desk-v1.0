@@ -53,6 +53,7 @@
 - Root-cause documented: stale `Status: isolation not complete` / `Step 6` text was still coming from the standard diagnostic mode prompt path (`prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt`) because the route was still asking the model in diagnostic mode after terminal state had already latched.
 - Updated route tests to assert the completion turn makes **no** upstream LLM call (`fetchTriggered=false`) and emits no stale `Step 6` / `Status: Isolation not completed` text.
 - Completed a root-level test hygiene cleanup PR: removed zero-byte root junk files, removed unused legacy `vitest.setup.ts`, archived root `test_reports/` to `docs/archive/test-reports/2026-03/`, and added root hygiene rules to docs + `.gitignore`.
+- Added documentation-only testing governance updates in `docs/TEST_STRATEGY_QA_CONTRACT.md` and `docs/REPO_STRUCTURE.md`: tests validate behavior contracts rather than incidental wording, exact-wording assertions are allowed only for contract-critical text, and assertion taxonomy/checklist guidance is now explicit.
 - Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
 - Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
 - Added a dedicated RU explicit-command architecture assertion (`Напиши отчет`) so Russian natural-language report-mode switching is now locked alongside `Write report`.
@@ -73,6 +74,8 @@
 - `yarn vitest run tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
 - `yarn vitest run tests/architecture`
 - `yarn test` (root hygiene PR validation attempt)
+- `yarn vitest run tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts`
+- `yarn vitest run tests/prompts/prompt-composer.test.ts`
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.

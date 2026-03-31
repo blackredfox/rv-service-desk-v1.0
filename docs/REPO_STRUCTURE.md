@@ -245,6 +245,8 @@ Logs must avoid PII.
 
 Tests are located in `/tests`.
 
+Behavior-contract testing doctrine lives in `docs/TEST_STRATEGY_QA_CONTRACT.md`.
+
 Root hygiene rule:
 
 * active tests belong under `/tests`
