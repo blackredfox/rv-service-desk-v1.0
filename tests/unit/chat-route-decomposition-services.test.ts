@@ -178,6 +178,12 @@ describe("Chat Route Decomposition Services", () => {
       nextMode: "final_report",
       changed: true,
     });
+
+    expect(resolveExplicitModeChange("diagnostic", "Write report")).toEqual({
+      currentMode: "diagnostic",
+      nextMode: "final_report",
+      changed: true,
+    });
   });
 
   it("builds bounded prompt constraints and preserves vision instruction", () => {

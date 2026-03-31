@@ -164,6 +164,16 @@ describe("Prompt Composer", () => {
       expect(detectModeCommand("PREAUTORIZACIÓN")).toBe("authorization");
     });
 
+    it("should detect natural-language final report commands", async () => {
+      const { detectModeCommand } = await import("@/lib/prompt-composer");
+
+      expect(detectModeCommand("Write report")).toBe("final_report");
+      expect(detectModeCommand("Generate report")).toBe("final_report");
+      expect(detectModeCommand("Напиши отчет")).toBe("final_report");
+      expect(detectModeCommand("Сформируй отчет")).toBe("final_report");
+      expect(detectModeCommand("Напиши Report")).toBe("final_report");
+    });
+
     it("should return null for non-exact matches", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
 

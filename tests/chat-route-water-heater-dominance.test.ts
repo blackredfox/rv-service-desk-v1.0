@@ -5,11 +5,7 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 const storageMocks = vi.hoisted(() => ({
-  inferLanguageForMessage: vi.fn(() => ({
-    language: "RU",
-    languageSource: "AUTO",
-    confidence: 0.95,
-  })),
+  inferLanguageForMessage: vi.fn(),
   getCase: vi.fn(() => ({ case: null, messages: [] })),
   ensureCase: vi.fn(),
   updateCase: vi.fn(),
@@ -65,6 +61,12 @@ describe("/api/chat water-heater runtime dominance", () => {
       status: "ACTIVE",
     });
 
+    storageMocks.inferLanguageForMessage.mockImplementation((message: string) => ({
+      language: /[А-Яа-яЁё]/.test(message) ? "RU" : "EN",
+      languageSource: "AUTO",
+      confidence: 0.95,
+    }));
+
     storageMocks.ensureCase.mockImplementation(async ({ caseId, inputLanguage }: { caseId?: string; inputLanguage?: string }) => ({
       id: caseId ?? "case_runtime_wh",
       title: "Water Heater Runtime Case",
@@ -94,6 +96,9 @@ describe("/api/chat water-heater runtime dominance", () => {
       "route_wh6_loop",
       "route_wh5_positive",
       "route_wh5_clarification",
+      "route_wh5_terminal_completion",
+      "route_wh5_report_ru",
+      "route_report_en",
     ].forEach((caseId) => {
       clearRegistry(caseId);
       clearContext(caseId);
@@ -193,5 +198,53 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.completedSteps.has("wh_5")).toBe(false);
     expect(getNextStepId(caseId)).toBe("wh_5");
     expect(getBranchState(caseId).activeBranchId).toBeNull();
+  });
+
+  it("stops diagnostic step progression when repair is complete and the heater works", async () => {
+    const caseId = "route_wh5_terminal_completion";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+
+    const completionTurn = await postChat(
+      caseId,
+      "предохранитель не работал. Я заменил, водонагреватель заработал.",
+    );
+
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(context.activeStepId).toBeNull();
+    expect(context.isolationComplete).toBe(true);
+    expect(context.terminalState.phase).toBe("terminal");
+    expect(completionTurn.payload.messages[0].content).toContain("START FINAL REPORT");
+    expect(completionTurn.payload.messages[0].content).not.toContain("wh_5b");
+  });
+
+  it("transitions to final_report for RU repair-complete + report-request runtime messages", async () => {
+    const caseId = "route_wh5_report_ru";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+
+    fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("Complaint: Heater inoperative.\nDiagnostic Procedure: Verified fuse failure and repair.\nVerified Condition: Heater operates normally after fuse replacement.\nRecommended Corrective Action: Replace failed fuse and verify operation.\nEstimated Labor: Replace fuse and functional test - 0.4 hr. Total labor: 0.4 hr.\nRequired Parts: Fuse."));
+
+    const reportTurn = await postChat(
+      caseId,
+      "предохранитель не работает. Я заменил, водонагреватель заработал. Напиши Report",
+    );
+
+    expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
+  });
+
+  it("transitions to final_report for natural-language English report commands", async () => {
+    const caseId = "route_report_en";
+    await postChat(caseId, "Suburban gas water heater is not working");
+
+    fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("Complaint: Heater inoperative.\nDiagnostic Procedure: Verified fuse failure and repair.\nVerified Condition: Heater operates normally after fuse replacement.\nRecommended Corrective Action: Replace failed fuse and verify operation.\nEstimated Labor: Replace fuse and functional test - 0.4 hr. Total labor: 0.4 hr.\nRequired Parts: Fuse."));
+
+    const reportTurn = await postChat(caseId, "Write report");
+
+    expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
   });
 });

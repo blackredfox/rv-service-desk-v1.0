@@ -449,11 +449,17 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
 
-    procedureContext = buildRegistryContext(
-      ensuredCase.id,
-      engineResult?.context.activeStepId,
-      outputPolicy.effective,
-    );
+    const shouldSuppressProcedureContext =
+      engineResult.context.isolationComplete ||
+      engineResult.context.terminalState?.phase !== "normal";
+
+    procedureContext = shouldSuppressProcedureContext
+      ? ""
+      : buildRegistryContext(
+          ensuredCase.id,
+          engineResult?.context.activeStepId,
+          outputPolicy.effective,
+        );
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────
