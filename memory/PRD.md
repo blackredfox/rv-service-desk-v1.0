@@ -28,12 +28,23 @@
   - positive `wh_5` still continues to `wh_6`
   - clarification at `wh_5` does not advance or trigger the branch
 - Updated water-heater RU language-lock expectations from 21 to 24 total steps to reflect the new deterministic branch steps.
+- Runtime authority fix: widened `no_12v_supply` and `no_ignition` trigger patterns so bare technician negatives (`no` / `нет`) now activate the intended branch in the real `/api/chat` flow.
+- Runtime authority fix: updated the legacy flat `getNextStep()` helper to skip branch steps, preventing branch-only steps like `wh_6a` from leaking into non-branch fallback contexts.
+- Runtime authority fix: updated `buildRegistryContext()` to resolve fallback active steps with branch-aware resolution before building prompt context.
+- Added `/api/chat` route-level regressions in `tests/chat-route-water-heater-dominance.test.ts` covering:
+  - real RU transcript pivot from `wh_5 = нет` to `wh_5a`
+  - `wh_6a` no-loop progression (`wh_6a → wh_6b → wh_6c`)
+  - positive-path runtime progression
+  - clarification preservation in the real route flow
 
 ## Verified on 2026-03-31
 - `yarn vitest run tests/water-heater-diagnostic.test.ts tests/diagnostic-language-lock.test.ts tests/branch-aware-resolution.test.ts`
 - `yarn vitest run tests/p1.7-terminal-state.test.ts`
 - `yarn vitest run tests/branch-runtime-integration.test.ts tests/p1-5-branch-runtime-integration.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
+- `yarn vitest run tests/unit/diagnostic-procedures.test.ts tests/integration/diagnostic-how-to-check.test.ts`
 - Testing agent report: `/app/test_reports/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
+- Testing agent report: `/app/test_reports/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
 
 ## Dominance-rule expansion proposal (analysis only, not implemented)
 - Best next step: introduce a small procedure-level blocker metadata layer in `src/lib/diagnostic-procedures.ts` for prerequisite facts that should dominate downstream steps.
@@ -42,11 +53,13 @@
 - Resolver hook: update next-step resolution so active blockers outrank ordinary main-flow progression until explicitly cleared.
 - Good first candidates after `wh_5`: missing LP supply (`wh_2`/`wh_3`), closed manual gas valve (`wh_4`), and similar prerequisite failures in furnace, LP gas, 12V electrical, and awning procedures.
 - Testing approach for future rollout: add one 3-case regression pack per blocker (`negative blocks downstream`, `positive keeps normal path`, `clarification preserved`) before expanding to the next procedure.
+- Runtime RCA from this fix confirms the general direction is still correct: blocker rules should normalize bare yes/no trigger replies and must be applied before any fallback next-step rendering.
 
 ## Prioritized backlog
 ### P0
 - Decide whether to generalize the new `wh_5` dominance behavior into reusable blocker metadata across procedures.
 - Add route/integration regression covering the exact `wh_5` no-12V runtime path through the chat API.
+- Review whether other branch trigger steps should accept bare yes/no confirmations in the real route flow, starting with LP/gas prerequisite checks.
 
 ### P1
 - Extend dominance-rule candidates to LP-supply and manual-valve blockers in water-heater and furnace procedures.
@@ -60,5 +73,5 @@
 
 ## Next tasks
 - If approved, design the reusable blocker metadata shape and wire it into the registry without refactoring unrelated flows.
-- Add chat-route coverage for the `wh_5` dominant no-12V path.
+- Extend chat-route coverage to the next blocker candidates beyond `wh_5`.
 - Continue localization hardening for remaining diagnostic procedures.
