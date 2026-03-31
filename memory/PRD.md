@@ -1,55 +1,38 @@
-# NEO TASK — Safe `route.ts` Decomposition (Boundary-First, No Hidden Authority)
+# PRD / Task Handoff
 
-## Original Problem Statement
-Safe maintainability refactor of `src/app/api/chat/route.ts` so it becomes a thinner orchestration boundary without introducing hidden diagnostic authority outside Context Engine. Preserve runtime behavior, do not mix in diagnostic logic fixes, and add direct tests for route wiring, no hidden authority, extracted modules, and strictness.
+## Original problem statement
+Fix language leakage in diagnostic output where Russian input sessions were detected as RU but structured diagnostic output (headers, progress lines, step labels, and step content) still leaked English in diagnostic mode. Scope included prompt construction, LLM execution, diagnostic context injection, validation/repair, route assembly, and regression tests.
 
-## Architecture Decisions
-- Kept Context Engine as the sole diagnostic flow authority; route still invokes `processContextMessage(...)` directly.
-- Extracted bounded chat services only for request preparation, explicit mode resolution, prompt assembly, OpenAI execution, response validation, final-report transport setup, and persistence side effects.
-- Left diagnostic step/branch/terminal orchestration inside `route.ts` rather than moving it into helpers, to avoid creating a second controller.
-- Preserved explicit-only mode transitions and existing validation / fallback behavior.
+## Architecture decisions
+- Kept the existing diagnostic flow authority in the context engine and registry.
+- Fixed leakage deterministically at the server-side metadata layer instead of trusting prompt behavior alone.
+- Hardened validation to use the effective output language and to explicitly detect English structured diagnostic leakage in non-English sessions.
+- Kept the fix minimal and targeted to the reproduced water-heater path while making the fallback/validation path language-aware.
 
-## What's Implemented
-- Reduced `src/app/api/chat/route.ts` from 1128 lines pre-refactor to 661 lines while keeping HTTP/SSE orchestration at the boundary.
-- Added bounded modules:
-  - `src/lib/chat/chat-request-preparer.ts`
-  - `src/lib/chat/chat-mode-resolver.ts`
-  - `src/lib/chat/prompt-context-builder.ts`
-  - `src/lib/chat/response-validation-service.ts`
-  - `src/lib/chat/final-report-flow-service.ts`
-  - `src/lib/chat/openai-execution-service.ts`
-  - `src/lib/chat/chat-persistence-service.ts`
-- Added/updated direct tests for extracted modules, no-hidden-authority guardrails, execution services, and route wiring.
-- Verified focused suite passes:
-  - `tests/unit/chat-route-decomposition-services.test.ts`
-  - `tests/unit/chat-openai-execution-service.test.ts`
-  - `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts`
-  - `tests/architecture/route-wiring/chat-route-wiring.test.ts`
-  - `tests/unit/chat-module-extraction.test.ts`
-  - `tests/architecture/strictness/route-strictness.test.ts`
-  - `tests/chat-route.test.ts`
+## Implemented
+- Added deterministic RU localization for water-heater procedure display name, active-step questions, and how-to-check instructions in `src/lib/diagnostic-procedures.ts`.
+- Updated `buildProcedureContext`, `buildRegistryContext`, and `getActiveStepMetadata` to render localized structured diagnostic context using the effective output language.
+- Updated `src/app/api/chat/route.ts` to pass the effective output language into registry context and active-step metadata retrieval.
+- Strengthened `buildLanguageDirectiveV2` so prompt instructions explicitly require translating any injected procedure metadata into the output language.
+- Hardened `validateLanguageConsistency` to catch English diagnostic markers like `Progress:` / `Step wh_*:` in RU/ES sessions.
+- Updated primary response validation to validate against the effective output language, not only tracked input language.
+- Updated retry correction + safe fallback so language mismatches fall back to a localized authoritative active-step response instead of leaking English fallback text.
+- Added regression tests in `tests/diagnostic-language-lock.test.ts`.
+- Installed project dependencies after upgrading Node to v22 so Vitest could run in this container.
 
-## Prioritized Backlog
+## Prioritized backlog
 ### P0
-- Separate targeted fix for the known water-heater / “no 12V” branch-handling defect inside Context Engine behavior.
-- Reduce remaining route-owned diagnostic glue only if it can be moved without fragmenting authority.
+- Extend deterministic localization coverage beyond water-heater to the rest of the diagnostic procedure catalog.
+- Add route/integration regression covering the exact RU reproduction flow end-to-end with mocked OpenAI output.
 
 ### P1
-- Consolidate existing route comments and historical patch notes into architecture-safe inline docs or ADR references.
-- Add broader integration safety coverage around labor override and diagnostic validation paths.
+- Add localized procedure metadata for ES where deterministic server-side structured output is required.
+- Add additional validator heuristics for mixed-language free-text leakage beyond structured headers.
 
 ### P2
-- Improve logging consistency for extracted persistence-side-effect helpers.
-- Tighten prompt/validator fixtures used in service-level tests.
+- Move procedure localizations into a dedicated localization module or data file to reduce maintenance cost.
+- Add snapshot-style tests for localized authoritative fallback blocks by language.
 
-## Next Tasks
-- If requested, do a separate Context Engine task focused only on the active signal/branch defect.
-- If requested, continue shrinking `route.ts` only around non-authoritative transport/persistence concerns.
-
-## Recent Follow-up Change
-- Replaced `prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt` with the user-provided prompt file content exactly as requested.
-
-## Recent Test Alignment Change
-- Built a full test inventory seed expansion, moved selected active Vitest suites into canonical `tests/unit`, `tests/integration`, `tests/prompts`, and `tests/architecture/*` folders, and relocated root-level Python test harnesses into `tests/helpers/legacy/`.
-- Rewrote brittle prompt assertions in prompt-related suites to enforce contract-shape instead of historical wording.
-- Verified the full Vitest suite passes after cleanup (`yarn test` → 793/793).
+## Next tasks
+- Localize the remaining diagnostic procedures.
+- Add an end-to-end chat route regression for RU diagnostic sessions with active-step rendering and fallback/repair coverage.

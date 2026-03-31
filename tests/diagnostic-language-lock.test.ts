@@ -12,7 +12,7 @@ describe("Diagnostic language lock regression", () => {
       "@/lib/diagnostic-registry"
     );
 
-    initializeCase("diag-lang-lock", "только газовый Suburban");
+    initializeCase("diag-lang-lock", "газовый водонагреватель Suburban");
 
     const context = buildRegistryContext("diag-lang-lock", "wh_2", "RU");
     const metadata = getActiveStepMetadata("diag-lang-lock", "wh_2", "RU");
