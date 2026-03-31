@@ -180,7 +180,7 @@ describe("Input Language Lock", () => {
       const { buildLanguageDirective } = await import("@/lib/prompt-composer");
       
       const directive = buildLanguageDirective({ inputLanguage: "RU", mode: "final_report" });
-      
+
       expect(directive).toContain("translate the full output into Russian (RU)");
     });
 
@@ -188,7 +188,7 @@ describe("Input Language Lock", () => {
       const { buildLanguageDirective } = await import("@/lib/prompt-composer");
       
       const directive = buildLanguageDirective({ inputLanguage: "ES", mode: "final_report" });
-      
+
       expect(directive).toContain("translate the full output into Spanish (ES)");
     });
 
@@ -196,7 +196,7 @@ describe("Input Language Lock", () => {
       const { buildLanguageDirective } = await import("@/lib/prompt-composer");
       
       const directive = buildLanguageDirective({ inputLanguage: "EN", mode: "final_report" });
-      
+
       // For English, still needs translation block (but will be same language)
       expect(directive).toContain("translate the full output into English (EN)");
     });
