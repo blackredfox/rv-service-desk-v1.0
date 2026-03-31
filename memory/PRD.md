@@ -50,6 +50,7 @@
   - the exact `wh_5a` Russian repair-complete transcript becomes terminal/isolation-complete with no further step injection
   - `START FINAL REPORT` after that transcript produces repaired/restored source-of-truth report content (failed fuse root cause, fuse replacement corrective action, water heater operational after repair)
 - Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
+- Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
 
 ## Verified on 2026-03-31
 - `yarn vitest run tests/water-heater-diagnostic.test.ts tests/diagnostic-language-lock.test.ts tests/branch-aware-resolution.test.ts`
