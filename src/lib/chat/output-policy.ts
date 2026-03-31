@@ -198,20 +198,46 @@ export function buildDiagnosticDriftFallback(activeStepId?: string): string {
  */
 export function buildAuthoritativeStepFallback(
   stepMetadata: { id: string; question: string; procedureName: string; progress: { completed: number; total: number } } | null,
-  fallbackStepId?: string
+  fallbackStepId?: string,
+  language: Language = "EN",
 ): string {
+  const labels =
+    language === "RU"
+      ? {
+          guidedDiagnostics: "Пошаговая диагностика",
+          progress: "Прогресс",
+          stepsCompleted: "шагов завершено",
+          step: "Шаг",
+          genericQuestion: "Каков фактический результат по этому активному диагностическому шагу?",
+        }
+      : language === "ES"
+      ? {
+          guidedDiagnostics: "Diagnóstico guiado",
+          progress: "Progreso",
+          stepsCompleted: "pasos completados",
+          step: "Paso",
+          genericQuestion: "¿Cuál es el resultado observado para este paso de diagnóstico activo?",
+        }
+      : {
+          guidedDiagnostics: "Guided Diagnostics",
+          progress: "Progress",
+          stepsCompleted: "steps completed",
+          step: "Step",
+          genericQuestion: "What is the observed result for this active diagnostic step?",
+        };
+
   if (!stepMetadata) {
     // No metadata available — use generic fallback
     const stepLabel = fallbackStepId ? ` (${fallbackStepId})` : "";
-    return `Guided Diagnostics${stepLabel}: What is the observed result for this active diagnostic step?`;
+    return `${labels.guidedDiagnostics}${stepLabel}: ${labels.genericQuestion}`;
   }
   
   // Build authoritative response with exact step question
   const lines = [
-    `${stepMetadata.procedureName} — Guided Diagnostics`,
-    `Progress: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} steps completed`,
+    `${stepMetadata.procedureName} — ${labels.guidedDiagnostics}`,
+    `${labels.progress}: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} ${labels.stepsCompleted}`,
     ``,
-    `Step ${stepMetadata.id}: ${stepMetadata.question}`,
+    `${labels.step} ${stepMetadata.id}: ${stepMetadata.question}`,
   ];
   
   return lines.join("\n");

@@ -415,7 +415,11 @@ export async function POST(req: Request) {
     }
 
     // Get active step metadata for authoritative rendering
-    activeStepMetadata = getActiveStepMetadata(ensuredCase.id, engineResult.context.activeStepId);
+    activeStepMetadata = getActiveStepMetadata(
+      ensuredCase.id,
+      engineResult.context.activeStepId,
+      outputPolicy.effective,
+    );
     if (activeStepMetadata) {
       console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
     }
@@ -445,7 +449,11 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
 
-    procedureContext = buildRegistryContext(ensuredCase.id, engineResult?.context.activeStepId);
+    procedureContext = buildRegistryContext(
+      ensuredCase.id,
+      engineResult?.context.activeStepId,
+      outputPolicy.effective,
+    );
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────

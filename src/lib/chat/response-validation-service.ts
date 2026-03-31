@@ -41,10 +41,12 @@ export function validatePrimaryResponse(args: {
   response: string;
   mode: CaseMode;
   trackedInputLanguage: Language;
+  outputLanguage?: Language;
   includeTranslation: boolean;
   translationLanguage?: Language;
   activeStepMetadata: ActiveStepMetadata;
 }): ValidationResult {
+  const expectedOutputLanguage = args.outputLanguage ?? args.trackedInputLanguage;
   let validation = validateOutput(
     args.response,
     args.mode,
@@ -61,7 +63,7 @@ export function validatePrimaryResponse(args: {
   if (args.mode === "diagnostic") {
     const langValidation = validateLanguageConsistency(
       args.response,
-      args.trackedInputLanguage,
+      expectedOutputLanguage,
     );
 
     if (!langValidation.valid) {
@@ -121,6 +123,12 @@ export function buildPrimaryCorrectionInstruction(args: {
     }
   }
 
+  if (args.validation.violations.some((violation) => violation.includes("LANGUAGE_MISMATCH"))) {
+    correctionInstructionParts.push(
+      "LANGUAGE REPAIR (MANDATORY): translate every visible diagnostic label, progress line, and active-step question into the required session language. Never echo raw English procedure metadata in a non-English session.",
+    );
+  }
+
   return correctionInstructionParts.join("\n");
 }
 
@@ -139,13 +147,15 @@ export function buildPrimaryFallbackResponse(args: {
   const hasDriftOrStepViolation =
     isDiagnosticDriftViolation(args.validation.violations) ||
     args.validation.violations.some((violation) =>
-      violation.includes("STEP_COMPLIANCE"),
+      violation.includes("STEP_COMPLIANCE") ||
+      violation.includes("LANGUAGE_MISMATCH"),
     );
 
   if (args.mode === "diagnostic" && hasDriftOrStepViolation) {
     return buildAuthoritativeStepFallback(
       args.activeStepMetadata,
       args.activeStepId,
+      args.outputLanguage,
     );
   }
 

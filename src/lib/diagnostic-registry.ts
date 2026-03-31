@@ -17,9 +17,13 @@ import {
   getMutuallyExclusiveBranches,
   mapInitialMessageToSteps,
   buildProcedureContext,
+  getLocalizedProcedureDisplayName,
+  getLocalizedStepHowToCheck,
+  getLocalizedStepQuestion,
   type DiagnosticProcedure,
   type ProcedureBranch,
 } from "./diagnostic-procedures";
+import type { Language } from "./lang";
 
 type DiagnosticEntry = {
   /** Active procedure system (e.g. "water_pump") */
@@ -347,7 +351,11 @@ export function processUserMessage(caseId: string, message: string, activeStepId
  * only that step's question is passed to the LLM. The engine, not the LLM,
  * determines step progression.
  */
-export function buildRegistryContext(caseId: string, activeStepId?: string | null): string {
+export function buildRegistryContext(
+  caseId: string,
+  activeStepId?: string | null,
+  language: Language = "EN",
+): string {
   const entry = registry.get(caseId);
   if (!entry) return "";
 
@@ -360,6 +368,7 @@ export function buildRegistryContext(caseId: string, activeStepId?: string | nul
       {
         howToCheckRequested: entry.howToCheckRequested,
         activeStepId: activeStepId ?? undefined,
+        language,
       },
     );
   }
@@ -603,7 +612,11 @@ export function getActiveStepQuestion(caseId: string, activeStepId: string | nul
 /**
  * Get complete step metadata for authoritative rendering.
  */
-export function getActiveStepMetadata(caseId: string, activeStepId: string | null): {
+export function getActiveStepMetadata(
+  caseId: string,
+  activeStepId: string | null,
+  language: Language = "EN",
+): {
   id: string;
   question: string;
   howToCheck: string | null;
@@ -617,9 +630,9 @@ export function getActiveStepMetadata(caseId: string, activeStepId: string | nul
   if (!step) return null;
   return {
     id: step.id,
-    question: step.question,
-    howToCheck: step.howToCheck ?? null,
-    procedureName: entry.procedure.displayName,
+    question: getLocalizedStepQuestion(entry.procedure, step, language),
+    howToCheck: getLocalizedStepHowToCheck(entry.procedure, step, language) ?? null,
+    procedureName: getLocalizedProcedureDisplayName(entry.procedure, language),
     progress: {
       completed: entry.completedStepIds.size + entry.unableStepIds.size,
       total: entry.procedure.steps.length,

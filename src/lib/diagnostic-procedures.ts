@@ -10,6 +10,8 @@
  * - Step completion is tracked in the diagnostic registry.
  */
 
+import type { Language } from "./lang";
+
 // ── Types ───────────────────────────────────────────────────────────
 
 export type DiagnosticStep = {
@@ -106,6 +108,267 @@ const PROCEDURES: Map<string, DiagnosticProcedure> = new Map();
 
 function reg(proc: DiagnosticProcedure) {
   PROCEDURES.set(proc.system, proc);
+}
+
+type LocalizedProcedureContent = {
+  displayName?: Partial<Record<Language, string>>;
+  steps?: Record<
+    string,
+    {
+      question?: Partial<Record<Language, string>>;
+      howToCheck?: Partial<Record<Language, string>>;
+    }
+  >;
+};
+
+const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>> = {
+  water_heater: {
+    displayName: {
+      RU: "Водонагреватель (газовый/комбинированный)",
+    },
+    steps: {
+      wh_1: {
+        question: {
+          RU: "Какой тип водонагревателя установлен? (только газ/LP, только электрический или комбинированный газ+электро) Если известно, укажите марку/модель.",
+        },
+        howToCheck: {
+          RU: "Проверьте шильдик на водонагревателе. У газовых моделей снаружи видна горелочная трубка. У чисто электрических моделей наружного доступа к горелке нет. У комбинированных есть оба режима.",
+        },
+      },
+      wh_2: {
+        question: {
+          RU: "Какой уровень в LP-баке — показание указателя или проверка по весу? Основной вентиль бака полностью открыт?",
+        },
+        howToCheck: {
+          RU: "Проверьте указатель уровня бака или взвесьте баллон. Убедитесь, что рукоятка основного вентиля параллельна линии (положение открыто).",
+        },
+      },
+      wh_3: {
+        question: {
+          RU: "Работают ли другие LP-приборы? (горелки плиты, печь, холодильник в режиме LP)",
+        },
+        howToCheck: {
+          RU: "Включите горелку плиты. Если она загорается и горит синим пламенем, подача LP в RV в норме.",
+        },
+      },
+      wh_4: {
+        question: {
+          RU: "Открыт ли ручной газовый запорный клапан на водонагревателе? (находится на газовой линии перед входом в узел)",
+        },
+        howToCheck: {
+          RU: "Проследите газовую линию до водонагревателя. Рукоятка запорного клапана должна быть параллельна трубе (открыто).",
+        },
+      },
+      wh_5: {
+        question: {
+          RU: "Есть ли 12 В DC на плате управления/поджиге водонагревателя? Измерьте напряжение.",
+        },
+        howToCheck: {
+          RU: "Переключите мультиметр в режим DC volts и измерьте напряжение на входных клеммах 12V платы управления. Норма: 11.5–13.5 В.",
+        },
+      },
+      wh_6: {
+        question: {
+          RU: "Когда водонагреватель включён: слышны ли щелчки/искрение от поджига? Для моделей со свечой накала — разогревается ли она до оранжевого цвета?",
+        },
+        howToCheck: {
+          RU: "Включите водонагреватель. У горелки послушайте щелчки (искровой розжиг) или посмотрите, появляется ли оранжевое свечение нагревателя.",
+        },
+      },
+      wh_7: {
+        question: {
+          RU: "Загорается ли горелка и удерживается ли пламя? Цвет: синий, жёлтый или пламени нет?",
+        },
+        howToCheck: {
+          RU: "Посмотрите через смотровое окно горелки. Исправное пламя в основном синее, допускаются небольшие жёлтые кончики.",
+        },
+      },
+      wh_6a: {
+        question: {
+          RU: "Ветка отсутствия розжига: есть ли 12 В на клеммах модуля поджига во время попытки розжига?",
+        },
+        howToCheck: {
+          RU: "Измерьте DC-напряжение на модуле поджига при включённом переключателе. Во время попытки розжига должно появляться 12 В.",
+        },
+      },
+      wh_6b: {
+        question: {
+          RU: "Ветка отсутствия розжига: проверьте зазор и состояние искрового электрода. Зазор 1/8\" (3 мм), наконечник чистый, трещин нет?",
+        },
+        howToCheck: {
+          RU: "Снимите электрод. Осмотрите наконечник на нагар и повреждения. Зазор до горелочной трубки должен быть 1/8\".",
+        },
+      },
+      wh_6c: {
+        question: {
+          RU: "Ветка отсутствия розжига: надёжно ли подключена масса модуля поджига? Есть ли непрерывность от модуля до шасси?",
+        },
+        howToCheck: {
+          RU: "Проверьте соединение провода и прозвоните массу до шасси.",
+        },
+      },
+      wh_7a: {
+        question: {
+          RU: "Ветка срыва пламени: сколько времени пламя горит до затухания? (в секундах)",
+        },
+        howToCheck: {
+          RU: "Засеките время от появления пламени до блокировки. Меньше 10 с часто указывает на датчик пламени, больше 30 с — на проблему подачи газа.",
+        },
+      },
+      wh_7b: {
+        question: {
+          RU: "Ветка срыва пламени: какое милливольтное значение на термопаре/датчике пламени при наличии пламени?",
+        },
+        howToCheck: {
+          RU: "Измерьте DC mV на выводах термопары при горящем пламени. Для удержания газового клапана обычно нужно минимум 20–30 mV.",
+        },
+      },
+      wh_7c: {
+        question: {
+          RU: "Ветка срыва пламени: положение термопары — наконечник находится по центру факела? Не касается металла горелки?",
+        },
+        howToCheck: {
+          RU: "Наконечник термопары должен быть в самой горячей части пламени (примерно на 1/2\" выше горелки) и не касаться металла.",
+        },
+      },
+      wh_8a: {
+        question: {
+          RU: "Ветка отсутствия подачи газа: есть ли 12 В на катушке соленоида газового клапана во время попытки розжига?",
+        },
+        howToCheck: {
+          RU: "Измерьте DC-напряжение на клеммах катушки соленоида во время цикла розжига.",
+        },
+      },
+      wh_8b: {
+        question: {
+          RU: "Ветка отсутствия подачи газа: какое сопротивление катушки соленоида газового клапана? (должно быть 30–200 Ом)",
+        },
+        howToCheck: {
+          RU: "Отсоедините провода катушки и измерьте сопротивление между клеммами. OL = обрыв катушки = замена клапана.",
+        },
+      },
+      wh_8c: {
+        question: {
+          RU: "Ветка отсутствия подачи газа: есть ли мусор во входной сетке узла ручного клапана?",
+        },
+        howToCheck: {
+          RU: "Отсоедините газовую линию на входе клапана и проверьте входную сетку на мусор или коррозию.",
+        },
+      },
+      wh_8: {
+        question: {
+          RU: "Если 12 В на соленоиде газового клапана подтверждены: проходит ли газ дальше? (краткая проверка запаха у горелочной трубки или показание манометра)",
+        },
+        howToCheck: {
+          RU: "БЕЗОПАСНОСТЬ: только кратко проверьте запах. Если на клапане есть 12 В, а газа нет, соленоид клапана может зависнуть или быть неисправным.",
+        },
+      },
+      wh_9: {
+        question: {
+          RU: "Термопара / датчик пламени: чистый и правильно расположен в зоне пламени? Какое милливольтное значение при наличии пламени?",
+        },
+        howToCheck: {
+          RU: "При наличии пламени измерьте DC mV на выводах термопары. Норма — минимум 20–30 mV.",
+        },
+      },
+      wh_10: {
+        question: {
+          RU: "Состояние горелочной трубки и жиклёра: видны ли засорение, коррозия, насекомые или повреждения?",
+        },
+        howToCheck: {
+          RU: "Снимите крышку доступа к горелочной трубке и осмотрите фонариком. Частые причины засора — паутина и гнёзда насекомых.",
+        },
+      },
+      wh_11: {
+        question: {
+          RU: "Только для COMBO-моделей: работает ли электрический ТЭН? Есть ли 120 В на элементе при включённом переключателе?",
+        },
+        howToCheck: {
+          RU: "При включённом электрорежиме измерьте 120 VAC на клеммах ТЭНа. Сопротивление элемента обычно 10–16 Ом.",
+        },
+      },
+      wh_12: {
+        question: {
+          RU: "Проверялась или нажималась кнопка сброса верхнего термопредохранителя (ECO)? Она находится на газовом клапане или рядом с термостатом.",
+        },
+        howToCheck: {
+          RU: "Найдите маленькую красную кнопку сброса на узле газового клапана. Нажмите уверенно. Если был щелчок, ECO был сработавшим.",
+        },
+      },
+    },
+  },
+};
+
+type ProcedureContextLabels = {
+  activeProcedure: string;
+  progress: (doneCount: number, totalSteps: number) => string;
+  currentStep: string;
+  askExactly: string;
+  howToCheckHeader: string;
+  allStepsComplete: string;
+  completionSummary: string;
+  completionWait: string;
+};
+
+function getProcedureContextLabels(language: Language = "EN"): ProcedureContextLabels {
+  switch (language) {
+    case "RU":
+      return {
+        activeProcedure: "АКТИВНАЯ ДИАГНОСТИЧЕСКАЯ ПРОЦЕДУРА",
+        progress: (doneCount, totalSteps) => `Прогресс: ${doneCount}/${totalSteps} шагов завершено`,
+        currentStep: "ТЕКУЩИЙ ШАГ",
+        askExactly: "Задай ТОЧНО",
+        howToCheckHeader: "ИНСТРУКЦИЯ КАК ПРОВЕРИТЬ (техник попросил пояснение)",
+        allStepsComplete: "ВСЕ ШАГИ ЗАВЕРШЕНЫ.",
+        completionSummary: "Кратко подведи итоги и спроси: 'Готовы сформировать финальный отчёт? Отправьте START FINAL REPORT, когда будете готовы.'",
+        completionWait: "Не формируй отчёт. Не объявляй изоляцию завершённой. Жди явную команду.",
+      };
+    case "ES":
+      return {
+        activeProcedure: "PROCEDIMIENTO DE DIAGNÓSTICO ACTIVO",
+        progress: (doneCount, totalSteps) => `Progreso: ${doneCount}/${totalSteps} pasos completados`,
+        currentStep: "PASO ACTUAL",
+        askExactly: "Pregunta EXACTAMENTE",
+        howToCheckHeader: "INSTRUCCIÓN DE CÓMO VERIFICAR (el técnico pidió orientación)",
+        allStepsComplete: "TODOS LOS PASOS COMPLETADOS.",
+        completionSummary: "Resume brevemente los hallazgos y pregunta: '¿Listo para generar el informe final? Envíe START FINAL REPORT cuando esté listo.'",
+        completionWait: "No generes el informe. No declares el aislamiento completo. Espera el comando explícito.",
+      };
+    default:
+      return {
+        activeProcedure: "ACTIVE DIAGNOSTIC PROCEDURE",
+        progress: (doneCount, totalSteps) => `Progress: ${doneCount}/${totalSteps} steps completed`,
+        currentStep: "CURRENT STEP",
+        askExactly: "Ask EXACTLY",
+        howToCheckHeader: "HOW-TO-CHECK INSTRUCTION (technician asked for guidance)",
+        allStepsComplete: "ALL STEPS COMPLETE.",
+        completionSummary: "Summarize findings and ask: 'Ready to generate final report? Send START FINAL REPORT when ready.'",
+        completionWait: "Do NOT generate the report. Do NOT declare isolation complete. Wait for explicit command.",
+      };
+  }
+}
+
+export function getLocalizedProcedureDisplayName(
+  procedure: DiagnosticProcedure,
+  language: Language = "EN",
+): string {
+  return PROCEDURE_LOCALIZATIONS[procedure.system]?.displayName?.[language] ?? procedure.displayName;
+}
+
+export function getLocalizedStepQuestion(
+  procedure: DiagnosticProcedure,
+  step: DiagnosticStep,
+  language: Language = "EN",
+): string {
+  return PROCEDURE_LOCALIZATIONS[procedure.system]?.steps?.[step.id]?.question?.[language] ?? step.question;
+}
+
+export function getLocalizedStepHowToCheck(
+  procedure: DiagnosticProcedure,
+  step: DiagnosticStep,
+  language: Language = "EN",
+): string | undefined {
+  return PROCEDURE_LOCALIZATIONS[procedure.system]?.steps?.[step.id]?.howToCheck?.[language] ?? step.howToCheck;
 }
 
 // ── Water Pump ──────────────────────────────────────────────────────
@@ -1077,10 +1340,11 @@ export function buildProcedureContext(
   procedure: DiagnosticProcedure,
   completedIds: Set<string>,
   unableIds: Set<string>,
-  options?: { howToCheckRequested?: boolean; activeStepId?: string | null },
+  options?: { howToCheckRequested?: boolean; activeStepId?: string | null; language?: Language },
 ): string {
   const totalSteps = procedure.steps.length;
   const doneCount = completedIds.size + unableIds.size;
+  const language = options?.language ?? "EN";
 
   // --- Authoritative mode: only show the active step ---
   if (options?.activeStepId) {
@@ -1089,7 +1353,7 @@ export function buildProcedureContext(
       // Step ID mismatch — fall back to computed next step
       const nextStep = getNextStep(procedure, completedIds, unableIds);
       if (!nextStep) {
-        return buildAllCompleteContext(procedure, doneCount, totalSteps);
+        return buildAllCompleteContext(procedure, doneCount, totalSteps, language);
       }
       return buildActiveStepContext(procedure, nextStep, doneCount, totalSteps, options);
     }
@@ -1099,7 +1363,7 @@ export function buildProcedureContext(
   // --- No active step: check if all done ---
   const nextStep = getNextStep(procedure, completedIds, unableIds);
   if (!nextStep) {
-    return buildAllCompleteContext(procedure, doneCount, totalSteps);
+    return buildAllCompleteContext(procedure, doneCount, totalSteps, language);
   }
 
   // Fallback: show the computed next step (should not happen in authoritative mode)
@@ -1111,21 +1375,27 @@ function buildActiveStepContext(
   step: DiagnosticStep,
   doneCount: number,
   totalSteps: number,
-  options?: { howToCheckRequested?: boolean },
+  options?: { howToCheckRequested?: boolean; language?: Language },
 ): string {
+  const language = options?.language ?? "EN";
+  const labels = getProcedureContextLabels(language);
+  const localizedProcedureName = getLocalizedProcedureDisplayName(procedure, language);
+  const localizedQuestion = getLocalizedStepQuestion(procedure, step, language);
+  const localizedHowToCheck = getLocalizedStepHowToCheck(procedure, step, language);
+
   const lines: string[] = [
-    `ACTIVE DIAGNOSTIC PROCEDURE: ${procedure.displayName} (${procedure.variant})`,
-    `Progress: ${doneCount}/${totalSteps} steps completed`,
+    `${labels.activeProcedure}: ${localizedProcedureName} (${procedure.variant})`,
+    labels.progress(doneCount, totalSteps),
     "",
-    `CURRENT STEP: ${step.id}`,
-    `Ask EXACTLY: "${step.question}"`,
+    `${labels.currentStep}: ${step.id}`,
+    `${labels.askExactly}: "${localizedQuestion}"`,
   ];
 
   // If technician asked "how to check?" — provide the instruction and re-ask
-  if (options?.howToCheckRequested && step.howToCheck) {
+  if (options?.howToCheckRequested && localizedHowToCheck) {
     lines.push("");
-    lines.push("HOW-TO-CHECK INSTRUCTION (technician asked for guidance):");
-    lines.push(step.howToCheck);
+    lines.push(`${labels.howToCheckHeader}:`);
+    lines.push(localizedHowToCheck);
     lines.push("");
     lines.push("After providing this instruction, re-ask the SAME step for the result.");
     lines.push("Do NOT close this step. Do NOT advance to the next step.");
@@ -1136,7 +1406,8 @@ function buildActiveStepContext(
   lines.push("- Ask ONLY the question above. Do NOT skip ahead or go back.");
   lines.push("- Do NOT invent diagnostic steps outside this procedure.");
   lines.push("- Do NOT list completed steps or remaining steps.");
-  lines.push("- Do NOT ask about systems other than " + procedure.displayName + ".");
+  lines.push("- Do NOT ask about systems other than " + localizedProcedureName + ".");
+  lines.push("- Any user-facing label or quoted procedure text MUST be rendered in the session language.");
   lines.push("- Render the question in the session language. Do NOT switch languages.");
 
   return lines.join("\n");
@@ -1146,14 +1417,17 @@ function buildAllCompleteContext(
   procedure: DiagnosticProcedure,
   doneCount: number,
   totalSteps: number,
+  language: Language = "EN",
 ): string {
+  const labels = getProcedureContextLabels(language);
+  const localizedProcedureName = getLocalizedProcedureDisplayName(procedure, language);
   const lines: string[] = [
-    `ACTIVE DIAGNOSTIC PROCEDURE: ${procedure.displayName} (${procedure.variant})`,
-    `Progress: ${doneCount}/${totalSteps} steps completed`,
+    `${labels.activeProcedure}: ${localizedProcedureName} (${procedure.variant})`,
+    labels.progress(doneCount, totalSteps),
     "",
-    "ALL STEPS COMPLETE.",
-    "Summarize findings and ask: 'Ready to generate final report? Send START FINAL REPORT when ready.'",
-    "Do NOT generate the report. Do NOT declare isolation complete. Wait for explicit command.",
+    labels.allStepsComplete,
+    labels.completionSummary,
+    labels.completionWait,
   ];
   return lines.join("\n");
 }
