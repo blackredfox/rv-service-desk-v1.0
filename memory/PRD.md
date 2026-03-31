@@ -36,6 +36,13 @@
   - `wh_6a` no-loop progression (`wh_6a → wh_6b → wh_6c`)
   - positive-path runtime progression
   - clarification preservation in the real route flow
+- Added natural-language final-report command detection in `src/lib/prompt-composer.ts` for RU/EN/ES phrases such as `Напиши отчет`, `Напиши Report`, `Write report`, and `Generate report`.
+- Route/runtime fix: suppressed diagnostic `procedureContext` fallback in `src/app/api/chat/route.ts` when `isolationComplete=true` or `terminalState.phase !== normal`, preventing `wh_5b`/other steps from leaking after repair-complete messages.
+- Added route regressions for:
+  - repair-complete runtime message from `wh_5a` stops diagnostic progression
+  - RU repair-complete + report-request message transitions to `final_report`
+  - EN natural-language `Write report` request transitions to `final_report`
+  - clarification behavior remains unchanged
 
 ## Verified on 2026-03-31
 - `yarn vitest run tests/water-heater-diagnostic.test.ts tests/diagnostic-language-lock.test.ts tests/branch-aware-resolution.test.ts`
@@ -43,8 +50,11 @@
 - `yarn vitest run tests/branch-runtime-integration.test.ts tests/p1-5-branch-runtime-integration.test.ts`
 - `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
 - `yarn vitest run tests/unit/diagnostic-procedures.test.ts tests/integration/diagnostic-how-to-check.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts tests/chat-transition-final-report.test.ts`
+- `yarn vitest run tests/prompts/prompt-composer.test.ts tests/mode-validators.test.ts tests/unit/chat-route-decomposition-services.test.ts`
 - Testing agent report: `/app/test_reports/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
 - Testing agent report: `/app/test_reports/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
+- Testing agent report: `/app/test_reports/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
 
 ## Dominance-rule expansion proposal (analysis only, not implemented)
 - Best next step: introduce a small procedure-level blocker metadata layer in `src/lib/diagnostic-procedures.ts` for prerequisite facts that should dominate downstream steps.
@@ -54,12 +64,14 @@
 - Good first candidates after `wh_5`: missing LP supply (`wh_2`/`wh_3`), closed manual gas valve (`wh_4`), and similar prerequisite failures in furnace, LP gas, 12V electrical, and awning procedures.
 - Testing approach for future rollout: add one 3-case regression pack per blocker (`negative blocks downstream`, `positive keeps normal path`, `clarification preserved`) before expanding to the next procedure.
 - Runtime RCA from this fix confirms the general direction is still correct: blocker rules should normalize bare yes/no trigger replies and must be applied before any fallback next-step rendering.
+- Additional runtime RCA: explicit natural-language mode commands should be resolved before prompt generation, and terminal/isolation states must suppress any fallback step rendering.
 
 ## Prioritized backlog
 ### P0
 - Decide whether to generalize the new `wh_5` dominance behavior into reusable blocker metadata across procedures.
 - Add route/integration regression covering the exact `wh_5` no-12V runtime path through the chat API.
 - Review whether other branch trigger steps should accept bare yes/no confirmations in the real route flow, starting with LP/gas prerequisite checks.
+- Review whether other natural-language mode commands need the same explicit detection treatment (e.g. authorization phrasing) without broadening to fuzzy inference.
 
 ### P1
 - Extend dominance-rule candidates to LP-supply and manual-valve blockers in water-heater and furnace procedures.
@@ -74,4 +86,5 @@
 ## Next tasks
 - If approved, design the reusable blocker metadata shape and wire it into the registry without refactoring unrelated flows.
 - Extend chat-route coverage to the next blocker candidates beyond `wh_5`.
+- Add a small route-level regression pack for terminal/isolation states in other procedures so no fallback step leakage reappears outside water-heater.
 - Continue localization hardening for remaining diagnostic procedures.
