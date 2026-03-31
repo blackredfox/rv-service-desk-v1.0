@@ -56,6 +56,9 @@
 - Added documentation-only testing governance updates in `docs/TEST_STRATEGY_QA_CONTRACT.md` and `docs/REPO_STRUCTURE.md`: tests validate behavior contracts rather than incidental wording, exact-wording assertions are allowed only for contract-critical text, and assertion taxonomy/checklist guidance is now explicit.
 - Applied the doctrine in the first narrow test-only refactor PR by updating exactly two files: `tests/prompts/tone-adjustment.test.ts` and `tests/prompts/prompt-composer.test.ts`.
 - Refactor scope: replaced incidental exact-string prompt assertions with behavior/structure assertions around tone contracts, language-directive contracts, and final-report translation structure, while keeping exact checks only for contract-critical markers like mode headings and `--- TRANSLATION ---`.
+- Added `rvsd-contract-check` v1 as a small pure evaluation layer in `src/lib/eval/rvsd-contract-check.ts` with machine-readable output (`passed`, `violations`, `checks`, `summary`).
+- v1 contract checks cover: diagnostic drift/premature completion/question-shape boundaries, final-report shape + language-policy boundaries, authorization drift boundaries, and an explicit transition-doctrine helper (`semantic completion alone must not be treated as a valid mode switch`).
+- Added a tiny fixture set in `tests/fixtures/rvsd-contract-check.ts` and focused tests in `tests/eval/rvsd-contract-check.test.ts`.
 - Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
 - Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
 - Added a dedicated RU explicit-command architecture assertion (`Напиши отчет`) so Russian natural-language report-mode switching is now locked alongside `Write report`.
@@ -80,6 +83,8 @@
 - `yarn vitest run tests/prompts/prompt-composer.test.ts`
 - `yarn vitest run tests/prompts/tone-adjustment.test.ts`
 - `yarn vitest run tests/prompts/prompt-composer.test.ts`
+- `yarn vitest run tests/eval/rvsd-contract-check.test.ts`
+- `yarn vitest run tests/eval/rvsd-contract-check.test.ts tests/mode-validators.test.ts`
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
 - Testing agent report: `/app/docs/archive/test-reports/2026-03/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
