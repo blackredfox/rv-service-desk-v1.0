@@ -125,6 +125,12 @@ function normalizeCommandAlias(text: string): string {
 const FINAL_REPORT_ALIAS_SET = new Set(FINAL_REPORT_COMMAND_ALIASES.map(normalizeCommandAlias));
 const AUTHORIZATION_ALIAS_SET = new Set(AUTHORIZATION_COMMAND_ALIASES.map(normalizeCommandAlias));
 
+const FINAL_REPORT_NATURAL_LANGUAGE_PATTERNS = [
+  /\b(?:write|generate|create|prepare|draft)\s+(?:the\s+)?(?:final\s+)?report\b/i,
+  /(?:^|[\s,.;:!?-])(?:напиши|сформируй|создай|подготовь)\s+(?:финальн(?:ый|ого)?\s+)?(?:отч[её]т|report|репорт)(?:$|[\s,.;:!?-])/iu,
+  /\b(?:genera|crear|prepara|haz)\s+(?:el\s+)?(?:reporte|informe)\b/i,
+];
+
 /**
  * Detect explicit command aliases from a fixed allow-list
  */
@@ -143,7 +149,14 @@ export function detectExplicitCommandAlias(message: string): CaseMode | null {
  * Returns the new mode, or null if no command found
  */
 export function detectModeCommand(message: string): CaseMode | null {
-  return detectExplicitCommandAlias(message);
+  const explicitAlias = detectExplicitCommandAlias(message);
+  if (explicitAlias) return explicitAlias;
+
+  if (FINAL_REPORT_NATURAL_LANGUAGE_PATTERNS.some((pattern) => pattern.test(message))) {
+    return "final_report";
+  }
+
+  return null;
 }
 
 /**
@@ -250,6 +263,8 @@ Final output MUST be in English only.`;
   return `LANGUAGE DIRECTIVE (MANDATORY):
 Technician input language: ${inputDetected} (${inputLangName}).
 All dialogue MUST be in ${outputLangName} (${outputEffective}).
+This includes headers, progress lines, step labels, quoted procedure steps, and any structured diagnostic block.
+If any injected procedure metadata appears in another language, translate it fully into ${outputLangName} before outputting it.
 Do not respond in any other language.
 Do not use English unless the output language is English.`;
 }

@@ -8,6 +8,8 @@ import { join } from "path";
  * - Prompt files exist and are valid
  * - Mode transitions work correctly
  * - Memory window is applied
+ * - Prompt file checks use contract-shape assertions where exact historical wording
+ *   is no longer the active source of truth
  */
 
 describe("Prompt Files", () => {
@@ -16,7 +18,7 @@ describe("Prompt Files", () => {
   it("should have SYSTEM_PROMPT_BASE.txt", () => {
     const path = join(promptsDir, "system", "SYSTEM_PROMPT_BASE.txt");
     expect(existsSync(path)).toBe(true);
-    
+
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("RV Service Desk");
     expect(content).toContain("NOT a chatbot");
@@ -28,7 +30,7 @@ describe("Prompt Files", () => {
   it("should have MODE_PROMPT_DIAGNOSTIC.txt", () => {
     const path = join(promptsDir, "modes", "MODE_PROMPT_DIAGNOSTIC.txt");
     expect(existsSync(path)).toBe(true);
-    
+
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("DIAGNOSTIC MODE");
     expect(content).toContain("COMPLEX SYSTEMS");
@@ -41,17 +43,22 @@ describe("Prompt Files", () => {
   it("should have MODE_PROMPT_AUTHORIZATION.txt", () => {
     const path = join(promptsDir, "modes", "MODE_PROMPT_AUTHORIZATION.txt");
     expect(existsSync(path)).toBe(true);
-    
+
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("AUTHORIZATION MODE");
-    expect(content).toContain("authorization-ready text");
-    expect(content).toContain("conservative, warranty-safe language");
+
+
+    // Contract-shape assertions:
+    // the prompt must generate authorization-ready output using conservative/warranty-safe phrasing
+    expect(content).toMatch(/authorization-ready (text|output)/i);
+    expect(content).toMatch(/warranty-safe/i);
+    expect(content).toMatch(/authorization request|authorization-ready/i);
   });
 
   it("should have MODE_PROMPT_FINAL_REPORT.txt", () => {
     const path = join(promptsDir, "modes", "MODE_PROMPT_FINAL_REPORT.txt");
     expect(existsSync(path)).toBe(true);
-    
+
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("FINAL REPORT MODE");
     expect(content).toContain("Shop-Style");
@@ -74,7 +81,7 @@ describe("Prompt Composer", () => {
   describe("composePrompt", () => {
     it("should compose diagnostic mode prompt", async () => {
       const { composePrompt } = await import("@/lib/prompt-composer");
-      
+
       const prompt = composePrompt({
         mode: "diagnostic",
         dialogueLanguage: "RU",
@@ -88,7 +95,7 @@ describe("Prompt Composer", () => {
 
     it("should compose authorization mode prompt", async () => {
       const { composePrompt } = await import("@/lib/prompt-composer");
-      
+
       const prompt = composePrompt({
         mode: "authorization",
         dialogueLanguage: "EN",
@@ -102,7 +109,7 @@ describe("Prompt Composer", () => {
 
     it("should compose final_report mode prompt", async () => {
       const { composePrompt } = await import("@/lib/prompt-composer");
-      
+
       const prompt = composePrompt({
         mode: "final_report",
         dialogueLanguage: "ES",
@@ -115,7 +122,7 @@ describe("Prompt Composer", () => {
 
     it("should include additional constraints when provided", async () => {
       const { composePrompt } = await import("@/lib/prompt-composer");
-      
+
       const prompt = composePrompt({
         mode: "diagnostic",
         dialogueLanguage: "EN",
@@ -129,7 +136,7 @@ describe("Prompt Composer", () => {
   describe("detectModeCommand", () => {
     it("should detect final report aliases (exact match)", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
-      
+
       expect(detectModeCommand("START FINAL REPORT")).toBe("final_report");
       expect(detectModeCommand("final report")).toBe("final_report");
       expect(detectModeCommand("GENERATE FINAL REPORT")).toBe("final_report");
@@ -141,7 +148,7 @@ describe("Prompt Composer", () => {
 
     it("should detect authorization aliases (exact match)", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
-      
+
       expect(detectModeCommand("START AUTHORIZATION REQUEST")).toBe("authorization");
       expect(detectModeCommand("AUTHORIZATION REQUEST")).toBe("authorization");
       expect(detectModeCommand("REQUEST AUTHORIZATION")).toBe("authorization");
@@ -157,9 +164,19 @@ describe("Prompt Composer", () => {
       expect(detectModeCommand("PREAUTORIZACIÓN")).toBe("authorization");
     });
 
+    it("should detect natural-language final report commands", async () => {
+      const { detectModeCommand } = await import("@/lib/prompt-composer");
+
+      expect(detectModeCommand("Write report")).toBe("final_report");
+      expect(detectModeCommand("Generate report")).toBe("final_report");
+      expect(detectModeCommand("Напиши отчет")).toBe("final_report");
+      expect(detectModeCommand("Сформируй отчет")).toBe("final_report");
+      expect(detectModeCommand("Напиши Report")).toBe("final_report");
+    });
+
     it("should return null for non-exact matches", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
-      
+
       expect(detectModeCommand("Please START FINAL REPORT now")).toBeNull();
       expect(detectModeCommand("reporting voltage at converter")).toBeNull();
       expect(detectModeCommand("We need authorization")).toBeNull();
@@ -169,7 +186,7 @@ describe("Prompt Composer", () => {
   describe("buildMessagesWithMemory", () => {
     it("should build messages with memory window", async () => {
       const { buildMessagesWithMemory } = await import("@/lib/prompt-composer");
-      
+
       const history = [
         { role: "user" as const, content: "Message 1" },
         { role: "assistant" as const, content: "Response 1" },
@@ -186,13 +203,13 @@ describe("Prompt Composer", () => {
 
       expect(messages[0].role).toBe("system");
       expect(messages[0].content).toBe("System prompt");
-      expect(messages.length).toBe(6); // system + 4 history + 1 new user
+      expect(messages.length).toBe(6);
       expect(messages[messages.length - 1].content).toBe("New message");
     });
 
     it("should truncate history to memory window", async () => {
       const { buildMessagesWithMemory } = await import("@/lib/prompt-composer");
-      
+
       const history = Array.from({ length: 20 }, (_, i) => ({
         role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
         content: `Message ${i}`,
@@ -205,9 +222,7 @@ describe("Prompt Composer", () => {
         memoryWindow: 6,
       });
 
-      // system (1) + last 6 from history + new user (1) = 8
       expect(messages.length).toBe(8);
-      // Last history message should be "Message 19"
       expect(messages[messages.length - 2].content).toBe("Message 19");
     });
   });
@@ -215,7 +230,7 @@ describe("Prompt Composer", () => {
   describe("Constants", () => {
     it("should export PROHIBITED_WORDS", async () => {
       const { PROHIBITED_WORDS } = await import("@/lib/prompt-composer");
-      
+
       expect(PROHIBITED_WORDS).toContain("broken");
       expect(PROHIBITED_WORDS).toContain("failed");
       expect(PROHIBITED_WORDS).toContain("defective");
@@ -226,7 +241,7 @@ describe("Prompt Composer", () => {
 
     it("should export DEFAULT_MEMORY_WINDOW", async () => {
       const { DEFAULT_MEMORY_WINDOW } = await import("@/lib/prompt-composer");
-      
+
       expect(DEFAULT_MEMORY_WINDOW).toBe(12);
     });
   });

@@ -188,7 +188,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 
-  it("transitions ONLY via explicit command (START FINAL REPORT)", async () => {
+  it("transitions via explicit report commands (START FINAL REPORT example)", async () => {
     mockStorage.ensureCase.mockResolvedValue({
       id: "case_123",
       title: "Water Pump Case",
@@ -222,6 +222,42 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     const streamText = await response.text();
 
     // Should have transitioned via explicit command
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
+  });
+
+  it("transitions via mixed-language explicit command (Напиши Report)", async () => {
+    mockStorage.ensureCase.mockResolvedValue({
+      id: "case_123",
+      title: "Water Pump Case",
+      userId: "user_123",
+      inputLanguage: "RU",
+      languageSource: "AUTO",
+      mode: "diagnostic",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: "case_123",
+        message: "Напиши Report",
+      }),
+    });
+
+    const response = await POST(req);
+    await response.text();
+
     expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 });

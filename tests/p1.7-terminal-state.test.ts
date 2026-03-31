@@ -257,7 +257,7 @@ describe("P1.7 — Terminal state dominance", () => {
 });
 
 // ── 4. Explicit Report Command Still Required ──────────────────────────
-describe("P1.7 — Explicit START FINAL REPORT still required", () => {
+describe("P1.7 — Explicit report command still required", () => {
   it("terminal state does NOT auto-transition to final_report mode", () => {
     const caseId = buildCase([]);
 

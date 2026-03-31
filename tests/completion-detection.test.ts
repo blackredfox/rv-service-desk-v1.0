@@ -172,8 +172,8 @@ describe("P1.6 — No auto-transition", () => {
   });
 });
 
-// ── 4. Explicit command still required ────────────────────────────────
-describe("P1.6 — Explicit START FINAL REPORT still required", () => {
+// ── 4. Explicit report command still required ─────────────────────────
+describe("P1.6 — Explicit report command still required", () => {
   it("system does NOT transition even after isolationComplete without explicit command", () => {
     const caseId = buildCase([]);
 
@@ -187,7 +187,7 @@ describe("P1.6 — Explicit START FINAL REPORT still required", () => {
     expect(result.context.mode).not.toBe("final_report");
   });
 
-  it("sending START FINAL REPORT still changes mode (existing behavior unchanged)", () => {
+  it("sending START FINAL REPORT still changes mode (existing explicit example unchanged)", () => {
     // This is tested via the existing mode transition path.
     // Confirmed: only explicit command triggers mode switch.
     // This test verifies the contract is documented.

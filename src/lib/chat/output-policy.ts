@@ -40,20 +40,26 @@ export function buildFinalReportFallback(args: {
   translationLanguage?: Language;
   laborHours?: number;
   complaint?: string;
+  diagnosticProcedure?: string;
   finding?: string;
+  correctiveAction?: string;
+  requiredParts?: string;
 }): string {
   const totalLaborText = formatLaborHoursForFallback(args.laborHours ?? 1.0);
   
   // Use provided complaint or fallback to generic
   const complaintText = args.complaint?.trim() || "Complaint details pending verification.";
+  const procedureText = args.diagnosticProcedure?.trim() || "Diagnostic isolation completed based on available technician inputs.";
   const findingText = args.finding?.trim() || "Condition not operating per specification under reported test conditions.";
+  const correctiveActionText = args.correctiveAction?.trim() || "Perform unit-level corrective action aligned to verified condition.";
+  const requiredPartsText = args.requiredParts?.trim() || "Part number to be confirmed at service counter.";
   
   const englishReport = `Complaint: ${complaintText}
-Diagnostic Procedure: Diagnostic isolation completed based on available technician inputs.
+Diagnostic Procedure: ${procedureText}
 Verified Condition: ${findingText}
-Recommended Corrective Action: Perform unit-level corrective action aligned to verified condition.
+Recommended Corrective Action: ${correctiveActionText}
 Estimated Labor: System isolation and access - ${totalLaborText} hr. Total labor: ${totalLaborText} hr.
-Required Parts: Part number to be confirmed at service counter.`;
+Required Parts: ${requiredPartsText}`;
 
   if (!args.policy.includeTranslation || !args.translationLanguage || args.translationLanguage === "EN") {
     return englishReport;
@@ -198,20 +204,46 @@ export function buildDiagnosticDriftFallback(activeStepId?: string): string {
  */
 export function buildAuthoritativeStepFallback(
   stepMetadata: { id: string; question: string; procedureName: string; progress: { completed: number; total: number } } | null,
-  fallbackStepId?: string
+  fallbackStepId?: string,
+  language: Language = "EN",
 ): string {
+  const labels =
+    language === "RU"
+      ? {
+          guidedDiagnostics: "Пошаговая диагностика",
+          progress: "Прогресс",
+          stepsCompleted: "шагов завершено",
+          step: "Шаг",
+          genericQuestion: "Каков фактический результат по этому активному диагностическому шагу?",
+        }
+      : language === "ES"
+      ? {
+          guidedDiagnostics: "Diagnóstico guiado",
+          progress: "Progreso",
+          stepsCompleted: "pasos completados",
+          step: "Paso",
+          genericQuestion: "¿Cuál es el resultado observado para este paso de diagnóstico activo?",
+        }
+      : {
+          guidedDiagnostics: "Guided Diagnostics",
+          progress: "Progress",
+          stepsCompleted: "steps completed",
+          step: "Step",
+          genericQuestion: "What is the observed result for this active diagnostic step?",
+        };
+
   if (!stepMetadata) {
     // No metadata available — use generic fallback
     const stepLabel = fallbackStepId ? ` (${fallbackStepId})` : "";
-    return `Guided Diagnostics${stepLabel}: What is the observed result for this active diagnostic step?`;
+    return `${labels.guidedDiagnostics}${stepLabel}: ${labels.genericQuestion}`;
   }
   
   // Build authoritative response with exact step question
   const lines = [
-    `${stepMetadata.procedureName} — Guided Diagnostics`,
-    `Progress: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} steps completed`,
+    `${stepMetadata.procedureName} — ${labels.guidedDiagnostics}`,
+    `${labels.progress}: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} ${labels.stepsCompleted}`,
     ``,
-    `Step ${stepMetadata.id}: ${stepMetadata.question}`,
+    `${labels.step} ${stepMetadata.id}: ${stepMetadata.question}`,
   ];
   
   return lines.join("\n");

@@ -1,47 +1,116 @@
-# NEO TASK — Safe `route.ts` Decomposition (Boundary-First, No Hidden Authority)
+# PRD / Task Handoff
 
-## Original Problem Statement
-Safe maintainability refactor of `src/app/api/chat/route.ts` so it becomes a thinner orchestration boundary without introducing hidden diagnostic authority outside Context Engine. Preserve runtime behavior, do not mix in diagnostic logic fixes, and add direct tests for route wiring, no hidden authority, extracted modules, and strictness.
+## Original problem statement
+1. Fix language leakage in diagnostic output where Russian input sessions were detected as RU but structured diagnostic output (headers, progress lines, step labels, and step content) still leaked English in diagnostic mode.
+2. Fix water-heater dominant-fact step resolution so a negative `wh_5` finding (`No 12V DC`) does not continue into downstream ignition checks and instead pivots into upstream 12V supply diagnostics.
+3. Preserve clarification behavior, existing branch behavior, and the recently fixed RU language behavior.
 
-## Architecture Decisions
-- Kept Context Engine as the sole diagnostic flow authority; route still invokes `processContextMessage(...)` directly.
-- Extracted bounded chat services only for request preparation, explicit mode resolution, prompt assembly, OpenAI execution, response validation, final-report transport setup, and persistence side effects.
-- Left diagnostic step/branch/terminal orchestration inside `route.ts` rather than moving it into helpers, to avoid creating a second controller.
-- Preserved explicit-only mode transitions and existing validation / fallback behavior.
+## Architecture decisions
+- Kept diagnostic flow authority in the existing context engine + diagnostic registry.
+- Fixed RU leakage deterministically at the server-side metadata/rendering layer instead of trusting prompt behavior alone.
+- Implemented the `wh_5` fix as a narrow deterministic branch extension inside the existing water-heater procedure model instead of rewriting the broader diagnostic engine.
+- Reused the current branch-runtime flow (`processResponseForBranch` + branch-aware next-step resolution) so the fix remains localized and regression-testable.
 
-## What's Implemented
-- Reduced `src/app/api/chat/route.ts` from 1128 lines pre-refactor to 661 lines while keeping HTTP/SSE orchestration at the boundary.
-- Added bounded modules:
-  - `src/lib/chat/chat-request-preparer.ts`
-  - `src/lib/chat/chat-mode-resolver.ts`
-  - `src/lib/chat/prompt-context-builder.ts`
-  - `src/lib/chat/response-validation-service.ts`
-  - `src/lib/chat/final-report-flow-service.ts`
-  - `src/lib/chat/openai-execution-service.ts`
-  - `src/lib/chat/chat-persistence-service.ts`
-- Added/updated direct tests for extracted modules, no-hidden-authority guardrails, execution services, and route wiring.
-- Verified focused suite passes:
-  - `tests/chat-route-decomposition-services.test.ts`
-  - `tests/chat-openai-execution-service.test.ts`
-  - `tests/chat-no-hidden-authority.test.ts`
-  - `tests/chat-route-wiring.test.ts`
-  - `tests/chat-module-extraction.test.ts`
-  - `tests/route-strictness.test.ts`
-  - `tests/chat-route.test.ts`
+## Implemented
+- Added deterministic RU localization for water-heater procedure display name, active-step questions, and how-to-check instructions in `src/lib/diagnostic-procedures.ts`.
+- Updated `buildProcedureContext`, `buildRegistryContext`, and `getActiveStepMetadata` to render localized structured diagnostic context using the effective output language.
+- Updated `src/app/api/chat/route.ts` to pass the effective output language into registry context and active-step metadata retrieval.
+- Strengthened `buildLanguageDirectiveV2` so prompt instructions explicitly require translating any injected procedure metadata into the output language.
+- Hardened `validateLanguageConsistency` to catch English diagnostic markers like `Progress:` / `Step wh_*:` in RU/ES sessions.
+- Updated primary response validation to validate against the effective output language, not only tracked input language.
+- Updated retry correction + safe fallback so language mismatches fall back to a localized authoritative active-step response instead of leaking English fallback text.
+- Added regression tests in `tests/diagnostic-language-lock.test.ts`.
+- Installed project dependencies after upgrading Node to v22 so Vitest could run in this container.
+- Added a new water-heater `no_12v_supply` branch triggered by negative `wh_5` responses in `src/lib/diagnostic-procedures.ts`.
+- Added upstream 12V supply diagnostic steps `wh_5a`, `wh_5b`, and `wh_5c` with RU localizations so `wh_5` negative answers now pivot upstream before ignition diagnostics.
+- Added 3 targeted regressions in `tests/water-heater-diagnostic.test.ts` for:
+  - negative `wh_5` blocks downstream path and enters upstream branch
+  - positive `wh_5` still continues to `wh_6`
+  - clarification at `wh_5` does not advance or trigger the branch
+- Updated water-heater RU language-lock expectations from 21 to 24 total steps to reflect the new deterministic branch steps.
+- Runtime authority fix: widened `no_12v_supply` and `no_ignition` trigger patterns so bare technician negatives (`no` / `нет`) now activate the intended branch in the real `/api/chat` flow.
+- Runtime authority fix: updated the legacy flat `getNextStep()` helper to skip branch steps, preventing branch-only steps like `wh_6a` from leaking into non-branch fallback contexts.
+- Runtime authority fix: updated `buildRegistryContext()` to resolve fallback active steps with branch-aware resolution before building prompt context.
+- Added `/api/chat` route-level regressions in `tests/chat-route-water-heater-dominance.test.ts` covering:
+  - real RU transcript pivot from `wh_5 = нет` to `wh_5a`
+  - `wh_6a` no-loop progression (`wh_6a → wh_6b → wh_6c`)
+  - positive-path runtime progression
+  - clarification preservation in the real route flow
+- Added natural-language final-report command detection in `src/lib/prompt-composer.ts` for RU/EN/ES phrases such as `Напиши отчет`, `Напиши Report`, `Write report`, and `Generate report`.
+- Route/runtime fix: suppressed diagnostic `procedureContext` fallback in `src/app/api/chat/route.ts` when `isolationComplete=true` or `terminalState.phase !== normal`, preventing `wh_5b`/other steps from leaking after repair-complete messages.
+- Added route regressions for:
+  - repair-complete runtime message from `wh_5a` stops diagnostic progression
+  - RU repair-complete + report-request message transitions to `final_report`
+  - EN natural-language `Write report` request transitions to `final_report`
+  - clarification behavior remains unchanged
+- Strengthened repair/restoration detection in `src/lib/context-engine/context-engine.ts` for explicit RU phrases like `Теперь водонагреватель работает` + `Проблема устранена`, and added fuse-specific fault patterns.
+- Added runtime final-report authority facts in `src/lib/fact-pack.ts` (`deriveFinalReportAuthorityFacts`, `buildFinalReportAuthorityConstraint`) so repaired/restored terminal state overrides stale pre-repair findings.
+- Updated final-report fallback path (`output-policy.ts`, `response-validation-service.ts`, `openai-execution-service.ts`) to use authoritative terminal facts deterministically when primary final-report output fails validation.
+- Added route regressions proving:
+  - the exact `wh_5a` Russian repair-complete transcript becomes terminal/isolation-complete with no further step injection
+  - `START FINAL REPORT` after that transcript produces repaired/restored source-of-truth report content (failed fuse root cause, fuse replacement corrective action, water heater operational after repair)
+- Fixed the real stale server-output authority path in `src/app/api/chat/route.ts`: when diagnostic `offer_completion` is reached with `isolationComplete=true`, the route now bypasses the normal diagnostic LLM/prompt path entirely and streams a deterministic server-built completion response.
+- Root-cause documented: stale `Status: isolation not complete` / `Step 6` text was still coming from the standard diagnostic mode prompt path (`prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt`) because the route was still asking the model in diagnostic mode after terminal state had already latched.
+- Updated route tests to assert the completion turn makes **no** upstream LLM call (`fetchTriggered=false`) and emits no stale `Step 6` / `Status: Isolation not completed` text.
+- Aligned architecture test `tests/architecture/no-hidden-authority/chat-no-hidden-authority.test.ts` with current explicit-command behavior: semantic completion alone does not switch modes, but explicit natural-language report commands (e.g. `Write report`) now do.
+- Re-ran the full `tests/architecture` block after the alignment; all 24 architecture tests pass with no additional outdated expectations.
+- Added a dedicated RU explicit-command architecture assertion (`Напиши отчет`) so Russian natural-language report-mode switching is now locked alongside `Write report`.
+- Ran one broader non-architecture test-alignment pass and found only wording/coverage updates — no runtime/code regression.
+- Added mixed-language explicit-command coverage (`Напиши Report`) in non-architecture tests and updated outdated test titles/comments that previously implied `START FINAL REPORT` was the only explicit report command.
 
-## Prioritized Backlog
+## Verified on 2026-03-31
+- `yarn vitest run tests/water-heater-diagnostic.test.ts tests/diagnostic-language-lock.test.ts tests/branch-aware-resolution.test.ts`
+- `yarn vitest run tests/p1.7-terminal-state.test.ts`
+- `yarn vitest run tests/branch-runtime-integration.test.ts tests/p1-5-branch-runtime-integration.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
+- `yarn vitest run tests/unit/diagnostic-procedures.test.ts tests/integration/diagnostic-how-to-check.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts tests/chat-transition-final-report.test.ts`
+- `yarn vitest run tests/prompts/prompt-composer.test.ts tests/mode-validators.test.ts tests/unit/chat-route-decomposition-services.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
+- `yarn vitest run tests/chat-route-water-heater-dominance.test.ts`
+- `yarn vitest run tests/chat-transition-final-report.test.ts tests/p1.7-terminal-state.test.ts tests/completion-detection.test.ts`
+- Testing agent report: `/app/test_reports/iteration_27.json` — 100% backend pass across 90 targeted tests, no issues.
+- Testing agent report: `/app/test_reports/iteration_28.json` — 100% backend pass across 158 tests in 9 targeted files, including the real `/api/chat` runtime regressions.
+- Testing agent report: `/app/test_reports/iteration_29.json` — 100% backend pass across 225 tests in 13 targeted files, including repair-complete/report-intent runtime regressions.
+- Testing agent report: `/app/test_reports/iteration_30.json` — 100% backend pass across 178 tests in 11 targeted files, including exact `wh_5a` repair transcript and repaired-state final-report authority regressions.
+- Testing agent report: `/app/test_reports/iteration_31.json` — 100% backend pass across 60 tests in 4 targeted files, confirming the route now bypasses the diagnostic LLM path on completion-offer turns and no longer emits stale `Status` / `Step` text.
+
+## Dominance-rule expansion proposal (analysis only, not implemented)
+- Best next step: introduce a small procedure-level blocker metadata layer in `src/lib/diagnostic-procedures.ts` for prerequisite facts that should dominate downstream steps.
+- Suggested shape: `blockingRules[]` with fields like `triggerStepId`, `triggerPattern`, `blockDownstreamStepIds`, `entryBranchId | entryStepId`, `resolutionStepId`, and optional `clearPattern`.
+- Runtime hook: evaluate blocking rules inside `src/lib/diagnostic-registry.ts` alongside branch processing, storing an active blocker state separate from ordinary branch state.
+- Resolver hook: update next-step resolution so active blockers outrank ordinary main-flow progression until explicitly cleared.
+- Good first candidates after `wh_5`: missing LP supply (`wh_2`/`wh_3`), closed manual gas valve (`wh_4`), and similar prerequisite failures in furnace, LP gas, 12V electrical, and awning procedures.
+- Testing approach for future rollout: add one 3-case regression pack per blocker (`negative blocks downstream`, `positive keeps normal path`, `clarification preserved`) before expanding to the next procedure.
+- Runtime RCA from this fix confirms the general direction is still correct: blocker rules should normalize bare yes/no trigger replies and must be applied before any fallback next-step rendering.
+- Additional runtime RCA: explicit natural-language mode commands should be resolved before prompt generation, and terminal/isolation states must suppress any fallback step rendering.
+- Additional runtime RCA: final-report generation needs an authoritative latest-state overlay from terminal context/history so earlier pre-repair observations cannot override the repaired/restored final state.
+- Additional runtime RCA: suppressing stale `procedureContext` was not enough by itself; the route also needed a hard server-side short-circuit because the base diagnostic mode prompt still contained status/step rendering instructions that could leak into live output.
+
+## Prioritized backlog
 ### P0
-- Separate targeted fix for the known water-heater / “no 12V” branch-handling defect inside Context Engine behavior.
-- Reduce remaining route-owned diagnostic glue only if it can be moved without fragmenting authority.
+- Decide whether to generalize the new `wh_5` dominance behavior into reusable blocker metadata across procedures.
+- Add route/integration regression covering the exact `wh_5` no-12V runtime path through the chat API.
+- Review whether other branch trigger steps should accept bare yes/no confirmations in the real route flow, starting with LP/gas prerequisite checks.
+- Review whether other natural-language mode commands need the same explicit detection treatment (e.g. authorization phrasing) without broadening to fuzzy inference.
+- Generalize repaired-state authority facts beyond the fuse scenario so final reports in other procedures also prefer the latest restored state over stale pre-repair history.
+- Review whether other diagnostic terminal/fault-candidate turns also need hard route-level short-circuits instead of relying on prompt compliance.
 
 ### P1
-- Consolidate existing route comments and historical patch notes into architecture-safe inline docs or ADR references.
-- Add broader integration safety coverage around labor override and diagnostic validation paths.
+- Extend dominance-rule candidates to LP-supply and manual-valve blockers in water-heater and furnace procedures.
+- Add localized procedure metadata for ES where deterministic server-side structured output is required.
+- Add additional validator heuristics for mixed-language free-text leakage beyond structured headers.
 
 ### P2
-- Improve logging consistency for extracted persistence-side-effect helpers.
-- Tighten prompt/validator fixtures used in service-level tests.
+- Move procedure localizations into a dedicated localization module or data file to reduce maintenance cost.
+- Add snapshot-style tests for localized authoritative fallback blocks by language.
+- Refactor branch and future blocker metadata into a shared diagnostic rule schema.
 
-## Next Tasks
-- If requested, do a separate Context Engine task focused only on the active signal/branch defect.
-- If requested, continue shrinking `route.ts` only around non-authoritative transport/persistence concerns.
+## Next tasks
+- If approved, design the reusable blocker metadata shape and wire it into the registry without refactoring unrelated flows.
+- Extend chat-route coverage to the next blocker candidates beyond `wh_5`.
+- Add a small route-level regression pack for terminal/isolation states in other procedures so no fallback step leakage reappears outside water-heater.
+- Expand final-report authority fact extraction for other common repair outcomes (wiring, valves, boards, pumps) using the same runtime-source-of-truth pattern.
+- Audit other server-rendered diagnostic completion/fault-candidate responses for any remaining prompt-driven stale output paths.
+- Continue localization hardening for remaining diagnostic procedures.

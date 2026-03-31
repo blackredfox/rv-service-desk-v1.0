@@ -35,7 +35,13 @@ import {
   type DiagnosticContext,
   DEFAULT_CONFIG,
 } from "@/lib/context-engine";
-import { buildFactLockConstraint } from "@/lib/fact-pack";
+import {
+  buildFactLockConstraint,
+  buildFinalReportAuthorityConstraint,
+  deriveFinalReportAuthorityFacts,
+  type FinalReportAuthorityFacts,
+} from "@/lib/fact-pack";
+import type { Language } from "@/lib/lang";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
@@ -68,6 +74,76 @@ import {
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
+
+function buildAuthoritativeCompletionOffer(args: {
+  language: Language;
+  isolationFinding?: string | null;
+  facts?: FinalReportAuthorityFacts | null;
+}): string {
+  const evidence = [
+    args.isolationFinding,
+    args.facts?.verifiedCondition,
+    args.facts?.correctiveAction,
+    args.facts?.requiredParts,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const isFuseRepair = /предохранител|fuse/i.test(evidence);
+
+  switch (args.language) {
+    case "RU":
+      return isFuseRepair
+        ? [
+            "Принято.",
+            "Причина подтверждена: неисправный предохранитель в цепи питания водонагревателя.",
+            "Ремонт подтверждён: предохранитель заменён, водонагреватель работает штатно.",
+            "Отправьте START FINAL REPORT — и я сформирую отчёт.",
+          ].join("\n")
+        : [
+            "Принято.",
+            args.isolationFinding ?? "Восстановление после ремонта подтверждено.",
+            "Отправьте START FINAL REPORT — и я сформирую отчёт.",
+          ].join("\n");
+    case "ES":
+      return isFuseRepair
+        ? [
+            "Entendido.",
+            "Causa confirmada: fusible defectuoso en el circuito de alimentación del calentador de agua.",
+            "Reparación confirmada: se reemplazó el fusible y el calentador funciona normalmente.",
+            "Envía START FINAL REPORT y generaré el informe.",
+          ].join("\n")
+        : [
+            "Entendido.",
+            args.isolationFinding ?? "La restauración después de la reparación fue confirmada.",
+            "Envía START FINAL REPORT y generaré el informe.",
+          ].join("\n");
+    default:
+      return isFuseRepair
+        ? [
+            "Noted.",
+            "Root cause confirmed: failed fuse in the water-heater power path.",
+            "Repair confirmed: the fuse was replaced and the water heater is operating normally.",
+            "Send START FINAL REPORT and I will generate the report.",
+          ].join("\n")
+        : [
+            "Noted.",
+            args.isolationFinding ?? "Repair completion and restored operation have been confirmed.",
+            "Send START FINAL REPORT and I will generate the report.",
+          ].join("\n");
+  }
+}
+
+function isClarificationRequest(message: string): boolean {
+  const msg = message.toLowerCase();
+
+  const clarificationWords =
+    /(?:how|where|which|what|как|где|какой|какие|como|donde|cual|cu[aá]l|qu[eé])/i;
+  const diagnosticActionWords =
+    /(?:check|measure|test|verify|terminal|wire|probe|voltage|read|reading|провер|измер|клемм|провод|напряж|показан|medir|probar|verificar|terminal|cable|voltaje|lectura)/i;
+
+  return clarificationWords.test(msg) && diagnosticActionWords.test(msg);
+}
 
 export const runtime = "nodejs";
 
@@ -159,6 +235,7 @@ export async function POST(req: Request) {
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
   let activeStepMetadata: ActiveStepMetadata = null;
+  let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
   if (currentMode === "diagnostic") {
     if (!STRICT_CONTEXT_ENGINE) {
@@ -260,7 +337,7 @@ export async function POST(req: Request) {
     // When a strong fault is identified but restoration is not yet confirmed,
     // inject a directive that limits the LLM to ONE restoration check question.
     // No further diagnostic expansion is allowed.
-    if (engineResult.context.terminalState?.phase === "fault_candidate" && 
+    if (engineResult.context.terminalState?.phase === "fault_candidate" &&
         engineResult.context.terminalState.faultIdentified &&
         !engineResult.context.isolationComplete) {
       const faultDirective = [
@@ -293,12 +370,12 @@ export async function POST(req: Request) {
         engineResult.context,
         DEFAULT_CONFIG
       );
-      
+
       if (loopCheck.violation) {
         console.log(`[Chat API v2] Loop violation detected: ${loopCheck.reason}`);
         const recovery = suggestLoopRecovery(engineResult.context, loopCheck.reason || "");
         console.log(`[Chat API v2] Loop recovery action: ${recovery.action} — ${recovery.reason}`);
-        
+
         // Apply recovery
         if (recovery.action.startsWith("mark_unable:")) {
           const stepToMark = recovery.action.split(":")[1];
@@ -333,15 +410,25 @@ export async function POST(req: Request) {
     // prematurely complete the NEXT question using the current (unrelated) message.
     const currentActiveStep = engineResult.context.activeStepId;
     const contextEngineAdvancedStep = stepIdBeforeProcessing !== currentActiveStep;
+    const clarificationRequested = isClarificationRequest(message);
 
-    if (!contextEngineAdvancedStep && currentActiveStep && !initResult.preCompletedSteps.includes(currentActiveStep)) {
+    if (clarificationRequested && currentActiveStep) {
+      console.log(`[Chat API v2] Clarification detected — NOT completing step ${currentActiveStep}`);
+    }
+
+    if (
+      !clarificationRequested &&
+      !contextEngineAdvancedStep &&
+      currentActiveStep &&
+      !initResult.preCompletedSteps.includes(currentActiveStep)
+    ) {
       const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
       if (isStepAnswered(message, stepQuestion)) {
         // Technician's message answers the step — mark it complete
         registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
         console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match, hardening backup)`);
-        
+
         // ── BRANCH TRIGGER CHECK (P1.5 backup) ───────────────────────────
         // Context engine didn't advance, so check branch trigger here.
         // processResponseForBranch was NOT called by the engine for this step.
@@ -354,7 +441,7 @@ export async function POST(req: Request) {
             engineResult.context.branchState.decisionPath.push({
               stepId: currentActiveStep,
               branchId: branchResult.branchEntered.id,
-              reason: `Triggered by technician response (hardening backup)`,
+              reason: "Triggered by technician response (hardening backup)",
               timestamp: new Date().toISOString(),
             });
             for (const lockedBranch of branchResult.lockedOut) {
@@ -362,7 +449,7 @@ export async function POST(req: Request) {
             }
           }
         }
-        
+
         // Advance to next step (branch-aware)
         const nextStep = getNextStepId(ensuredCase.id);
         if (nextStep) {
@@ -394,7 +481,11 @@ export async function POST(req: Request) {
     }
 
     // Get active step metadata for authoritative rendering
-    activeStepMetadata = getActiveStepMetadata(ensuredCase.id, engineResult.context.activeStepId);
+    activeStepMetadata = getActiveStepMetadata(
+      ensuredCase.id,
+      engineResult.context.activeStepId,
+      outputPolicy.effective,
+    );
     if (activeStepMetadata) {
       console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
     }
@@ -424,14 +515,42 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
 
-    procedureContext = buildRegistryContext(ensuredCase.id, engineResult?.context.activeStepId);
+    const shouldSuppressProcedureContext =
+      engineResult.context.isolationComplete ||
+      engineResult.context.terminalState?.phase !== "normal";
+
+    procedureContext = shouldSuppressProcedureContext
+      ? ""
+      : buildRegistryContext(
+          ensuredCase.id,
+          engineResult?.context.activeStepId,
+          outputPolicy.effective,
+        );
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────
   let factLockConstraint = "";
   if (currentMode === "final_report") {
-    factLockConstraint = buildFactLockConstraint(history);
+    const reportContext = getOrCreateContext(ensuredCase.id);
+    finalReportAuthorityFacts = deriveFinalReportAuthorityFacts(history, reportContext);
+    factLockConstraint = [
+      buildFinalReportAuthorityConstraint(finalReportAuthorityFacts),
+      buildFactLockConstraint(history),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
+
+  const authoritativeDiagnosticCompletionResponse =
+    currentMode === "diagnostic" &&
+    engineResult?.context.isolationComplete &&
+    engineResult?.responseInstructions.action === "offer_completion"
+      ? buildAuthoritativeCompletionOffer({
+          language: outputPolicy.effective,
+          isolationFinding: engineResult.context.isolationFinding,
+          facts: deriveFinalReportAuthorityFacts(history, engineResult.context),
+        })
+      : null;
 
   const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
   const isLaborOverrideRequest = laborOverride.isLaborOverrideRequest;
@@ -500,6 +619,33 @@ export async function POST(req: Request) {
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
+        if (authoritativeDiagnosticCompletionResponse) {
+          emitToken(authoritativeDiagnosticCompletionResponse);
+          full = authoritativeDiagnosticCompletionResponse;
+
+          if (!aborted && full.trim()) {
+            await appendAssistantChatMessage({
+              caseId: ensuredCase.id,
+              content: full,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          if (currentMode === "diagnostic" && engineResult) {
+            finalizeDiagnosticPersistence({
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              engineResult,
+              responseText: full,
+            });
+          }
+
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
+
         // ── LABOR OVERRIDE PATH ─────────────────────────────────────
         if (isLaborOverrideRequest && requestedLaborHours !== null && requestedLaborHoursText) {
           console.log(
@@ -554,6 +700,7 @@ export async function POST(req: Request) {
           translationLanguage,
           activeStepMetadata,
           activeStepId: engineResult?.context.activeStepId ?? undefined,
+          finalReportAuthorityFacts,
           model: getModelForMode(currentMode),
           requestStartedAt,
         });

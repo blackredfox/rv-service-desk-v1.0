@@ -30,6 +30,25 @@ const FINAL_REPORT_HEADERS = [
 
 const CYRILLIC_RE = /[\u0400-\u04FF]/;
 const SPANISH_CHARS_RE = /[áéíóúñ¿¡üÁÉÍÓÚÑÜ]/;
+const ENGLISH_DIAGNOSTIC_MARKERS = [
+  /\bguided\s+diagnostics\b/i,
+  /\bprogress\s*:\s*\d+\/\d+/i,
+  /\bcurrent\s+step\s*:/i,
+  /\bstep\s+[a-z0-9_]+\s*:/i,
+  /\bhow-to-check\s+instruction\b/i,
+  /^\s*system\s*:/im,
+  /^\s*classification\s*:/im,
+  /^\s*status\s*:/im,
+  /\ball\s+steps\s+complete\b/i,
+];
+const NON_DIAGNOSTIC_ENGLISH_WORDS = new Set([
+  "suburban",
+  "atwood",
+  "dometic",
+  "girard",
+  "combo",
+  "gas",
+]);
 
 function findHeaderIndex(text: string, header: string): number {
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -44,6 +63,15 @@ function englishSectionHasNonEnglish(text: string): boolean {
 
 function detectTranslationLanguage(text: string): Language {
   return detectLanguage(text).language;
+}
+
+function containsStructuredEnglishDiagnosticLeak(text: string): boolean {
+  return ENGLISH_DIAGNOSTIC_MARKERS.some((pattern) => pattern.test(text));
+}
+
+function countMeaningfulEnglishWords(text: string): number {
+  const matches = text.match(/\b[A-Za-z]{4,}\b/g) ?? [];
+  return matches.filter((word) => !NON_DIAGNOSTIC_ENGLISH_WORDS.has(word.toLowerCase())).length;
 }
 
 // Final report section indicators (heuristics)
@@ -255,19 +283,27 @@ export function validateLanguageConsistency(
   
   const hasCyrillic = CYRILLIC_RE.test(text);
   const hasSpanish = SPANISH_CHARS_RE.test(text);
+  const hasStructuredEnglishLeak = containsStructuredEnglishDiagnosticLeak(text);
+  const meaningfulEnglishWords = countMeaningfulEnglishWords(text);
   
   if (expectedLanguage === "RU") {
-    // Russian session — should have Cyrillic, should NOT have Spanish chars
-    if (!hasCyrillic && text.length > 50) {
+    // Russian session — should have Cyrillic and should not leak English diagnostic structure
+    if (!hasCyrillic && text.length > 30) {
       violations.push("LANGUAGE_MISMATCH: Russian session but output appears to be in English");
+    }
+    if (hasStructuredEnglishLeak || meaningfulEnglishWords >= 5) {
+      violations.push("LANGUAGE_MISMATCH: Russian session but output contains English diagnostic text");
     }
     if (hasSpanish) {
       violations.push("LANGUAGE_MISMATCH: Russian session but output contains Spanish characters");
     }
   } else if (expectedLanguage === "ES") {
-    // Spanish session — should have Spanish chars or at least not Cyrillic
+    // Spanish session — should not contain Cyrillic or leaked English diagnostic structure
     if (hasCyrillic) {
       violations.push("LANGUAGE_MISMATCH: Spanish session but output contains Cyrillic characters");
+    }
+    if (hasStructuredEnglishLeak) {
+      violations.push("LANGUAGE_MISMATCH: Spanish session but output contains English diagnostic text");
     }
   } else if (expectedLanguage === "EN") {
     // English session — should NOT have Cyrillic or heavy Spanish markers

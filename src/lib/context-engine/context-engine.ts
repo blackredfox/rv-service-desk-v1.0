@@ -61,6 +61,9 @@ const RESTORATION_PATTERNS: RegExp[] = [
   /после.{0,60}(?:восстановлен|замен|ремонт|починк|устранен|подключен|отремонтир|починен).{0,80}(?:работает|работает\s*нормально|функционирует|заработал|запустился|включается|нагревает)/i,
   // Russian: "[repair verb] + работает" — core pattern for TestCase11/12
   /(?:восстановил|починил|заменил|отремонтировал|подключил|устранил).{0,80}(?:работает|работает\s*нормально|функционирует|заработал|запустился)/i,
+  // Russian: explicit resolution phrasing after repair
+  /(?:заменил|восстановил|починил|устранил).{0,120}(?:теперь\s+)?(?:водонагреватель|система|оборудование)?.{0,40}(?:работает|работает\s*нормально|функционирует|заработал).{0,40}(?:проблема\s+устранена|неисправность\s+устранена|исправен)/i,
+  /(?:проблема\s+устранена|неисправность\s+устранена).{0,80}(?:работает|заработал|функционирует)|(?:работает|заработал|функционирует).{0,80}(?:проблема\s+устранена|неисправность\s+устранена)/i,
   // Russian: "[unk repair] проводку + работает" — wiring-specific restoration
   /(?:заменил|восстановил|отремонтировал|починил)\s+проводку.{0,80}(?:работает|заработал|функционирует)/i,
   // Russian: loose "работает" after a temporal/causal sequence
@@ -71,6 +74,8 @@ const RESTORATION_PATTERNS: RegExp[] = [
 ];
 
 const FAULT_PATTERNS: RegExp[] = [
+  /\b(?:blown|failed|faulty|bad)\s+fuse\b/i,
+  /\bfuse\b.{0,40}\b(?:blown|failed|faulty|bad)\b/i,
   // English: component first then state word (e.g. "the relay board is burnt")
   /\b(?:board|motor|relay|valve|pump|module|capacitor|compressor|controller|component|igniter|electrode|wire|connector)\b.{0,80}\b(?:burnt?|burned?|melted?|shorted?|blown?|seized|dead|failed)\b/i,
   // English: state word first then component (e.g. "burnt relay board")
@@ -81,6 +86,8 @@ const FAULT_PATTERNS: RegExp[] = [
   /(?:power|voltage|12v|12\s*volt).{0,60}(?:confirmed|present|verified).{0,80}(?:motor|pump|board|relay|valve).{0,40}(?:not\s+run|not\s+work|won'?t\s+start|no\s+response|dead|nothing)/i,
   // Russian: "короткое замыкание" (short circuit) — Issue 1 in TestCase12
   /короткое\s+замыкание/i,
+  /(?:неисправен|перегорел|сгорел)\s+предохранитель/i,
+  /предохранитель.{0,40}(?:неисправен|перегорел|сгорел)/i,
   // Russian: "обрыв проводки/провода/цепи" (wiring/circuit break)
   /обрыв\s+(?:проводки|провода|цепи|питания)/i,
   // Russian: "разрыв проводки/провода" (wiring break)

@@ -1,0 +1,36 @@
+{
+  "summary": "Backend-only verification completed for P0 wh_5a repair-complete route fix. All 60 tests pass across 4 targeted test files. The fix correctly: (1) bypasses LLM/diagnostic prompt entirely on completion-offer turns via buildAuthoritativeCompletionOffer(), (2) emits deterministic server-built completion response without 'Step 6' or 'Status: Isolation not completed' stale text, (3) uses repaired/restored terminal state as final-report source of truth after START FINAL REPORT.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/chat-route-water-heater-dominance.test.ts",
+    "/app/tests/chat-transition-final-report.test.ts",
+    "/app/tests/p1.7-terminal-state.test.ts",
+    "/app/tests/completion-detection.test.ts"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "route.ts:78-135 buildAuthoritativeCompletionOffer() correctly builds deterministic completion response without LLM call",
+    "route.ts:544-551 correctly derives authoritativeDiagnosticCompletionResponse when isolationComplete && action=offer_completion",
+    "route.ts:622-646 correctly short-circuits the primary LLM path and streams deterministic completion output instead",
+    "context-engine.ts:536-544 P1.7 TERMINAL STATE FINAL ENFORCEMENT correctly clears activeStepId and sets isolationComplete=true",
+    "Tests correctly verify: fetchTriggered=false (no LLM call), no 'Step 6', no 'Status: Isolation not completed' in output"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (60/60 tests across 4 files)",
+    "frontend": "N/A (skipped by request)"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "P0 wh_5a repair-complete route fix verified. Key behaviors: (1) Route now bypasses LLM entirely for diagnostic completion-offer turns using buildAuthoritativeCompletionOffer() at route.ts:78-135. (2) The exact Russian transcript 'Был неисправен предохранитель. Я заменил. Теперь водонагреватель работает. Проблема устранена' at wh_5a correctly triggers terminal state with fetchTriggered=false (no LLM call). (3) Output contains 'START FINAL REPORT' but NOT 'Step 6' or 'Status: Isolation not completed'. (4) START FINAL REPORT after terminal state uses deriveFinalReportAuthorityFacts() for repaired/restored state as source of truth.",
+  "rca_of_the_issue": "Root cause: The stale 'Status: Isolation not completed' and 'Step 6' strings were coming from the normal diagnostic prompt path (MODE_PROMPT_DIAGNOSTIC.txt:97-103, 146-172). Even after terminal state latched, if the route asked the model in diagnostic mode, the base prompt file could still push stale formatting. Fix: route.ts now bypasses the LLM entirely for diagnostic completion-offer turns by checking (currentMode === 'diagnostic' && isolationComplete && action === 'offer_completion') and streaming a deterministic server-built completion response via buildAuthoritativeCompletionOffer()."
+}

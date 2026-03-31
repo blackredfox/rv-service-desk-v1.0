@@ -18,6 +18,7 @@ import {
 } from "@/lib/chat/output-policy";
 import { hasCanonicalTotalLaborLine } from "@/lib/chat/labor-override";
 import { buildLaborOverrideCorrectionInstruction } from "@/lib/chat/final-report-service";
+import type { FinalReportAuthorityFacts } from "@/lib/fact-pack";
 
 export type ValidationResult = {
   valid: boolean;
@@ -41,10 +42,12 @@ export function validatePrimaryResponse(args: {
   response: string;
   mode: CaseMode;
   trackedInputLanguage: Language;
+  outputLanguage?: Language;
   includeTranslation: boolean;
   translationLanguage?: Language;
   activeStepMetadata: ActiveStepMetadata;
 }): ValidationResult {
+  const expectedOutputLanguage = args.outputLanguage ?? args.trackedInputLanguage;
   let validation = validateOutput(
     args.response,
     args.mode,
@@ -61,7 +64,7 @@ export function validatePrimaryResponse(args: {
   if (args.mode === "diagnostic") {
     const langValidation = validateLanguageConsistency(
       args.response,
-      args.trackedInputLanguage,
+      expectedOutputLanguage,
     );
 
     if (!langValidation.valid) {
@@ -121,6 +124,12 @@ export function buildPrimaryCorrectionInstruction(args: {
     }
   }
 
+  if (args.validation.violations.some((violation) => violation.includes("LANGUAGE_MISMATCH"))) {
+    correctionInstructionParts.push(
+      "LANGUAGE REPAIR (MANDATORY): translate every visible diagnostic label, progress line, and active-step question into the required session language. Never echo raw English procedure metadata in a non-English session.",
+    );
+  }
+
   return correctionInstructionParts.join("\n");
 }
 
@@ -135,17 +144,20 @@ export function buildPrimaryFallbackResponse(args: {
   translationLanguage?: Language;
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
+  finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
 }): string {
   const hasDriftOrStepViolation =
     isDiagnosticDriftViolation(args.validation.violations) ||
     args.validation.violations.some((violation) =>
-      violation.includes("STEP_COMPLIANCE"),
+      violation.includes("STEP_COMPLIANCE") ||
+      violation.includes("LANGUAGE_MISMATCH"),
     );
 
   if (args.mode === "diagnostic" && hasDriftOrStepViolation) {
     return buildAuthoritativeStepFallback(
       args.activeStepMetadata,
       args.activeStepId,
+      args.outputLanguage,
     );
   }
 
@@ -157,6 +169,11 @@ export function buildPrimaryFallbackResponse(args: {
     return buildFinalReportFallback({
       policy: args.langPolicy,
       translationLanguage: args.translationLanguage,
+      complaint: args.finalReportAuthorityFacts?.complaint,
+      diagnosticProcedure: args.finalReportAuthorityFacts?.diagnosticProcedure,
+      finding: args.finalReportAuthorityFacts?.verifiedCondition,
+      correctiveAction: args.finalReportAuthorityFacts?.correctiveAction,
+      requiredParts: args.finalReportAuthorityFacts?.requiredParts,
     });
   }
 
