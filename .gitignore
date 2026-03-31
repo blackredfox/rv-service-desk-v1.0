@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/test_reports/
 
 # next.js
 /.next/
@@ -55,6 +56,10 @@ next-env.d.ts
 #farebase
 # secrets
 secrets/
+# Environment files
+*.env
+*.env.*
+-e 
 # Environment files
 *.env
 *.env.*

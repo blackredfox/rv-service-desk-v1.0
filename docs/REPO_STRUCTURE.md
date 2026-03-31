@@ -245,6 +245,12 @@ Logs must avoid PII.
 
 Tests are located in `/tests`.
 
+Root hygiene rule:
+
+* active tests belong under `/tests`
+* repo root must not contain scratch/ad hoc test files
+* generated test reports must not live in repo root; archive them under `docs/archive/test-reports/` if they need to be kept
+
 Categories:
 
 ```
