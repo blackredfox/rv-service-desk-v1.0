@@ -314,6 +314,7 @@ describe("Mode Transition Tests", () => {
       expect(detectModeCommand("Write report")).toBe("final_report");
       expect(detectModeCommand("Generate report")).toBe("final_report");
       expect(detectModeCommand("Напиши отчет")).toBe("final_report");
+      expect(detectModeCommand("Напиши Report")).toBe("final_report");
       expect(detectModeCommand("AUTHORIZATION REQUEST")).toBe("authorization");
       expect(detectModeCommand("SOLICITAR AUTORIZACIÓN")).toBe("authorization");
     });
