@@ -5,7 +5,7 @@
 **Status:** Enforced QA / Testing Contract  
 **Purpose:** Define the required testing model for behavior correctness, architecture preservation, regression control, and safe route decomposition.
 
-**Last updated:** 2026-03-31
+**Last updated:** 2026-04-01
 
 ---
 
@@ -56,15 +56,19 @@ It operationalizes them into QA requirements.
 
 In this repository, a good test protects what the product must do, not merely how one prompt phrased it on one day.
 
-Tests should prefer validating:
+This is the default doctrine for new tests, PR review, and QA decisions.
+
+Tests should prefer validating behavior such as:
 - mode correctness
-- transition rules
+- no invalid mode drift
 - prerequisite/order discipline
-- safety boundaries
+- no skipped steps
+- no premature completion
+- no unauthorized transition
 - output structure / shape
 - language policy
-- report shape
-- authoritative state usage
+- safety boundaries
+- authoritative-state behavior
 
 Tests should avoid brittle exact-string assertions when the wording itself is not the contract.
 
@@ -77,9 +81,25 @@ Exact wording assertions are allowed only when the wording itself is contract-cr
 - safety/compliance-critical mandated wording
 - intentionally fixed canonical templates
 
+Exact wording assertions are NOT the default. They are a narrow exception that should be used only when changing the wording would change product correctness, safety, compliance, or parsing expectations.
+
 If a phrase is not part of the actual product contract, the test should be rewritten to validate structure, markers, state, ordering, or policy instead.
 
-### 3.3 Tiny example
+### 3.3 Preferred assertion classes
+
+When writing or reviewing tests, prefer assertions that answer questions like:
+- Is the system in the correct mode?
+- Did it avoid invalid mode drift?
+- Did it preserve prerequisite and ordering discipline?
+- Did it avoid skipping required steps?
+- Did it avoid premature completion?
+- Did it block unauthorized transitions?
+- Did it preserve the required output structure and shape?
+- Did it follow language policy?
+- Did it stay within safety boundaries?
+- Did it use authoritative state rather than inferred or improvised state?
+
+### 3.4 Tiny example
 
 Bad:
 - `expect(text).toContain("Please continue diagnostics with the next question")`
@@ -560,7 +580,7 @@ it does not protect the system.
 ### Test author / reviewer checklist
 - Am I testing behavior or just wording?
 - Is this wording itself part of the contract?
-- Can this assertion be rewritten as structure/marker/state validation?
+- Can this assertion be rewritten as structure/mode/state/policy validation?
 - Does this test protect a real product behavior boundary?
 
 ---
