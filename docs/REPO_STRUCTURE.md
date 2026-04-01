@@ -243,15 +243,24 @@ Logs must avoid PII.
 
 # 4. Tests
 
-Tests are located in `/tests`.
+Active automated tests are located in `/tests`.
 
 Behavior-contract testing doctrine lives in `docs/TEST_STRATEGY_QA_CONTRACT.md`.
 
 Root hygiene rule:
 
-* active tests belong under `/tests`
-* repo root must not contain scratch/ad hoc test files
-* generated test reports must not live in repo root; archive them under `docs/archive/test-reports/` if they need to be kept
+* active automated tests belong under `/tests`
+* repository root must not contain ad hoc tests
+* repository root must not contain scratch files
+* repository root must not contain generated test reports
+* historical debug evidence belongs in explicit archive paths, not in root
+* if test reports or debug artifacts need to be retained, archive them under `docs/archive/test-reports/` or another explicit archive path rather than placing them in root
+
+Operational rule for reviews and new work:
+
+* if a file is an active automated test, it belongs under `/tests`
+* if a file is temporary debugging evidence, it belongs in an explicit archive location or should be removed after use
+* root-level test clutter is a repository hygiene defect and should be cleaned before merge
 
 Categories:
 
