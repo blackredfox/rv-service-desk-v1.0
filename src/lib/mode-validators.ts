@@ -50,6 +50,30 @@ const NON_DIAGNOSTIC_ENGLISH_WORDS = new Set([
   "gas",
 ]);
 
+const STEP_GUIDANCE_CONTINUATION_MARKERS: Record<Language, RegExp[]> = {
+  EN: [/still\s+on\s+this\s+step/i, /tell\s+me\s+exactly\s+what\s+you\s+found/i],
+  RU: [/всё\s+ещё\s+на\s+этом\s+шаге/i, /что\s+вы\s+обнаружили/i],
+  ES: [/seguimos\s+en\s+este\s+paso/i, /qué\s+encontraste/i],
+};
+
+const STEP_GUIDANCE_DRIFT_PATTERNS = [
+  /start\s+final\s+report/i,
+  /authorization/i,
+  /authorisation/i,
+  /next\s+step/i,
+  /move\s+on/i,
+  /all\s+steps\s+complete/i,
+  /final\s+report/i,
+  /authorization\s+request/i,
+  /авторизац/i,
+  /следующ(?:ий|его)\s+шаг/i,
+  /переходим/i,
+  /финальн(?:ый|ого)\s+отч[её]т/i,
+  /autorizaci[oó]n/i,
+  /siguiente\s+paso/i,
+  /informe\s+final/i,
+];
+
 function findHeaderIndex(text: string, header: string): number {
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`^\\s*${escaped}\\s*:` , "im");
@@ -268,6 +292,51 @@ export function validateDiagnosticOutput(text: string): ValidationResult {
     suggestion: violations.length > 0 
       ? "Produce diagnostic output with system info and ONE specific diagnostic question."
       : undefined,
+  };
+}
+
+/**
+ * Validate server-owned STEP_GUIDANCE output.
+ */
+export function validateStepGuidanceOutput(
+  text: string,
+  expectedLanguage: Language,
+): ValidationResult {
+  const violations: string[] = [];
+
+  if (looksLikeFinalReport(text)) {
+    violations.push("STEP_GUIDANCE_DRIFT: Output looks like a final report.");
+  }
+
+  if (text.includes(TRANSLATION_SEPARATOR)) {
+    violations.push("STEP_GUIDANCE_DRIFT: Output contains translation separator / report block formatting.");
+  }
+
+  if (containsIsolationCompleteLanguage(text)) {
+    violations.push("STEP_GUIDANCE_PROGRESS_DRIFT: Guidance must not declare isolation complete or transition state.");
+  }
+
+  if (STEP_GUIDANCE_DRIFT_PATTERNS.some((pattern) => pattern.test(text))) {
+    violations.push("STEP_GUIDANCE_PROGRESS_DRIFT: Guidance must not advance steps, switch mode, or emit authorization/final-report wording.");
+  }
+
+  const continuationMarkers = STEP_GUIDANCE_CONTINUATION_MARKERS[expectedLanguage];
+  if (!continuationMarkers.every((pattern) => pattern.test(text))) {
+    violations.push("STEP_GUIDANCE_CONTINUATION: Guidance must keep the same step active and request actual findings after the check.");
+  }
+
+  const langValidation = validateLanguageConsistency(text, expectedLanguage);
+  if (!langValidation.valid) {
+    violations.push(...langValidation.violations);
+  }
+
+  return {
+    valid: violations.length === 0,
+    violations,
+    suggestion:
+      violations.length > 0
+        ? "Keep the same active step, stay in diagnostic mode, and end with a same-step request for actual findings in the session language."
+        : undefined,
   };
 }
 
