@@ -5,11 +5,66 @@
  * Does NOT own: flow control, diagnostic logic.
  */
 
-import type { LanguagePolicy, Language } from "@/lib/lang";
+import { detectLanguage, type LanguagePolicy, type Language } from "@/lib/lang";
 import type { CaseMode } from "@/lib/prompt-composer";
 
 // Translation separator (must match mode-validators / output-validator)
 export const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
+
+export const STEP_GUIDANCE_CONTINUATIONS: Record<Language, string> = {
+  EN: "We are still on this step. After you perform that check, tell me exactly what you found.",
+  RU: "Мы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.",
+  ES: "Seguimos en este paso. Después de realizar esa verificación, dime exactamente qué encontraste.",
+};
+
+const STEP_GUIDANCE_LABELS: Record<Language, { currentStep: string; genericGuidance: string }> = {
+  EN: {
+    currentStep: "Current step",
+    genericGuidance:
+      "Perform the exact check for this active step at the referenced point with the correct tool, then note the actual reading or condition.",
+  },
+  RU: {
+    currentStep: "Текущий шаг",
+    genericGuidance:
+      "Выполните точную проверку для этого активного шага в указанной точке подходящим инструментом, затем зафиксируйте фактическое показание или состояние.",
+  },
+  ES: {
+    currentStep: "Paso actual",
+    genericGuidance:
+      "Realiza la verificación exacta de este paso activo en el punto indicado con la herramienta correcta y anota la lectura o condición real.",
+  },
+};
+
+function isSessionLanguageText(text: string | null | undefined, language: Language): boolean {
+  if (!text?.trim()) return false;
+  return detectLanguage(text).language === language;
+}
+
+export function getStepGuidanceContinuation(language: Language): string {
+  return STEP_GUIDANCE_CONTINUATIONS[language];
+}
+
+export function buildStepGuidanceResponse(args: {
+  language: Language;
+  stepQuestion?: string | null;
+  guidance?: string | null;
+}): string {
+  const labels = STEP_GUIDANCE_LABELS[args.language];
+  const safeStepQuestion = isSessionLanguageText(args.stepQuestion, args.language)
+    ? args.stepQuestion!.trim()
+    : "";
+  const safeGuidance = isSessionLanguageText(args.guidance, args.language)
+    ? args.guidance!.trim()
+    : labels.genericGuidance;
+
+  const lines = [
+    safeStepQuestion ? `${labels.currentStep}: ${safeStepQuestion}` : "",
+    safeGuidance,
+    getStepGuidanceContinuation(args.language),
+  ].filter(Boolean);
+
+  return lines.join("\n\n");
+}
 
 /**
  * Output-layer enforcement: strip translation block when policy says none.

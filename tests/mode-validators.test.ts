@@ -79,6 +79,52 @@ describe("Mode Validators", () => {
     });
   });
 
+  describe("validateStepGuidanceOutput", () => {
+    it("should pass valid same-step RU guidance", async () => {
+      const { validateStepGuidanceOutput } = await import("@/lib/mode-validators");
+
+      const result = validateStepGuidanceOutput(
+        [
+          "Текущий шаг: Есть ли 12 В DC на плате управления/поджиге водонагревателя? Измерьте напряжение.",
+          "Переключите мультиметр в режим DC volts и измерьте напряжение на входных клеммах 12V платы управления. Норма: 11.5–13.5 В.",
+          "Мы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.",
+        ].join("\n\n"),
+        "RU",
+      );
+
+      expect(result.valid).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it("should reject final-report / progress drift in STEP_GUIDANCE", async () => {
+      const { validateStepGuidanceOutput } = await import("@/lib/mode-validators");
+
+      const result = validateStepGuidanceOutput(
+        [
+          "Complaint: Heater inoperative.",
+          "Diagnostic Procedure: Verified missing 12V at control board.",
+          "Send START FINAL REPORT and I will generate the report.",
+        ].join("\n"),
+        "EN",
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some((v) => v.includes("STEP_GUIDANCE_DRIFT") || v.includes("STEP_GUIDANCE_PROGRESS_DRIFT"))).toBe(true);
+    });
+
+    it("should reject guidance that does not request actual findings", async () => {
+      const { validateStepGuidanceOutput } = await import("@/lib/mode-validators");
+
+      const result = validateStepGuidanceOutput(
+        "Check the control-board input directly with a DC meter.",
+        "EN",
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some((v) => v.includes("STEP_GUIDANCE_CONTINUATION"))).toBe(true);
+    });
+  });
+
   describe("validateAuthorizationOutput", () => {
     it("should pass valid authorization text", async () => {
       const { validateAuthorizationOutput } = await import("@/lib/mode-validators");

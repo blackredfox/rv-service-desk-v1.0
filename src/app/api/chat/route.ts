@@ -5,6 +5,7 @@ import {
 } from "@/lib/prompt-composer";
 import {
   isStepAnswered,
+  validateStepGuidanceOutput,
 } from "@/lib/mode-validators";
 import {
   initializeCase,
@@ -27,10 +28,12 @@ import {
   buildReplanNotice,
   isInClarificationSubflow,
   buildReturnToMainInstruction,
+  popTopic,
   updateContext,
   checkLoopViolation,
   suggestLoopRecovery,
   markStepCompleted as markContextStepCompleted,
+  recordAgentAction,
   type ContextEngineResult,
   type DiagnosticContext,
   DEFAULT_CONFIG,
@@ -42,6 +45,9 @@ import {
   type FinalReportAuthorityFacts,
 } from "@/lib/fact-pack";
 import type { Language } from "@/lib/lang";
+import {
+  buildStepGuidanceResponse,
+} from "@/lib/chat/output-policy";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
@@ -138,11 +144,91 @@ function isClarificationRequest(message: string): boolean {
   const msg = message.toLowerCase();
 
   const clarificationWords =
-    /(?:how|where|which|what|как|где|какой|какие|como|donde|cual|cu[aá]l|qu[eé])/i;
+    /(?:how|where|which|what|explain|show|tell\s+me|как|где|какой|какие|что|объясни|покажи|como|c[oó]mo|donde|d[oó]nde|cual|cu[aá]l|qu[eé]|explica|muestra)/i;
   const diagnosticActionWords =
-    /(?:check|measure|test|verify|terminal|wire|probe|voltage|read|reading|провер|измер|клемм|провод|напряж|показан|medir|probar|verificar|terminal|cable|voltaje|lectura)/i;
+    /(?:check|measure|test|verify|inspect|locate|find|terminal|wire|probe|voltage|reading|connector|fuse|relay|board|module|valve|igniter|electrode|burner|ground|spark|провер|измер|клемм|провод|напряж|разъ[её]м|предохран|реле|плат|модул|клапан|электрод|горел|искра|masa|conector|fusible|rele|placa|m[oó]dulo|v[aá]lvula|encendedor|electrodo|quemador|tierra|chispa|voltaje|lectura|verific|comprueb|mido|mide|reviso|revisa|pruebo|prueba)/i;
 
   return clarificationWords.test(msg) && diagnosticActionWords.test(msg);
+}
+
+function extractSignificantTerms(text: string): string[] {
+  return (text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).filter(
+    (term) => term.length >= 4 && ![
+      "this",
+      "that",
+      "with",
+      "have",
+      "from",
+      "step",
+      "what",
+      "where",
+      "which",
+      "check",
+      "как",
+      "где",
+      "что",
+      "этот",
+      "это",
+      "paso",
+      "esto",
+      "eso",
+      "como",
+      "cómo",
+      "donde",
+      "dónde",
+      "qué",
+      "cual",
+      "cuál",
+    ].includes(term),
+  );
+}
+
+function hasActiveStepReferenceOverlap(message: string, stepReference: string): boolean {
+  const stepTerms = new Set(extractSignificantTerms(stepReference));
+  if (stepTerms.size === 0) return false;
+  return extractSignificantTerms(message).some((term) => stepTerms.has(term));
+}
+
+function containsGuidanceEvidence(message: string): boolean {
+  const trimmed = message.trim();
+  const howToLead = /^(?:how|how\s+to|how\s+do\s+i|how\s+can\s+i|how\s+should\s+i|what\s+should\s+i|what\s+do\s+i|как|каким\s+образом|c[oó]mo|de\s+qu[eé]\s+manera)/i;
+  const explicitEvidence = [
+    /(?:i\s+)?(?:measured|checked|tested|verified|confirmed|found|got|read|see|saw)\b/i,
+    /(?:я\s+)?(?:измерил|проверил|подтвердил|наш[её]л|увидел|заметил)\b/i,
+    /(?:ya\s+)?(?:med[ií]|comprob[eé]|verifiqu[eé]|confirm[eé]|encontr[eé]|vi)\b/i,
+    /^(?:yes|no|да|нет|s[ií]|no)\b[\s,.;:-]/i,
+  ];
+
+  if (explicitEvidence.some((pattern) => pattern.test(trimmed))) {
+    return true;
+  }
+
+  const measurementValue = /\b\d+(?:\.\d+)?\s*(?:v|vac|vdc|volts?|mv|ma|amps?|ohms?|psi|wc)\b/i;
+  return measurementValue.test(trimmed) && !howToLead.test(trimmed);
+}
+
+function isStepGuidanceRequest(args: {
+  message: string;
+  activeStepQuestion: string;
+  activeStepHowToCheck?: string | null;
+}): boolean {
+  if (!isClarificationRequest(args.message)) {
+    return false;
+  }
+
+  if (containsGuidanceEvidence(args.message)) {
+    return false;
+  }
+
+  const genericReference = /(?:\b(?:this|that|it|step|check|reading|voltage|result|measurement)\b|эт(?:о|от|ом)|\bшаг\b|\bпроверк|\bизмерен|\bрезультат|\besto\b|\beso\b|\bpaso\b|verificaci[oó]n|medici[oó]n|resultado|voltaje)/i;
+  if (genericReference.test(args.message)) {
+    return true;
+  }
+
+  return hasActiveStepReferenceOverlap(
+    args.message,
+    [args.activeStepQuestion, args.activeStepHowToCheck ?? ""].join(" "),
+  );
 }
 
 export const runtime = "nodejs";
@@ -221,6 +307,60 @@ export async function POST(req: Request) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
+  let stepGuidanceResponse: string | null = null;
+  let stepGuidanceStepId: string | null = null;
+
+  if (currentMode === "diagnostic") {
+    const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
+    const activeStepBeforeProcessing = contextBeforeProcessing.activeStepId;
+    const eligibleForStepGuidance =
+      activeStepBeforeProcessing !== null &&
+      !contextBeforeProcessing.isolationComplete &&
+      contextBeforeProcessing.terminalState.phase === "normal";
+
+    if (eligibleForStepGuidance) {
+      const stepGuidanceMetadata = getActiveStepMetadata(
+        ensuredCase.id,
+        activeStepBeforeProcessing,
+        outputPolicy.effective,
+      );
+
+      if (
+        stepGuidanceMetadata &&
+        isStepGuidanceRequest({
+          message,
+          activeStepQuestion: stepGuidanceMetadata.question,
+          activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
+        })
+      ) {
+        const draftedGuidanceResponse = buildStepGuidanceResponse({
+          language: outputPolicy.effective,
+          stepQuestion: stepGuidanceMetadata.question,
+          guidance: stepGuidanceMetadata.howToCheck,
+        });
+        const validation = validateStepGuidanceOutput(
+          draftedGuidanceResponse,
+          outputPolicy.effective,
+        );
+
+        stepGuidanceResponse = validation.valid
+          ? draftedGuidanceResponse
+          : buildStepGuidanceResponse({
+              language: outputPolicy.effective,
+            });
+        stepGuidanceStepId = stepGuidanceMetadata.id;
+
+        if (!validation.valid) {
+          console.warn(
+            `[Chat API v2] STEP_GUIDANCE validator repaired response for step ${stepGuidanceStepId}: ${validation.violations.join(" | ")}`,
+          );
+        }
+
+        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceStepId}`);
+      }
+    }
+  }
+
   await appendUserChatMessage({
     caseId: ensuredCase.id,
     message,
@@ -228,7 +368,9 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  const history = await loadChatHistory(ensuredCase.id);
+  const history = stepGuidanceResponse
+    ? []
+    : await loadChatHistory(ensuredCase.id);
 
   // ── CONTEXT ENGINE: SINGLE FLOW AUTHORITY ─────────────────────────
   let procedureContext = "";
@@ -237,7 +379,7 @@ export async function POST(req: Request) {
   let activeStepMetadata: ActiveStepMetadata = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
-  if (currentMode === "diagnostic") {
+  if (currentMode === "diagnostic" && !stepGuidanceResponse) {
     if (!STRICT_CONTEXT_ENGINE) {
       console.error("[Chat API v2] STRICT_CONTEXT_ENGINE is disabled — this is not supported in production");
     }
@@ -490,6 +632,41 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
     }
 
+    const shouldPromoteToStepGuidance =
+      !stepGuidanceResponse &&
+      engineResult.responseInstructions.action === "provide_clarification" &&
+      stepIdBeforeProcessing !== null &&
+      engineResult.context.activeStepId === stepIdBeforeProcessing &&
+      engineResult.context.terminalState.phase === "normal" &&
+      !engineResult.context.isolationComplete;
+
+    if (shouldPromoteToStepGuidance) {
+      const draftedGuidanceResponse = buildStepGuidanceResponse({
+        language: outputPolicy.effective,
+        stepQuestion: activeStepMetadata?.question,
+        guidance: activeStepMetadata?.howToCheck,
+      });
+      const validation = validateStepGuidanceOutput(
+        draftedGuidanceResponse,
+        outputPolicy.effective,
+      );
+
+      stepGuidanceResponse = validation.valid
+        ? draftedGuidanceResponse
+        : buildStepGuidanceResponse({
+            language: outputPolicy.effective,
+          });
+      stepGuidanceStepId = activeStepMetadata?.id ?? stepIdBeforeProcessing;
+
+      if (!validation.valid) {
+        console.warn(
+          `[Chat API v2] STEP_GUIDANCE validator repaired promoted response for step ${stepGuidanceStepId}: ${validation.violations.join(" | ")}`,
+        );
+      }
+
+      console.log(`[Chat API v2] STEP_GUIDANCE promoted from Context Engine clarification for step ${stepGuidanceStepId}`);
+    }
+
     // ── P1.7 TERMINAL STATE ENFORCEMENT ─────────────────────────────────
     // This is the DOMINANT rule that runs AFTER all step-assignment code paths.
     // No loop recovery, no step completion hardening, no registry fallback can
@@ -618,6 +795,41 @@ export async function POST(req: Request) {
         })));
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
+
+        if (stepGuidanceResponse) {
+          emitToken(stepGuidanceResponse);
+          full = stepGuidanceResponse;
+
+          if (!aborted && full.trim()) {
+            await appendAssistantChatMessage({
+              caseId: ensuredCase.id,
+              content: full,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          if (currentMode === "diagnostic") {
+            recordAgentAction(
+              ensuredCase.id,
+              {
+                type: "clarification",
+                content: full.slice(0, 200),
+                stepId: stepGuidanceStepId ?? undefined,
+                submode: "main",
+              },
+              DEFAULT_CONFIG,
+            );
+
+            if (engineResult && isInClarificationSubflow(engineResult.context)) {
+              updateContext(popTopic(engineResult.context));
+            }
+          }
+
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
 
         if (authoritativeDiagnosticCompletionResponse) {
           emitToken(authoritativeDiagnosticCompletionResponse);
