@@ -164,7 +164,7 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
           RU: "Есть ли 12 В DC на плате управления/поджиге водонагревателя? Измерьте напряжение.",
         },
         howToCheck: {
-          RU: "Переключите мультиметр в режим DC volts и измерьте напряжение на входных клеммах 12V платы управления. Норма: 11.5–13.5 В.",
+          RU: "Переключите мультиметр в режим DC volts. Чёрный щуп поставьте на массу/B-, красный — на вход 12V/B+ платы управления во время запроса нагрева. Норма: примерно напряжение аккумулятора, обычно 11.5–13.5 В.",
         },
       },
       wh_5a: {
@@ -212,7 +212,7 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
           RU: "Ветка отсутствия розжига: есть ли 12 В на клеммах модуля поджига во время попытки розжига?",
         },
         howToCheck: {
-          RU: "Измерьте DC-напряжение на модуле поджига при включённом переключателе. Во время попытки розжига должно появляться 12 В.",
+          RU: "Во время попытки розжига измерьте DC-напряжение между клеммой питания модуля поджига и его массой. В момент, когда плата запрашивает искру, должно появляться напряжение аккумулятора.",
         },
       },
       wh_6b: {
@@ -284,7 +284,7 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
           RU: "Если 12 В на соленоиде газового клапана подтверждены: проходит ли газ дальше? (краткая проверка запаха у горелочной трубки или показание манометра)",
         },
         howToCheck: {
-          RU: "БЕЗОПАСНОСТЬ: только кратко проверьте запах. Если на клапане есть 12 В, а газа нет, соленоид клапана может зависнуть или быть неисправным.",
+          RU: "Если это допускается правилами безопасности на месте, во время попытки розжига кратко проверьте наличие газа у выхода горелочной трубки или подтвердите поток манометром на выходе/тестовой точке клапана. Для этого шага важен только факт: проходит ли газ через клапан при наличии 12 В.",
         },
       },
       wh_9: {
@@ -316,7 +316,7 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
           RU: "Проверялась или нажималась кнопка сброса верхнего термопредохранителя (ECO)? Она находится на газовом клапане или рядом с термостатом.",
         },
         howToCheck: {
-          RU: "Найдите маленькую красную кнопку сброса на узле газового клапана. Нажмите уверенно. Если был щелчок, ECO был сработавшим.",
+          RU: "Откройте наружную сервисную дверцу и найдите кнопку сброса ECO/верхнего предела на узле газового клапана или рядом с термостатом. Нажмите её один раз и отметьте, был ли отчётливый щелчок или кнопка уже была во взведённом положении.",
         },
       },
     },
@@ -449,6 +449,7 @@ reg({
       question: "LP tank level — gauge reading or weight check? Valve in full open position?",
       prerequisites: [],
       matchPatterns: [/tank.*(?:full|empty|level|gauge|\d+%)/i, /valve.*(?:open|closed)/i],
+      howToCheck: "Use the tank gauge or known cylinder weight to confirm fuel remains. Then verify the service valve is fully open before judging downstream LP flow.",
     },
     {
       id: "lpg_2",
@@ -462,14 +463,14 @@ reg({
       question: "Gas leak detector applied at all connections from tank to appliance? Any bubbles or detector alerts?",
       prerequisites: ["lpg_1"],
       matchPatterns: [/(?:no|yes)\s*(?:leak|bubble)/i, /leak.*(?:test|detect|check)/i, /(?:clean|good|tight)\s*(?:connection|fitting)/i],
-      howToCheck: "Apply leak detector solution or use an electronic sniffer at each fitting from tank valve to appliance. Bubbles or detector alarm = leak. Tighten or replace fitting.",
+      howToCheck: "With the LP system pressurized, apply leak detector solution or use an electronic sniffer at each fitting from the tank outlet to the appliance inlet. Growing bubbles or a detector alarm mean that connection is leaking.",
     },
     {
       id: "lpg_4",
       question: "Manual gas valve at the appliance — open? Verify gas flow reaches the appliance.",
       prerequisites: ["lpg_2"],
       matchPatterns: [/manual\s*(?:gas\s*)?valve.*(?:open|closed)/i, /gas.*(?:reach|flow|present)/i],
-      howToCheck: "Locate the manual shutoff valve on the gas line entering the appliance. Handle parallel to pipe = open. If open but no gas, check upstream connections.",
+      howToCheck: "Follow the appliance gas line to the manual shutoff at the inlet. Handle parallel to the pipe = open. Confirm this valve position before judging gas flow at the appliance.",
     },
     {
       id: "lpg_5",
@@ -497,6 +498,7 @@ reg({
       question: "Control board error codes or fault indicators? LED status?",
       prerequisites: [],
       matchPatterns: [/(?:error|fault|code|led|blink|flash)/i],
+      howToCheck: "Open the appliance control-board access and watch the status LED during the heat call. Count the exact flash pattern between pauses; steady, off, or repeating flashes are the result to report.",
     },
   ],
 });
@@ -565,7 +567,7 @@ reg({
         /(?:12v|12\s*volt|voltage|напряжени)/i,
         /(?:no|yes|есть|нет)\s*(?:power|voltage|питани)/i,
       ],
-      howToCheck: "With multimeter set to DC volts, measure across the 12V input terminals on the control board. Should read 11.5-13.5V.",
+      howToCheck: "Set meter to DC volts. Place black lead on board ground/B- and red lead on the 12V input or B+ terminal at the control board during the call for heat. Reading should stay around battery voltage, typically 11.5-13.5V.",
     },
     // Step 6: Ignition attempt (BRANCH TRIGGER STEP)
     {
@@ -601,7 +603,7 @@ reg({
         /(?:12v|voltage).*(?:igniter|module|terminal)/i,
         /(?:no|yes)\s*(?:12v|voltage|power)/i,
       ],
-      howToCheck: "Measure DC voltage at igniter module while switch is ON. Should see 12V during ignition attempt.",
+      howToCheck: "During an ignition attempt, place meter leads across the igniter module power and ground terminals. You should see battery voltage appear while the board is commanding spark.",
     },
     {
       id: "wh_6b",
@@ -703,7 +705,7 @@ reg({
         /(?:газ|запах).*(?:да|нет|есть)/i,
         /manometer.*(?:\d+|0)/i,
       ],
-      howToCheck: "SAFETY: Brief sniff only. If 12V is at valve but no gas flows, valve solenoid may be stuck or failed.",
+      howToCheck: "If site safety allows, check during the ignition attempt for brief gas odor at the burner tube outlet or verify flow with a manometer at the valve outlet/test point. For this step, report only whether gas is passing the valve while 12V is present.",
     },
     // Step 9: Thermocouple/ECO check
     {
@@ -749,7 +751,7 @@ reg({
         /(?:eco|high\s*limit|reset).*(?:press|check|yes|no|trip)/i,
         /(?:кнопк|сброс).*(?:нажа|провер|да|нет)/i,
       ],
-      howToCheck: "Find the small red reset button on the gas valve assembly. Press firmly. If it clicks, the ECO had tripped.",
+      howToCheck: "Open the exterior service access and locate the ECO/high-limit reset on the gas valve or thermostat assembly. Press the small reset button once and note whether it clicks or already feels set.",
     },
     // === NO 12V SUPPLY BRANCH (wh_5 → no board power) ===
     {
@@ -839,6 +841,7 @@ reg({
       question: "When furnace calls for heat, does the blower motor attempt to run?",
       prerequisites: [],
       matchPatterns: [/blower.*(?:run|spin|start|attempt|nothing|dead|no)/i, /motor.*(?:run|spin|nothing)/i],
+      howToCheck: "Raise the thermostat above room temperature and listen at the furnace housing after the call for heat starts. Any motor hum, brief spin, or full blower run counts as an attempt from the furnace itself.",
     },
     {
       id: "furn_2",
@@ -866,12 +869,14 @@ reg({
       question: "Error codes on control board? How many LED flashes?",
       prerequisites: [],
       matchPatterns: [/(?:error|fault|code|led|flash|blink).*(?:\d+|no|none)/i],
+      howToCheck: "Open the furnace control-board compartment and watch the board LED during the failed heat call. Count the flashes between pauses exactly as the pattern repeats.",
     },
     {
       id: "furn_6",
       question: "Exhaust vent clear and unobstructed?",
       prerequisites: [],
       matchPatterns: [/exhaust.*(?:clear|blocked|obstruct|clean)/i, /vent.*(?:clear|blocked)/i],
+      howToCheck: "Inspect the exterior furnace exhaust/intake port for insect nests, soot buildup, packed debris, or bent vent parts. The air path should be visibly open end to end.",
     },
     {
       id: "furn_7",
@@ -898,6 +903,7 @@ reg({
       question: "All wire connections secure on control board and components?",
       prerequisites: [],
       matchPatterns: [/wire.*(?:secure|loose|connection|tight)/i, /control\s*board.*(?:connection|wire)/i],
+      howToCheck: "Inspect the board plug, gas valve leads, sail switch, limit switch, igniter, and ground connections. Each connector should be fully seated with no green corrosion, burned insulation, or loose spades.",
     },
   ],
 });
