@@ -501,6 +501,29 @@ describe("Procedure Contract Audit v1", () => {
     );
   });
 
+  describe("5b. rollout-targeted howToCheck coverage", () => {
+    const rolloutTargetSystems = [
+      "water_pump",
+      "roof_ac",
+      "refrigerator",
+      "leveling",
+      "consumer_appliance",
+    ] as const;
+
+    it.each(rolloutTargetSystems)(
+      "%s: every step has technician-facing howToCheck guidance",
+      (system) => {
+        const proc = getProcedure(system)!;
+
+        const missingHowToCheck = proc.steps
+          .filter((step) => !step.howToCheck || step.howToCheck.trim().length === 0)
+          .map((step) => step.id);
+
+        expect(missingHowToCheck).toEqual([]);
+      }
+    );
+  });
+
   describe("6. Structural Consistency", () => {
     it.each(allSystems)("%s: all steps have non-empty questions", (system) => {
       const proc = getProcedure(system)!;
