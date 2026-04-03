@@ -66,6 +66,11 @@ export type DiagnosticProcedure = {
 // ── System Detection ────────────────────────────────────────────────
 
 const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
+  { system: "aqua_hot_system", patterns: [
+    /aqua[\s-]?hot/i,
+    /hydronic\s*(?:heat|heating|system)/i,
+    /diesel\s*hydronic/i,
+  ]},
   // Water heater MUST be before furnace (more specific pattern)
   { system: "water_heater", patterns: [
     /water\s*heater/i, 
@@ -81,9 +86,25 @@ const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
   { system: "lp_gas", patterns: [/lp\s*gas|propane|gas\s*(?:system|leak|line|valve|regulator)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
   { system: "slide_out", patterns: [/slide[\s-]*out/i, /слайд/i, /slide\s*room/i] },
   { system: "leveling", patterns: [/level(?:ing|er)?\s*(?:system|jack)/i, /jack\s*system/i, /выравнива/i, /nivelaci/i] },
+  { system: "solar_system", patterns: [
+    /solar\s*(?:system|panel|array|charging|charge|controller|regulator)/i,
+    /solar.*(?:not\s*charging|no\s*charge|fault|error)/i,
+    /mppt|pwm.*solar/i,
+  ]},
+  { system: "bmpro_system", patterns: [
+    /bmpro/i,
+    /batteryplus35/i,
+    /jhub/i,
+    /trek3/i,
+  ]},
   { system: "inverter_converter", patterns: [/inverter/i, /converter/i, /инвертер|инвертор|конвертер|конвертор/i] },
   { system: "furnace", patterns: [/furnace/i, /heater(?!\s*pump)/i, /печ[ьк]/i, /калориф/i, /horno/i, /calefacc/i] },
   { system: "roof_ac", patterns: [/(?:roof\s*)?(?:ac|a\/c)\b/i, /air\s*condition/i, /heat\s*pump/i, /кондицион/i, /aire\s*acondicionado/i] },
+  { system: "ice_maker", patterns: [
+    /ice\s*maker/i,
+    /icemaker/i,
+    /ice\s*machine/i,
+  ]},
   { system: "refrigerator", patterns: [/refrig/i, /fridge/i, /холодильник/i, /refrigerador/i, /nevera/i] },
   { system: "electrical_ac", patterns: [/(?:120v|110v)\s*(?:outlet|circuit|power|electrical)/i, /gfci/i, /\boutlet\b/i, /розетк/i] },
   { system: "electrical_12v", patterns: [/12v|12\s*volt|dc\s*(?:power|circuit|system)/i, /(?:light|fan|vent)\s*(?:not|won't|doesn't|don't)/i] },
@@ -1360,6 +1381,292 @@ reg({
       prerequisites: ["ca_1"],
       matchPatterns: [/(?:damage|burn|smell).*(?:yes|no|visible)/i],
       howToCheck: "Inspect the power cord, plug, housing vents, and control area. Burnt odor, heat discoloration, cracked components, or melted plug blades count as visible damage.",
+    },
+  ],
+});
+
+// ── Solar System ────────────────────────────────────────────────────
+
+reg({
+  system: "solar_system",
+  displayName: "Solar System",
+  complex: false,
+  variant: "STANDARD",
+  steps: [
+    {
+      id: "sol_1",
+      question: "What is the solar complaint — no charge, low charge, controller blank, or fault indication?",
+      prerequisites: [],
+      matchPatterns: [
+        /solar.*(?:no\s*charge|not\s*charging|low\s*charge|fault|error|blank|dead)/i,
+        /controller.*(?:fault|error|blank|dead|off)/i,
+        /panel.*(?:not\s*charging|no\s*charge)/i,
+      ],
+      howToCheck: "Check the solar controller or display in daylight and report the main symptom only: no charge, low charge, blank display, or fault.",
+    },
+    {
+      id: "sol_2",
+      question: "Battery voltage at the house bank with daylight on the panels? Exact reading?",
+      prerequisites: ["sol_1"],
+      matchPatterns: [
+        /(?:battery|house\s*bank).*(?:\d+(?:\.\d+)?)\s*v/i,
+        /(?:\d+(?:\.\d+)?)\s*v(?:olts?)?.*(?:battery|bank)/i,
+        /battery.*(?:low|good|dead)/i,
+      ],
+      howToCheck: "Measure DC voltage directly at the house battery bank with the panels in daylight. Report the exact battery reading.",
+    },
+    {
+      id: "sol_3",
+      question: "Is the solar controller powered and showing charging, standby, or a fault code?",
+      prerequisites: ["sol_1"],
+      matchPatterns: [
+        /controller.*(?:charging|standby|fault|error|code|blank|dead|off)/i,
+        /display.*(?:on|off|blank|fault)/i,
+      ],
+      howToCheck: "Read the controller screen or status LEDs. Report whether it is powered up and what charge state or fault indication it shows.",
+    },
+    {
+      id: "sol_4",
+      question: "PV input at the controller or inline solar fuse/breaker verified? Any open fuse, tripped breaker, or no panel input?",
+      prerequisites: ["sol_3"],
+      matchPatterns: [
+        /(?:pv|panel|solar).*(?:input|voltage|present|missing|none)/i,
+        /(?:fuse|breaker).*(?:open|tripped|blown|reset|ok|good)/i,
+      ],
+      howToCheck: "At the controller, verify panel input is present and check the inline fuse or breaker on the solar feed. Report open, tripped, or normal.",
+    },
+    {
+      id: "sol_5",
+      question: "Controller battery-side output present? Is charging current or battery-side voltage rise seen?",
+      prerequisites: ["sol_2", "sol_4"],
+      matchPatterns: [
+        /(?:output|charge|charging).*(?:current|amps|amp|voltage|rise|present|none|zero)/i,
+        /battery.*(?:voltage\s*rise|charging|not\s*charging)/i,
+      ],
+      howToCheck: "With daylight available, check controller output on the battery side or confirm whether battery voltage rises when solar charging should be active.",
+    },
+    {
+      id: "sol_6",
+      question: "Any visible panel or wiring issue — shading, cracked panel, loose MC4, corrosion, or damaged roof lead?",
+      prerequisites: ["sol_4"],
+      matchPatterns: [
+        /(?:shade|shading|crack|broken|loose|mc4|corrosion|damage|damaged)/i,
+        /(?:panel|wire|roof\s*lead).*(?:good|ok|damaged|loose)/i,
+      ],
+      howToCheck: "Inspect the panels, roof lead, and MC4 or similar connectors for full sun exposure, damage, corrosion, or loose connections. Report only visible issues.",
+    },
+  ],
+});
+
+// ── Aqua-Hot System ─────────────────────────────────────────────────
+
+reg({
+  system: "aqua_hot_system",
+  displayName: "Aqua-Hot System",
+  complex: false,
+  variant: "STANDARD",
+  steps: [
+    {
+      id: "aqh_1",
+      question: "What is the Aqua-Hot complaint — no coach heat, no hot water, or both?",
+      prerequisites: [],
+      matchPatterns: [
+        /aqua[\s-]?hot.*(?:heat|hot\s*water|both|fault|error|no)/i,
+        /(?:coach\s*heat|domestic\s*hot\s*water|hot\s*water).*(?:no|lost|weak)/i,
+      ],
+      howToCheck: "Use the complaint and control setting to confirm whether the loss is coach heat, domestic hot water, or both. Report the main symptom only.",
+    },
+    {
+      id: "aqh_2",
+      question: "Main power and Aqua-Hot switches ON? Any panel fault or lockout indication?",
+      prerequisites: ["aqh_1"],
+      matchPatterns: [
+        /(?:power|switch|master).*(?:on|off|ok|good|dead)/i,
+        /(?:fault|lockout|error|code|indicator|light).*(?:on|off|present|none)/i,
+      ],
+      howToCheck: "Check the Aqua-Hot control panel and unit switches. Confirm the master power is on and note any fault, lockout, or warning indication.",
+    },
+    {
+      id: "aqh_3",
+      question: "Required heat source enabled for this check — diesel burner, electric element, or both?",
+      prerequisites: ["aqh_1"],
+      matchPatterns: [
+        /(?:diesel|burner|electric\s*element|electric\s*mode|source).*(?:on|off|enabled|disabled|available)/i,
+        /(?:both|diesel\s*only|electric\s*only)/i,
+      ],
+      howToCheck: "Check the service switches or interior panel and confirm which heat source is enabled before judging the unit response.",
+    },
+    {
+      id: "aqh_4",
+      question: "When a zone calls for heat, is circulation or heat-call status active? Any pump noise or status light?",
+      prerequisites: ["aqh_2"],
+      matchPatterns: [
+        /(?:circulation|pump|zone|heat\s*call).*(?:active|running|noise|present|none|no)/i,
+        /status.*(?:light|indicator).*(?:on|off|active)/i,
+      ],
+      howToCheck: "Command one heating zone and listen for the circulation pump or check the unit status lights for an active heat call.",
+    },
+    {
+      id: "aqh_5",
+      question: "Does the burner fire or the electric element heat when called? Any lockout, smoke, or ignition fault?",
+      prerequisites: ["aqh_3", "aqh_4"],
+      matchPatterns: [
+        /(?:burner|element|ignite|ignition|fire|heat).*(?:yes|no|lockout|fault|smoke|running)/i,
+        /(?:smoke|soot|misfire|no\s*fire)/i,
+      ],
+      howToCheck: "With the heat source enabled and a call active, observe whether the burner starts or the electric element draws heat. Report lockout, smoke, or no-start if present.",
+    },
+    {
+      id: "aqh_6",
+      question: "Coolant level and visible condition at tank, hoses, and exhaust area OK? Any leak, low level, or soot?",
+      prerequisites: ["aqh_5"],
+      matchPatterns: [
+        /(?:coolant|tank|reservoir|glycol).*(?:level|low|full|ok|good)/i,
+        /(?:leak|soot|wet|stain|smell).*(?:yes|no|present|none)/i,
+      ],
+      howToCheck: "Inspect the expansion tank level and look around hoses, fittings, and the exhaust area for wet spots, coolant residue, or soot.",
+    },
+  ],
+});
+
+// ── BMPro System ────────────────────────────────────────────────────
+
+reg({
+  system: "bmpro_system",
+  displayName: "BMPro System",
+  complex: false,
+  variant: "STANDARD",
+  steps: [
+    {
+      id: "bmp_1",
+      question: "Which BMPro function is affected — panel display, battery monitor, tank data, or coach control?",
+      prerequisites: [],
+      matchPatterns: [
+        /bmpro.*(?:display|screen|battery|tank|control|lighting|app)/i,
+        /(?:panel|screen|monitor|tank|control).*(?:dead|blank|wrong|offline|fault)/i,
+      ],
+      howToCheck: "Identify the BMPro function that is failing before going deeper: display, battery data, tank data, or coach control.",
+    },
+    {
+      id: "bmp_2",
+      question: "BMPro display or panel powers up? Screen, LEDs, or app connection present?",
+      prerequisites: ["bmp_1"],
+      matchPatterns: [
+        /(?:display|panel|screen|led|app).*(?:on|off|blank|connected|offline|dead)/i,
+        /(?:powers\s*up|boots|blank|no\s*display)/i,
+      ],
+      howToCheck: "Wake the BMPro panel or app and report whether the screen, LEDs, or connection comes up normally, stays blank, or drops offline.",
+    },
+    {
+      id: "bmp_3",
+      question: "12V supply and fuse at the BMPro module or panel present? Exact reading if checked?",
+      prerequisites: ["bmp_2"],
+      matchPatterns: [
+        /(?:12v|voltage|power|supply).*(?:present|missing|dead|low|good|\d+)/i,
+        /(?:fuse|breaker).*(?:good|ok|blown|open|tripped)/i,
+      ],
+      howToCheck: "Check the BMPro fuse and verify 12V feed at the panel or control module. Report the exact reading if a meter was used.",
+    },
+    {
+      id: "bmp_4",
+      question: "Communication between the panel and BMPro module present? Any offline, no-data, or pairing error?",
+      prerequisites: ["bmp_2"],
+      matchPatterns: [
+        /(?:communication|comms|data|pairing|link).*(?:ok|good|lost|offline|error|fault)/i,
+        /(?:no\s*data|offline|pairing\s*error)/i,
+      ],
+      howToCheck: "Check the BMPro screen or app for offline, no-data, or pairing messages and confirm whether the control module is being seen.",
+    },
+    {
+      id: "bmp_5",
+      question: "Any BMPro fault message, status code, or reset loop shown? Exact wording?",
+      prerequisites: ["bmp_2"],
+      matchPatterns: [
+        /(?:fault|error|code|message|reset\s*loop|reboot).*(?:shown|present|none|exact|wording)/i,
+        /(?:code|message):/i,
+      ],
+      howToCheck: "Read the exact BMPro message, code, or repeated reset behavior from the panel or app. Report the wording as shown.",
+    },
+    {
+      id: "bmp_6",
+      question: "Visible harness or connector issue at the BMPro panel, module, or shunt — loose, corroded, or damaged?",
+      prerequisites: ["bmp_3", "bmp_4"],
+      matchPatterns: [
+        /(?:harness|connector|plug|shunt|wire).*(?:loose|corroded|damaged|good|ok|secure)/i,
+        /(?:damage|corrosion|loose\s*pin)/i,
+      ],
+      howToCheck: "Inspect accessible BMPro connectors, module plugs, and any related shunt leads for loose fit, corrosion, or damage.",
+    },
+  ],
+});
+
+// ── Ice Maker ───────────────────────────────────────────────────────
+
+reg({
+  system: "ice_maker",
+  displayName: "Ice Maker",
+  complex: false,
+  variant: "STANDARD",
+  steps: [
+    {
+      id: "im_1",
+      question: "Ice maker powered on and calling for ice? Switch, arm, or bin sensor status?",
+      prerequisites: [],
+      matchPatterns: [
+        /ice\s*maker.*(?:on|off|power|dead|making|not\s*making)/i,
+        /(?:switch|arm|bin\s*sensor).*(?:on|off|up|down|blocked|ok)/i,
+      ],
+      howToCheck: "Confirm the ice maker is turned on and not shut down by the arm, switch, or bin-full sensor. Report the actual status.",
+    },
+    {
+      id: "im_2",
+      question: "Water supply to the ice maker available? Valve open and line not kinked or frozen?",
+      prerequisites: ["im_1"],
+      matchPatterns: [
+        /(?:water|supply|valve|line).*(?:open|closed|kinked|frozen|available|none)/i,
+        /(?:no\s*water|water\s*present)/i,
+      ],
+      howToCheck: "Verify the water valve is open and inspect the feed line for a kink, freeze, or obvious restriction before judging fill behavior.",
+    },
+    {
+      id: "im_3",
+      question: "Does the unit attempt a cycle? Any motor noise, tray movement, or harvest attempt?",
+      prerequisites: ["im_1"],
+      matchPatterns: [
+        /(?:cycle|motor|noise|tray|harvest|ejector).*(?:yes|no|runs|moves|stuck|none)/i,
+        /(?:attempts\s*a\s*cycle|no\s*cycle)/i,
+      ],
+      howToCheck: "Start or wait for an ice cycle and listen or watch for tray movement, ejector movement, or motor noise.",
+    },
+    {
+      id: "im_4",
+      question: "During the cycle attempt, does it fill with water?",
+      prerequisites: ["im_2", "im_3"],
+      matchPatterns: [
+        /(?:fill|water\s*fill|fills).*(?:yes|no|partial|none)/i,
+        /(?:no\s*fill|overfill|partial\s*fill)/i,
+      ],
+      howToCheck: "Watch or listen at the start of the fill portion and confirm whether water enters the mold fully, partially, or not at all.",
+    },
+    {
+      id: "im_5",
+      question: "Any ice production after a full cycle attempt — full cubes, partial cubes, or none?",
+      prerequisites: ["im_4"],
+      matchPatterns: [
+        /(?:ice|cubes).*(?:full|partial|small|none|no|produced|production)/i,
+        /(?:no\s*ice|partial\s*cubes)/i,
+      ],
+      howToCheck: "After a complete cycle attempt, inspect the mold and bin for full cubes, partial cubes, or no ice result.",
+    },
+    {
+      id: "im_6",
+      question: "Any visible jam, frozen mold, or ice blockage at the tray, ejector, or bin?",
+      prerequisites: ["im_3"],
+      matchPatterns: [
+        /(?:jam|stuck|frozen|ice\s*blockage|blocked).*(?:tray|ejector|bin|mold)?/i,
+        /(?:tray|ejector|mold).*(?:stuck|frozen|jammed)/i,
+      ],
+      howToCheck: "Inspect the mold, ejector, and bin area for a jammed cube, frozen tray, or ice buildup blocking normal movement.",
     },
   ],
 });

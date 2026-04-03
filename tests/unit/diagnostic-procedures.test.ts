@@ -42,6 +42,26 @@ describe("detectSystem", () => {
     expect(detectSystem("Fridge not cooling")).toBe("refrigerator");
   });
 
+  it("detects solar system", async () => {
+    const { detectSystem } = await import("@/lib/diagnostic-procedures");
+    expect(detectSystem("Solar controller shows fault and batteries are not charging")).toBe("solar_system");
+  });
+
+  it("detects Aqua-Hot system", async () => {
+    const { detectSystem } = await import("@/lib/diagnostic-procedures");
+    expect(detectSystem("Aqua-Hot has no coach heat and no hot water")).toBe("aqua_hot_system");
+  });
+
+  it("detects BMPro system", async () => {
+    const { detectSystem } = await import("@/lib/diagnostic-procedures");
+    expect(detectSystem("BMPro screen is blank and tank data is offline")).toBe("bmpro_system");
+  });
+
+  it("detects ice maker", async () => {
+    const { detectSystem } = await import("@/lib/diagnostic-procedures");
+    expect(detectSystem("Ice maker is powered on but not making ice")).toBe("ice_maker");
+  });
+
   it("detects slide-out", async () => {
     const { detectSystem } = await import("@/lib/diagnostic-procedures");
     expect(detectSystem("Slide-out won't extend")).toBe("slide_out");
@@ -95,6 +115,22 @@ describe("getProcedure", () => {
   it("returns null for unknown system", async () => {
     const { getProcedure } = await import("@/lib/diagnostic-procedures");
     expect(getProcedure("antigravity_drive")).toBeNull();
+  });
+
+  it.each([
+    ["solar_system", "sol_1"],
+    ["aqua_hot_system", "aqh_1"],
+    ["bmpro_system", "bmp_1"],
+    ["ice_maker", "im_1"],
+  ])("returns dedicated procedure coverage for %s", async (system, firstStepId) => {
+    const { getProcedure } = await import("@/lib/diagnostic-procedures");
+    const proc = getProcedure(system);
+
+    expect(proc).not.toBeNull();
+    expect(proc!.system).toBe(system);
+    expect(proc!.steps[0]?.id).toBe(firstStepId);
+    expect(proc!.steps.length).toBeGreaterThanOrEqual(5);
+    expect(proc!.steps.every((step) => Boolean(step.howToCheck?.trim()))).toBe(true);
   });
 
   it("all procedures have unique step IDs", async () => {

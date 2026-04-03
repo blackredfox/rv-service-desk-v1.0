@@ -508,10 +508,47 @@ describe("Procedure Contract Audit v1", () => {
       "refrigerator",
       "leveling",
       "consumer_appliance",
+      "solar_system",
+      "aqua_hot_system",
+      "bmpro_system",
+      "ice_maker",
     ] as const;
 
     it.each(rolloutTargetSystems)(
       "%s: every step has technician-facing howToCheck guidance",
+      (system) => {
+        const proc = getProcedure(system)!;
+
+        const missingHowToCheck = proc.steps
+          .filter((step) => !step.howToCheck || step.howToCheck.trim().length === 0)
+          .map((step) => step.id);
+
+        expect(missingHowToCheck).toEqual([]);
+      }
+    );
+  });
+
+  describe("5c. customer-requested missing-family coverage", () => {
+    const customerRequestedSystems = [
+      "solar_system",
+      "aqua_hot_system",
+      "bmpro_system",
+      "ice_maker",
+    ] as const;
+
+    it.each(customerRequestedSystems)(
+      "%s: family is registered with dedicated procedure coverage",
+      (system) => {
+        expect(allSystems).toContain(system);
+
+        const proc = getProcedure(system)!;
+        expect(proc.system).toBe(system);
+        expect(proc.steps.length).toBeGreaterThanOrEqual(5);
+      }
+    );
+
+    it.each(customerRequestedSystems)(
+      "%s: every step has bounded technician-facing howToCheck guidance",
       (system) => {
         const proc = getProcedure(system)!;
 
