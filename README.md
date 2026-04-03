@@ -12,10 +12,12 @@ RV Service Desk is an AI-powered assistant designed to help RV technicians perfo
 - A **diagnostic workflow engine**
 - A **documentation standardization tool**
 - A **senior-tech assistant** that enforces procedure discipline
+- A **bounded collaborative technician tool** for real shop-floor use
 
 ## This is NOT:
 - A generic chatbot
 - An autopilot mechanic
+- A rigid form engine that forces technicians to speak in magic phrases
 - A system that makes repair decisions instead of the technician
 
 > The technician is always the decision-maker.  
@@ -27,7 +29,7 @@ RV Service Desk is an AI-powered assistant designed to help RV technicians perfo
 
 ## 2.1 Procedure-Driven, Not Chat-Driven
 
-The system does NOT behave like a free-form conversation.
+The system does NOT behave like a free-form consumer conversation.
 
 Instead:
 > Diagnostics are governed by **explicit procedures**.
@@ -87,7 +89,8 @@ The system enforces:
 
 A step is only complete when:
 - the required fact is explicitly obtained,
-- not inferred or guessed.
+- not inferred or guessed,
+- not assumed from a help response.
 
 ---
 
@@ -97,32 +100,37 @@ The system knows when to stop diagnostics.
 
 Once:
 - the fault is localized, OR
-- all required branches are exhausted,
+- all required branches are exhausted, OR
+- repair is verified and the workflow is report-ready,
 
 the assistant must:
 - stop routine questioning,
-- move toward next valid action.
+- move toward the next valid action.
 
 > Continuing unnecessary questions after completion is a system error.
 
 ---
 
-## 2.6 Report Suggestion (No Auto-Switch)
+## 2.6 Report Suggestion and Natural Report Intent
 
 The system can recognize when:
 - diagnostics are complete,
 - repair is done,
 - report can be generated.
 
+The system may also recognize real technician phrasing such as:
+- “write report”
+- “generate warranty report”
+- “сделай отчет”
+
 But:
 
-> The system NEVER switches modes automatically.
+> The system NEVER performs uncontrolled auto-transition.
 
 Instead, it:
-- suggests next action,
-- provides explicit command instructions:
-  - `START AUTHORIZATION REQUEST`
-  - `START FINAL REPORT`
+- uses a server-approved trigger path,
+- applies readiness/gating rules,
+- and preserves runtime authority.
 
 ---
 
@@ -132,8 +140,11 @@ The assistant can help the technician with:
 
 - how to perform a diagnostic check,
 - where a component is located,
+- how to identify the correct connector / fuse / terminal / switch,
 - what result to expect,
-- clarification of current step.
+- what an expected or unexpected reading means,
+- acceptable alternate check points for the current step,
+- concise technician-style clarification of the current step.
 
 BUT ONLY:
 - within the active procedure,
@@ -146,14 +157,34 @@ The assistant must NOT:
 - invent new steps,
 - provide off-procedure guidance,
 - act as a DIY tutorial system,
-- drift into generic advice.
+- drift into generic advice,
+- convert support into silent progress.
 
 After any explanation:
-> The assistant MUST return to the diagnostic flow.
+> The assistant MUST return to the active diagnostic path.
 
 ---
 
-## 2.8 Mode System (Invisible to User)
+## 2.8 Technician-Realistic Interaction
+
+The product is built for real technicians, not idealized users.
+
+That means the system must handle:
+- short input,
+- messy input,
+- mixed language input,
+- copied work-order text,
+- typo-heavy field notes,
+- complaint + findings + repair summary in one message.
+
+The system should feel like:
+- a concise senior-tech partner,
+- not a rigid questionnaire,
+- not a bureaucratic workflow screen.
+
+---
+
+## 2.9 Mode System (Invisible to User)
 
 The system operates internally in modes:
 
@@ -162,12 +193,13 @@ The system operates internally in modes:
 - Final Report Mode
 
 Mode transitions:
-- only via explicit commands
-- never inferred from conversation meaning
+- are server-authoritative,
+- only through explicit commands or approved natural-language aliases,
+- never through uncontrolled semantic guessing.
 
 ---
 
-## 2.9 Language Behavior
+## 2.10 Language Behavior
 
 - Technician speaks in their language (EN/RU/ES)
 - Diagnostic dialogue follows technician language
@@ -183,6 +215,7 @@ Mode transitions:
 - One question at a time
 - Structured progression
 - No conclusions until allowed
+- Current-step support allowed without advancement
 
 ---
 
@@ -210,7 +243,8 @@ Structured output:
 - No unsafe wording
 - No premature conclusions
 - No skipping diagnostic gates
-- No automatic mode transitions
+- No uncontrolled mode transitions
+- No hidden authority outside the Context Engine
 
 ---
 
@@ -231,6 +265,7 @@ The system is built around:
 
 ### Route Layer (API)
 - handles transport
+- may normalize realistic technician input
 - does NOT control diagnostic logic
 
 > There must be a single flow authority (Context Engine).
@@ -247,6 +282,7 @@ Implications:
 - minimal friction
 - clear next action
 - no UI complexity
+- low tolerance for ritual commands and robotic phrasing
 
 Future UI direction:
 - step-focused screens
@@ -260,11 +296,13 @@ Future UI direction:
 Most AI tools fail in this space because they:
 - behave like chatbots,
 - skip structure,
-- produce inconsistent documentation.
+- produce inconsistent documentation,
+- or become too rigid to be useful in real work.
 
 RV Service Desk is different:
 
-> It enforces **structure, causality, and approval-safe communication**.
+> It enforces **structure, causality, and approval-safe communication**  
+> while still aiming to feel like a bounded senior-tech assistant.
 
 ---
 
@@ -274,6 +312,7 @@ RV Service Desk is different:
 - Determinism over “AI intuition”
 - Validation over trust
 - Benchmark over assumptions
+- Real technician UX over ritual command friction
 
 ---
 
@@ -282,9 +321,12 @@ RV Service Desk is different:
 - stabilize diagnostic logic
 - introduce benchmark system
 - enhance context engine (signal-aware)
+- harden natural report-intent handling
+- improve current-step locate/identify guidance
+- harden dirty-input robustness
 - safely decompose route layer
 - improve mobile usability
 
 ---
 
-End of file
+End of file.

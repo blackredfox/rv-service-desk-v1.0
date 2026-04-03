@@ -1,11 +1,11 @@
 # AI_RUNTIME_ARCHITECTURE.md
 
-**Project:** RV Service Desk
+**Project:** RV Service Desk  
 **Purpose:** Explain how the AI system operates at runtime.
 
 This document describes the **AI orchestration pipeline** used by RV Service Desk.
 
-The system is **not an autonomous chatbot**.
+The system is **not** an autonomous chatbot.
 All AI behavior is controlled by server-side orchestration.
 
 ---
@@ -14,21 +14,22 @@ All AI behavior is controlled by server-side orchestration.
 
 AI responses are generated through a controlled pipeline.
 
-```
 Client
-  ↓
+↓
 API Route
-  ↓
+↓
+Input Normalization / Intent Extraction
+↓
 Context Engine
-  ↓
+↓
 Prompt Builder
-  ↓
+↓
 LLM
-  ↓
+↓
 Output Validator
-  ↓
+↓
 Response to Client
-```
+
 
 ---
 
@@ -40,15 +41,14 @@ The technician sends a message through the chat interface.
 
 Example:
 
-```
-AC is not cooling. Compressor running but no cold air.
-```
+The bedr00m slide... water leaking... added screws and silicone... write warranty report
 
-The client sends a request to:
 
-```
-POST /api/chat
-```
+Real-world input may be:
+- mixed language,
+- typo-heavy,
+- copied from work orders,
+- complaint + findings + repair summary in one message.
 
 ---
 
@@ -56,102 +56,121 @@ POST /api/chat
 
 The API route performs initial checks:
 
-* authentication
-* rate limiting
-* case retrieval
-* language detection
-* mode detection
+- authentication
+- rate limiting
+- case retrieval
+- language detection
+- bounded mode/intent detection
+- request normalization
 
 Modes include:
 
-```
-diagnostic
-authorization
-final_report
-```
+- diagnostic
+- authorization
+- final_report
 
-Mode transitions only occur through explicit commands.
+Mode transitions occur only through explicit commands or approved natural-language aliases.
+
+The server must not perform uncontrolled semantic switching.
 
 ---
 
-## Step 3 — Context Engine Execution
+## Step 3 — Input Normalization / Intent Extraction
+
+Before flow routing, the runtime may perform bounded preprocessing for:
+- mixed-language input,
+- keyboard-layout corruption,
+- typo/noise cleanup,
+- complaint / findings / corrective action extraction,
+- report-intent detection.
+
+This layer exists to make the product usable with real technician input.
+
+Hard boundaries:
+- no invented facts,
+- no diagnostic authority,
+- no hidden step selection,
+- no uncontrolled mode switching.
+
+---
+
+## Step 4 — Context Engine Execution
 
 The Context Engine evaluates the current case state.
 
 Responsibilities:
 
-* determine active procedure
-* determine next diagnostic step
-* verify prerequisites
-* enforce diagnostic gates
-* decide whether final output is allowed
+- determine active procedure
+- determine next diagnostic step
+- verify prerequisites
+- enforce diagnostic gates
+- decide whether final output is allowed
+- determine terminal/report-ready state
 
 The Context Engine is the **single authority for diagnostic step flow**.
 
 ---
 
-## Step 4 — Prompt Construction
+## Step 5 — Prompt Construction
 
 The Prompt Builder constructs the AI prompt.
 
 Prompt composition includes:
 
-* system prompt
-* mode-specific prompt
-* diagnostic context
-* previous conversation messages
-
-Example components:
-
-```
-SYSTEM_PROMPT_BASE
-MODE_PROMPT_DIAGNOSTIC
-MODE_PROMPT_AUTHORIZATION
-MODE_PROMPT_FINAL_REPORT
-```
+- system prompt
+- mode-specific prompt
+- diagnostic context
+- previous conversation messages
+- active-step support context when applicable
 
 ---
 
-## Step 5 — LLM Execution
+## Step 6 — LLM Execution
 
 The prompt is sent to the language model.
 
 The LLM is responsible only for:
 
-* generating technician-readable text
-* producing translation
-* formatting final outputs
+- generating technician-readable text
+- bounded current-step explanation
+- concise collaborative technician phrasing
+- producing translation
+- formatting final outputs
 
 The LLM does **not decide diagnostic logic**.
 
 ---
 
-## Step 6 — Output Validation
+## Step 7 — Output Validation
 
 The server validates the AI response.
 
 Validation includes:
 
-* correct mode output
-* English-first formatting
-* translation block presence
-* diagnostic gate compliance
+- correct mode output
+- English-first formatting
+- translation block presence
+- diagnostic gate compliance
+- current-step guidance staying non-advancing
+- no hidden report drift
+- no wrong-mode output generation
 
 If validation fails:
 
-* the response may be repaired
-* or the request retried
+- the response may be repaired
+- or the request retried
+- or authoritative fallback may be used
 
 ---
 
-## Step 7 — Response Delivery
+## Step 8 — Response Delivery
 
 After validation, the server returns the response to the client.
 
 The response is stored in:
 
-* case messages
-* message history
+- case messages
+- message history
 
 The chat UI displays the assistant response.
 
@@ -163,15 +182,20 @@ The system includes resilience mechanisms.
 
 Possible failure cases:
 
-* AI response formatting errors
-* translation block missing
-* OpenAI connectivity issues
+- AI response formatting errors
+- translation block missing
+- wrong-mode output
+- robotic step-guidance repetition
+- natural report-intent not honored
+- dirty-input misclassification
+- OpenAI connectivity issues
 
 Fallback strategies include:
 
-* retry policies
-* response validation repair
-* graceful degradation
+- retry policies
+- response validation repair
+- authoritative step fallback
+- deterministic intent handling
 
 ---
 
@@ -179,7 +203,6 @@ Fallback strategies include:
 
 The runtime pipeline follows strict architectural rules.
 
-```
 Context Engine
 → diagnostic logic
 
@@ -187,10 +210,13 @@ LLM
 → language generation
 
 Server
-→ validation and enforcement
-```
+→ validation, normalization, and enforcement
 
-This separation prevents AI systems from drifting into uncontrolled chatbot behavior.
+
+This separation prevents AI systems from drifting
+
+
+This separation prevents AI systems from drifting into uncontrolled chatbot behavior or brittle ritual-command UX.
 
 ---
 
@@ -198,12 +224,16 @@ This separation prevents AI systems from drifting into uncontrolled chatbot beha
 
 Uncontrolled AI systems often produce:
 
-* inconsistent diagnostics
-* unsafe authorization language
-* unpredictable workflows
+- inconsistent diagnostics
+- unsafe authorization language
+- unpredictable workflows
+- robotic or brittle interaction patterns
 
 RV Service Desk uses **server-controlled AI orchestration** to ensure:
 
-* deterministic diagnostic flow
-* safe authorization text
-* reliable documentation outputs
+- deterministic diagnostic flow
+- safe authorization text
+- reliable documentation outputs
+- technician-realistic interaction under constraints
+
+End of file.
