@@ -84,6 +84,46 @@ export async function verifyFirebasePassword(
 }
 
 /**
+ * Trigger Firebase-native password reset email flow.
+ * Returns successfully even when the email does not exist to avoid user enumeration.
+ */
+export async function requestFirebasePasswordReset(email: string): Promise<void> {
+  const apiKey = process.env.FIREBASE_WEB_API_KEY;
+  if (!apiKey) {
+    throw new Error("FIREBASE_WEB_API_KEY not configured");
+  }
+
+  const continueUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestType: "PASSWORD_RESET",
+        email,
+        ...(continueUrl ? { continueUrl } : {}),
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorCode = errorData?.error?.message || "UNKNOWN_ERROR";
+
+    if (errorCode === "EMAIL_NOT_FOUND") {
+      return;
+    }
+
+    if (errorCode === "INVALID_EMAIL" || errorCode === "MISSING_EMAIL") {
+      throw new Error("Invalid email address");
+    }
+
+    throw new Error(`Firebase password reset error: ${errorCode}`);
+  }
+}
+
+/**
  * Create Firebase session cookie from ID token
  */
 export async function createFirebaseSessionCookie(idToken: string): Promise<string> {

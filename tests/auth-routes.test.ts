@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/auth", () => ({
   registerUser: vi.fn(),
   loginUser: vi.fn(),
+  requestFirebasePasswordReset: vi.fn(),
   getCurrentUser: vi.fn(),
   setSessionCookie: vi.fn(),
   clearSessionCookie: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("next/headers", () => ({
 import {
   registerUser,
   loginUser,
+  requestFirebasePasswordReset,
   getCurrentUser,
   setSessionCookie,
   clearSessionCookie,
@@ -173,6 +175,67 @@ describe("Auth API Routes", () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe("Invalid credentials");
+    });
+  });
+
+  describe("POST /api/auth/forgot-password", () => {
+    it("should return a generic success message for password reset requests", async () => {
+      vi.mocked(requestFirebasePasswordReset).mockResolvedValue(undefined);
+
+      const { POST } = await import("@/app/api/auth/forgot-password/route");
+
+      const req = new Request("http://localhost/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "  Test@Example.com  ",
+        }),
+      });
+
+      const response = await POST(req);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.message).toBe("If an account exists for that email, a reset link has been sent.");
+      expect(requestFirebasePasswordReset).toHaveBeenCalledWith("test@example.com");
+    });
+
+    it("should reject forgot-password requests with missing email", async () => {
+      const { POST } = await import("@/app/api/auth/forgot-password/route");
+
+      const req = new Request("http://localhost/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const response = await POST(req);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Email is required");
+    });
+
+    it("should return service unavailable when Firebase reset configuration is missing", async () => {
+      vi.mocked(requestFirebasePasswordReset).mockRejectedValue(
+        new Error("FIREBASE_WEB_API_KEY not configured")
+      );
+
+      const { POST } = await import("@/app/api/auth/forgot-password/route");
+
+      const req = new Request("http://localhost/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "test@example.com",
+        }),
+      });
+
+      const response = await POST(req);
+      const data = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(data.error).toBe("Authentication service not configured");
     });
   });
 
