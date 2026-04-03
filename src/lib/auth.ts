@@ -1,6 +1,4 @@
 import { cookies } from "next/headers";
-import { getPrisma } from "@/lib/db";
-import { getFirebaseAuth } from "@/lib/firebase-admin";
 
 const SESSION_COOKIE_NAME = "rv_session";
 const SESSION_DURATION_DAYS = parseInt(process.env.SESSION_COOKIE_DAYS || "7", 10);
@@ -17,6 +15,16 @@ export type AuthUser = {
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = process.env.NODE_ENV === "development" ? 200 : 10;
+
+async function loadPrisma() {
+  const { getPrisma } = await import("@/lib/db");
+  return getPrisma();
+}
+
+async function loadFirebaseAuth() {
+  const { getFirebaseAuth } = await import("@/lib/firebase-admin");
+  return getFirebaseAuth();
+}
 
 export function checkRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -127,7 +135,7 @@ export async function requestFirebasePasswordReset(email: string): Promise<void>
  * Create Firebase session cookie from ID token
  */
 export async function createFirebaseSessionCookie(idToken: string): Promise<string> {
-  const auth = getFirebaseAuth();
+  const auth = await loadFirebaseAuth();
   return auth.createSessionCookie(idToken, { expiresIn: SESSION_DURATION_MS });
 }
 
@@ -137,7 +145,7 @@ export async function createFirebaseSessionCookie(idToken: string): Promise<stri
 export async function verifyFirebaseSessionCookie(
   sessionCookie: string
 ): Promise<{ uid: string; email: string }> {
-  const auth = getFirebaseAuth();
+  const auth = await loadFirebaseAuth();
   const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
   return {
     uid: decodedClaims.uid,
@@ -190,7 +198,7 @@ export async function upsertPrismaUser(
   email: string,
   firebaseUid: string
 ): Promise<AuthUser> {
-  const prisma = await getPrisma();
+  const prisma = await loadPrisma();
   if (!prisma) {
     // When no database is configured (eg. local dev without DATABASE_URL),
     // return a minimal AuthUser so registration/login still works for auth flows.
@@ -258,7 +266,7 @@ export async function registerUser(
   email: string,
   password: string
 ): Promise<AuthUser> {
-  const auth = getFirebaseAuth();
+  const auth = await loadFirebaseAuth();
 
   // Create user in Firebase
   const firebaseUser = await auth.createUser({
@@ -284,7 +292,7 @@ export async function loginUser(
   const sessionCookie = await createFirebaseSessionCookie(idToken);
 
   // Decode token to get uid
-  const auth = getFirebaseAuth();
+  const auth = await loadFirebaseAuth();
   const decodedToken = await auth.verifyIdToken(idToken);
 
   // Upsert user in Prisma
