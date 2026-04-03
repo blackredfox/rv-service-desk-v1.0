@@ -70,7 +70,7 @@ import {
   appendAssistantChatMessage,
   loadChatHistory,
   finalizeDiagnosticPersistence,
-  type ActiveStepMetadata,
+  type ActiveStepMetadata as ChatActiveStepMetadata,
   // Re-export for tests
   parseRequestedLaborHours,
   detectLaborOverrideIntent,
@@ -80,6 +80,10 @@ import {
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
+
+type RegistryActiveStepMetadata = NonNullable<
+  ReturnType<typeof getActiveStepMetadata>
+>;
 
 function buildAuthoritativeCompletionOffer(args: {
   language: Language;
@@ -313,10 +317,12 @@ export async function POST(req: Request) {
   if (currentMode === "diagnostic") {
     const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
     const activeStepBeforeProcessing = contextBeforeProcessing.activeStepId;
+    const terminalPhaseBeforeProcessing =
+      contextBeforeProcessing.terminalState?.phase ?? "normal";
     const eligibleForStepGuidance =
       activeStepBeforeProcessing !== null &&
       !contextBeforeProcessing.isolationComplete &&
-      contextBeforeProcessing.terminalState.phase === "normal";
+      terminalPhaseBeforeProcessing === "normal";
 
     if (eligibleForStepGuidance) {
       const stepGuidanceMetadata = getActiveStepMetadata(
@@ -376,7 +382,7 @@ export async function POST(req: Request) {
   let procedureContext = "";
   let engineResult: ContextEngineResult | null = null;
   let contextEngineDirectives = "";
-  let activeStepMetadata: ActiveStepMetadata = null;
+  let activeStepMetadata: RegistryActiveStepMetadata | null = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
   if (currentMode === "diagnostic" && !stepGuidanceResponse) {
@@ -632,12 +638,15 @@ export async function POST(req: Request) {
       console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
     }
 
+    const terminalPhaseAfterProcessing =
+      engineResult.context.terminalState?.phase ?? "normal";
+
     const shouldPromoteToStepGuidance =
       !stepGuidanceResponse &&
       engineResult.responseInstructions.action === "provide_clarification" &&
       stepIdBeforeProcessing !== null &&
       engineResult.context.activeStepId === stepIdBeforeProcessing &&
-      engineResult.context.terminalState.phase === "normal" &&
+      terminalPhaseAfterProcessing === "normal" &&
       !engineResult.context.isolationComplete;
 
     if (shouldPromoteToStepGuidance) {
@@ -910,7 +919,7 @@ export async function POST(req: Request) {
           outputLanguage: outputPolicy.effective,
           langPolicy,
           translationLanguage,
-          activeStepMetadata,
+          activeStepMetadata: activeStepMetadata as ChatActiveStepMetadata | null,
           activeStepId: engineResult?.context.activeStepId ?? undefined,
           finalReportAuthorityFacts,
           model: getModelForMode(currentMode),
