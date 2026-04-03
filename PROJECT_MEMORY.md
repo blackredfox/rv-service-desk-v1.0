@@ -1,11 +1,11 @@
 # RV Service Desk
-## PROJECT_MEMORY-1.md
+## PROJECT_MEMORY.md
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Status:** Official Project Memory (Product + Technical)  
 **Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
 
-**Last updated:** 2026-03-18
+**Last updated:** 2026-04-03
 
 ---
 
@@ -22,9 +22,10 @@ The assistant helps technicians:
   - customer-pay repairs.
 
 **Critical positioning:**
-- This is **NOT** a chatbot.
+- This is **NOT** a generic chatbot.
 - This is **NOT** an autopilot mechanic.
 - This is a **diagnostic + documentation engine** designed to reduce claim denials and documentation errors.
+- At the same time, the product must feel like a **bounded senior-tech assistant**, not a rigid form robot.
 
 The technician **always** makes the final diagnostic conclusion and repair decision.
 
@@ -41,6 +42,18 @@ RV technicians are technically competent, but authorization documentation often 
 
 RV Service Desk standardizes the documentation layer and reduces reliance on “tribal knowledge”.
 
+A second product problem is equally important:
+- technician-facing AI often feels too robotic,
+- misses real-world intent,
+- fails on messy field input,
+- and becomes slower than simply writing the report manually.
+
+RV Service Desk must therefore balance:
+- structure,
+- authority,
+- realism,
+- and low-friction technician UX.
+
 ---
 
 ## 3) Non-Goals (Hard Product Boundaries)
@@ -55,7 +68,12 @@ Explicitly out of scope for MVP (and must not creep back in):
 
 **Important nuance (updated):**
 - The product **may** explain *how to perform a check* **only** when that check is part of the approved diagnostic procedure (shop context, pro-tech tone, safe sequencing).
-- The product may also help the technician *locate* the relevant part or explain *what result to observe* **only within the active approved procedure**.
+- The product may also help the technician:
+  - *locate* the relevant part,
+  - *identify* the likely connector / fuse / terminal / switch,
+  - explain *what result to observe*,
+  - suggest *acceptable alternate check points* when the exact labeled point is unclear,
+  - but **only within the active approved procedure and active step/branch**.
 - The product must **not** drift into consumer “DIY coaching”, improvisation, generic homeowner advice, or unapproved steps.
 
 ---
@@ -73,6 +91,16 @@ Explicitly out of scope for MVP (and must not creep back in):
   - final report text (if generated).
 - Case title is auto-generated and can be renamed.
 
+### 4.3 Real-world input reality (critical)
+Technician input may be:
+- mixed RU/EN/ES,
+- copied from work orders or portals,
+- short, incomplete, noisy, or typo-heavy,
+- written with keyboard-layout corruption,
+- complaint + findings + corrective action + report request in one message.
+
+The system must be robust to realistic shop-floor input and must not depend on “clean user phrasing” to function correctly.
+
 ---
 
 ## 5) Invisible Operating Modes (Enforced)
@@ -83,7 +111,7 @@ Modes are **internal** and not shown in UI as “workflow statuses”.
 1. **Diagnostic Mode (default)**
    - Asks one question at a time (when diagnostics are needed).
    - Records facts only.
-   - No conclusions/recommendations.
+   - No conclusions/recommendations unless the contract explicitly allows a bounded summary.
    - Dialogue stays in technician’s language (EN/RU/ES).
 
 2. **Authorization Mode**
@@ -96,24 +124,44 @@ Modes are **internal** and not shown in UI as “workflow statuses”.
    - Output is English-first + translated copy.
 
 ### 5.2 Mode transitions (Hard Rule)
-Mode changes are **explicit only** and must never be inferred from meaning.
-- Server switches mode only on exact technician commands:
-  - `START AUTHORIZATION REQUEST`
-  - `START FINAL REPORT`
+Mode changes are **server-authoritative only** and must never be inferred freely from meaning.
 
-This rule exists to prevent web-agent drift and “helpful assistant” shortcuts.
+The server may activate authorization or final-report flow only through:
+- an allow-listed explicit command, or
+- a **server-approved natural-language alias** that is explicitly mapped to that transition class.
 
-### 5.3 Report suggestion vs mode transition (critical distinction)
-The system **may recognize** that the workflow is report-ready or authorization-ready, but it must **not** auto-switch modes.
-- Allowed:
-  - suggest the next explicit command,
-  - state that diagnostics appear complete,
-  - state that final report generation is available,
-  - state that authorization-ready text can be generated.
-- Not allowed:
-  - implicit switch to `authorization`,
-  - implicit switch to `final_report`,
-  - semantic mode inference from meaning alone.
+This rule exists to prevent uncontrolled web-agent drift and “helpful assistant” shortcuts.
+
+### 5.3 Natural intent recognition without uncontrolled mode inference (critical)
+The system **may recognize natural technician intent** such as:
+- “write report”
+- “generate warranty report”
+- “сделай отчет”
+- “напиши warranty report”
+- “final report”
+- similar server-approved aliases
+
+But this does **not** permit uncontrolled semantic mode switching.
+
+Hard rule:
+- natural-language intent recognition must be **bounded and allow-listed**,
+- server remains the only authority,
+- uncontrolled “it seems like they probably want a report” behavior remains forbidden.
+
+### 5.4 Report suggestion vs transition (critical distinction)
+The system **may recognize** that the workflow is report-ready or authorization-ready.
+
+Allowed:
+- suggest the next explicit command,
+- state that diagnostics appear complete,
+- state that final report generation is available,
+- state that authorization-ready text can be generated,
+- honor a server-approved natural-language report/authorization alias when readiness/gating conditions are satisfied.
+
+Not allowed:
+- implicit uncontrolled switch to `authorization`,
+- implicit uncontrolled switch to `final_report`,
+- semantic mode inference from meaning alone without approved aliasing / gating.
 
 ---
 
@@ -127,6 +175,11 @@ The system **may recognize** that the workflow is report-ready or authorization-
 **Reliability rule (updated):**
 - Translation must not be left to “model luck”.
 - Server must validate presence/format of the translation block and apply a retry/repair strategy if missing.
+
+**Input rule (new):**
+- dirty multilingual input must be normalized safely before classification/routing,
+- but normalization must not invent facts,
+- and must not overwrite technician meaning.
 
 ---
 
@@ -273,7 +326,7 @@ When multiple valid next questions exist, the system must prioritize the branch 
 
 This means:
 - the active procedure is not a dumb flat checklist,
-- the active procedure is an ordered diagnostic tree with prerequisites, abnormal-condition branches, and local priorities.
+- the active procedure is an ordered diagnostic graph with prerequisites, abnormal-condition branches, local priorities, and terminal conditions.
 
 Hard rule:
 - “next by number” is not sufficient if the latest technician answer has already revealed a more urgent or causally prior issue.
@@ -281,24 +334,22 @@ Hard rule:
 ### 9.11 Signal Ignoring Prohibition (critical)
 The system must not continue asking irrelevant or lower-priority questions after a critical signal has already identified the most urgent unresolved path.
 
-Example failure:
-- asks “Is the gas valve open?” after the technician has already established “there is no 12V supply,” when electrical source-path diagnosis is the immediate priority.
-
 This is treated as a **contract breach**, not a stylistic defect.
 
 ### 9.12 Report Suggestion Rule (critical)
-The system may recognize report-ready or authorization-ready situations and must suggest the correct explicit next step, but must not auto-switch modes.
+The system may recognize report-ready or authorization-ready situations and must suggest the correct next step, but must not perform uncontrolled auto-transition.
 
-Allowed suggestions include:
+Allowed behavior includes:
 - diagnostics appear complete,
 - authorization-ready text can be generated,
 - final report can be generated,
 - use `START AUTHORIZATION REQUEST`,
-- use `START FINAL REPORT`.
+- use `START FINAL REPORT`,
+- honor a server-approved natural-language report/authorization alias if all required readiness / safety conditions are met.
 
 Not allowed:
-- silent transition into authorization mode,
-- silent transition into final report mode,
+- silent uncontrolled transition into authorization mode,
+- silent uncontrolled transition into final report mode,
 - semantic mode switching because the system “thinks it is time.”
 
 ### 9.13 Report-ready situations (recognized states)
@@ -316,37 +367,53 @@ Expected behavior:
 **B. Fault localized and repair completed**
 - verified condition identified,
 - technician already repaired/replaced/adjusted,
-- labor and/or parts are available.
+- labor and/or parts are available or inferable from provided facts.
 
 Expected behavior:
-- suggest final report generation.
+- suggest or support final report generation.
 
 **C. Technician provides completed repair summary**
 - technician already states:
   - complaint,
   - findings,
   - repair action,
-  - labor and/or parts,
-- and asks for report help.
+  - labor and/or parts (when available),
+- and asks for report help in natural language.
 
 Expected behavior:
-- be ready to generate final report upon explicit command,
-- or instruct the technician to use the exact explicit command if required by mode rules.
+- be ready to generate final report through an approved report trigger path,
+- do not restart routine diagnostics if gating conditions are already satisfied.
 
 ### 9.14 Procedure Support / Mentor behavior (allowed but bounded)
 Within the active approved procedure, the assistant may:
 - explain how to perform the current check,
 - explain where to locate the relevant component,
+- explain how to identify the referenced connector / fuse / switch / terminal,
 - explain what result to look for,
 - answer short clarification questions,
+- mention acceptable alternate check points when the exact labeled point is unclear,
+- briefly summarize current likely possibilities in technician language,
 - then return to the active step without losing procedure discipline.
 
 Hard boundaries:
 - no off-procedure coaching,
-- no speculative repair strategy,
+- no speculative repair strategy outside the active path,
 - no consumer DIY drift,
 - no silent closure of the active step,
-- clarification must return to the main diagnostic path.
+- clarification must return to the main diagnostic path or active signal-driven branch.
+
+### 9.15 Collaborative but bounded diagnostic expression (new)
+The assistant may behave like a concise senior technician partner by:
+- acknowledging current evidence,
+- briefly thinking with the technician,
+- naming likely possibilities already supported by the active branch,
+- using natural colleague-style phrasing.
+
+This is allowed only if:
+- no flow authority shifts to the prompt layer,
+- no diagnostic gate is weakened,
+- no completion is implied without evidence,
+- no report or authorization output is emitted outside allowed conditions.
 
 ---
 
@@ -360,7 +427,7 @@ Diagnostics are governed by explicit system procedures with:
 - recognition of steps already completed in the technician’s initial message (skip what’s already done),
 - prevention of “cross-system drift” (agent must not invent steps outside the active procedure).
 
-### 10.1 Procedure model refinement (v1.2)
+### 10.1 Procedure model refinement (v1.3)
 A procedure is not only a linear sequence.
 A valid procedure may contain:
 - mainline ordered steps,
@@ -377,7 +444,9 @@ Therefore:
 ### 10.2 Operational requirement (updated)
 - If the technician asks “How do I check that?”, the agent must provide a short, safe, procedure-aligned instruction sequence.
 - If the technician asks where a part is located, the agent may provide a short, procedure-aligned location aid.
-- The agent must never “close the step silently” (that creates absurd diagnostics and breaks customer trust).
+- If the technician asks how to identify the point or what to look for, the agent may provide short identification cues.
+- If the exact point is unclear, the agent may provide a procedure-aligned alternate check point.
+- The agent must never “close the step silently”.
 - After clarification/support, the agent must return to the active procedure step or the active signal-driven branch.
 
 ### 10.3 Completed Step definition (critical)
@@ -391,13 +460,14 @@ A step is **not** considered completed merely because:
 - the model guessed it,
 - the system “probably knows” the answer,
 - a nearby fact suggests it indirectly,
-- the assistant asked the question but did not receive the required fact.
+- the assistant asked the question but did not receive the required fact,
+- a guidance / locate / explain reply was given.
 
 ### 10.4 Terminal State definition (critical)
 A diagnostic branch is in **terminal state** when at least one is true:
 - verified condition is sufficient for the allowed next business action,
 - all primary branches required by the active procedure have been ruled out,
-- the technician explicitly requests the allowed next explicit mode transition,
+- the technician explicitly requests the allowed next explicit or server-approved alias transition,
 - the workflow is report-ready or authorization-ready and further questioning would be redundant.
 
 Hard rule:
@@ -411,22 +481,21 @@ Post-completion questioning is a contract breach when:
 
 ### 10.6 Known procedure defects to eliminate (if observed)
 - duplicated steps (either procedure definition bug or runtime “completed” tracking bug),
-- wrong ordering (e.g. electrical pre-checks like fuse/CB should be first when required by the procedure),
+- wrong ordering,
 - signal ignoring after a critical abnormal condition,
 - failure to return from clarification/support to the active path,
-- asking diagnostic questions after terminal state is reached.
+- asking diagnostic questions after terminal state is reached,
+- locate/identify questions being answered with repeated measurement wording only.
 
 ---
 
 ## 11) Prompt Architecture & Version Truth
 
 ### 11.1 Customer prompt (source of truth)
-Customer-approved behavior originates from:
-- “RV SERVICE DESK — Diagnostic & Authorization Engine (v2.3.7) PORTAL-CAUSE MODE WITH MECHANICAL, POST-REPAIR, COMPLETENESS AND DIAGNOSTIC FORM ENFORCEMENT”.
+Customer-approved behavior originates from the evolving RV Service Desk runtime prompt contract and must be normalized into product/runtime docs rather than left as isolated prompt wording.
 
 ### 11.2 System prompt (production)
-Production system prompt is a structured normalization of the customer prompt:
-- **System Prompt v3.1 (PRODUCTION)** is the intended “single source of truth” for runtime orchestration.
+Production system prompt is a structured normalization of the customer behavior contract.
 
 ### 11.3 Important note on web-agent behavior
 A web-agent may:
@@ -436,7 +505,7 @@ A web-agent may:
 - behave statelessly.
 
 Therefore:
-- the authoritative behavior must be enforced **server-side** with explicit mode state and validation.
+- authoritative behavior must be enforced **server-side** with explicit runtime state and validation.
 
 ### 11.4 Prompt role boundary
 Prompts may influence wording, tone, and constrained explanation quality, but they must not become the hidden source of:
@@ -472,8 +541,8 @@ Core endpoint:
   - returns agent response + current mode.
 
 Mode transitions:
-- only via explicit commands in technician content.
-- server must never infer transitions from meaning.
+- only via explicit commands or approved natural-language aliases.
+- server must never perform uncontrolled transition inference from meaning alone.
 
 ### 12.4 Flow authority (critical)
 The **Context Engine** is the single authority for diagnostic flow decisions.
@@ -498,11 +567,12 @@ Allowed in route/boundary layer:
 - model transport,
 - validation/retry/fallback orchestration,
 - logging/telemetry,
-- explicit mode orchestration.
+- approved transition orchestration,
+- input normalization / intent extraction support that does not seize diagnostic authority.
 
 Not allowed in route helpers or extracted boundary modules:
 - hidden next-step selection,
-- semantic mode inference,
+- uncontrolled semantic mode inference,
 - fallback diagnostic state machine,
 - hidden branch logic,
 - hidden completion inference.
@@ -515,12 +585,14 @@ Route decomposition is allowed and desirable for maintainability, but only if:
 - decomposition does not create dual state machines.
 
 ### 12.7 Signal-aware Context Engine (planned authority refinement)
-The Context Engine should evolve to explicitly represent:
+The Context Engine should explicitly represent:
 - abnormal diagnostic signals,
 - branch priority,
 - report-ready suggestion state,
+- approved natural intent handling boundaries,
 - completion and terminal definitions,
-- procedure support submode.
+- procedure support submode,
+- dirty-input normalization handoff expectations.
 
 This is an architecture refinement, not a prompt-only enhancement.
 
@@ -539,10 +611,12 @@ Recommended future state fields or runtime equivalents:
 - clarification/support submode,
 - signal/override branch state,
 - report-ready state,
-- terminal-state marker.
+- terminal-state marker,
+- normalized-input metadata,
+- detected request intent class (bounded, server-owned).
 
 **Migration note:**
-- If production uses Neon/Postgres, deploy migrations during release (`prisma migrate deploy` or your chosen process).
+- If production uses Neon/Postgres, deploy migrations during release.
 
 ---
 
@@ -551,29 +625,32 @@ Recommended future state fields or runtime equivalents:
 **Rule:** Unit/component tests must be deterministic and must not require a live DB.
 
 - Vitest defaults to **memory-mode**.
-- DB env (`DATABASE_URL`, `DIRECT_URL`) is stubbed empty in test setup so Prisma is not selected.
-- DB-backed integration tests are **opt-in** via `TEST_DATABASE_URL` (separate job later).
-
-**Why:** prevents flakes from Neon/network/schema drift and keeps PR gating fast and reliable.
+- DB env is stubbed empty in test setup so Prisma is not selected.
+- DB-backed integration tests are **opt-in** via separate test env.
 
 ### 14.1 Testing expectations (minimum)
-- Unit tests: mode transitions, validators, procedure engine, language gating.
+- Unit tests: mode transitions, validators, procedure engine, language gating, intent recognition boundaries.
 - Integration tests: `/api/chat` end-to-end for:
   - complex equipment diagnostic form behavior,
   - completeness gate,
   - post-repair guardrail,
   - mechanical guardrail cases,
-  - final output formatting.
+  - final output formatting,
+  - report-intent alias behavior,
+  - locate-guidance support behavior,
+  - dirty-input classification robustness.
 
 ### 14.2 Benchmark requirement (new)
-A benchmark/evaluation harness is a required project asset, not an optional nice-to-have.
+A benchmark/evaluation harness is a required project asset.
 
 Benchmark must cover at least:
 - single-turn discipline,
 - procedure + signal branch logic,
 - state/terminal behavior,
 - report readiness / suggestion logic,
+- natural report intent recognition,
 - formatting / language compliance,
+- dirty-input robustness,
 - known failure cases converted into regression cases.
 
 ### 14.3 Structure-preserving tests (new)
@@ -584,17 +661,18 @@ Required categories:
 - no-hidden-authority tests,
 - extracted-module unit tests,
 - strictness tests proving flow authority remains in Context Engine,
-- regression tests for duplicate-step / wrong-order / signal-ignore / post-terminal questioning failures.
+- regression tests for duplicate-step / wrong-order / signal-ignore / post-terminal questioning / natural-intent failures.
 
 ### 14.4 Hard validation expectations
 Server-side validation must catch and prevent:
-- language rule violations (English-first + translation block),
+- language rule violations,
 - generating Cause before gates are satisfied,
 - adding forbidden “guarantee” language,
-- output format deviations (headers/numbering/tables),
-- procedure violations (skipped prerequisites, step repetition, out-of-order branching),
+- output format deviations,
+- procedure violations,
 - report generation in the wrong mode,
-- continuation of routine diagnostics after terminal state when no gating reason remains.
+- continuation of routine diagnostics after terminal state when no gating reason remains,
+- uncontrolled report generation from vague meaning-only inference.
 
 ---
 
@@ -605,9 +683,7 @@ Retention metadata must be **fresh** on reads:
 - `getCase`
 - `searchCases`
 
-This ensures UI (e.g. sidebar expiry badge) is correct and avoids “missing retention” edge-cases.
-
-A scheduled job may run retention cleanup (cron workflow). CI should be robust to Yarn version differences (Corepack/Berry vs Classic), but **must still fail** if `yarn.lock` truly diverges from `package.json`.
+This ensures UI remains correct and avoids “missing retention” edge-cases.
 
 ---
 
@@ -615,11 +691,9 @@ A scheduled job may run retention cleanup (cron workflow). CI should be robust t
 
 ### 16.1 Determinism & validation
 The system must be auditable and deterministic at the business-rule level.
-“Model preference” is not enough.
 
 ### 16.2 Single-authority rule
 There must be only one diagnostic flow authority at runtime.
-If flow logic is split across route helpers, prompts, and Context Engine simultaneously, that is a P1 architecture defect.
 
 ### 16.3 Contract-first behavior
 When a conflict exists between:
@@ -632,11 +706,14 @@ the explicit product contract wins.
 ### 16.4 Safe technician UX
 The agent should feel like a concise senior technician assistant:
 - focused,
-- short,
+- direct,
 - procedure-aligned,
+- practical,
+- collaborative when helpful,
 - not chatty,
 - not bureaucratic,
-- not “AI-explainy”.
+- not “AI-explainy”,
+- not a rigid form robot.
 
 But this UX goal must never weaken contract enforcement.
 
@@ -644,24 +721,28 @@ But this UX goal must never weaken contract enforcement.
 
 ## 17) Known Risks
 
-- Web-agent prompt non-compliance (system layer not respected).
+- Web-agent prompt non-compliance.
 - Stateless execution causing “mode forgetting”.
-- Model differences (temperature/context window) causing drift.
+- Model differences causing drift.
 - Liability risk if unsafe language slips through.
-- Procedure definition drift (dup steps / missing “how to check” guidance) causing customer-visible failures.
-- Checklist-following without signal awareness causing obviously illogical questioning.
+- Procedure definition drift causing customer-visible failures.
+- Checklist-following without signal awareness causing illogical questioning.
 - Dual-authority drift caused by route decomposition or helper extraction.
 - Hidden semantic inference reappearing in prompt or boundary code.
 - Report-ready situations being recognized but not surfaced clearly to the technician.
+- Dirty multilingual field input being misclassified.
+- Natural report intent not being recognized, causing unnecessary friction.
+- Locate/identify questions being answered with repeated generic measurement text.
 
 Mitigation:
 - enforce mode and gates server-side,
 - keep Context Engine as single diagnostic authority,
-- add validators + retry policy (especially translation),
-- log and audit outputs (text-only, no PII),
-- treat procedures as code: versioned, reviewed, test-covered,
+- add validators + retry policy,
+- log and audit outputs,
+- treat procedures as code,
 - convert each real failure into benchmark coverage,
-- enforce structure-preserving tests during decomposition work.
+- enforce structure-preserving tests,
+- treat dirty-input robustness and report-intent recognition as product-contract work, not optional UX polish.
 
 ---
 
@@ -674,7 +755,9 @@ Immediate architecture priorities now include:
 - signal-aware branch semantics,
 - procedure support submode,
 - report-ready suggestion,
+- natural report-intent handling,
 - terminal/completion hardening,
+- dirty-input normalization,
 - safe route.ts decomposition with single-authority preservation.
 
 Billing, orgs, integrations are post-v1.0 and require separate specs.
@@ -686,8 +769,13 @@ Billing, orgs, integrations are post-v1.0 and require separate specs.
 - Prompt wording changes require explicit approval.
 - Procedure changes are treated as product contract changes (review + tests).
 - Context Engine flow-rule changes are treated as product contract changes.
-- Signal/branch/terminal/report-readiness changes require benchmark updates.
+- Signal/branch/terminal/report-readiness/natural-intent changes require benchmark updates.
 - System prompt is treated as a product contract.
-- Any deviation in behavior is a P1 defect if it affects authorization safety, diagnostic flow authority, or contract enforcement.
+- Any deviation in behavior is a P1 defect if it affects:
+  - authorization safety,
+  - diagnostic flow authority,
+  - report/transition handling,
+  - dirty-input robustness,
+  - or contract enforcement.
 
 End of file.

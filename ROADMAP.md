@@ -1,8 +1,8 @@
 # RV Service Desk
 ## ROADMAP
 
-**Version:** 1.2  
-**Last updated:** 2026-03-18  
+**Version:** 1.3  
+**Last updated:** 2026-04-03  
 **Status:** Active Execution Plan
 
 ---
@@ -15,8 +15,9 @@ Order of development:
 1. Behavioral contracts (PROJECT_MEMORY)
 2. Evaluation system (Benchmark)
 3. Engine logic (Context Engine)
-4. Safe architecture refactor (route.ts)
-5. UI / UX improvements
+4. Runtime interaction hardening
+5. Safe architecture refactor (route.ts)
+6. UI / UX improvements
 
 ---
 
@@ -26,20 +27,24 @@ Order of development:
 - Eliminate critical diagnostic logic failures
 - Establish deterministic system behavior
 - Prevent regression via benchmark
+- Remove technician-facing robotic friction that violates the product contract
 
 ---
 
-## 1.1 Benchmark / Evaluation System (NEW — CRITICAL)
+## 1.1 Benchmark / Evaluation System (CRITICAL)
 
 ### Purpose
 Create a **project-specific SWE-style benchmark** for RV diagnostics.
 
 ### Why
-Public benchmarks (SWE-bench, etc.) do NOT reflect:
+Public benchmarks do NOT reflect:
 - diagnostic flow correctness
 - step discipline
 - authorization safety
 - report readiness behavior
+- natural report-intent behavior
+- dirty-input robustness
+- current-step guidance realism
 
 ---
 
@@ -61,11 +66,19 @@ Public benchmarks (SWE-bench, etc.) do NOT reflect:
 - Correct step completion tracking
 - No post-completion questioning
 - Correct terminal state behavior
+- Correct return after guidance / clarification
 
 #### Level 4 — Report Readiness & Transition
 - Detect report-ready situations
-- Suggest correct next action
-- No illegal auto-transition
+- Suggest or support correct next action
+- No illegal uncontrolled auto-transition
+- Natural report-intent alias handling works correctly
+
+#### Level 5 — Technician Interaction Realism
+- Locate/identify questions answered usefully
+- Current-step guidance is not robotic repetition
+- Dirty-input cases do not collapse classification
+- System does not depend on magic phrases only
 
 ---
 
@@ -74,6 +87,9 @@ Public benchmarks (SWE-bench, etc.) do NOT reflect:
 - Failure taxonomy
 - Pass/Fail rules
 - Regression suite
+- Dirty-input cases
+- Natural report-intent cases
+- Locate-guidance cases
 
 ---
 
@@ -84,17 +100,18 @@ Public benchmarks (SWE-bench, etc.) do NOT reflect:
 
 ---
 
-## 1.2 Context Engine Enhancement (Signal-Aware) (NEW — CRITICAL)
+## 1.2 Context Engine Enhancement (Signal-Aware) (CRITICAL)
 
 ### Problem
 Current engine is:
 - step-driven
-- but NOT signal-aware
+- but NOT fully signal-aware / terminal-aware in all runtime paths
 
 This leads to:
 - ignoring obvious faults
 - incorrect branching
 - checklist-following behavior
+- weak report-ready handling in some cases
 
 ---
 
@@ -133,9 +150,10 @@ Engine must detect:
 - fault localized
 - repair completed
 - technician summary provided
+- report-intent request present
 
 But:
-- must NOT switch mode automatically
+- must NOT perform uncontrolled transition
 
 ---
 
@@ -143,6 +161,7 @@ But:
 Explicit handling of:
 - when to stop diagnostics
 - when questioning becomes invalid
+- when report flow should be preferred
 
 ---
 
@@ -150,10 +169,75 @@ Explicit handling of:
 - Engine produces signal-aware next step
 - No signal-ignore failures in benchmark
 - Terminal state respected in all cases
+- Report-ready cases no longer fall back into useless diagnostics
 
 ---
 
-## 1.3 Safe route.ts Decomposition (NEW — HIGH PRIORITY)
+## 1.3 Runtime Interaction Hardening (NEW — CRITICAL)
+
+### Problem
+Current technician-facing runtime still shows three major defects:
+- natural report intent is too dependent on exact commands,
+- step guidance answers can be robotic and non-locational,
+- dirty real-world input can break classification.
+
+These are not just UX polish issues.
+They are product-contract issues because they make the tool feel less useful than a human coworker.
+
+---
+
+### Required Workstreams
+
+#### 1. Natural Report-Intent Handling
+Support bounded aliases such as:
+- write report
+- generate report
+- напиши отчет
+- сделай warranty report
+
+Hard rule:
+- no uncontrolled semantic switching,
+- gates still apply,
+- server remains authority.
+
+#### 2. Step Guidance Expansion
+Current-step support must answer:
+- how to perform the check,
+- where to find the part,
+- how to identify it,
+- what result to look for,
+- acceptable alternate check points.
+
+Hard rule:
+- support does not equal progress.
+
+#### 3. Dirty-Input Normalization
+Before classification:
+- normalize typo-heavy / mixed-language / keyboard-corrupted input,
+- split complaint / findings / action / report intent when possible,
+- do not invent facts.
+
+#### 4. Collaborative Diagnostic Expression
+The assistant should be allowed to sound like a concise senior technician:
+- “Давай…”
+- “Похоже…”
+- “Сначала я бы проверил…”
+
+Hard rule:
+- expression becomes more natural,
+- authority does not move from runtime to prompt.
+
+---
+
+### Definition of Done
+- no magic-phrase-only dependence in approved report-ready cases
+- locate questions no longer get repeated measurement-only answers
+- dirty-input benchmark cases classify correctly
+- technician-facing tone is bounded, concise, and non-robotic
+
+---
+
+## 1.4 Safe route.ts Decomposition (HIGH PRIORITY)
 
 ### Problem
 `route.ts` currently acts as:
@@ -182,7 +266,7 @@ Must remain:
 - diagnostic logic
 - step selection
 - branch decisions
-- mode inference
+- uncontrolled mode inference
 - completion logic
 
 ---
@@ -193,14 +277,16 @@ Must remain:
 Extract:
 - request preparation
 - language handling
+- input normalization
 
 #### Step 2
 Extract:
-- diagnostic flow orchestration
+- diagnostic flow orchestration support
 
 #### Step 3
 Extract:
 - final report / labor override flow
+- approved transition handling
 
 #### Step 4
 Extract:
@@ -221,11 +307,11 @@ No dual logic allowed in:
 ### Definition of Done
 - route.ts < 300–400 lines
 - no hidden flow logic outside Context Engine
-- behavior unchanged (validated by benchmark)
+- behavior unchanged or intentionally improved only with benchmark coverage
 
 ---
 
-## 1.4 Structure-Preserving Tests (NEW — CRITICAL)
+## 1.5 Structure-Preserving Tests (CRITICAL)
 
 ### Problem
 Refactoring can silently break architecture.
@@ -239,18 +325,12 @@ Refactoring can silently break architecture.
 - no duplicate paths
 - SSE lifecycle intact
 
----
-
 #### 2. No-Hidden-Authority Tests
 - ensure only Context Engine decides flow
 - detect logic leakage into helpers
 
----
-
 #### 3. Module Unit Tests
 - extracted services tested independently
-
----
 
 #### 4. Regression Tests
 Must cover:
@@ -259,12 +339,16 @@ Must cover:
 - duplicate step
 - post-terminal questioning
 - illegal report behavior
+- natural report-intent failure
+- dirty-input misclassification
+- locate-guidance robotic failure
 
 ---
 
 ### Definition of Done
 - tests fail if flow authority is violated
 - tests fail if branching logic moves outside engine
+- tests fail if technician-realistic interaction regresses
 
 ---
 
@@ -297,7 +381,7 @@ Must cover:
 
 ---
 
-## 2.4 Mobile-First UI Redesign (NEW — HIGH PRIORITY)
+## 2.4 Mobile-First UI Redesign (HIGH PRIORITY)
 
 ### Problem
 Current UI:
@@ -326,8 +410,6 @@ This is a critical adoption blocker because:
 - High contrast
 - XL readable text
 
----
-
 #### 2. Multi-Screen Flow (Possible Redesign)
 Instead of one dense screen, split into:
 
@@ -336,34 +418,21 @@ Instead of one dense screen, split into:
 - Screen 3: Input (answer / voice / quick buttons)
 - Screen 4: Report / output
 
-Navigation:
-- forward/back buttons
-- minimal friction
-- no hidden state
-
----
-
 #### 3. Diagnostic Step Focus Mode
 - highlight ONLY current question
 - hide previous noise by default
 - allow optional expand for history
-
----
 
 #### 4. Quick Input Optimization
 - Yes / No buttons
 - predefined answers where possible
 - voice input support (future)
 
----
-
 #### 5. Report View Optimization
 - easy copy
 - clear sections
 - mobile-friendly formatting
 - no horizontal overflow
-
----
 
 #### 6. Web Alignment
 Web version:
@@ -381,15 +450,6 @@ Web version:
 
 ---
 
-### Validation
-- test on real devices (not just dev tools)
-- test with gloves / dirty hands scenario (real technician context)
-- measure:
-  - time to answer step
-  - error rate
-  - abandonment
----
-
 # 3. P2 — Product Expansion
 
 ## Goals
@@ -402,6 +462,7 @@ Web version:
 - better mobile flow
 - faster input
 - clearer prompts
+- faster report generation from realistic technician phrasing
 
 ---
 
@@ -440,17 +501,19 @@ Web version:
 - No prompt-only fixes for logic bugs
 - No dual flow authority
 - Every real bug → benchmark test
+- Technician-realistic interaction failures are product bugs, not cosmetic notes
 
 ---
 
 # 6. Immediate Next Actions
 
-1. Finalize PROJECT_MEMORY (DONE)
-2. Create RV_SWE_BENCHMARK_v1.md (NEXT)
-3. Define signal taxonomy
-4. Build first 20 test cases
-5. Only then start route.ts decomposition
+1. Update contract docs (DONE / IN PROGRESS)
+2. Expand benchmark with current real failures
+3. Implement natural report-intent handling
+4. Implement stronger step-guidance locate/identify behavior
+5. Add dirty-input normalization
+6. Only then continue major route.ts decomposition
 
 ---
 
-End of file
+End of file.

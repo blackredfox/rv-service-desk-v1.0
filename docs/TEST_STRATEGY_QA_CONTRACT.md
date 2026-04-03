@@ -1,11 +1,11 @@
 # RV Service Desk
 ## TEST_STRATEGY_QA_CONTRACT.md
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Enforced QA / Testing Contract  
 **Purpose:** Define the required testing model for behavior correctness, architecture preservation, regression control, and safe route decomposition.
 
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-03
 
 ---
 
@@ -20,6 +20,9 @@ The system now depends on multiple critical invariants:
 - prompt layer must not become a second diagnostic engine
 - benchmarked behavior must not regress
 - language, report, and terminal-state contracts must remain enforced
+- natural report-intent handling must remain bounded and deterministic
+- dirty-input robustness must not regress
+- current-step support must remain helpful without becoming progress
 
 This document defines the testing strategy required to keep those invariants true.
 
@@ -56,8 +59,6 @@ It operationalizes them into QA requirements.
 
 In this repository, a good test protects what the product must do, not merely how one prompt phrased it on one day.
 
-This is the default doctrine for new tests, PR review, and QA decisions.
-
 Tests should prefer validating behavior such as:
 - mode correctness
 - no invalid mode drift
@@ -69,21 +70,22 @@ Tests should prefer validating behavior such as:
 - language policy
 - safety boundaries
 - authoritative-state behavior
-
-Tests should avoid brittle exact-string assertions when the wording itself is not the contract.
+- natural report-intent handling
+- dirty-input robustness
+- useful current-step guidance behavior
 
 ### 3.2 Exact wording boundary
 
 Exact wording assertions are allowed only when the wording itself is contract-critical, for example:
 - exact section headers
-- exact command tokens
+- exact command tokens if still intentionally fixed
 - exact separators
 - safety/compliance-critical mandated wording
 - intentionally fixed canonical templates
 
-Exact wording assertions are NOT the default. They are a narrow exception that should be used only when changing the wording would change product correctness, safety, compliance, or parsing expectations.
+Exact wording assertions are NOT the default.
 
-If a phrase is not part of the actual product contract, the test should be rewritten to validate structure, markers, state, ordering, or policy instead.
+If a phrase is not part of the actual product contract, the test should validate structure, markers, state, ordering, or policy instead.
 
 ### 3.3 Preferred assertion classes
 
@@ -98,22 +100,8 @@ When writing or reviewing tests, prefer assertions that answer questions like:
 - Did it follow language policy?
 - Did it stay within safety boundaries?
 - Did it use authoritative state rather than inferred or improvised state?
-
-### 3.4 Tiny example
-
-Bad:
-- `expect(text).toContain("Please continue diagnostics with the next question")`
-
-Better:
-- assert the response stays in diagnostic mode
-- assert it asks the next-step question shape
-- assert it does not emit final-report structure
-
-For this project, a change is unsafe if it:
-- produces the right wording but breaks flow authority,
-- passes happy-path output tests but introduces hidden diagnostic logic,
-- improves one case while breaking benchmarked regressions,
-- makes route.ts cleaner while scattering authority into helpers.
+- Did it answer the actual current-step question the technician asked?
+- Did it remain robust to realistic technician input?
 
 ---
 
@@ -148,6 +136,7 @@ Purpose:
 
 Must cover at minimum:
 - mode resolution
+- alias / natural-intent trigger classification boundaries
 - language gating
 - validators
 - output formatting helpers
@@ -155,6 +144,7 @@ Must cover at minimum:
 - prompt-layer helper utilities (if any)
 - pure procedure utilities
 - Context Engine pure functions
+- dirty-input normalization helpers (if extracted)
 
 ### 5.2 Integration Tests
 Purpose:
@@ -168,8 +158,10 @@ Must cover at minimum:
 - post-repair fallback to diagnostics
 - mechanical direct-power guardrail
 - final output formatting
-- explicit mode transitions
+- explicit / approved-alias mode transitions
 - language enforcement behavior
+- locate-guidance support behavior
+- dirty-input route behavior on realistic examples
 
 ### 5.3 Benchmark / Evaluation Tests
 Purpose:
@@ -181,9 +173,11 @@ Benchmark must cover:
 - procedure compliance
 - signal-aware branch behavior
 - terminal-state behavior
-- report readiness / suggestion behavior
+- report readiness / support behavior
+- natural report-intent handling
 - language consistency
 - state / memory loss
+- dirty-input robustness
 - known historical failures
 
 Benchmark is not optional.
@@ -191,8 +185,6 @@ Benchmark is not optional.
 ### 5.4 Structure-Preserving Tests
 Purpose:
 - verify that refactors do not create architecture drift.
-
-These tests are mandatory because route decomposition is planned and helper extraction is dangerous.
 
 Must include:
 - route wiring tests
@@ -213,12 +205,7 @@ Must prove:
 - `case`, `language`, `mode`, `done`, and `error` events are emitted correctly
 - no duplicated close/return behavior occurs
 - route boundary still coordinates without silently becoming a second flow engine
-
-Examples:
-- stream closes exactly once
-- `done` is always sent on success
-- error path does not emit success events
-- explicit mode orchestration still works after refactor
+- report-intent path does not bounce back into diagnostics after readiness is reached
 
 ### 6.2 No Hidden Authority Tests
 These tests verify that flow authority is not leaking into helpers, prompts, or route glue.
@@ -226,7 +213,7 @@ These tests verify that flow authority is not leaking into helpers, prompts, or 
 Must prove:
 - extracted modules do NOT choose next steps
 - extracted modules do NOT infer completion
-- extracted modules do NOT infer semantic mode transitions
+- extracted modules do NOT perform uncontrolled semantic mode transitions
 - prompt-layer changes do NOT create hidden branch logic
 - route does NOT become a second state machine
 
@@ -236,22 +223,19 @@ These tests should fail if:
 - report/readiness logic is implemented outside the intended authority layer
 
 ### 6.3 Extracted Module Unit Tests
-These are required once route decomposition begins.
-
 Each extracted module must have targeted unit coverage.
 
 Expected extraction targets include:
 - request preparation
 - mode resolution
+- intent extraction / alias handling
 - validation services
 - report helpers
 - logging helpers
 - prompt context builders
 - execution wrappers
 - persistence side-effect services
-
-Requirement:
-- every extracted module with logic must be test-covered before or at extraction time
+- dirty-input normalization utilities
 
 ### 6.4 Strictness Tests
 These tests verify that single-authority architecture is still intact.
@@ -262,39 +246,7 @@ Must prove:
 - no dual state machine appears
 - clarification, replan, and terminal behavior are not split across hidden controllers
 - prompt layer remains delivery/support only
-
-These tests are blocking, not optional.
-
-### 6.5 Assertion taxonomy by product contract
-
-#### Diagnostic mode
-Prefer assertions that validate whether the system:
-- asks the correct next question shape
-- remains in diagnostic mode unless an explicit transition command is given
-- does not emit final report structure
-- does not declare completion when not allowed
-- respects ordering and prerequisites
-- respects language/output policy
-
-#### Final report mode
-Prefer assertions that validate whether the system:
-- includes required section headers
-- preserves required section order
-- follows translation/language policy
-- avoids prohibited denial wording
-- is built from authoritative facts/state
-
-#### Authorization mode
-Prefer assertions that validate whether the system:
-- stays in authorization output class
-- does not drift into final report format
-- avoids prohibited wording
-
-#### Transition rules
-Prefer assertions that validate whether the system:
-- transitions only via explicit command where required
-- does not let semantic completion alone force mode change
-- does not hide transition authority inside prompts/helpers
+- natural report-intent handling stays bounded and server-owned
 
 ---
 
@@ -321,11 +273,13 @@ The suite must include regression coverage for all major known failure types.
 - branch reopening without valid new evidence
 
 ### 7.4 Report / authorization regressions
-- auto-switch behavior
+- uncontrolled auto-switch behavior
 - report generated in wrong mode
-- report not suggested when runtime says ready
+- report not suggested/supported when runtime says ready
 - labor confirmation path re-entering diagnostics
 - authorization/report confusion across modes
+- approved natural report intent not honored
+- exact magic-phrase-only dependence when an approved report trigger should work
 
 ### 7.5 Support / mentor regressions
 - how-to explanation closes step implicitly
@@ -333,6 +287,7 @@ The suite must include regression coverage for all major known failure types.
 - no return-to-step after clarification
 - tutorial drift outside procedure
 - prompt acts like hidden diagnostic engine
+- locate or identify question answered with repeated generic measurement wording only
 
 ### 7.6 Language regressions
 - RU/EN/ES drift in diagnostics
@@ -340,6 +295,19 @@ The suite must include regression coverage for all major known failure types.
 - wrong final output language structure
 - missing translation block
 - English block contaminated with RU/ES text
+
+### 7.7 Dirty-input robustness regressions
+- mixed-language complaint/findings misclassified
+- keyboard-layout corruption breaks routing
+- complaint + findings + repair + report request in one message mishandled
+- report-intent extraction fails on realistic noisy input
+
+### 7.8 Interaction realism regressions
+- robotic bureaucratic banner dominates when bounded natural phrasing is allowed
+- assistant ignores the actual question and repeats the previous step text
+- report flow blocked by unnecessary ritual command friction
+
+These are benchmarked only where they cross a documented product boundary.
 
 ---
 
@@ -349,7 +317,6 @@ The suite must include regression coverage for all major known failure types.
 - active test files belong under `/tests`
 - repo root must not be used for scratch/ad hoc test files
 - generated test reports must not be stored in repo root
-- if report artifacts have historical/debug value, archive them under `docs/archive/test-reports/`
 
 ### 8.1 Determinism
 Unit/component tests must be deterministic.
@@ -362,19 +329,12 @@ Default rule:
 ### 8.2 Database policy
 Default tests run in memory-mode / DB-free mode.
 
-If DB-backed tests exist:
-- they must be opt-in
-- they must not block standard deterministic PR validation unless explicitly intended
-
 ### 8.3 Runtime isolation
 Tests must not depend on:
 - current local machine state
 - manual prompt tweaking
 - prior test order
 - hidden shared mutable state without explicit reset
-
-### 8.4 TypeScript / build sanity
-Type-aware test expectations must remain compatible with repository TypeScript strictness and path configuration.
 
 ---
 
@@ -390,6 +350,8 @@ The following failures must block merge:
 - output contract validation regressions
 - language contract regressions
 - deterministic unit/integration failures
+- dirty-input classification regressions
+- natural report-intent regressions
 
 ### 9.2 Non-blocking observations
 The following may be tracked without immediate block only if explicitly approved:
@@ -402,10 +364,6 @@ A PR cannot be accepted because:
 - manual demo looked good
 - one happy-path case improved
 - output sounded more natural
-
-PRs must not be accepted solely because prompt wording was tuned until brittle tests passed.
-
-Tests should fail for real behavioral regressions, not because incidental wording changed while the contract stayed intact.
 
 A PR is acceptable only if:
 - required tests pass,
@@ -424,6 +382,8 @@ Any PR touching:
 - report flow
 - mode logic
 - procedure logic
+- intent handling
+- input normalization
 
 must satisfy:
 
@@ -443,12 +403,13 @@ must satisfy:
 ### Assertion quality
 - [ ] this test protects a real product behavior boundary
 - [ ] if using an exact wording assertion, the wording is contract-critical
-- [ ] if wording is not contract-critical, the assertion is phrased as structure/marker/state/policy validation instead
+- [ ] if wording is not contract-critical, the assertion is phrased as structure/marker/state/policy validation
 
 ### Refactor safety
 - [ ] no hidden flow logic introduced into helpers
-- [ ] no semantic mode inference introduced
+- [ ] no uncontrolled semantic mode inference introduced
 - [ ] no alternate completion logic introduced outside intended authority
+- [ ] alias handling remains bounded and deterministic
 
 ---
 
@@ -499,11 +460,6 @@ The benchmark and test suite are related but not identical.
 
 Both are required.
 
-A project can have:
-- passing unit tests,
-- passing integration tests,
-- but still be unsafe if benchmark or strictness coverage is missing.
-
 ---
 
 ## 13) Failure Severity Guidance
@@ -516,6 +472,8 @@ Critical failures:
 - language-lock failure
 - terminal-state failure
 - silent architecture split
+- dirty-input collapse into wrong system
+- approved natural report-intent failure
 
 ### P1
 Major failures:
@@ -541,10 +499,10 @@ Whenever the project changes materially in any of these areas:
 - benchmark taxonomy
 - report/labor flow
 - language contract
+- natural-intent handling
+- dirty-input robustness
 
 the test strategy / QA contract must be reviewed and updated.
-
-This document must evolve with the architecture.
 
 ---
 
@@ -560,8 +518,6 @@ Until superseded, use this order:
 6. strictness tests
 7. extracted-module unit tests for any new decomposition work
 
-This keeps fast feedback first while still protecting architecture.
-
 ---
 
 ## 16) Final Principle
@@ -576,13 +532,5 @@ it is unsafe.
 
 If the suite does not prove single-authority preservation,
 it does not protect the system.
-
-### Test author / reviewer checklist
-- Am I testing behavior or just wording?
-- Is this wording itself part of the contract?
-- Can this assertion be rewritten as structure/mode/state/policy validation?
-- Does this test protect a real product behavior boundary?
-
----
 
 End of file.
