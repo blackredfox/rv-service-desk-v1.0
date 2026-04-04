@@ -78,6 +78,9 @@ import {
   shouldTreatAsFinalReportForOverride,
   detectApprovedFinalReportIntent,
   classifyStepGuidanceIntent,
+  normalizeRoutingInput,
+  assessRepairSummaryIntent,
+  buildRepairSummaryClarificationResponse,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -146,6 +149,32 @@ function buildAuthoritativeCompletionOffer(args: {
   }
 }
 
+function buildRepairSummaryReportSupportResponse(language: Language): string {
+  switch (language) {
+    case "RU":
+      return [
+        "Понял.",
+        "В сообщении уже есть жалоба, результаты осмотра и выполненный ремонт — это можно использовать для подготовки отчёта.",
+        "Я не буду запускать несвязанную диагностику по этому вводу.",
+        "Когда кейс будет готов по текущему потоку, отправьте START FINAL REPORT.",
+      ].join("\n");
+    case "ES":
+      return [
+        "Entendido.",
+        "Tu mensaje ya incluye la queja, los hallazgos y la reparación completada; eso sirve para preparar el informe.",
+        "No voy a iniciar una ruta de diagnóstico no relacionada con esta entrada.",
+        "Cuando el caso esté listo dentro del flujo actual, envía START FINAL REPORT.",
+      ].join("\n");
+    default:
+      return [
+        "Understood.",
+        "Your message already includes the complaint, findings, and completed repair, so it can be used for report support.",
+        "I will not start an unrelated diagnostic path from this input.",
+        "When the case is ready under the current flow, send START FINAL REPORT.",
+      ].join("\n");
+  }
+}
+
 function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete" | "terminalState"> | null | undefined): boolean {
   return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
@@ -171,6 +200,8 @@ export async function POST(req: Request) {
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  const { normalizedMessage: routingMessage } = normalizeRoutingInput(message);
 
   // ── ATTACHMENT VALIDATION ─────────────────────────────────────────
   const attachmentBundleResult = prepareAttachmentBundle(body);
@@ -221,14 +252,36 @@ export async function POST(req: Request) {
 
   const approvedFinalReportIntent =
     currentMode === "diagnostic"
-      ? detectApprovedFinalReportIntent(message)
+      ? detectApprovedFinalReportIntent(routingMessage)
       : { matched: false };
 
-  const modeResolution = resolveExplicitModeChange(currentMode, message);
+  let repairSummaryClarificationResponse: string | null = null;
+  let repairSummaryReportSupportResponse: string | null = null;
+  const runtimeReportReady = isFinalReportReady(getOrCreateContext(ensuredCase.id));
+
+  const pendingFinalReportCommand =
+    currentMode === "diagnostic"
+      ? resolveExplicitModeChange(currentMode, routingMessage)
+      : { currentMode, nextMode: currentMode, changed: false };
+
+  const hasEmbeddedExplicitFinalReportCommand =
+    /(?:^|[.!?;:,\n]\s*)START FINAL REPORT(?:$|[.!?;:,\n])/i.test(routingMessage);
+
+  const hasBoundedReportRequest =
+    approvedFinalReportIntent.matched ||
+    hasEmbeddedExplicitFinalReportCommand ||
+    (pendingFinalReportCommand.changed && pendingFinalReportCommand.nextMode === "final_report");
+
+  const repairSummaryIntent = assessRepairSummaryIntent({
+    message: routingMessage,
+    hasReportRequest: hasBoundedReportRequest,
+  });
+
+  const modeResolution = pendingFinalReportCommand;
   if (modeResolution.changed) {
     const reportReadyBeforeTransition =
       modeResolution.nextMode !== "final_report" ||
-      isFinalReportReady(getOrCreateContext(ensuredCase.id));
+      runtimeReportReady;
 
     if (reportReadyBeforeTransition) {
       console.log(`[Chat API v2] Mode transition: ${modeResolution.currentMode} → ${modeResolution.nextMode} (explicit command)`);
@@ -239,10 +292,26 @@ export async function POST(req: Request) {
     }
   }
 
+  if (
+    currentMode === "diagnostic" &&
+    (approvedFinalReportIntent.matched || hasEmbeddedExplicitFinalReportCommand) &&
+    repairSummaryIntent.readyForReportRouting &&
+    !runtimeReportReady
+  ) {
+    repairSummaryReportSupportResponse = buildRepairSummaryReportSupportResponse(outputPolicy.effective);
+    console.log(`[Chat API v2] Dirty-input report support readiness surfaced (approved report intent: ${approvedFinalReportIntent.matchedText ?? "matched"})`);
+  } else if (currentMode === "diagnostic" && repairSummaryIntent.shouldAskClarification) {
+    repairSummaryClarificationResponse = buildRepairSummaryClarificationResponse({
+      language: outputPolicy.effective,
+      missingFields: repairSummaryIntent.missingFields,
+    });
+    console.log(`[Chat API v2] Dirty-input repair summary clarification requested (missing: ${repairSummaryIntent.missingFields.join(", ")})`);
+  }
+
   let stepGuidanceResponse: string | null = null;
   let stepGuidanceStepId: string | null = null;
 
-  if (currentMode === "diagnostic") {
+  if (currentMode === "diagnostic" && !repairSummaryClarificationResponse && !repairSummaryReportSupportResponse) {
     const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
     const activeStepBeforeProcessing = contextBeforeProcessing.activeStepId;
     const terminalPhaseBeforeProcessing =
@@ -316,12 +385,12 @@ export async function POST(req: Request) {
   let activeStepMetadata: RegistryActiveStepMetadata | null = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
-  if (currentMode === "diagnostic" && !stepGuidanceResponse) {
+  if (currentMode === "diagnostic" && !stepGuidanceResponse && !repairSummaryClarificationResponse && !repairSummaryReportSupportResponse) {
     if (!STRICT_CONTEXT_ENGINE) {
       console.error("[Chat API v2] STRICT_CONTEXT_ENGINE is disabled — this is not supported in production");
     }
 
-    const initResult = initializeCase(ensuredCase.id, message);
+    const initResult = initializeCase(ensuredCase.id, routingMessage);
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
       console.log(`[Chat API v2] Procedure catalog: ${initResult.procedure.displayName}, initial steps: ${initResult.preCompletedSteps.join(", ")}`);
       for (const stepId of initResult.preCompletedSteps) {
@@ -350,7 +419,7 @@ export async function POST(req: Request) {
     // Used by STEP COMPLETION HARDENING to determine if the engine already advanced the step.
     const stepIdBeforeProcessing = getOrCreateContext(ensuredCase.id)?.activeStepId ?? null;
 
-    engineResult = processContextMessage(ensuredCase.id, message, DEFAULT_CONFIG);
+    engineResult = processContextMessage(ensuredCase.id, routingMessage, DEFAULT_CONFIG);
 
     if (!engineResult || !engineResult.context) {
       console.error("[Chat API v2] CRITICAL: Context Engine returned invalid result — using safe fallback");
@@ -492,7 +561,7 @@ export async function POST(req: Request) {
     const clarificationRequested = Boolean(
       currentActiveStep &&
       classifyStepGuidanceIntent({
-        message,
+        message: routingMessage,
         activeStepQuestion: getActiveStepQuestion(ensuredCase.id, currentActiveStep) ?? "",
         activeStepHowToCheck: getActiveStepMetadata(
           ensuredCase.id,
@@ -513,7 +582,7 @@ export async function POST(req: Request) {
       !initResult.preCompletedSteps.includes(currentActiveStep)
     ) {
       const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
-      if (isStepAnswered(message, stepQuestion)) {
+      if (isStepAnswered(routingMessage, stepQuestion)) {
         // Technician's message answers the step — mark it complete
         registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
@@ -522,7 +591,7 @@ export async function POST(req: Request) {
         // ── BRANCH TRIGGER CHECK (P1.5 backup) ───────────────────────────
         // Context engine didn't advance, so check branch trigger here.
         // processResponseForBranch was NOT called by the engine for this step.
-        const branchResult = processResponseForBranch(ensuredCase.id, currentActiveStep, message);
+        const branchResult = processResponseForBranch(ensuredCase.id, currentActiveStep, routingMessage);
         if (branchResult.branchEntered) {
           console.log(`[Chat API v2] Branch entered (hardening backup): ${branchResult.branchEntered.id} (locked out: ${branchResult.lockedOut.join(", ") || "none"})`);
           // Sync branch state to context engine
@@ -756,6 +825,38 @@ export async function POST(req: Request) {
         })));
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
+
+        const directRoutingResponse = repairSummaryClarificationResponse ?? repairSummaryReportSupportResponse;
+
+        if (directRoutingResponse) {
+          emitToken(directRoutingResponse);
+          full = directRoutingResponse;
+
+          if (!aborted && full.trim()) {
+            await appendAssistantChatMessage({
+              caseId: ensuredCase.id,
+              content: full,
+              language: outputPolicy.effective,
+              userId: user?.id,
+            });
+          }
+
+          if (currentMode === "diagnostic" && repairSummaryClarificationResponse) {
+            recordAgentAction(
+              ensuredCase.id,
+              {
+                type: "clarification",
+                content: full.slice(0, 200),
+                submode: "main",
+              },
+              DEFAULT_CONFIG,
+            );
+          }
+
+          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+          controller.close();
+          return;
+        }
 
         if (stepGuidanceResponse) {
           emitToken(stepGuidanceResponse);

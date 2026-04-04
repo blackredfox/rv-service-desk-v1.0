@@ -15,6 +15,8 @@ const pureBoundaryModules = [
   "src/lib/chat/response-validation-service.ts",
   "src/lib/chat/final-report-flow-service.ts",
   "src/lib/chat/openai-execution-service.ts",
+  "src/lib/chat/input-normalization.ts",
+  "src/lib/chat/repair-summary-intent.ts",
 ];
 
 describe("No Hidden Authority — Route Decomposition", () => {

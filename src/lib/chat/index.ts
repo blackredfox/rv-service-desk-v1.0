@@ -78,6 +78,17 @@ export {
 } from "./report-intent";
 
 export {
+  normalizeRoutingInput,
+} from "./input-normalization";
+
+export {
+  assessRepairSummaryIntent,
+  buildRepairSummaryClarificationResponse,
+  type RepairSummaryIntentAssessment,
+  type RepairSummaryMissingField,
+} from "./repair-summary-intent";
+
+export {
   classifyStepGuidanceIntent,
   type StepGuidanceIntentCategory,
 } from "./step-guidance-intent";
