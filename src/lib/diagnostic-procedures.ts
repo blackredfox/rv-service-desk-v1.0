@@ -146,6 +146,7 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
   water_heater: {
     displayName: {
       RU: "Водонагреватель (газовый/комбинированный)",
+      ES: "Calentador de agua (gas/combo)",
     },
     steps: {
       wh_1: {
@@ -183,17 +184,21 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
       wh_5: {
         question: {
           RU: "Есть ли 12 В DC на плате управления/поджиге водонагревателя? Измерьте напряжение.",
+          ES: "¿Hay 12 V DC en la placa de control/encendido del calentador de agua? Mida el voltaje.",
         },
         howToCheck: {
-          RU: "Переключите мультиметр в режим DC volts. Чёрный щуп поставьте на массу/B-, красный — на вход 12V/B+ платы управления во время запроса нагрева. Норма: примерно напряжение аккумулятора, обычно 11.5–13.5 В.",
+          RU: "Откройте наружную сервисную дверцу и найдите плату управления или модуль розжига. Переключите мультиметр в режим DC volts. Чёрный щуп поставьте на массу/B- платы или на чистую массу шасси, красный — на вход 12V/B+ во время запроса нагрева. Если точный вывод B+ неясен, измеряйте на входящем 12V проводе в разъёме платы или на проводе питания после внутреннего выключателя. Норма: примерно напряжение аккумулятора, обычно 11.5–13.5 В.",
+          ES: "Abra el acceso exterior de servicio y ubique la placa de control o el módulo de encendido. Ponga el multímetro en DC volts. Coloque la punta negra en tierra/B- de la placa o en una tierra limpia del chasis, y la roja en la entrada de 12V/B+ durante la demanda de calor. Si no está claro cuál es el pin B+, mida en el cable de entrada de 12V en el conector de la placa o en la alimentación que sale del interruptor interior ON/OFF. Lo normal es ver voltaje de batería, normalmente 11.5–13.5 V.",
         },
       },
       wh_5a: {
         question: {
           RU: "Ветка отсутствия 12 В: проверьте предохранитель/автомат водонагревателя, отключатель аккумулятора и цепь питания от внутреннего выключателя. Есть ли напряжение аккумулятора до платы управления?",
+          ES: "Rama sin 12 V: revise el fusible/disyuntor del calentador, el desconectador de batería y la alimentación desde el interruptor interior ON/OFF. ¿Hay voltaje de batería antes de la placa de control?",
         },
         howToCheck: {
-          RU: "Измерьте DC-напряжение с обеих сторон предохранителя или автомата, затем на отключателе аккумулятора и на проводе питания от внутреннего выключателя. На каждой точке до платы должно быть напряжение аккумулятора.",
+          RU: "Проверяйте цепь по ходу к плате: сначала обе стороны предохранителя или автомата водонагревателя, затем отключатель аккумулятора, затем вход и выход внутреннего выключателя ON/OFF, затем сам вход платы. Измеряйте DC-напряжение в каждой точке. Если неясно, какой именно предохранитель относится к водонагревателю, ищите маркировку Water Heater/WH или проследите тот же питающий провод по цвету до платы. Допустимые альтернативные точки проверки: вход и выход предохранителя, вход и выход выключателя, а также 12V-провод непосредственно перед платой. Напряжение аккумулятора должно присутствовать до места обрыва.",
+          ES: "Siga la alimentación hacia la placa: primero ambos lados del fusible o disyuntor del calentador, luego el desconectador de batería, después la entrada y salida del interruptor interior ON/OFF y, por último, la entrada de la placa. Mida voltaje DC en cada punto. Si no está claro cuál es el fusible correcto, busque una etiqueta Water Heater/WH o siga el mismo color de cable hacia la placa. Los puntos alternos aceptables son ambos lados del fusible, la entrada y salida del interruptor y el cable de 12V justo antes de la placa. Debe haber voltaje de batería hasta el punto donde se pierde la alimentación.",
         },
       },
       wh_5b: {
@@ -593,7 +598,7 @@ reg({
         /(?:12v|12\s*volt|voltage|напряжени)/i,
         /(?:no|yes|есть|нет)\s*(?:power|voltage|питани)/i,
       ],
-      howToCheck: "Set meter to DC volts. Place black lead on board ground/B- and red lead on the 12V input or B+ terminal at the control board during the call for heat. Reading should stay around battery voltage, typically 11.5-13.5V.",
+      howToCheck: "Open the exterior service access and locate the control board or igniter module. Set meter to DC volts. Place the black lead on board ground/B- or a clean chassis ground. Place the red lead on the 12V/B+ feed during the call for heat. If the exact B+ pin is unclear, use the incoming 12V wire at the board connector or the board feed coming out of the interior ON/OFF switch. Normal reading is battery voltage, typically 11.5-13.5V.",
     },
     // Step 6: Ignition attempt (BRANCH TRIGGER STEP)
     {
@@ -789,7 +794,7 @@ reg({
         /(?:fuse|breaker|disconnect|switch|feed).*(?:12v|voltage|power|ok|good|bad|open|blown|present|missing)/i,
         /(?:blown|tripped|open)\s*(?:fuse|breaker)/i,
       ],
-      howToCheck: "Measure DC voltage on both sides of the water heater fuse/breaker, then at the battery disconnect and interior ON/OFF feed. Battery voltage should be present at each upstream point before the control board.",
+      howToCheck: "Work upstream toward the control board: check both sides of the water-heater fuse or breaker, then the battery disconnect, then the interior ON/OFF switch input and output, then the board feed itself. Measure DC voltage at each point. If the exact fuse is unclear, look for a Water Heater/WH label or trace the same feed wire color toward the board. Acceptable alternate check points are the upstream and downstream sides of the fuse, the switch input and output, and the 12V feed entering the board. Battery voltage should be present until the open point is found.",
     },
     {
       id: "wh_5b",

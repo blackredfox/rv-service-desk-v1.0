@@ -357,10 +357,10 @@ describe("Mode Transition Tests", () => {
       expect(detectModeCommand("FINAL REPORT")).toBe("final_report");
       expect(detectModeCommand("GIVE ME THE REPORT")).toBe("final_report");
       expect(detectModeCommand("ВЫДАЙ РЕПОРТ")).toBe("final_report");
-      expect(detectModeCommand("Write report")).toBe("final_report");
-      expect(detectModeCommand("Generate report")).toBe("final_report");
-      expect(detectModeCommand("Напиши отчет")).toBe("final_report");
-      expect(detectModeCommand("Напиши Report")).toBe("final_report");
+      expect(detectModeCommand("Write report")).toBeNull();
+      expect(detectModeCommand("Generate report")).toBeNull();
+      expect(detectModeCommand("Напиши отчет")).toBeNull();
+      expect(detectModeCommand("Напиши Report")).toBeNull();
       expect(detectModeCommand("AUTHORIZATION REQUEST")).toBe("authorization");
       expect(detectModeCommand("SOLICITAR AUTORIZACIÓN")).toBe("authorization");
     });

@@ -76,6 +76,8 @@ import {
   detectLaborOverrideIntent,
   looksLikeFinalReport,
   shouldTreatAsFinalReportForOverride,
+  detectApprovedFinalReportIntent,
+  classifyStepGuidanceIntent,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -144,95 +146,8 @@ function buildAuthoritativeCompletionOffer(args: {
   }
 }
 
-function isClarificationRequest(message: string): boolean {
-  const msg = message.toLowerCase();
-
-  const clarificationWords =
-    /(?:how|where|which|what|explain|show|tell\s+me|как|где|какой|какие|что|объясни|покажи|como|c[oó]mo|donde|d[oó]nde|cual|cu[aá]l|qu[eé]|explica|muestra)/i;
-  const diagnosticActionWords =
-    /(?:check|measure|test|verify|inspect|locate|find|terminal|wire|probe|voltage|reading|connector|fuse|relay|board|module|valve|igniter|electrode|burner|ground|spark|провер|измер|клемм|провод|напряж|разъ[её]м|предохран|реле|плат|модул|клапан|электрод|горел|искра|masa|conector|fusible|rele|placa|m[oó]dulo|v[aá]lvula|encendedor|electrodo|quemador|tierra|chispa|voltaje|lectura|verific|comprueb|mido|mide|reviso|revisa|pruebo|prueba)/i;
-
-  return clarificationWords.test(msg) && diagnosticActionWords.test(msg);
-}
-
-function extractSignificantTerms(text: string): string[] {
-  return (text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []).filter(
-    (term) => term.length >= 4 && ![
-      "this",
-      "that",
-      "with",
-      "have",
-      "from",
-      "step",
-      "what",
-      "where",
-      "which",
-      "check",
-      "как",
-      "где",
-      "что",
-      "этот",
-      "это",
-      "paso",
-      "esto",
-      "eso",
-      "como",
-      "cómo",
-      "donde",
-      "dónde",
-      "qué",
-      "cual",
-      "cuál",
-    ].includes(term),
-  );
-}
-
-function hasActiveStepReferenceOverlap(message: string, stepReference: string): boolean {
-  const stepTerms = new Set(extractSignificantTerms(stepReference));
-  if (stepTerms.size === 0) return false;
-  return extractSignificantTerms(message).some((term) => stepTerms.has(term));
-}
-
-function containsGuidanceEvidence(message: string): boolean {
-  const trimmed = message.trim();
-  const howToLead = /^(?:how|how\s+to|how\s+do\s+i|how\s+can\s+i|how\s+should\s+i|what\s+should\s+i|what\s+do\s+i|как|каким\s+образом|c[oó]mo|de\s+qu[eé]\s+manera)/i;
-  const explicitEvidence = [
-    /(?:i\s+)?(?:measured|checked|tested|verified|confirmed|found|got|read|see|saw)\b/i,
-    /(?:я\s+)?(?:измерил|проверил|подтвердил|наш[её]л|увидел|заметил)\b/i,
-    /(?:ya\s+)?(?:med[ií]|comprob[eé]|verifiqu[eé]|confirm[eé]|encontr[eé]|vi)\b/i,
-    /^(?:yes|no|да|нет|s[ií]|no)\b[\s,.;:-]/i,
-  ];
-
-  if (explicitEvidence.some((pattern) => pattern.test(trimmed))) {
-    return true;
-  }
-
-  const measurementValue = /\b\d+(?:\.\d+)?\s*(?:v|vac|vdc|volts?|mv|ma|amps?|ohms?|psi|wc)\b/i;
-  return measurementValue.test(trimmed) && !howToLead.test(trimmed);
-}
-
-function isStepGuidanceRequest(args: {
-  message: string;
-  activeStepQuestion: string;
-  activeStepHowToCheck?: string | null;
-}): boolean {
-  if (!isClarificationRequest(args.message)) {
-    return false;
-  }
-
-  if (containsGuidanceEvidence(args.message)) {
-    return false;
-  }
-
-  const genericReference = /(?:\b(?:this|that|it|step|check|reading|voltage|result|measurement)\b|эт(?:о|от|ом)|\bшаг\b|\bпроверк|\bизмерен|\bрезультат|\besto\b|\beso\b|\bpaso\b|verificaci[oó]n|medici[oó]n|resultado|voltaje)/i;
-  if (genericReference.test(args.message)) {
-    return true;
-  }
-
-  return hasActiveStepReferenceOverlap(
-    args.message,
-    [args.activeStepQuestion, args.activeStepHowToCheck ?? ""].join(" "),
-  );
+function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete" | "terminalState"> | null | undefined): boolean {
+  return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
 
 export const runtime = "nodejs";
@@ -304,11 +219,24 @@ export async function POST(req: Request) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
+  const approvedFinalReportIntent =
+    currentMode === "diagnostic"
+      ? detectApprovedFinalReportIntent(message)
+      : { matched: false };
+
   const modeResolution = resolveExplicitModeChange(currentMode, message);
   if (modeResolution.changed) {
-    console.log(`[Chat API v2] Mode transition: ${modeResolution.currentMode} → ${modeResolution.nextMode} (explicit command)`);
-    currentMode = modeResolution.nextMode;
-    await storage.updateCase(ensuredCase.id, { mode: currentMode });
+    const reportReadyBeforeTransition =
+      modeResolution.nextMode !== "final_report" ||
+      isFinalReportReady(getOrCreateContext(ensuredCase.id));
+
+    if (reportReadyBeforeTransition) {
+      console.log(`[Chat API v2] Mode transition: ${modeResolution.currentMode} → ${modeResolution.nextMode} (explicit command)`);
+      currentMode = modeResolution.nextMode;
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+    } else {
+      console.log("[Chat API v2] Final report command blocked — readiness not satisfied");
+    }
   }
 
   let stepGuidanceResponse: string | null = null;
@@ -330,14 +258,17 @@ export async function POST(req: Request) {
         activeStepBeforeProcessing,
         outputPolicy.effective,
       );
+      const guidanceIntent = stepGuidanceMetadata
+        ? classifyStepGuidanceIntent({
+            message,
+            activeStepQuestion: stepGuidanceMetadata.question,
+            activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
+          })
+        : null;
 
       if (
         stepGuidanceMetadata &&
-        isStepGuidanceRequest({
-          message,
-          activeStepQuestion: stepGuidanceMetadata.question,
-          activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
-        })
+        guidanceIntent
       ) {
         const draftedGuidanceResponse = buildStepGuidanceResponse({
           language: outputPolicy.effective,
@@ -362,7 +293,7 @@ export async function POST(req: Request) {
           );
         }
 
-        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceStepId}`);
+        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceStepId} (${guidanceIntent?.category ?? "UNKNOWN"})`);
       }
     }
   }
@@ -558,7 +489,18 @@ export async function POST(req: Request) {
     // prematurely complete the NEXT question using the current (unrelated) message.
     const currentActiveStep = engineResult.context.activeStepId;
     const contextEngineAdvancedStep = stepIdBeforeProcessing !== currentActiveStep;
-    const clarificationRequested = isClarificationRequest(message);
+    const clarificationRequested = Boolean(
+      currentActiveStep &&
+      classifyStepGuidanceIntent({
+        message,
+        activeStepQuestion: getActiveStepQuestion(ensuredCase.id, currentActiveStep) ?? "",
+        activeStepHowToCheck: getActiveStepMetadata(
+          ensuredCase.id,
+          currentActiveStep,
+          outputPolicy.effective,
+        )?.howToCheck,
+      }),
+    );
 
     if (clarificationRequested && currentActiveStep) {
       console.log(`[Chat API v2] Clarification detected — NOT completing step ${currentActiveStep}`);
@@ -712,6 +654,16 @@ export async function POST(req: Request) {
           engineResult?.context.activeStepId,
           outputPolicy.effective,
         );
+
+    if (
+      approvedFinalReportIntent.matched &&
+      currentMode === "diagnostic" &&
+      isFinalReportReady(engineResult.context)
+    ) {
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      console.log(`[Chat API v2] Mode transition: diagnostic → final_report (approved report intent: ${approvedFinalReportIntent.matchedText ?? "matched"})`);
+    }
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────

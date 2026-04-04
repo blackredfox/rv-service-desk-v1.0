@@ -181,8 +181,8 @@ describe("Chat Route Decomposition Services", () => {
 
     expect(resolveExplicitModeChange("diagnostic", "Write report")).toEqual({
       currentMode: "diagnostic",
-      nextMode: "final_report",
-      changed: true,
+      nextMode: "diagnostic",
+      changed: false,
     });
   });
 
