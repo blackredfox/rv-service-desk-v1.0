@@ -128,14 +128,7 @@ describe("Dirty-input report routing", () => {
     });
   });
 
-  it("routes ugly mixed-language completed repair summary + report request away from unrelated diagnostics", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
-      }),
-    });
-
+  it("surfaces bounded report support for ugly mixed-language repair summary + report request without entering unrelated diagnostics", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide outside left side wall black metal vertical piece not attached and water leaking into the RV.",
@@ -152,22 +145,16 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
-    expect(streamText).toContain("Complaint:");
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).toContain("START FINAL REPORT");
     expect(streamText).not.toContain("converter");
   });
 
-  it("handles typo-heavy mixed input without falling into unrelated diagnostics", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
-      }),
-    });
-
+  it("handles typo-heavy mixed input with bounded report support and no unrelated diagnostics", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "bedrom slied ouside left wall blak metal vertical peice not atached, water leeking into rv.",
@@ -184,13 +171,15 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).toContain("START FINAL REPORT");
     expect(streamText).not.toContain("ic_4");
   });
 
-  it("routes sufficient Spanish repair summary + report request to report support", async () => {
+  it("surfaces bounded Spanish report support without activating final_report directly", async () => {
     mockStorage.ensureCase.mockResolvedValueOnce({
       id: "case_dirty_1",
       title: "Dirty Input Case",
@@ -200,13 +189,6 @@ describe("Dirty-input report routing", () => {
       mode: "diagnostic",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
-      }),
     });
 
     const { POST } = await import("@/app/api/chat/route");
@@ -225,10 +207,12 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).toContain("START FINAL REPORT");
   });
 
   it("asks one bounded clarifying question when dirty input summary is incomplete", async () => {
