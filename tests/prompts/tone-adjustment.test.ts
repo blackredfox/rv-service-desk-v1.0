@@ -120,6 +120,33 @@ describe("Tone Adjustment - Prompt Files", () => {
     expect(content).toMatch(/one short/i);
     expect(content).toMatch(/"\w+\."/);
   });
+
+  it("MODE_PROMPT_DIAGNOSTIC: has human-like reply guidance for colleague tone", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const content = readFileSync(
+      join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"),
+      "utf-8",
+    );
+
+    // Contract: human-like diagnostic replies section exists
+    expect(content).toContain("HUMAN-LIKE DIAGNOSTIC REPLIES");
+    expect(content).toMatch(/senior technician partner/i);
+    expect(content).toMatch(/colleague-like/i);
+  });
+
+  it("MODE_PROMPT_DIAGNOSTIC: human-like guidance is soft, not rigid", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const content = readFileSync(
+      join(process.cwd(), "prompts/modes/MODE_PROMPT_DIAGNOSTIC.txt"),
+      "utf-8",
+    );
+
+    // Contract: preferred pattern, not mandatory template
+    expect(content).toMatch(/preferred pattern/i);
+    expect(content).toMatch(/not.*rigid/i);
+  });
 });
 
 describe("Tone Adjustment - Behavior", () => {
