@@ -56,4 +56,7 @@ next-env.d.ts
 secrets/
 
 # emergent
-.emergent/
+.emergent/-e 
+# Environment files
+*.env
+*.env.*
