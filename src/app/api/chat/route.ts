@@ -258,20 +258,18 @@ export async function POST(req: Request) {
         activeStepBeforeProcessing,
         outputPolicy.effective,
       );
+      const guidanceIntent = stepGuidanceMetadata
+        ? classifyStepGuidanceIntent({
+            message,
+            activeStepQuestion: stepGuidanceMetadata.question,
+            activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
+          })
+        : null;
 
       if (
         stepGuidanceMetadata &&
-        classifyStepGuidanceIntent({
-          message,
-          activeStepQuestion: stepGuidanceMetadata.question,
-          activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
-        })
+        guidanceIntent
       ) {
-        const guidanceIntent = classifyStepGuidanceIntent({
-          message,
-          activeStepQuestion: stepGuidanceMetadata.question,
-          activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
-        });
         const draftedGuidanceResponse = buildStepGuidanceResponse({
           language: outputPolicy.effective,
           stepQuestion: stepGuidanceMetadata.question,
