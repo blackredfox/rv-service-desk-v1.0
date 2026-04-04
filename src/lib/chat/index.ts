@@ -90,6 +90,7 @@ export {
 
 export {
   classifyStepGuidanceIntent,
+  isChainedClarificationFollowUp,
   type StepGuidanceIntentCategory,
 } from "./step-guidance-intent";
 

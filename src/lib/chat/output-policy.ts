@@ -17,6 +17,34 @@ export const STEP_GUIDANCE_CONTINUATIONS: Record<Language, string> = {
   ES: "Seguimos en este paso. Después de realizar esa verificación, dime exactamente qué encontraste.",
 };
 
+/**
+ * PR4: Chained clarification responses — more natural locate/identify help
+ * that stays on the same active step.
+ */
+export const CHAINED_LOCATE_GUIDANCE: Record<Language, Record<string, string>> = {
+  EN: {
+    fuse: "The fuse is typically located in the DC distribution panel or near the water heater itself. Look for the fuse/breaker panel inside a compartment on the exterior of the RV, or check behind a removable panel near the water heater. Check both upstream (source side) and downstream (load side) of the fuse.",
+    connector: "The connector is usually at the back of the control board or near the gas valve assembly. Follow the wiring harness from the board to locate the connection point.",
+    board: "The control board is typically mounted inside the water heater access panel. Remove the exterior cover to access the electronics compartment.",
+    relay: "The relay is usually mounted on or near the control board. It may be a small black box with multiple terminals.",
+    generic: "Check the component location in the equipment access panel. Look for labels or follow the wiring from known points.",
+  },
+  RU: {
+    fuse: "Предохранитель обычно находится в распределительном щитке постоянного тока или рядом с самим водонагревателем. Ищите панель предохранителей/автоматов внутри отсека снаружи автодома, или проверьте за съёмной панелью рядом с водонагревателем. Проверьте напряжение с обеих сторон — на входе (со стороны источника) и на выходе (со стороны нагрузки) предохранителя.",
+    connector: "Разъём обычно находится на задней стороне платы управления или рядом с газовым клапаном. Проследите жгут проводов от платы, чтобы найти точку подключения.",
+    board: "Плата управления обычно установлена внутри панели доступа водонагревателя. Снимите наружную крышку для доступа к отсеку электроники.",
+    relay: "Реле обычно установлено на плате управления или рядом с ней. Это может быть небольшая чёрная коробочка с несколькими клеммами.",
+    generic: "Проверьте расположение компонента в панели доступа оборудования. Ищите маркировку или проследите проводку от известных точек.",
+  },
+  ES: {
+    fuse: "El fusible generalmente está ubicado en el panel de distribución de CC o cerca del calentador de agua. Busca el panel de fusibles/interruptores dentro de un compartimento en el exterior de la casa rodante, o revisa detrás de un panel removible cerca del calentador de agua. Verifica tanto aguas arriba (lado de la fuente) como aguas abajo (lado de la carga) del fusible.",
+    connector: "El conector generalmente está en la parte posterior de la placa de control o cerca del conjunto de la válvula de gas. Sigue el arnés de cables desde la placa para localizar el punto de conexión.",
+    board: "La placa de control generalmente está montada dentro del panel de acceso del calentador de agua. Retira la cubierta exterior para acceder al compartimento de electrónica.",
+    relay: "El relé generalmente está montado en o cerca de la placa de control. Puede ser una pequeña caja negra con múltiples terminales.",
+    generic: "Verifica la ubicación del componente en el panel de acceso del equipo. Busca etiquetas o sigue el cableado desde puntos conocidos.",
+  },
+};
+
 const STEP_GUIDANCE_LABELS: Record<Language, { currentStep: string; genericGuidance: string }> = {
   EN: {
     currentStep: "Current step",
@@ -48,6 +76,8 @@ export function buildStepGuidanceResponse(args: {
   language: Language;
   stepQuestion?: string | null;
   guidance?: string | null;
+  isChainedClarification?: boolean;
+  clarificationTarget?: string | null;
 }): string {
   const labels = STEP_GUIDANCE_LABELS[args.language];
   const safeStepQuestion = isSessionLanguageText(args.stepQuestion, args.language)
@@ -57,6 +87,19 @@ export function buildStepGuidanceResponse(args: {
     ? args.guidance!.trim()
     : labels.genericGuidance;
 
+  // PR4: For chained clarification, provide more specific locate help
+  if (args.isChainedClarification && args.clarificationTarget) {
+    const locateGuidance = CHAINED_LOCATE_GUIDANCE[args.language];
+    const targetKey = detectLocateTarget(args.clarificationTarget);
+    const specificGuidance = locateGuidance[targetKey] || locateGuidance.generic;
+    
+    const lines = [
+      specificGuidance,
+      getStepGuidanceContinuation(args.language),
+    ];
+    return lines.join("\n\n");
+  }
+
   const lines = [
     safeStepQuestion ? `${labels.currentStep}: ${safeStepQuestion}` : "",
     safeGuidance,
@@ -64,6 +107,27 @@ export function buildStepGuidanceResponse(args: {
   ].filter(Boolean);
 
   return lines.join("\n\n");
+}
+
+/**
+ * PR4: Detect what component the technician is trying to locate
+ */
+function detectLocateTarget(message: string): string {
+  const lower = message.toLowerCase();
+  
+  // Fuse patterns (EN/RU/ES)
+  if (/fuse|fusible|предохранител/i.test(lower)) return "fuse";
+  
+  // Connector patterns
+  if (/connector|conector|разъ[её]м|подключен/i.test(lower)) return "connector";
+  
+  // Board patterns
+  if (/board|placa|плат/i.test(lower)) return "board";
+  
+  // Relay patterns
+  if (/relay|rel[eé]|реле/i.test(lower)) return "relay";
+  
+  return "generic";
 }
 
 /**

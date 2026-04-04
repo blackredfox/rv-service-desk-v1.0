@@ -47,6 +47,7 @@ import {
 import type { Language } from "@/lib/lang";
 import {
   buildStepGuidanceResponse,
+  STEP_GUIDANCE_CONTINUATIONS,
 } from "@/lib/chat/output-policy";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
@@ -78,6 +79,7 @@ import {
   shouldTreatAsFinalReportForOverride,
   detectApprovedFinalReportIntent,
   classifyStepGuidanceIntent,
+  isChainedClarificationFollowUp,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
   buildRepairSummaryClarificationResponse,
@@ -327,11 +329,33 @@ export async function POST(req: Request) {
         activeStepBeforeProcessing,
         outputPolicy.effective,
       );
+
+      // PR4: Check if previous assistant message was step guidance (chained clarification detection)
+      const recentMessages = await storage.listMessagesForContext(ensuredCase.id);
+      const lastAssistantMessage = recentMessages
+        .filter((m: { role: string }) => m.role === "assistant")
+        .pop();
+      const previousWasGuidance = lastAssistantMessage?.content
+        ? STEP_GUIDANCE_CONTINUATIONS[outputPolicy.effective] &&
+          lastAssistantMessage.content.includes(STEP_GUIDANCE_CONTINUATIONS[outputPolicy.effective])
+        : false;
+
+      // PR4: Detect chained clarification follow-up
+      const isChainedFollowUp = stepGuidanceMetadata
+        ? isChainedClarificationFollowUp({
+            message,
+            previousWasGuidance,
+            activeStepQuestion: stepGuidanceMetadata.question,
+            activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
+          })
+        : false;
+
       const guidanceIntent = stepGuidanceMetadata
         ? classifyStepGuidanceIntent({
             message,
             activeStepQuestion: stepGuidanceMetadata.question,
             activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
+            isChainedFollowUp,
           })
         : null;
 
@@ -339,10 +363,15 @@ export async function POST(req: Request) {
         stepGuidanceMetadata &&
         guidanceIntent
       ) {
+        // PR4: For chained clarification, provide more specific locate help
+        const isChainedClarification = guidanceIntent.category === "CHAINED_CLARIFICATION" || isChainedFollowUp;
+        
         const draftedGuidanceResponse = buildStepGuidanceResponse({
           language: outputPolicy.effective,
           stepQuestion: stepGuidanceMetadata.question,
           guidance: stepGuidanceMetadata.howToCheck,
+          isChainedClarification,
+          clarificationTarget: isChainedClarification ? message : null,
         });
         const validation = validateStepGuidanceOutput(
           draftedGuidanceResponse,
@@ -362,7 +391,7 @@ export async function POST(req: Request) {
           );
         }
 
-        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceStepId} (${guidanceIntent?.category ?? "UNKNOWN"})`);
+        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceStepId} (${guidanceIntent?.category ?? "UNKNOWN"}, chained=${isChainedClarification})`);
       }
     }
   }
