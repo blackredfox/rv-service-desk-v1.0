@@ -125,12 +125,6 @@ function normalizeCommandAlias(text: string): string {
 const FINAL_REPORT_ALIAS_SET = new Set(FINAL_REPORT_COMMAND_ALIASES.map(normalizeCommandAlias));
 const AUTHORIZATION_ALIAS_SET = new Set(AUTHORIZATION_COMMAND_ALIASES.map(normalizeCommandAlias));
 
-const FINAL_REPORT_NATURAL_LANGUAGE_PATTERNS = [
-  /\b(?:write|generate|create|prepare|draft)\s+(?:the\s+)?(?:final\s+)?report\b/i,
-  /(?:^|[\s,.;:!?-])(?:напиши|сформируй|создай|подготовь)\s+(?:финальн(?:ый|ого)?\s+)?(?:отч[её]т|report|репорт)(?:$|[\s,.;:!?-])/iu,
-  /\b(?:genera|crear|prepara|haz)\s+(?:el\s+)?(?:reporte|informe)\b/i,
-];
-
 /**
  * Detect explicit command aliases from a fixed allow-list
  */
@@ -151,10 +145,6 @@ export function detectExplicitCommandAlias(message: string): CaseMode | null {
 export function detectModeCommand(message: string): CaseMode | null {
   const explicitAlias = detectExplicitCommandAlias(message);
   if (explicitAlias) return explicitAlias;
-
-  if (FINAL_REPORT_NATURAL_LANGUAGE_PATTERNS.some((pattern) => pattern.test(message))) {
-    return "final_report";
-  }
 
   return null;
 }

@@ -5,6 +5,7 @@ global.fetch = mockFetch;
 
 const mockGetCurrentUser = vi.fn();
 const mockProcessContextMessage = vi.fn();
+const mockGetOrCreateContext = vi.fn();
 
 const mockStorage = {
   getCase: vi.fn(),
@@ -44,7 +45,7 @@ vi.mock("@/lib/diagnostic-registry", () => ({
 vi.mock("@/lib/context-engine", () => ({
   processMessage: (...args: unknown[]) => mockProcessContextMessage(...args),
   recordAgentAction: vi.fn(),
-  getOrCreateContext: vi.fn(() => ({ caseId: "case_123" })),
+  getOrCreateContext: (...args: unknown[]) => mockGetOrCreateContext(...args),
   isInReplanState: vi.fn(() => false),
   clearReplanState: vi.fn((ctx) => ctx),
   generateAntiLoopDirectives: vi.fn(() => []),
@@ -90,6 +91,12 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     mockStorage.listMessagesForContext.mockResolvedValue([]);
     mockStorage.appendMessage.mockResolvedValue({ id: "msg_1" });
     mockStorage.updateCase.mockResolvedValue({ id: "case_123" });
+    mockGetOrCreateContext.mockReturnValue({
+      caseId: "case_123",
+      activeStepId: "wp_3",
+      isolationComplete: false,
+      terminalState: { phase: "normal", faultIdentified: null, correctiveAction: null, restorationConfirmed: null },
+    });
 
     mockProcessContextMessage.mockReturnValue({
       context: {
@@ -189,6 +196,18 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
   });
 
   it("transitions via explicit report commands (START FINAL REPORT example)", async () => {
+    mockGetOrCreateContext.mockReturnValue({
+      caseId: "case_123",
+      activeStepId: null,
+      isolationComplete: true,
+      terminalState: {
+        phase: "terminal",
+        faultIdentified: { text: "Pump fault fixed", detectedAt: new Date().toISOString() },
+        correctiveAction: { text: "Pump repaired", detectedAt: new Date().toISOString() },
+        restorationConfirmed: { text: "Pump works now", detectedAt: new Date().toISOString() },
+      },
+    });
+
     mockStorage.ensureCase.mockResolvedValue({
       id: "case_123",
       title: "Water Pump Case",
@@ -225,16 +244,44 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 
-  it("transitions via mixed-language explicit command (Напиши Report)", async () => {
+  it.each([
+    ["EN", "write report"],
+    ["RU", "сделай отчет"],
+    ["ES", "genera el reporte"],
+  ])("allows approved natural report intent when case is report-ready (%s)", async (language, message) => {
     mockStorage.ensureCase.mockResolvedValue({
       id: "case_123",
       title: "Water Pump Case",
       userId: "user_123",
-      inputLanguage: "RU",
+      inputLanguage: language,
       languageSource: "AUTO",
       mode: "diagnostic",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    });
+
+    mockProcessContextMessage.mockReturnValueOnce({
+      context: {
+        caseId: "case_123",
+        submode: "main",
+        activeStepId: null,
+        isolationComplete: true,
+        isolationFinding: "Repair completion confirmed",
+        terminalState: {
+          phase: "terminal",
+          faultIdentified: { text: "Pump fault fixed", detectedAt: new Date().toISOString() },
+          correctiveAction: { text: "Pump repaired", detectedAt: new Date().toISOString() },
+          restorationConfirmed: { text: "Pump works now", detectedAt: new Date().toISOString() },
+        },
+      },
+      intent: { type: "MAIN_DIAGNOSTIC" },
+      responseInstructions: {
+        action: "offer_completion",
+        constraints: [],
+        antiLoopDirectives: [],
+      },
+      stateChanged: true,
+      notices: [],
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -246,19 +293,36 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
 
     const { POST } = await import("@/app/api/chat/route");
 
-    const req = new Request("http://localhost/api/chat", {
+    const response = await POST(new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        caseId: "case_123",
-        message: "Напиши Report",
-      }),
-    });
+      body: JSON.stringify({ caseId: "case_123", message }),
+    }));
 
-    const response = await POST(req);
     await response.text();
 
     expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
+  });
+
+  it("does not bypass readiness for natural report intent", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "Continue diagnostics." } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: "case_123", message: "write report" }),
+    }));
+
+    await response.text();
+
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 });
 

@@ -174,14 +174,14 @@ describe("Prompt Composer", () => {
       expect(detectModeCommand("PREAUTORIZACIÓN")).toBe("authorization");
     });
 
-    it("should detect natural-language final report commands", async () => {
+    it("should leave natural-language report requests to the bounded route path", async () => {
       const { detectModeCommand } = await import("@/lib/prompt-composer");
 
-      expect(detectModeCommand("Write report")).toBe("final_report");
-      expect(detectModeCommand("Generate report")).toBe("final_report");
-      expect(detectModeCommand("Напиши отчет")).toBe("final_report");
-      expect(detectModeCommand("Сформируй отчет")).toBe("final_report");
-      expect(detectModeCommand("Напиши Report")).toBe("final_report");
+      expect(detectModeCommand("Write report")).toBeNull();
+      expect(detectModeCommand("Generate report")).toBeNull();
+      expect(detectModeCommand("Напиши отчет")).toBeNull();
+      expect(detectModeCommand("Сформируй отчет")).toBeNull();
+      expect(detectModeCommand("Напиши Report")).toBeNull();
     });
 
     it("should return null for non-exact matches", async () => {

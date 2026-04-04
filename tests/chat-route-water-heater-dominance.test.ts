@@ -268,7 +268,9 @@ describe("/api/chat water-heater runtime dominance", () => {
 
   it("transitions to final_report for natural-language English report commands", async () => {
     const caseId = "route_report_en";
-    await postChat(caseId, "Suburban gas water heater is not working");
+    await advanceToWh5(caseId);
+    await postChat(caseId, "no");
+    await postChat(caseId, "The fuse was open. I replaced it and the water heater works now.");
 
     fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("Complaint: Heater inoperative.\nDiagnostic Procedure: Verified fuse failure and repair.\nVerified Condition: Heater operates normally after fuse replacement.\nRecommended Corrective Action: Replace failed fuse and verify operation.\nEstimated Labor: Replace fuse and functional test - 0.4 hr. Total labor: 0.4 hr.\nRequired Parts: Fuse."));
 

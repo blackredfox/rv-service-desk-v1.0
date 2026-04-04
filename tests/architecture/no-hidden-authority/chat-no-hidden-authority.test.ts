@@ -31,7 +31,7 @@ describe("No Hidden Authority — Route Decomposition", () => {
     },
   );
 
-  it("mode resolver refuses semantic completion inference but accepts explicit report commands", () => {
+  it("mode resolver refuses semantic completion inference and leaves natural report aliases to the route gate", () => {
     const semantic = resolveExplicitModeChange(
       "diagnostic",
       "I think the repair is complete, the heater works now.",
@@ -53,10 +53,10 @@ describe("No Hidden Authority — Route Decomposition", () => {
     );
 
     expect(semantic.changed).toBe(false);
-    expect(explicitNaturalLanguage.changed).toBe(true);
-    expect(explicitNaturalLanguage.nextMode).toBe("final_report");
-    expect(explicitRussian.changed).toBe(true);
-    expect(explicitRussian.nextMode).toBe("final_report");
+    expect(explicitNaturalLanguage.changed).toBe(false);
+    expect(explicitNaturalLanguage.nextMode).toBe("diagnostic");
+    expect(explicitRussian.changed).toBe(false);
+    expect(explicitRussian.nextMode).toBe("diagnostic");
     expect(explicit.changed).toBe(true);
     expect(explicit.nextMode).toBe("final_report");
   });

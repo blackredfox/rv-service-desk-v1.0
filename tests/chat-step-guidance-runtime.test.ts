@@ -91,8 +91,12 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
 
     [
       "sg_en_wh5",
+      "sg_en_wh5_identify",
+      "sg_en_wh5a_locate",
       "sg_ru_branch_wh5a",
+      "sg_ru_branch_wh5a_locate",
       "sg_es_wp2",
+      "sg_es_wh5_identify",
     ].forEach((caseId) => {
       clearRegistry(caseId);
       clearContext(caseId);
@@ -170,6 +174,38 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     expect(context.mode).toBe("diagnostic");
   });
 
+  it("answers EN identify-point guidance for the active wh_5 step without advancing", async () => {
+    const caseId = "sg_en_wh5_identify";
+    await seedActiveStep(caseId, "gas water heater not working", "wh_5");
+
+    const turn = await postChat(caseId, "How do I find the 12V/B+ input?");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(turn.fetchTriggered).toBe(false);
+    expect(turn.streamText).toContain("12V/B+");
+    expect(turn.streamText).toMatch(/board|connector|switch/i);
+    expect(turn.streamText).toContain("We are still on this step. After you perform that check, tell me exactly what you found.");
+    expect(context.activeStepId).toBe("wh_5");
+    expect(context.completedSteps.has("wh_5")).toBe(false);
+  });
+
+  it("answers EN fuse-location guidance for the active wh_5a step without advancing", async () => {
+    const caseId = "sg_en_wh5a_locate";
+    await seedActiveStep(caseId, "gas water heater not working", "wh_5a");
+
+    const turn = await postChat(caseId, "Where is the fuse on this model?");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(turn.fetchTriggered).toBe(false);
+    expect(turn.streamText).toMatch(/fuse|breaker/i);
+    expect(turn.streamText).toMatch(/switch input and output|upstream and downstream/i);
+    expect(turn.streamText).toContain("We are still on this step. After you perform that check, tell me exactly what you found.");
+    expect(context.activeStepId).toBe("wh_5a");
+    expect(context.completedSteps.has("wh_5a")).toBe(false);
+  });
+
   it("preserves the active branch and same branch step for RU STEP_GUIDANCE", async () => {
     const caseId = "sg_ru_branch_wh5a";
     await advanceToWh5(caseId, "RU");
@@ -183,6 +219,25 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     expect(guidanceTurn.fetchTriggered).toBe(false);
     expect(guidanceTurn.streamText).toContain("Мы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.");
     expect(guidanceTurn.streamText).not.toContain("START FINAL REPORT");
+    expect(context.activeStepId).toBe("wh_5a");
+    expect(context.completedSteps.has("wh_5a")).toBe(false);
+    expect(getBranchState(caseId).activeBranchId).toBe("no_12v_supply");
+  });
+
+  it("answers RU fuse-location guidance for the active wh_5a branch step without advancing", async () => {
+    const caseId = "sg_ru_branch_wh5a_locate";
+    await advanceToWh5(caseId, "RU");
+    await postChat(caseId, "нет");
+
+    const guidanceTurn = await postChat(caseId, "Где находится предохранитель у этой модели?");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const { getBranchState } = await import("@/lib/diagnostic-registry");
+    const context = getOrCreateContext(caseId);
+
+    expect(guidanceTurn.fetchTriggered).toBe(false);
+    expect(guidanceTurn.streamText).toMatch(/предохранител|автомат/i);
+    expect(guidanceTurn.streamText).toMatch(/вход и выход|напряжение аккумулятора/i);
+    expect(guidanceTurn.streamText).toContain("Мы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.");
     expect(context.activeStepId).toBe("wh_5a");
     expect(context.completedSteps.has("wh_5a")).toBe(false);
     expect(getBranchState(caseId).activeBranchId).toBe("no_12v_supply");
@@ -203,5 +258,22 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     expect(turn.streamText).not.toContain("Complaint:");
     expect(context.activeStepId).toBe("wp_2");
     expect(context.completedSteps.has("wp_2")).toBe(false);
+  });
+
+  it("answers ES identify-point guidance for the active wh_5 step without advancing", async () => {
+    const caseId = "sg_es_wh5_identify";
+    await seedActiveStep(caseId, "el calentador de agua a gas no funciona", "wh_5");
+
+    const turn = await postChat(caseId, "¿Cómo encuentro la entrada 12V/B+?");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(turn.fetchTriggered).toBe(false);
+    expect(turn.streamText).toContain("12V/B+");
+    expect(turn.streamText).toMatch(/placa|interruptor interior|conector/i);
+    expect(turn.streamText).toContain("Seguimos en este paso. Después de realizar esa verificación, dime exactamente qué encontraste.");
+    expect(turn.streamText).not.toContain("START FINAL REPORT");
+    expect(context.activeStepId).toBe("wh_5");
+    expect(context.completedSteps.has("wh_5")).toBe(false);
   });
 });

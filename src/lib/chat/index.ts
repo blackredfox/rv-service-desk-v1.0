@@ -74,6 +74,15 @@ export {
 } from "./chat-mode-resolver";
 
 export {
+  detectApprovedFinalReportIntent,
+} from "./report-intent";
+
+export {
+  classifyStepGuidanceIntent,
+  type StepGuidanceIntentCategory,
+} from "./step-guidance-intent";
+
+export {
   parseChatRequest,
   prepareAttachmentBundle,
   resolveLanguageContext,
