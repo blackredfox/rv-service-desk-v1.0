@@ -1,6 +1,10 @@
 import type { Language, LanguagePolicy } from "@/lib/lang";
 import type { CaseMode } from "@/lib/prompt-composer";
-import { logValidation } from "@/lib/mode-validators";
+import {
+  buildCorrectionInstruction,
+  logValidation,
+  validateStepGuidanceOutput,
+} from "@/lib/mode-validators";
 import {
   buildOpenAiMessages,
   callOpenAI,
@@ -38,6 +42,142 @@ export type PrimaryChatExecutionResult = {
   emittedValidationFallback: boolean;
   upstreamError?: string;
 };
+
+export type StepGuidanceExecutionResult = {
+  response: string;
+  validation: ValidationResult;
+  emittedValidationFallback: boolean;
+};
+
+/**
+ * Execute the bounded same-step clarification path with step-guidance validation,
+ * retry, and deterministic fallback.
+ */
+export async function executeStepGuidanceCompletion(args: {
+  apiKey: string;
+  caseId: string;
+  systemPrompt: string;
+  message: string;
+  attachments?: Array<{ type: "image"; dataUrl: string }>;
+  signal: AbortSignal;
+  emitToken: TokenEmitter;
+  isAborted: () => boolean;
+  outputLanguage: Language;
+  langPolicy: LanguagePolicy;
+  fallbackResponse: string;
+  requiredContinuation: string;
+  model: string;
+  requestStartedAt: number;
+}): Promise<StepGuidanceExecutionResult> {
+  const openAiBody = {
+    model: args.model,
+    messages: buildOpenAiMessages({
+      system: args.systemPrompt,
+      history: [],
+      userMessage: args.message,
+      attachments: args.attachments,
+    }),
+  };
+
+  const firstStart = Date.now();
+  let result = await callOpenAI(
+    args.apiKey,
+    openAiBody,
+    args.signal,
+    args.emitToken,
+  );
+
+  logTiming("openai_call", {
+    caseId: args.caseId,
+    mode: "diagnostic",
+    path: "step_guidance_first",
+    openAiStartMs: firstStart - args.requestStartedAt,
+    openAiMs: result.durationMs,
+    openAiFirstTokenMs: result.firstTokenMs,
+  });
+
+  let validation = validateStepGuidanceOutput(
+    result.response,
+    args.outputLanguage,
+  );
+
+  logValidation(validation, { caseId: args.caseId, mode: "diagnostic" });
+
+  if ((result.error || !validation.valid) && !args.isAborted()) {
+    args.emitToken("\n\n[System] Repairing clarification...\n\n");
+
+    const correctionInstruction = [
+      buildCorrectionInstruction(
+        result.error
+          ? [result.error]
+          : validation.violations,
+      ),
+      "STEP CLARIFICATION REPAIR (MANDATORY):",
+      "- Stay on the current active diagnostic step only.",
+      "- Answer the technician's current related question helpfully and concisely within this same step.",
+      "- Do NOT advance, complete, branch, switch mode, or mention final report / authorization / next step.",
+      `- End with exactly this line: \"${args.requiredContinuation}\"`,
+    ].join("\n");
+
+    const retryBody = {
+      ...openAiBody,
+      messages: buildOpenAiMessages({
+        system: args.systemPrompt,
+        history: [],
+        userMessage: args.message,
+        attachments: args.attachments,
+        correctionInstruction,
+      }),
+    };
+
+    const retryStart = Date.now();
+    result = await callOpenAI(
+      args.apiKey,
+      retryBody,
+      args.signal,
+      args.emitToken,
+    );
+
+    logTiming("openai_call", {
+      caseId: args.caseId,
+      mode: "diagnostic",
+      path: "step_guidance_retry",
+      openAiStartMs: retryStart - args.requestStartedAt,
+      openAiMs: result.durationMs,
+      openAiFirstTokenMs: result.firstTokenMs,
+    });
+
+    validation = validateStepGuidanceOutput(
+      result.response,
+      args.outputLanguage,
+    );
+
+    logValidation(validation, { caseId: args.caseId, mode: "diagnostic" });
+
+    if (result.error || !validation.valid) {
+      logFlow("safe_fallback_used", {
+        caseId: args.caseId,
+        mode: "diagnostic",
+        path: "step_guidance_retry",
+        reason: result.error ? "upstream_error_on_retry" : "validation_after_retry_failed",
+      });
+
+      args.emitToken(args.fallbackResponse);
+
+      return {
+        response: args.fallbackResponse,
+        validation,
+        emittedValidationFallback: true,
+      };
+    }
+  }
+
+  return {
+    response: enforceLanguagePolicy(result.response, args.langPolicy),
+    validation,
+    emittedValidationFallback: false,
+  };
+}
 
 /**
  * Execute the main OpenAI path with validation, retry, and safe fallback handling.
