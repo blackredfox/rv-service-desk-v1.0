@@ -94,6 +94,7 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
       "sg_en_wh5_identify",
       "sg_en_wh5a_locate",
       "sg_en_case_27",
+      "sg_en_generic_support",
       "sg_en_progress_after_followup",
       "sg_ru_branch_wh5a",
       "sg_ru_branch_wh5a_locate",
@@ -215,6 +216,20 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     await seedActiveStep(caseId, "gas water heater not working", "wh_5");
 
     const turn = await postChat(caseId, "Is this the right one?");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(turn.fetchTriggered).toBe(false);
+    expect(turn.streamText).toContain("We are still on this step. After you perform that check, tell me exactly what you found.");
+    expect(context.activeStepId).toBe("wh_5");
+    expect(context.completedSteps.has("wh_5")).toBe(false);
+  });
+
+  it("keeps an unlisted but related EN follow-up on the same active step by default", async () => {
+    const caseId = "sg_en_generic_support";
+    await seedActiveStep(caseId, "gas water heater not working", "wh_5");
+
+    const turn = await postChat(caseId, "near the board harness?");
     const { getOrCreateContext } = await import("@/lib/context-engine");
     const context = getOrCreateContext(caseId);
 

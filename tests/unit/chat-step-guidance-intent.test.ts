@@ -15,18 +15,30 @@ function classify(message: string, hasPhotoAttachment = false) {
 }
 
 describe("classifyStepGuidanceIntent — sticky active-step support", () => {
-  it("keeps locate follow-ups inside the same active step", () => {
+  it("keeps broad active-step follow-ups on the same step while findings are missing", () => {
+    [
+      "Where is it?",
+      "What does it look like?",
+      "Is this the right one?",
+      "left side?",
+      "near the board harness?",
+      "рядом с платой?",
+      "junto a la placa?",
+    ].forEach((message) => {
+      expect(classify(message)).not.toBeNull();
+    });
+  });
+
+  it("still tags obvious same-step clarification subtypes when they are clear", () => {
     expect(classify("Where is it?")).toEqual({ category: "LOCATE_COMPONENT" });
-  });
-
-  it("handles appearance and recognition follow-ups without requiring explicit findings", () => {
     expect(classify("What does it look like?")).toEqual({ category: "APPEARANCE_RECOGNITION" });
-    expect(classify("glass or metal?")).toEqual({ category: "APPEARANCE_RECOGNITION" });
+    expect(classify("Is this the right one?")).toEqual({ category: "CONFIRM_STEP_TARGET" });
   });
 
-  it("keeps confirmation-style and fragment follow-ups on the same step", () => {
-    expect(classify("Is this the right one?")).toEqual({ category: "CONFIRM_STEP_TARGET" });
-    expect(classify("red wire?")).toEqual({ category: "CONFIRM_STEP_TARGET" });
+  it("defaults unknown but related follow-ups to generic same-step support instead of null", () => {
+    expect(classify("near the board harness?")).toEqual({ category: "GENERIC_STEP_SUPPORT" });
+    expect(classify("рядом с платой?")).toEqual({ category: "GENERIC_STEP_SUPPORT" });
+    expect(classify("junto a la placa?")).toEqual({ category: "GENERIC_STEP_SUPPORT" });
   });
 
   it("treats photo-related clarification as same-step support, not automatic evidence", () => {
