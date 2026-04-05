@@ -68,45 +68,47 @@ const ALTERNATE_CHECK_POINT_PATTERNS = [
  * - photo confirmation requests
  *
  * These must NOT advance the step — they stay on the same active step.
+ *
+ * IMPORTANT: These patterns should match QUESTIONS, not repair statements.
+ * Patterns must be narrow to avoid catching repair completion messages.
  */
 const CHAINED_CLARIFICATION_PATTERNS = [
-  // EN: repeated locate/tell-me patterns
+  // EN: repeated locate/tell-me patterns (questions only)
   /tell\s+(?:me\s+)?where\s+(?:the\s+)?(?:fuse|connector|board|relay|pump|wire|terminal|input|switch)/i,
   /show\s+(?:me\s+)?where/i,
   /point\s+(?:me\s+)?to/i,
+  /where\s+(?:is|are|can\s+i\s+find)\s+(?:the\s+)?(?:fuse|connector|board|relay|pump|wire|terminal|input|switch)/i,
   // EN: confirmation questions (is this it? is this the one?)
-  /is\s+(?:this|that)\s+(?:it|the\s+(?:one|right\s+one|correct\s+one|fuse|connector|board|relay|terminal))/i,
+  /is\s+(?:this|that)\s+(?:it|the\s+(?:one|right\s+one|correct\s+one|fuse|connector|board|relay|terminal))\s*\??/i,
   /does\s+(?:this|that)\s+look\s+(?:right|correct|like)/i,
   /is\s+(?:this|that)\s+(?:what\s+(?:you|i)\s+(?:mean|need))/i,
-  /(?:attached|sent|uploaded)\s+(?:a\s+)?(?:photo|picture|image)/i,
-  // EN: short fragmented follow-ups
-  /^(?:this\s+one|that\s+one|here|this|that)\??\s*$/i,
-  /^(?:is\s+it\s+)?(?:here|there)\??\s*$/i,
+  /(?:attached|sent|uploaded)\s+(?:a\s+)?(?:photo|picture|image).*\?/i,
+  // EN: short fragmented follow-ups (must end with ? or be very short)
+  /^(?:this\s+one|that\s+one|here|this|that)\s*\?\s*$/i,
+  /^(?:is\s+it\s+)?(?:here|there)\s*\?\s*$/i,
 
-  // RU: repeated locate/tell-me patterns
+  // RU: repeated locate/tell-me patterns (questions only)
   /скаж(?:и|ите)\s+(?:мне\s+)?(?:где|куда)/iu,
   /покаж(?:и|ите)\s+(?:мне\s+)?где/iu,
   /(?:а\s+)?где\s+(?:именно\s+)?(?:находится|искать|найти)\s+(?:предохранител|разъ[её]м|плат|реле|насос|провод|клемм|вход|выключател)/iu,
-  // RU: confirmation questions
-  /это\s+(?:он|она|оно|тот|та|то|правильн|нужн)/iu,
-  /(?:это\s+)?(?:тот\s+)?(?:предохранител|разъ[её]м|провод|клемм|вход)/iu,
-  /(?:приложил|отправил|загрузил)\s+(?:фото|фотографи|изображени)/iu,
-  /(?:похож|выглядит)\s+(?:как|на)\s+(?:вход|плат|разъ[её]м)/iu,
-  // RU: short fragmented follow-ups
-  /^(?:это\s+)?(?:он|она|оно|тут|здесь|там)\??\s*$/iu,
+  // RU: confirmation questions (must have question markers)
+  /это\s+(?:он|она|оно|тот|та|то|правильн|нужн)[ыоае]?\s*\??$/iu,
+  /(?:приложил|отправил|загрузил)\s+(?:фото|фотографи|изображени).*\?/iu,
+  /(?:похож|выглядит)\s+(?:как|на)\s+(?:вход|плат|разъ[её]м).*\?/iu,
+  // RU: short fragmented follow-ups (must be short questions)
+  /^(?:это\s+)?(?:он|она|оно|тут|здесь|там)\s*\?\s*$/iu,
 
-  // ES: repeated locate/tell-me patterns
+  // ES: repeated locate/tell-me patterns (questions only)
   /d(?:i|í)me\s+(?:d[oó]nde|donde)/iu,
   /mu[ée]strame\s+(?:d[oó]nde|donde)/iu,
   /(?:y\s+)?(?:d[oó]nde|donde)\s+(?:exactamente\s+)?(?:est[aá]|queda|encuentro)\s+(?:el\s+)?(?:fusible|conector|placa|rel[eé]|bomba|cable|terminal|entrada|interruptor)/iu,
-  // ES: confirmation questions
-  /(?:[eé]s)?(?:te|a)\s+(?:es\s+)?(?:el\s+)?(?:correcto|indicado|fusible|conector)/iu,
-  /es\s+(?:este|ese|esto|eso)(?:\s+(?:el\s+)?(?:correcto|indicado|que\s+(?:necesito|busco)))?\s*\??\s*$/iu,
-  /(?:adjunt[eé]|env[ií][eé]|sub[ií])\s+(?:una\s+)?(?:foto|imagen)/iu,
-  /(?:parece|se\s+ve)\s+(?:como|que\s+es)/iu,
-  // ES: short fragmented follow-ups
-  /^(?:[eé]s)?(?:te|a|o)?\s*\??\s*$/iu,
-  /^(?:aqu[ií]|all[ií])\s*\??\s*$/iu,
+  // ES: confirmation questions (must have question markers)
+  /es\s+(?:este|ese|esto|eso)(?:\s+(?:el\s+)?(?:correcto|indicado|que\s+(?:necesito|busco)))?\s*\?\s*$/iu,
+  /(?:adjunt[eé]|env[ií][eé]|sub[ií])\s+(?:una\s+)?(?:foto|imagen).*\?/iu,
+  /(?:parece|se\s+ve)\s+(?:como|que\s+es).*\?/iu,
+  // ES: short fragmented follow-ups (must be short questions)
+  /^(?:[eé]s)?(?:te|a|o)?\s*\?\s*$/iu,
+  /^(?:aqu[ií]|all[ií])\s*\?\s*$/iu,
 ];
 
 const GENERIC_REFERENCE = /(?:\b(?:this|that|it|step|check|point|reading|measurement|result)\b|\b12v\b|\bb\+\b|эт(?:о|от|ом)|\bшаг\b|\bточк|\bвход\b|\bпровод\b|\bклемм\b|\bразъ[её]м\b|\bпредохранител|\besto\b|\beso\b|\bpaso\b|\bpunto\b|\bentrada\b|\bcable\b|\bterminal\b|\bconector\b|\bfusible\b|revisi[oó]n)/iu;
@@ -116,6 +118,17 @@ const GUIDANCE_EVIDENCE_PATTERNS = [
   /(?:я\s+)?(?:измерил|проверил|подтвердил|наш[её]л|увидел|заметил)\b/iu,
   /(?:ya\s+)?(?:med[ií]|comprob[eé]|verifiqu[eé]|confirm[eé]|encontr[eé]|vi)\b/iu,
   /^(?:yes|no|да|нет|s[ií]|no)\b[\s,.;:-]?/iu,
+  // PR4: Repair completion evidence — these indicate actual findings/completion, NOT clarification
+  /(?:i\s+)?(?:replaced|fixed|repaired|installed|changed|swapped)\b/i,
+  /(?:it\s+)?(?:works|working|operational|runs|running|fixed)\s*(?:now|again|fine)?\b/i,
+  /(?:problem\s+)?(?:solved|resolved|fixed)\b/i,
+  /(?:я\s+)?(?:заменил|починил|исправил|установил|поменял)\b/iu,
+  /(?:водонагреватель|он[ао]?|устройство)?\s*(?:заработал[ао]?|работает)\b/iu,
+  /(?:проблема\s+)?(?:устранена|решена|исправлена)\b/iu,
+  /(?:неисправ(?:ен|на|но|ны)|не\s+работа(?:ет|л[ао]?)|сгоре(?:л[ао]?|вши[йя]))\b/iu,
+  /(?:ya\s+)?(?:reemplac[eé]|arregl[eé]|repar[eé]|instal[eé]|cambi[eé])\b/iu,
+  /(?:funciona|funcionando|arreglado|reparado)\s*(?:ahora|bien)?\b/iu,
+  /(?:problema\s+)?(?:resuelto|solucionado|arreglado)\b/iu,
 ];
 
 function extractSignificantTerms(text: string): string[] {

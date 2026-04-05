@@ -23,14 +23,14 @@ export const STEP_GUIDANCE_CONTINUATIONS: Record<Language, string> = {
  */
 export const CHAINED_LOCATE_GUIDANCE: Record<Language, Record<string, string>> = {
   EN: {
-    fuse: "The fuse is typically located in the DC distribution panel or near the water heater itself. Look for the fuse/breaker panel inside a compartment on the exterior of the RV, or check behind a removable panel near the water heater. Check both upstream (source side) and downstream (load side) of the fuse.",
+    fuse: "The fuse is typically located in the DC distribution panel or near the water heater itself. Look for the fuse/breaker panel inside a compartment on the exterior of the RV, or check behind a removable panel near the water heater. Measure battery voltage at the switch input and output, or check both upstream (source side) and downstream (load side) of the fuse.",
     connector: "The connector is usually at the back of the control board or near the gas valve assembly. Follow the wiring harness from the board to locate the connection point.",
     board: "The control board is typically mounted inside the water heater access panel. Remove the exterior cover to access the electronics compartment.",
     relay: "The relay is usually mounted on or near the control board. It may be a small black box with multiple terminals.",
     generic: "Check the component location in the equipment access panel. Look for labels or follow the wiring from known points.",
   },
   RU: {
-    fuse: "Предохранитель обычно находится в распределительном щитке постоянного тока или рядом с самим водонагревателем. Ищите панель предохранителей/автоматов внутри отсека снаружи автодома, или проверьте за съёмной панелью рядом с водонагревателем. Проверьте напряжение с обеих сторон — на входе (со стороны источника) и на выходе (со стороны нагрузки) предохранителя.",
+    fuse: "Предохранитель обычно находится в распределительном щитке постоянного тока или рядом с самим водонагревателем. Ищите панель предохранителей/автоматов внутри отсека снаружи автодома, или проверьте за съёмной панелью рядом с водонагревателем. Проверьте напряжение аккумулятора на вход и выход предохранителя.",
     connector: "Разъём обычно находится на задней стороне платы управления или рядом с газовым клапаном. Проследите жгут проводов от платы, чтобы найти точку подключения.",
     board: "Плата управления обычно установлена внутри панели доступа водонагревателя. Снимите наружную крышку для доступа к отсеку электроники.",
     relay: "Реле обычно установлено на плате управления или рядом с ней. Это может быть небольшая чёрная коробочка с несколькими клеммами.",
