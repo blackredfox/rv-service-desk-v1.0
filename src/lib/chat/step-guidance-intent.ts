@@ -31,6 +31,12 @@ const QUESTION_LEAD_PATTERNS = [
   /^(?:d[oó]nde|qu[eé]|c[oó]mo|cu[aá]l|es|este|ese|esta|esa|esto|eso)\b/iu,
 ];
 
+const LEADING_FILLER_PATTERNS = [
+  /^(?:and|so|well|uh|um)\s+/i,
+  /^(?:а|ну|и)\s+/iu,
+  /^(?:y|bueno|pues)\s+/iu,
+];
+
 const HOW_TO_CHECK_PATTERNS = [
   /\b(?:how|check|test|measure|verify|inspect|probe|explain|show|tell)\b/i,
   /\b(?:как|провер|измер|тест|объясн|покажи|подскажи)\b/iu,
@@ -101,6 +107,18 @@ const ACTIVE_STEP_REFERENCE_PATTERNS = [
   /(?:\b(?:paso|punto|entrada|cable|terminal|conector|fusible|revisi[oó]n)\b)/iu,
 ];
 
+const MEASUREMENT_SUPPORT_PATTERNS = [
+  /(?:12\s*[vв]|b\+|voltage|meter|multimeter)/iu,
+  /(?:12\s*[vв]|напряжен|мультиметр|вольт)/iu,
+  /(?:12\s*[vв]|voltaje|mult[ií]metro)/iu,
+];
+
+const SHORTHAND_SAME_STEP_SUPPORT_PATTERNS = [
+  /^(?:(?:а|ну|и)\s+)?как(?:\s|$).*(?:12\s*[vв]|напряжен|вольт|мультиметр)/iu,
+  /^(?:(?:and|so|well)\s+)?how(?:\s|$).*(?:12\s*v|voltage|meter|multimeter)/i,
+  /^(?:(?:y|bueno|pues)\s+)?c[oó]mo(?:\s|$).*(?:12\s*v|voltaje|mult[ií]metro)/iu,
+];
+
 const GUIDANCE_EVIDENCE_PATTERNS = [
   /(?:i\s+)?(?:measured|checked|tested|verified|confirmed|found|got|read|see|saw)\b/i,
   /(?:я\s+)?(?:измерил|проверил|подтвердил|наш[её]л|увидел|заметил)\b/iu,
@@ -145,6 +163,16 @@ function getTokenCount(text: string): number {
   return (text.match(/[\p{L}\p{N}_+/\-]+/gu) ?? []).length;
 }
 
+function normalizeSupportMessage(message: string): string {
+  let normalized = message.trim();
+
+  for (const pattern of LEADING_FILLER_PATTERNS) {
+    normalized = normalized.replace(pattern, "");
+  }
+
+  return normalized.trim();
+}
+
 function hasActiveStepReferenceOverlap(message: string, stepReference: string): boolean {
   const stepTerms = new Set(extractSignificantTerms(stepReference));
   if (stepTerms.size === 0) return false;
@@ -161,7 +189,7 @@ function hasBroadActiveStepReference(message: string, stepReference: string): bo
 }
 
 function containsGuidanceEvidence(message: string): boolean {
-  const trimmed = message.trim();
+  const trimmed = normalizeSupportMessage(message);
 
   if (isQuestionLikeSupportMessage(trimmed) || isShortFragmentFollowUp(trimmed)) {
     return false;
@@ -179,12 +207,12 @@ function looksLikeProgressionOrModeChange(message: string): boolean {
 }
 
 function isQuestionLikeSupportMessage(message: string): boolean {
-  const trimmed = message.trim();
+  const trimmed = normalizeSupportMessage(message);
   return /\?$/.test(trimmed) || QUESTION_LEAD_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
 function isShortFragmentFollowUp(message: string): boolean {
-  const trimmed = message.trim();
+  const trimmed = normalizeSupportMessage(message);
   if (!trimmed) return false;
 
   const tokenCount = getTokenCount(trimmed);
@@ -214,7 +242,24 @@ function looksLikeSameStepSupport(args: {
     return true;
   }
 
+  if (SHORTHAND_SAME_STEP_SUPPORT_PATTERNS.some((pattern) => pattern.test(message))) {
+    return true;
+  }
+
+  if (
+    tokenCount <= 6 &&
+    (HOW_TO_CHECK_PATTERNS.some((pattern) => pattern.test(message)) ||
+      LOCATE_COMPONENT_PATTERNS.some((pattern) => pattern.test(message)) ||
+      IDENTIFY_POINT_PATTERNS.some((pattern) => pattern.test(message)))
+  ) {
+    return true;
+  }
+
   if (questionLikeSupport && (hasStepReference || hasVisualCue || tokenCount <= 6)) {
+    return true;
+  }
+
+  if (questionLikeSupport && MEASUREMENT_SUPPORT_PATTERNS.some((pattern) => pattern.test(message))) {
     return true;
   }
 
@@ -228,6 +273,10 @@ function inferStepGuidanceCategory(message: string, hasPhotoCue: boolean): StepG
 
   if (ALTERNATE_CHECK_POINT_PATTERNS.some((pattern) => pattern.test(message))) {
     return "ALTERNATE_CHECK_POINT";
+  }
+
+  if (SHORTHAND_SAME_STEP_SUPPORT_PATTERNS.some((pattern) => pattern.test(message))) {
+    return "HOW_TO_CHECK";
   }
 
   if (IDENTIFY_POINT_PATTERNS.some((pattern) => pattern.test(message))) {
@@ -260,7 +309,7 @@ export function classifyStepGuidanceIntent(args: {
   hasPhotoAttachment?: boolean;
 }): StepGuidanceIntentResult | null {
   const stepReference = [args.activeStepQuestion, args.activeStepHowToCheck ?? ""].join(" ").trim();
-  const message = args.message.trim();
+  const message = normalizeSupportMessage(args.message);
   const hasPhotoCue = args.hasPhotoAttachment || PHOTO_REFERENCE_PATTERNS.some((pattern) => pattern.test(message));
 
   if (!stepReference) return null;

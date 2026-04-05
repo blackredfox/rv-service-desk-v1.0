@@ -53,6 +53,10 @@ describe("classifyStepGuidanceIntent — sticky active-step support", () => {
     expect(classify(message)).not.toBeNull();
   });
 
+  it("supports same-step RU clarification with a leading filler word", () => {
+    expect(classify("А как проверить 12V?")) .not.toBeNull();
+  });
+
   it("returns null when actual findings are reported so normal progression can resume", () => {
     expect(classify("I measured 12.6V at the board input.")).toBeNull();
     expect(classify("12.6V present")).toBeNull();

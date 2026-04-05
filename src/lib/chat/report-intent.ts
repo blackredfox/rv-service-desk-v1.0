@@ -19,11 +19,17 @@ export type ReportRevisionIntent = {
   reportKind?: ReportKind;
 };
 
+const REPORT_TRIGGER_NOUN = "(?:report|репорт|reporte|informe|отч[её]т)";
+const WARRANTY_TRIGGER = "(?:warranty|garant[ií]a|гарантийн\\S*|ворант\\S*|варрант\\S*)";
+const RETAIL_TRIGGER = "(?:retail|customer[\\s-]*pay|рознич\\S*)";
+
 const APPROVED_FINAL_REPORT_PATTERNS = [
-  /(?:write|generate|prepare|make|create)\s+(?:the\s+)?(?:(?:final|warranty|retail|service|repair)\s+)?report(?:$|[.!?;:,\n\s])/iu,
-  /(?:напиши|сделай|сформируй|подготовь|сгенерируй)\s+(?:(?:финальн(?:ый|ого)|гарантийн(?:ый|ого)|warranty|retail|сервисн(?:ый|ого)|ремонтн(?:ый|ого))\s+)?(?:отч[её]т|report)(?:$|[.!?;:,\n\s])/iu,
-  /(?:haz|genera|prepara|escribe|crea)\s+(?:el\s+)?(?:(?:warranty|retail|final|de\s+servicio|de\s+reparaci[oó]n)\s+)?(?:reporte|informe|report)(?:$|[.!?;:,\n\s])/iu,
-  /(?:haz|genera|prepara|escribe|crea)\s+(?:el\s+)?(?:reporte|informe)\s+(?:final|warranty|retail)(?:$|[.!?;:,\n\s])/iu,
+  new RegExp(`(?:write|generate|prepare|make|create)\\s+(?:the\\s+)?(?:(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|service|repair)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:напиши|сделай|сформируй|подготовь|сгенерируй)\\s+(?:(?:финальн(?:ый|ого)|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|сервисн(?:ый|ого)|ремонтн(?:ый|ого))\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:haz|genera|prepara|escribe|crea)\\s+(?:el\\s+)?(?:(?:${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|final|de\\s+servicio|de\\s+reparaci[oó]n)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:haz|genera|prepara|escribe|crea)\\s+(?:el\\s+)?(?:reporte|informe|report)\\s+(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER})(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`${WARRANTY_TRIGGER}\\s+${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`${RETAIL_TRIGGER}\\s+${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
 ];
 
 const REPORT_REVISION_ACTION_PATTERNS = [
@@ -43,6 +49,8 @@ const REPORT_KIND_PATTERNS: Record<Exclude<ReportKind, "generic">, RegExp[]> = {
     /\bwarranty\b/i,
     /garant[ií]a/iu,
     /гарантийн/iu,
+    /ворант/iu,
+    /варрант/iu,
   ],
   retail: [
     /\bretail\b/i,

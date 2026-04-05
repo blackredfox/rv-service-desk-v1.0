@@ -53,6 +53,10 @@ function getMockClarificationResponse(body: string): string {
     return "Проверьте предохранитель в цепи питания 12V перед платой и сравните напряжение до и после него.\n\nМы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.";
   }
 
+  if (/А как измеритл 12В/i.test(text)) {
+    return "Измерьте напряжение мультиметром между входом 12V на плате и массой, затем сравните показание с напряжением аккумулятора.\n\nМы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.";
+  }
+
   if (/Где находится предохранитель/i.test(text)) {
     return "Ищите предохранитель в линии 12V перед платой водонагревателя или у панели предохранителей дома на колёсах.\n\nМы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.";
   }
@@ -167,6 +171,7 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
       "sg_ru_branch_wh5a",
       "sg_ru_branch_wh5a_locate",
       "sg_ru_case_28",
+      "sg_ru_branch_wh5a_typo_howto",
       "sg_es_wp2",
       "sg_es_wh5_identify",
       "sg_es_fragment_wh5",
@@ -367,6 +372,25 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     expect(context.activeStepId).toBe("wh_5a");
     expect(context.completedSteps.has("wh_5a")).toBe(false);
     expect(getBranchState(caseId).activeBranchId).toBe("no_12v_supply");
+  });
+
+  it("keeps wh_5a sticky for typo-heavy RU same-step clarification without findings", async () => {
+    const caseId = "sg_ru_branch_wh5a_typo_howto";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+
+    const guidanceTurn = await postChat(caseId, "А как измеритл 12В");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const { getBranchState, getNextStepId } = await import("@/lib/diagnostic-registry");
+    const context = getOrCreateContext(caseId);
+
+    expect(guidanceTurn.fetchTriggered).toBe(true);
+    expect(guidanceTurn.streamText).toContain("Мы всё ещё на этом шаге. После проверки сообщите точно, что вы обнаружили.");
+    expect(context.activeStepId).toBe("wh_5a");
+    expect(context.completedSteps.has("wh_5a")).toBe(false);
+    expect(getNextStepId(caseId)).toBe("wh_5a");
+    expect(getBranchState(caseId).activeBranchId).toBe("no_12v_supply");
+    expect(guidanceTurn.streamText).not.toContain("wh_5b");
   });
 
   it("Case-28 failure class: RU photo-confirmation follow-up stays on the same branch step", async () => {

@@ -130,6 +130,22 @@ function buildValidatedStepGuidanceFallback(args: {
   });
 }
 
+function detectStickyStepClarificationOverride(message: string): StepGuidancePlan["intentCategory"] | null {
+  if (/^(?:(?:а|ну|и)\s+)?как(?:\s|$).*(?:12\s*[vв]|напряжен|вольт|мультиметр)/iu.test(message)) {
+    return "HOW_TO_CHECK";
+  }
+
+  if (/^(?:(?:and|so|well)\s+)?how(?:\s|$).*(?:12\s*v|voltage|meter|multimeter)/i.test(message)) {
+    return "HOW_TO_CHECK";
+  }
+
+  if (/^(?:(?:y|bueno|pues)\s+)?c[oó]mo(?:\s|$).*(?:12\s*v|voltaje|mult[ií]metro)/iu.test(message)) {
+    return "HOW_TO_CHECK";
+  }
+
+  return null;
+}
+
 function buildStepGuidanceClarificationSystemPrompt(args: {
   language: Language;
   stepQuestion: string;
@@ -332,6 +348,7 @@ export async function POST(req: Request) {
 
   const storedMode = ensuredCase.mode ?? "diagnostic";
   let currentMode: CaseMode = resolveStoredCaseMode(ensuredCase.mode);
+  const currentContextSnapshot = getOrCreateContext(ensuredCase.id);
 
   if (currentMode !== storedMode) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
@@ -356,7 +373,7 @@ export async function POST(req: Request) {
 
   let reportRoutingResponse: string | null = null;
   let reportPromptConstraint = "";
-  const runtimeReportReady = isFinalReportReady(getOrCreateContext(ensuredCase.id));
+  const runtimeReportReady = isFinalReportReady(currentContextSnapshot);
 
   const pendingFinalReportCommand =
     currentMode === "final_report"
@@ -377,13 +394,17 @@ export async function POST(req: Request) {
     priorUserMessages: historyBeforeAppend
       .filter((msg) => msg.role === "user")
       .map((msg) => msg.content),
+    hasActiveDiagnosticContext: Boolean(currentContextSnapshot.activeProcedureId),
   });
   const hasPriorUserEvidence = historyBeforeAppend.some((msg) => msg.role === "user");
   const requestedReportKind = reportRevisionIntent.reportKind ?? approvedFinalReportIntent.reportKind;
   const readyForImmediateReport = runtimeReportReady || repairSummaryIntent.readyForReportRouting;
   const shouldAskForMissingReportFieldsEarly =
     repairSummaryIntent.shouldAskClarification &&
-    (repairSummaryIntent.hasStructuredSummarySignals || hasPriorUserEvidence);
+    (repairSummaryIntent.hasStructuredSummarySignals ||
+      hasPriorUserEvidence ||
+      (Boolean(currentContextSnapshot.activeProcedureId) &&
+        repairSummaryIntent.currentMessageHasRepairSignal));
   const missingReportFields = repairSummaryIntent.missingFields.length > 0
     ? repairSummaryIntent.missingFields
     : ["complaint", "findings", "corrective_action"];
@@ -438,6 +459,39 @@ export async function POST(req: Request) {
   let stepGuidancePlan: StepGuidancePlan | null = null;
 
   if (currentMode === "diagnostic" && !reportRoutingResponse) {
+    const forcedStickyStepGuidanceCategory = detectStickyStepClarificationOverride(routingMessage);
+    const forcedStickyStepMetadata =
+      forcedStickyStepGuidanceCategory && currentContextSnapshot.activeStepId
+        ? getActiveStepMetadata(
+            ensuredCase.id,
+            currentContextSnapshot.activeStepId,
+            outputPolicy.effective,
+          )
+        : null;
+
+    if (forcedStickyStepMetadata) {
+      stepGuidancePlan = {
+        fallbackResponse: buildValidatedStepGuidanceFallback({
+          language: outputPolicy.effective,
+          stepQuestion: forcedStickyStepMetadata.question,
+          guidance: forcedStickyStepMetadata.howToCheck,
+          logLabel: forcedStickyStepMetadata.id,
+        }),
+        intentCategory: forcedStickyStepGuidanceCategory,
+        metadata: forcedStickyStepMetadata,
+        source: "preclassified",
+        systemPrompt: buildStepGuidanceClarificationSystemPrompt({
+          language: outputPolicy.effective,
+          stepQuestion: forcedStickyStepMetadata.question,
+          guidance: forcedStickyStepMetadata.howToCheck,
+          continuation: getStepGuidanceContinuation(outputPolicy.effective),
+          hasPhotoAttachment: attachmentCount > 0,
+        }),
+      };
+
+      console.log(`[Chat API v2] STEP_GUIDANCE forced-sticky detection for step ${forcedStickyStepMetadata.id} (${forcedStickyStepGuidanceCategory})`);
+    }
+
     const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
     const activeStepBeforeProcessing = contextBeforeProcessing.activeStepId;
     const terminalPhaseBeforeProcessing =
@@ -447,7 +501,7 @@ export async function POST(req: Request) {
       !contextBeforeProcessing.isolationComplete &&
       terminalPhaseBeforeProcessing === "normal";
 
-    if (eligibleForStepGuidance) {
+    if (!stepGuidancePlan && eligibleForStepGuidance) {
       const stepGuidanceMetadata = getActiveStepMetadata(
         ensuredCase.id,
         activeStepBeforeProcessing,
@@ -461,10 +515,14 @@ export async function POST(req: Request) {
             hasPhotoAttachment: attachmentCount > 0,
           })
         : null;
+      const stickyOverrideIntentCategory =
+        !guidanceIntent && stepGuidanceMetadata
+          ? detectStickyStepClarificationOverride(routingMessage)
+          : null;
 
       if (
         stepGuidanceMetadata &&
-        guidanceIntent
+        (guidanceIntent || stickyOverrideIntentCategory)
       ) {
         stepGuidancePlan = {
           fallbackResponse: buildValidatedStepGuidanceFallback({
@@ -473,7 +531,7 @@ export async function POST(req: Request) {
             guidance: stepGuidanceMetadata.howToCheck,
             logLabel: stepGuidanceMetadata.id,
           }),
-          intentCategory: guidanceIntent.category,
+          intentCategory: guidanceIntent?.category ?? stickyOverrideIntentCategory!,
           metadata: stepGuidanceMetadata,
           source: "preclassified",
           systemPrompt: buildStepGuidanceClarificationSystemPrompt({
@@ -485,7 +543,7 @@ export async function POST(req: Request) {
           }),
         };
 
-        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceMetadata.id} (${guidanceIntent?.category ?? "UNKNOWN"})`);
+        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceMetadata.id} (${guidanceIntent?.category ?? stickyOverrideIntentCategory ?? "UNKNOWN"})`);
       }
     }
   }

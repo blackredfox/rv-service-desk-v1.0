@@ -102,7 +102,7 @@ describe("No Hidden Authority — Route Decomposition", () => {
   });
 
   it("report intent helpers classify only bounded report signals and expose no flow decisions", () => {
-    const reportIntent = detectApprovedFinalReportIntent("generate warranty report");
+    const reportIntent = detectApprovedFinalReportIntent("сделай воранти репорт");
     const reportEditIntent = detectReportRevisionIntent({
       message: "change total labor to 0.5 hr",
       hasExistingReport: true,

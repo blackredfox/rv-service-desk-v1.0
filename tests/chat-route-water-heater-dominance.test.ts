@@ -62,7 +62,7 @@ describe("/api/chat water-heater runtime dominance", () => {
     });
 
     storageMocks.inferLanguageForMessage.mockImplementation((message: string) => ({
-      language: /[А-Яа-яЁё]/.test(message) ? "RU" : "EN",
+      language: /[А-Яа-яЁё]/.test(message) ? "RU" : /[¿¡]|(?:c[oó]mo|d[oó]nde|qu[eé]|s[ií]|cambi[eé]|prepara|reporte)/iu.test(message) ? "ES" : "EN",
       languageSource: "AUTO",
       confidence: 0.95,
     }));
@@ -101,6 +101,9 @@ describe("/api/chat water-heater runtime dominance", () => {
       "route_report_en",
       "route_wh5_terminal_completion_exact",
       "route_wh5_final_report_restored",
+      "route_wh5_report_ru_typo",
+      "route_wh5_report_en_active_flow",
+      "route_wh5_report_es_missing_active_flow",
     ].forEach((caseId) => {
       clearRegistry(caseId);
       clearContext(caseId);
@@ -264,6 +267,66 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
     expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
+  });
+
+  it("overrides unfinished wh_5a branch flow for typo-heavy RU repair summary + natural warranty-report request", async () => {
+    const caseId = "route_wh5_report_ru_typo";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+
+    fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("Complaint: Heater inoperative.\nDiagnostic Procedure: Verified failed fuse and completed repair summary.\nVerified Condition: Water heater operates normally after fuse replacement.\nRecommended Corrective Action: Replace the failed fuse and verify normal operation.\nEstimated Labor: Fuse replacement and functional test - 0.4 hr. Total labor: 0.4 hr.\nRequired Parts: Fuse."));
+
+    const reportTurn = await postChat(
+      caseId,
+      "я нашел, поменял предохранитель и теперь водонагреватель работает. Сделай воранти репорт",
+    );
+
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+
+    expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    expect(reportTurn.fetchTriggered).toBe(true);
+    expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(reportTurn.streamText).toContain("Complaint:");
+    expect(reportTurn.streamText).not.toContain("wh_5b");
+    expect(reportTurn.streamText).not.toContain("wh_5c");
+    expect(getOrCreateContext(caseId).activeStepId).toBe("wh_5a");
+  });
+
+  it("overrides unfinished wh_5a branch flow for EN repair summary + natural warranty-report request", async () => {
+    const caseId = "route_wh5_report_en_active_flow";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "no");
+
+    fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("Complaint: Heater inoperative.\nDiagnostic Procedure: Verified failed fuse and completed repair summary.\nVerified Condition: Water heater operates normally after fuse replacement.\nRecommended Corrective Action: Replace the failed fuse and verify normal operation.\nEstimated Labor: Fuse replacement and functional test - 0.4 hr. Total labor: 0.4 hr.\nRequired Parts: Fuse."));
+
+    const reportTurn = await postChat(
+      caseId,
+      "I found the fuse was blown, replaced it, and now the water heater works. Generate warranty report",
+    );
+
+    expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    expect(reportTurn.fetchTriggered).toBe(true);
+    expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(reportTurn.streamText).not.toContain("wh_5b");
+    expect(reportTurn.streamText).not.toContain("wh_5c");
+  });
+
+  it("asks only for missing report fields during active flow when ES report request is still incomplete", async () => {
+    const caseId = "route_wh5_report_es_missing_active_flow";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "no");
+
+    const reportTurn = await postChat(
+      caseId,
+      "¿Prepara el warranty report? Cambié el fusible.",
+    );
+
+    expect(reportTurn.fetchTriggered).toBe(false);
+    expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    expect(reportTurn.streamText).toContain("solo me faltan estos datos");
+    expect(reportTurn.streamText).toContain("qué encontraste exactamente");
+    expect(reportTurn.streamText).not.toContain("wh_5b");
+    expect(reportTurn.streamText).not.toContain("wh_5c");
   });
 
   it("transitions to final_report for natural-language English report commands", async () => {
