@@ -348,6 +348,11 @@ export async function POST(req: Request) {
     message: routingMessage,
     hasExistingReport: existingReportInContext,
   });
+  const precomputedLaborOverride = computeLaborOverrideRequest(
+    currentMode,
+    historyBeforeAppend,
+    message,
+  );
 
   let reportRoutingResponse: string | null = null;
   let reportPromptConstraint = "";
@@ -384,7 +389,10 @@ export async function POST(req: Request) {
     : ["complaint", "findings", "corrective_action"];
 
   const modeResolution = pendingFinalReportCommand;
-  if (existingReportInContext && (reportRevisionIntent.matched || approvedFinalReportIntent.matched)) {
+  if (existingReportInContext && precomputedLaborOverride.isLaborOverrideRequest) {
+    currentMode = "final_report";
+    console.log(`[Chat API v2] Mode held in-memory as final_report (existing report labor override)`);
+  } else if (existingReportInContext && (reportRevisionIntent.matched || approvedFinalReportIntent.matched)) {
     reportPromptConstraint = [
       buildReportTypePromptConstraint(requestedReportKind),
       buildReportRevisionPromptConstraint(message),

@@ -440,7 +440,6 @@ describe("Post-report natural edit loop", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"final_report"');
     expect(streamText).toContain("Total labor: 0.5 hr");
