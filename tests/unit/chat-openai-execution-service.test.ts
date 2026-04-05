@@ -18,6 +18,7 @@ vi.mock("@/lib/chat/openai-client", async () => {
 import {
   executeLaborOverrideCompletion,
   executePrimaryChatCompletion,
+  executeStepGuidanceCompletion,
 } from "@/lib/chat/openai-execution-service";
 
 const englishOnlyPolicy = {
@@ -110,5 +111,43 @@ describe("OpenAI Execution Service", () => {
 
     expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
     expect(result.response).toContain("Total labor: 2.5 hr");
+  });
+
+  it("falls back deterministically when bounded step clarification stays invalid", async () => {
+    const emitted: string[] = [];
+    openAiMocks.callOpenAI
+      .mockResolvedValueOnce({
+        response: "Understood.",
+        durationMs: 1,
+        firstTokenMs: 1,
+      })
+      .mockResolvedValueOnce({
+        response: "Still checking.",
+        durationMs: 1,
+        firstTokenMs: 1,
+      });
+
+    const fallbackResponse = "Current step: Is 12V present at the water heater control board input?\n\nPerform the exact check for this active step at the referenced point with the correct tool, then note the actual reading or condition.\n\nWe are still on this step. After you perform that check, tell me exactly what you found.";
+
+    const result = await executeStepGuidanceCompletion({
+      apiKey: "sk-test",
+      caseId: "case_step_guidance",
+      systemPrompt: "bounded same-step clarification",
+      message: "Is this the right one?",
+      signal: new AbortController().signal,
+      emitToken: (token) => emitted.push(token),
+      isAborted: () => false,
+      outputLanguage: "EN",
+      langPolicy: englishOnlyPolicy,
+      fallbackResponse,
+      requiredContinuation: "We are still on this step. After you perform that check, tell me exactly what you found.",
+      model: "gpt-5-mini-2025-08-07",
+      requestStartedAt: Date.now(),
+    });
+
+    expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
+    expect(emitted.some((token) => token.includes("Repairing clarification"))).toBe(true);
+    expect(result.emittedValidationFallback).toBe(true);
+    expect(result.response).toBe(fallbackResponse);
   });
 });

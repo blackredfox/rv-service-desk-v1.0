@@ -47,7 +47,9 @@ import {
 import type { Language } from "@/lib/lang";
 import {
   buildStepGuidanceResponse,
+  getStepGuidanceContinuation,
 } from "@/lib/chat/output-policy";
+import { executeStepGuidanceCompletion } from "@/lib/chat/openai-execution-service";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
@@ -89,6 +91,81 @@ const STRICT_CONTEXT_ENGINE = true;
 type RegistryActiveStepMetadata = NonNullable<
   ReturnType<typeof getActiveStepMetadata>
 >;
+
+type StepGuidancePlan = {
+  fallbackResponse: string;
+  intentCategory: string;
+  metadata: RegistryActiveStepMetadata;
+  source: "preclassified" | "promoted";
+  systemPrompt: string;
+};
+
+function buildValidatedStepGuidanceFallback(args: {
+  language: Language;
+  stepQuestion?: string | null;
+  guidance?: string | null;
+  logLabel: string;
+}): string {
+  const drafted = buildStepGuidanceResponse({
+    language: args.language,
+    stepQuestion: args.stepQuestion,
+    guidance: args.guidance,
+  });
+  const validation = validateStepGuidanceOutput(drafted, args.language);
+
+  if (validation.valid) {
+    return drafted;
+  }
+
+  console.warn(
+    `[Chat API v2] STEP_GUIDANCE validator repaired fallback for ${args.logLabel}: ${validation.violations.join(" | ")}`,
+  );
+
+  return buildStepGuidanceResponse({
+    language: args.language,
+  });
+}
+
+function buildStepGuidanceClarificationSystemPrompt(args: {
+  language: Language;
+  stepQuestion: string;
+  guidance?: string | null;
+  continuation: string;
+  hasPhotoAttachment: boolean;
+}): string {
+  const photoRule = args.hasPhotoAttachment
+    ? "- The technician included a photo. Use it only for bounded same-step identification support. Do NOT treat it as automatic evidence, completion, or progression proof."
+    : "";
+
+  return [
+    "You are handling a bounded same-step clarification inside an active diagnostic step.",
+    "",
+    `Output language: ${args.language}`,
+    `Active step question: ${args.stepQuestion}`,
+    `Current step guidance: ${args.guidance?.trim() || "Use only the current step context and ask for the actual finding afterward."}`,
+    "",
+    "MANDATORY BOUNDARIES:",
+    "- Stay on the CURRENT ACTIVE STEP only.",
+    "- Answer the technician's actual related question helpfully and naturally within this step.",
+    "- You may clarify location, identification, appearance, confirmation, comparison, or photo-based same-step support.",
+    "- Be concise, practical, and bounded to the current step context.",
+    "- Do NOT advance the step.",
+    "- Do NOT complete the step.",
+    "- Do NOT branch.",
+    "- Do NOT switch mode.",
+    "- Do NOT mention final report, authorization, next step, completion, or readiness.",
+    "- Do NOT claim that findings/results have already been established.",
+    photoRule,
+    "",
+    "RESPONSE RULES:",
+    "- Answer the real support question, not a generic procedural wall of text.",
+    "- If certainty is limited, say what cue or comparison to use within this same step.",
+    `- End with exactly this line: \"${args.continuation}\"`,
+    "- Do not use report headers, progress headers, or generic section labels.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 function buildAuthoritativeCompletionOffer(args: {
   language: Language;
@@ -308,8 +385,7 @@ export async function POST(req: Request) {
     console.log(`[Chat API v2] Dirty-input repair summary clarification requested (missing: ${repairSummaryIntent.missingFields.join(", ")})`);
   }
 
-  let stepGuidanceResponse: string | null = null;
-  let stepGuidanceStepId: string | null = null;
+  let stepGuidancePlan: StepGuidancePlan | null = null;
 
   if (currentMode === "diagnostic" && !repairSummaryClarificationResponse && !repairSummaryReportSupportResponse) {
     const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
@@ -340,30 +416,26 @@ export async function POST(req: Request) {
         stepGuidanceMetadata &&
         guidanceIntent
       ) {
-        const draftedGuidanceResponse = buildStepGuidanceResponse({
-          language: outputPolicy.effective,
-          stepQuestion: stepGuidanceMetadata.question,
-          guidance: stepGuidanceMetadata.howToCheck,
-        });
-        const validation = validateStepGuidanceOutput(
-          draftedGuidanceResponse,
-          outputPolicy.effective,
-        );
+        stepGuidancePlan = {
+          fallbackResponse: buildValidatedStepGuidanceFallback({
+            language: outputPolicy.effective,
+            stepQuestion: stepGuidanceMetadata.question,
+            guidance: stepGuidanceMetadata.howToCheck,
+            logLabel: stepGuidanceMetadata.id,
+          }),
+          intentCategory: guidanceIntent.category,
+          metadata: stepGuidanceMetadata,
+          source: "preclassified",
+          systemPrompt: buildStepGuidanceClarificationSystemPrompt({
+            language: outputPolicy.effective,
+            stepQuestion: stepGuidanceMetadata.question,
+            guidance: stepGuidanceMetadata.howToCheck,
+            continuation: getStepGuidanceContinuation(outputPolicy.effective),
+            hasPhotoAttachment: attachmentCount > 0,
+          }),
+        };
 
-        stepGuidanceResponse = validation.valid
-          ? draftedGuidanceResponse
-          : buildStepGuidanceResponse({
-              language: outputPolicy.effective,
-            });
-        stepGuidanceStepId = stepGuidanceMetadata.id;
-
-        if (!validation.valid) {
-          console.warn(
-            `[Chat API v2] STEP_GUIDANCE validator repaired response for step ${stepGuidanceStepId}: ${validation.violations.join(" | ")}`,
-          );
-        }
-
-        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceStepId} (${guidanceIntent?.category ?? "UNKNOWN"})`);
+        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceMetadata.id} (${guidanceIntent?.category ?? "UNKNOWN"})`);
       }
     }
   }
@@ -375,7 +447,7 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  const history = stepGuidanceResponse
+  const history = stepGuidancePlan
     ? []
     : await loadChatHistory(ensuredCase.id);
 
@@ -386,7 +458,7 @@ export async function POST(req: Request) {
   let activeStepMetadata: RegistryActiveStepMetadata | null = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
-  if (currentMode === "diagnostic" && !stepGuidanceResponse && !repairSummaryClarificationResponse && !repairSummaryReportSupportResponse) {
+  if (currentMode === "diagnostic" && !stepGuidancePlan && !repairSummaryClarificationResponse && !repairSummaryReportSupportResponse) {
     if (!STRICT_CONTEXT_ENGINE) {
       console.error("[Chat API v2] STRICT_CONTEXT_ENGINE is disabled — this is not supported in production");
     }
@@ -654,39 +726,44 @@ export async function POST(req: Request) {
     const terminalPhaseAfterProcessing =
       engineResult.context.terminalState?.phase ?? "normal";
 
+    const promotedStepMetadata =
+      activeStepMetadata ??
+      getActiveStepMetadata(
+        ensuredCase.id,
+        stepIdBeforeProcessing,
+        outputPolicy.effective,
+      );
+
     const shouldPromoteToStepGuidance =
-      !stepGuidanceResponse &&
+      !stepGuidancePlan &&
       engineResult.responseInstructions.action === "provide_clarification" &&
       stepIdBeforeProcessing !== null &&
       engineResult.context.activeStepId === stepIdBeforeProcessing &&
       terminalPhaseAfterProcessing === "normal" &&
-      !engineResult.context.isolationComplete;
+      !engineResult.context.isolationComplete &&
+      Boolean(promotedStepMetadata);
 
     if (shouldPromoteToStepGuidance) {
-      const draftedGuidanceResponse = buildStepGuidanceResponse({
-        language: outputPolicy.effective,
-        stepQuestion: activeStepMetadata?.question,
-        guidance: activeStepMetadata?.howToCheck,
-      });
-      const validation = validateStepGuidanceOutput(
-        draftedGuidanceResponse,
-        outputPolicy.effective,
-      );
+      stepGuidancePlan = {
+        fallbackResponse: buildValidatedStepGuidanceFallback({
+          language: outputPolicy.effective,
+          stepQuestion: promotedStepMetadata?.question,
+          guidance: promotedStepMetadata?.howToCheck,
+          logLabel: promotedStepMetadata?.id ?? stepIdBeforeProcessing,
+        }),
+        intentCategory: engineResult.responseInstructions.clarificationType ?? "PROMOTED_CONTEXT_CLARIFICATION",
+        metadata: promotedStepMetadata!,
+        source: "promoted",
+        systemPrompt: buildStepGuidanceClarificationSystemPrompt({
+          language: outputPolicy.effective,
+          stepQuestion: promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing),
+          guidance: promotedStepMetadata?.howToCheck,
+          continuation: getStepGuidanceContinuation(outputPolicy.effective),
+          hasPhotoAttachment: attachmentCount > 0,
+        }),
+      };
 
-      stepGuidanceResponse = validation.valid
-        ? draftedGuidanceResponse
-        : buildStepGuidanceResponse({
-            language: outputPolicy.effective,
-          });
-      stepGuidanceStepId = activeStepMetadata?.id ?? stepIdBeforeProcessing;
-
-      if (!validation.valid) {
-        console.warn(
-          `[Chat API v2] STEP_GUIDANCE validator repaired promoted response for step ${stepGuidanceStepId}: ${validation.violations.join(" | ")}`,
-        );
-      }
-
-      console.log(`[Chat API v2] STEP_GUIDANCE promoted from Context Engine clarification for step ${stepGuidanceStepId}`);
+      console.log(`[Chat API v2] STEP_GUIDANCE promoted from Context Engine clarification for step ${stepGuidancePlan.metadata.id}`);
     }
 
     // ── P1.7 TERMINAL STATE ENFORCEMENT ─────────────────────────────────
@@ -860,9 +937,25 @@ export async function POST(req: Request) {
           return;
         }
 
-        if (stepGuidanceResponse) {
-          emitToken(stepGuidanceResponse);
-          full = stepGuidanceResponse;
+        if (stepGuidancePlan) {
+          const stepGuidanceResult = await executeStepGuidanceCompletion({
+            apiKey,
+            caseId: ensuredCase.id,
+            systemPrompt: stepGuidancePlan.systemPrompt,
+            message,
+            attachments,
+            signal: ac.signal,
+            emitToken,
+            isAborted: () => aborted,
+            outputLanguage: outputPolicy.effective,
+            langPolicy: langPolicy,
+            fallbackResponse: stepGuidancePlan.fallbackResponse,
+            requiredContinuation: getStepGuidanceContinuation(outputPolicy.effective),
+            model: getModelForMode(currentMode),
+            requestStartedAt,
+          });
+
+          full = stepGuidanceResult.response;
 
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
@@ -879,7 +972,7 @@ export async function POST(req: Request) {
               {
                 type: "clarification",
                 content: full.slice(0, 200),
-                stepId: stepGuidanceStepId ?? undefined,
+                stepId: stepGuidancePlan.metadata.id,
                 submode: "main",
               },
               DEFAULT_CONFIG,
