@@ -67,6 +67,18 @@ Recommended Corrective Action: Document completed repair and warranty claim deta
 Estimated Labor: Repair summary review and report preparation - 0.5 hr. Total labor: 0.5 hr.
 Required Parts: Screws and sealant as used.`;
 
+const FINAL_REPORT_TEXT_RU = `${FINAL_REPORT_TEXT}
+
+--- TRANSLATION ---
+
+Жалоба: течь воды в стенке слайда спальни. Диагностика выполнена по сводке техника. Состояние после ремонта подтверждено.`;
+
+const FINAL_REPORT_TEXT_ES = `${FINAL_REPORT_TEXT}
+
+--- TRANSLATION ---
+
+Queja: filtración de agua en la pared del slide del dormitorio. El diagnóstico se revisó con base en el resumen del técnico. La condición reparada quedó verificada.`;
+
 describe("Dirty-input report routing", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -128,11 +140,18 @@ describe("Dirty-input report routing", () => {
     });
   });
 
-  it("surfaces bounded report support for ugly mixed-language repair summary + report request without entering unrelated diagnostics", async () => {
+  it("generates a report immediately for EN complaint + findings + repair summary at the beginning", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
+      }),
+    });
+
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide outside left side wall black metal vertical piece not attached and water leaking into the RV.",
-      "Найдено: только два самореза, силикона нет.",
+      "Findings: only two screws were present and there was no silicone sealant.",
       "Corrective action: added more screws and applied silicone sealant.",
       "write warranty report",
     ].join("\n");
@@ -145,22 +164,39 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
-    expect(streamText).toContain("START FINAL REPORT");
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).toContain("Complaint:");
     expect(streamText).not.toContain("converter");
   });
 
-  it("handles typo-heavy mixed input with bounded report support and no unrelated diagnostics", async () => {
+  it("generates a report immediately for RU natural report intent when enough data already exists", async () => {
+    mockStorage.ensureCase.mockResolvedValueOnce({
+      id: "case_dirty_1",
+      title: "Dirty Input Case",
+      userId: "user_123",
+      inputLanguage: "RU",
+      languageSource: "AUTO",
+      mode: "diagnostic",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT_RU } }],
+      }),
+    });
+
     const { POST } = await import("@/app/api/chat/route");
     const message = [
-      "bedrom slied ouside left wall blak metal vertical peice not atached, water leeking into rv.",
-      "найдено: герметика нет.",
-      "added more screwws and applied sillicone.",
-      "write warranty report",
+      "Жалоба: течь воды у левой наружной стенки слайда спальни.",
+      "Найдено: только два самореза, герметика нет.",
+      "Ремонт: добавил саморезы и нанес герметик.",
+      "сделай отчет",
     ].join("\n");
 
     const response = await POST(new Request("http://localhost/api/chat", {
@@ -171,15 +207,15 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain("START FINAL REPORT");
-    expect(streamText).not.toContain("ic_4");
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).not.toContain("START FINAL REPORT");
   });
 
-  it("surfaces bounded Spanish report support without activating final_report directly", async () => {
+  it("generates a report immediately for ES natural report intent when enough data already exists", async () => {
     mockStorage.ensureCase.mockResolvedValueOnce({
       id: "case_dirty_1",
       title: "Dirty Input Case",
@@ -189,6 +225,12 @@ describe("Dirty-input report routing", () => {
       mode: "diagnostic",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT_ES } }],
+      }),
     });
 
     const { POST } = await import("@/app/api/chat/route");
@@ -207,15 +249,45 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
-    expect(streamText).toContain("START FINAL REPORT");
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
   });
 
-  it("asks one bounded clarifying question when dirty input summary is incomplete", async () => {
+  it("handles mixed-language typo-heavy report requests when intent is still clear", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT_RU } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const message = [
+      "bedrom slied ouside left wall blak metal vertical peice not atached, water leeking into rv.",
+      "найдено: герметика нет.",
+      "added more screwws and applied sillicone.",
+      "write warranty report",
+    ].join("\n");
+
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: "case_dirty_1", message }),
+    }));
+
+    const streamText = await response.text();
+
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockInitializeCase).not.toHaveBeenCalled();
+    expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+  });
+
+  it("asks only for the missing report fields when dirty input summary is incomplete", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide wall leak.",
@@ -236,11 +308,12 @@ describe("Dirty-input report routing", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).toContain("missing report details");
     expect(streamText).toContain("what repair you completed");
     expect(questionCount).toBe(1);
   });
 
-  it("does not bypass report routing gates for dirty input with a report request but no completed repair action", async () => {
+  it("does not bypass readiness for explicit START FINAL REPORT when repair data is still missing", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide wall leak.",
@@ -260,6 +333,7 @@ describe("Dirty-input report routing", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockInitializeCase).not.toHaveBeenCalled();
     expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).not.toContain("START FINAL REPORT");
     expect(streamText).toContain("какой ремонт был фактически выполнен");
   });
 });

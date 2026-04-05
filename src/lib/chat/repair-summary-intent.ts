@@ -56,10 +56,18 @@ function dedupeMissingFields(fields: RepairSummaryMissingField[]): RepairSummary
 export function assessRepairSummaryIntent(args: {
   message: string;
   hasReportRequest: boolean;
+  priorUserMessages?: string[];
 }): RepairSummaryIntentAssessment {
-  const hasComplaint = COMPLAINT_PATTERNS.some((pattern) => pattern.test(args.message));
-  const hasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(args.message));
-  const hasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(args.message));
+  const evidenceText = [
+    ...(args.priorUserMessages ?? []),
+    args.message,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const hasComplaint = COMPLAINT_PATTERNS.some((pattern) => pattern.test(evidenceText));
+  const hasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(evidenceText));
+  const hasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(evidenceText));
 
   const summarySignalCount = [hasComplaint, hasFindings, hasCorrectiveAction].filter(Boolean).length;
   const hasStructuredSummarySignals = summarySignalCount >= 2;
@@ -71,10 +79,7 @@ export function assessRepairSummaryIntent(args: {
   ]);
 
   const readyForReportRouting = args.hasReportRequest && hasComplaint && hasFindings && hasCorrectiveAction;
-  const shouldAskClarification =
-    !readyForReportRouting &&
-    args.hasReportRequest &&
-    hasStructuredSummarySignals;
+  const shouldAskClarification = args.hasReportRequest && !readyForReportRouting;
 
   return {
     hasComplaint,
@@ -122,10 +127,10 @@ export function buildRepairSummaryClarificationResponse(args: {
 
   switch (args.language) {
     case "RU":
-      return `Прежде чем я направлю это в отчёт, мне нужно одно уточнение: подтвердите ${fieldsText}?`;
+      return `Чтобы сформировать отчёт сейчас, мне нужны только недостающие данные: подтвердите ${fieldsText}?`;
     case "ES":
-      return `Antes de pasar esto al informe, necesito una sola aclaración: ¿puedes confirmar ${fieldsText}?`;
+      return `Para generar el informe ahora, solo me faltan estos datos: ¿puedes confirmar ${fieldsText}?`;
     default:
-      return `Before I route this to the report path, I need one clarification: can you confirm ${fieldsText}?`;
+      return `To generate the report now, I only need the missing report details: can you confirm ${fieldsText}?`;
   }
 }
