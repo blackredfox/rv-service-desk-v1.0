@@ -329,9 +329,10 @@ export async function POST(req: Request) {
       );
       const guidanceIntent = stepGuidanceMetadata
         ? classifyStepGuidanceIntent({
-            message,
+            message: routingMessage,
             activeStepQuestion: stepGuidanceMetadata.question,
             activeStepHowToCheck: stepGuidanceMetadata.howToCheck,
+            hasPhotoAttachment: attachmentCount > 0,
           })
         : null;
 
@@ -568,6 +569,7 @@ export async function POST(req: Request) {
           currentActiveStep,
           outputPolicy.effective,
         )?.howToCheck,
+        hasPhotoAttachment: attachmentCount > 0,
       }),
     );
 
