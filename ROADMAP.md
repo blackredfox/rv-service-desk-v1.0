@@ -2,7 +2,7 @@
 ## ROADMAP
 
 **Version:** 1.3  
-**Last updated:** 2026-04-03  
+**Last updated:** 2026-04-06  
 **Status:** Active Execution Plan
 
 ---

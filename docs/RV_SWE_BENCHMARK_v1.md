@@ -5,7 +5,7 @@
 **Status:** Active Benchmark Specification  
 **Purpose:** Behavioral evaluation framework for RV Service Desk diagnostic, transition, and output correctness.
 
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-06
 
 ---
 

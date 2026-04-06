@@ -3,7 +3,7 @@
 
 **Version:** 1.1  
 **Status:** Enforced engineering rules (PR review gate)  
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-06
 
 ---
 
@@ -159,7 +159,7 @@ Edit behavior must not re-enter diagnostic sequencing unless the technician expl
 
 For any final output:
 
-1) English block (100% English)  
+1) English block  
 2) `--- TRANSLATION ---`  
 3) Full translation to dialogue language
 

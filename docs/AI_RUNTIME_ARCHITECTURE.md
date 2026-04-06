@@ -13,7 +13,6 @@ All AI behavior is controlled by server-side orchestration.
 # 1. High-Level Architecture
 
 AI responses are generated through a controlled pipeline.
-
 Client
 ↓
 API Route
@@ -30,7 +29,6 @@ Output Validator
 ↓
 Response to Client
 
-
 ---
 
 # 2. Step-by-Step Runtime Flow
@@ -40,9 +38,7 @@ Response to Client
 The technician sends a message through the chat interface.
 
 Example:
-
 The bedr00m slide... water leaking... added screws and silicone... write warranty report
-
 
 Real-world input may be:
 - mixed language,
@@ -141,7 +137,7 @@ The LLM does **not decide diagnostic logic**.
 
 ---
 
-## Step 7 — Output Validation
+## 7 — Output Validation
 
 The server validates the AI response.
 
@@ -202,7 +198,6 @@ Fallback strategies include:
 # 4. Architecture Principles
 
 The runtime pipeline follows strict architectural rules.
-
 Context Engine
 → diagnostic logic
 
@@ -211,10 +206,6 @@ LLM
 
 Server
 → validation, normalization, and enforcement
-
-
-This separation prevents AI systems from drifting
-
 
 This separation prevents AI systems from drifting into uncontrolled chatbot behavior or brittle ritual-command UX.
 

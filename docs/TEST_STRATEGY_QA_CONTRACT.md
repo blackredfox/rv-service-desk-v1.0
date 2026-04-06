@@ -5,7 +5,7 @@
 **Status:** Enforced QA / Testing Contract  
 **Purpose:** Define the required testing model for behavior correctness, architecture preservation, regression control, and safe route decomposition.
 
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-06
 
 ---
 
