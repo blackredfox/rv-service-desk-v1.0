@@ -1,7 +1,6 @@
 "use client";
 
 import { RefObject } from "react";
-import Image from "next/image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSelector } from "@/components/language-selector";
 import type { LanguageMode } from "@/lib/api";
@@ -52,8 +51,7 @@ export function AppHeader({
       className="
         sticky top-0 z-40
         flex h-14 items-center justify-between
-        border-b border-zinc-200 bg-white/95 px-3 backdrop-blur
-        dark:border-zinc-800 dark:bg-zinc-950/95
+        border-b border-zinc-700 bg-zinc-900 px-3
         md:px-4
       "
     >
@@ -68,8 +66,7 @@ export function AppHeader({
             aria-label={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
             className="
               flex h-9 w-9 items-center justify-center
-              rounded-lg text-zinc-600 hover:bg-zinc-100
-              dark:text-zinc-400 dark:hover:bg-zinc-800
+              rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200
               transition-colors
             "
           >
@@ -85,22 +82,22 @@ export function AppHeader({
           </button>
         )}
 
-        {/* Logo + Wordmark */}
+        {/* Logo + Wordmark - compact inline brand */}
         <div className="flex items-center gap-2">
-          <Image
-            src="/logo.svg"
-            alt="RV Service Desk"
-            width={32}
-            height={26}
-            className="h-6 w-auto md:h-7"
-            priority
-          />
-          <span className="hidden text-sm font-semibold text-zinc-900 dark:text-zinc-50 sm:block">
+          {/* Mini RV icon */}
+          <svg viewBox="0 0 48 32" className="h-7 w-auto" fill="none">
+            <path d="M4 20C4 17 6 14 10 14H28C31 14 32 16 32 18V22H10C7 22 4 21 4 20Z" stroke="#00CED1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            <rect x="12" y="15.5" width="6" height="4" rx="0.5" stroke="#00CED1" strokeWidth="1.5" fill="none"/>
+            <circle cx="12" cy="23" r="3" stroke="#00CED1" strokeWidth="1.5" fill="none"/>
+            <circle cx="12" cy="23" r="1" fill="#00CED1"/>
+            <path d="M32 16H38V13H41V16H48V20H41V23H38V20H32V16Z" fill="#FF6B00"/>
+          </svg>
+          <span className="hidden text-sm font-semibold text-zinc-100 sm:block">
             RV Service Desk
           </span>
         </div>
 
-        {/* New Case CTA - always visible */}
+        {/* New Case CTA - PRIMARY BUTTON */}
         <button
           type="button"
           onClick={onNewCase}
@@ -132,9 +129,8 @@ export function AppHeader({
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className="
               flex items-center gap-1.5
-              rounded-lg border border-zinc-200 px-2 py-1.5
-              text-xs font-medium text-zinc-700 hover:bg-zinc-50
-              dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900
+              rounded-lg border border-zinc-700 px-2 py-1.5
+              text-xs font-medium text-zinc-300 hover:bg-zinc-800
               transition-colors
             "
             aria-haspopup="menu"

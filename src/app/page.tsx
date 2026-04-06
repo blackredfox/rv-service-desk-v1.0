@@ -618,21 +618,21 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Terms & Privacy button - positioned to not overlap with support button */}
+      {/* Terms & Privacy link - anchored bottom-left, clear of support button */}
       <button
         type="button"
         onClick={() => setShowTermsModal(true)}
         data-testid="terms-privacy-btn"
         className="
-          fixed bottom-3 left-3 z-30
-          text-[9px] italic uppercase
-          tracking-wider
-          text-zinc-500 hover:text-zinc-700 hover:underline
-          dark:text-zinc-500 dark:hover:text-zinc-300
-          md:right-3 md:left-auto
+          fixed bottom-4 left-4 z-30
+          px-2 py-1 rounded
+          text-[10px] font-medium uppercase tracking-wide
+          text-cyan-700 hover:text-cyan-800 hover:bg-cyan-50
+          dark:text-cyan-400 dark:hover:text-cyan-300 dark:hover:bg-cyan-950/30
+          transition-colors
         "
       >
-        Terms and Privacy
+        Terms & Privacy
       </button>
 
       <TermsModal

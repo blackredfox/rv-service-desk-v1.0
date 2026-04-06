@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CaseSummary } from "@/lib/storage";
-import { apiCreateCase, apiDeleteCase, apiListCases, apiSearch } from "@/lib/api";
-import { analytics } from "@/lib/client-analytics";
+import { apiDeleteCase, apiListCases, apiSearch } from "@/lib/api";
 import { formatTimeLeft, getUrgencyTier } from "@/lib/retention";
 
 type Props = {
@@ -73,24 +72,6 @@ export function Sidebar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  async function onNewCase() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiCreateCase();
-      await refresh();
-      onSelectCase(res.case.id);
-      void analytics.caseCreated(res.case.id);
-      // Close mobile sidebar after creating case
-      onMobileClose?.();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to create case";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function onDelete(caseId: string) {
     if (!confirm("Delete this case?")) return;
     setLoading(true);
@@ -112,7 +93,6 @@ export function Sidebar({
 
   function handleCaseSelect(caseId: string) {
     onSelectCase(caseId);
-    // Close mobile sidebar after selecting
     onMobileClose?.();
   }
 
@@ -132,7 +112,7 @@ export function Sidebar({
         data-testid="cases-sidebar-collapsed"
         className="
           hidden md:flex
-          h-full w-16 flex-col items-center
+          h-full w-14 flex-col items-center
           border-r border-zinc-200 bg-white/70 py-3 backdrop-blur
           dark:border-zinc-800 dark:bg-zinc-950/50
         "
@@ -143,7 +123,7 @@ export function Sidebar({
           onClick={() => onCollapsedChange?.(false)}
           data-testid="sidebar-expand-btn"
           className="
-            flex h-10 w-10 items-center justify-center
+            flex h-9 w-9 items-center justify-center
             rounded-lg text-zinc-600 hover:bg-zinc-100
             dark:text-zinc-400 dark:hover:bg-zinc-800
             mb-3
@@ -155,30 +135,9 @@ export function Sidebar({
           </svg>
         </button>
 
-        {/* New case button (icon only) */}
-        <button
-          type="button"
-          data-testid="new-case-button-collapsed"
-          onClick={() => void onNewCase()}
-          disabled={Boolean(disabled)}
-          className="
-            flex h-10 w-10 items-center justify-center
-            rounded-lg bg-zinc-900 text-white
-            disabled:cursor-not-allowed disabled:opacity-50
-            hover:bg-zinc-800
-            dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white
-            mb-4
-          "
-          title="New case"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-
-        {/* Case icons */}
-        <div className="flex-1 overflow-y-auto w-full px-2 space-y-1">
-          {filtered.slice(0, 10).map((c, index) => {
+        {/* Case icons - compact list */}
+        <div className="flex-1 overflow-y-auto w-full px-1.5 space-y-1">
+          {filtered.slice(0, 12).map((c, index) => {
             const active = c.id === activeCaseId;
             return (
               <button
@@ -186,10 +145,10 @@ export function Sidebar({
                 type="button"
                 onClick={() => handleCaseSelect(c.id)}
                 className={`
-                  flex h-10 w-full items-center justify-center
+                  flex h-9 w-full items-center justify-center
                   rounded-lg text-xs font-medium
                   ${active
-                    ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                    ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300"
                     : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
                   }
                 `}
@@ -204,7 +163,7 @@ export function Sidebar({
     );
   }
 
-  // Full sidebar content
+  // Full sidebar content (no New Case button - it's in header)
   const sidebarContent = (
     <>
       {/* Header with collapse button (desktop only) */}
@@ -246,28 +205,15 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* New case button */}
-      <div className="p-3">
-        <button
-          type="button"
-          data-testid="new-case-button"
-          onClick={() => void onNewCase()}
-          disabled={Boolean(disabled)}
-          className="w-full rounded-lg bg-zinc-900 px-3 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
-        >
-          New case
-        </button>
-      </div>
-
       {/* Search */}
-      <div className="px-3 pb-3">
+      <div className="p-3">
         <input
           data-testid="case-search-input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search"
+          placeholder="Search cases..."
           disabled={Boolean(disabled)}
-          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
+          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-cyan-500/30"
         />
       </div>
 
@@ -292,7 +238,7 @@ export function Sidebar({
                   className={
                     "group flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm " +
                     (active
-                      ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                      ? "bg-cyan-50 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-100"
                       : "hover:bg-zinc-100 text-zinc-700 dark:hover:bg-zinc-900 dark:text-zinc-200")
                   }
                 >
@@ -349,7 +295,7 @@ export function Sidebar({
         data-testid="cases-sidebar"
         className="
           hidden md:flex
-          h-full w-[280px] flex-col
+          h-full w-[260px] flex-col
           border-r border-zinc-200
           bg-white/70 backdrop-blur
           dark:border-zinc-800 dark:bg-zinc-950/50

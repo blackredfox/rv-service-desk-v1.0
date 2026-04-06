@@ -23,8 +23,8 @@ type Props = {
 const SUPPORT_EMAIL = "support@rvservicedesk.com";
 
 /**
- * Floating support button with modal for contact + copy account details
- * Positioned to avoid overlap with Terms & Privacy button
+ * Floating support button - positioned in bottom-right corner
+ * with adequate spacing from other elements
  */
 export function SupportButton({ accountData }: Props) {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +68,6 @@ export function SupportButton({ accountData }: Props) {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      // Fallback for browsers without clipboard API
       try {
         const textarea = document.createElement("textarea");
         textarea.value = text;
@@ -103,20 +102,19 @@ export function SupportButton({ accountData }: Props) {
 
   return (
     <>
-      {/* Floating Button - positioned higher to avoid Terms button overlap */}
+      {/* Floating Button - bottom right with safe spacing */}
       <button
         type="button"
         onClick={() => setIsOpen(true)}
         data-testid="support-button"
         aria-label="Get support"
         className="
-          fixed bottom-16 right-4 z-40
+          fixed bottom-4 right-4 z-40
           flex h-11 w-11 items-center justify-center
-          rounded-full bg-zinc-900 text-white shadow-lg
-          hover:bg-zinc-800
-          dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white
+          rounded-full bg-cyan-600 text-white shadow-lg
+          hover:bg-cyan-700
           transition-all hover:scale-105
-          md:bottom-4 md:h-12 md:w-12
+          md:h-12 md:w-12
         "
       >
         <svg
