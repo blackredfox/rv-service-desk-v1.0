@@ -5,7 +5,7 @@
 **Status:** Official Project Memory (Product + Technical)  
 **Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
 
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-06
 
 ---
 

@@ -1,8 +1,9 @@
 # ADR: Step Guidance Without Diagnostic Advancement
 
-**Status:** Proposed  
+**Status:** Active  
 **Date:** 2026-04-01  
-**Task:** Step 8A — Guidance responses without diagnostic advancement
+**Updated:** 2026-04-06  
+**Task:** Current-step guidance responses without diagnostic advancement
 
 ---
 
@@ -13,6 +14,8 @@ RV Service Desk must answer clarification and help questions about the **current
 - what a measurement means,
 - where to look,
 - what connector / fuse / part is being referenced,
+- how to identify the correct point,
+- what alternate check point is acceptable when the labeled point is unclear,
 - how to verify something safely.
 
 However, that extra flexibility must **not** let clarification behavior silently become progress behavior.
@@ -29,7 +32,7 @@ This ADR makes that contract explicit for current-step help responses.
 
 ## 2) Decision
 
-Introduce a dedicated interaction / response class named:
+Introduce and formalize a dedicated interaction / response class named:
 
 `STEP_GUIDANCE`
 
@@ -52,7 +55,8 @@ This ADR does **not**:
 - redefine procedure content,
 - expand support into generic off-procedure mentoring,
 - redefine report / authorization mode behavior,
-- allow explanation text to count as diagnostic evidence by itself.
+- allow explanation text to count as diagnostic evidence by itself,
+- allow vague helpfulness to override current-step discipline.
 
 ---
 
@@ -64,8 +68,10 @@ Use `STEP_GUIDANCE` when the technician is asking for clarification or execution
 - how to perform the current check,
 - where the referenced part / fuse / connector is,
 - what tool or measurement point is meant,
+- how to identify the referenced connector / switch / terminal,
 - what result to look for,
 - what the expected reading means,
+- what alternate check point is acceptable for the current step,
 - how to perform the current check safely within approved procedure boundaries.
 
 The response may:
@@ -73,7 +79,8 @@ The response may:
 - restate the current step in technician-friendly wording,
 - give short, safe, procedure-aligned guidance,
 - clarify the meaning of the current measurement or observation,
-- help the technician find the referenced component **only as needed for the current step**.
+- help the technician find the referenced component **only as needed for the current step**,
+- use concise colleague-style phrasing when helpful.
 
 ### 4.2 What `STEP_GUIDANCE` must NOT do
 
@@ -140,6 +147,13 @@ Any implementation that allows `STEP_GUIDANCE` to mutate step progress without e
 - safe, concise, pro-tech explanation,
 - technician language consistency for the session.
 
+It may include:
+- how-to guidance,
+- locate guidance,
+- identify guidance,
+- expected-result guidance,
+- acceptable alternate check-point guidance.
+
 It must not become:
 - generic training,
 - consumer DIY instruction,
@@ -173,9 +187,17 @@ For `STEP_GUIDANCE`, the server should append or control a continuation in the t
 - request actual findings after the technician performs the check,
 - maintain language consistency.
 
-### 8.2 Canonical continuation patterns
+### 8.2 Canonical continuation semantics
 
-The following canonical server-owned patterns are approved:
+The continuation must preserve the following semantics:
+- still on the same step,
+- no advancement,
+- report actual findings,
+- stay in session language.
+
+The exact wording may vary if the function remains unchanged.
+
+### 8.3 Preferred continuation examples
 
 #### English
 `We are still on this step. After you perform that check, tell me exactly what you found.`
@@ -186,25 +208,14 @@ The following canonical server-owned patterns are approved:
 #### Spanish
 `Seguimos en este paso. Después de realizar esa verificación, dime exactamente qué encontraste.`
 
-### 8.3 Canonical-function requirements
-
-If later implementation allows controlled wording variants, they must preserve the same function:
-- remain on the current step,
-- no advancement,
-- ask for findings,
-- preserve session language.
-
-Behavior-contract tests should treat these continuation patterns as **server-owned contract behavior**, while still preferring functional assertions over incidental wording when exact wording is not required by parsing or policy.
+These examples are preferred baselines, not the only acceptable wording, unless a specific implementation intentionally fixes them.
 
 ---
 
 ## 9) Relationship to Existing Doctrine
 
-This ADR is a direct extension of existing project doctrine:
-
 ### 9.1 Behavior-contract testing doctrine
-
-Per `docs/TEST_STRATEGY_QA_CONTRACT.md`, tests should protect the actual contract here:
+Tests should protect the actual contract here:
 - support does not equal progress,
 - active-step guidance does not close the step,
 - no unauthorized transition occurs,
@@ -213,21 +224,18 @@ Per `docs/TEST_STRATEGY_QA_CONTRACT.md`, tests should protect the actual contrac
 - authoritative state remains server-owned.
 
 ### 9.2 Procedure-as-law / approved procedure boundaries
-
-Per `PROJECT_MEMORY.md` and `ARCHITECTURE_RULES.md`, procedure is law.
+Per project memory and architecture rules, procedure is law.
 
 `STEP_GUIDANCE` is allowed only as bounded explanation of the active approved step. It must not invent steps, improvise alternate diagnostics, or teach outside the approved procedure.
 
 ### 9.3 Server-side authority over state
-
-Per `ARCHITECTURE_RULES.md`, `AI_RUNTIME_ARCHITECTURE.md`, and `PROMPT_MENTOR_CONTRACT.md`:
+Per architecture/runtime docs:
 - Context Engine / server runtime owns diagnostic flow authority,
 - prompt / LLM layer delivers wording,
 - prompt / LLM layer does not own completion or advancement decisions.
 
 ### 9.4 Avoidance of silent completion / silent advancement
-
-Per benchmark and QA doctrine, the following remain failures:
+The following remain failures:
 - clarification closes step implicitly,
 - explanation causes branch loss,
 - support answer advances progress,
@@ -242,7 +250,8 @@ Per benchmark and QA doctrine, the following remain failures:
 - clearer separation between explanation and progression,
 - lower chance of silent completion defects,
 - lower chance of prompt-layer authority drift,
-- stronger multilingual consistency after help exchanges.
+- stronger multilingual consistency after help exchanges,
+- lower chance of robotic non-answers to locate/identify questions.
 
 ### Tradeoffs introduced
 - server orchestration becomes slightly more explicit because continuation must be controlled,
@@ -250,7 +259,6 @@ Per benchmark and QA doctrine, the following remain failures:
 - implementations must distinguish help intent from evidence-reporting intent carefully.
 
 ### Main risk if ignored
-
 Without this contract, a “helpful” answer can accidentally act like:
 - step completion,
 - branch change,
@@ -261,12 +269,7 @@ That would violate single-authority architecture.
 
 ---
 
-## 11) Implementation-Ready Wiring Plan (Step 8B Addendum)
-
-This section translates the Step 8A contract into a narrow runtime wiring plan for a later implementation PR.
-
-This is still design only.
-It defines intended runtime ownership, detection boundaries, response-class handling, and minimum validation expectations without changing code, prompts, procedures, or tests in this PR.
+## 11) Implementation-Ready Wiring Plan
 
 ### 11.1 Entry conditions: what should count as `STEP_GUIDANCE`
 
@@ -277,23 +280,15 @@ At minimum, the detection contract must cover requests such as:
 - what a measurement means,
 - where to look,
 - what part / connector / fuse / terminal is being referenced,
-- what the current active step is asking for,
-- clarification of wording, tool point, expected reading, or safe execution of the current step.
+- how to identify the right point,
+- what alternate point is acceptable for the same check.
 
-The later implementation should treat the following as required **non-guidance exclusions**:
+The implementation should treat the following as required **non-guidance exclusions**:
 - actual findings or results,
 - completion confirmations,
 - explicit mode-switch requests,
 - unrelated new diagnostics,
 - messages that introduce a new fault path rather than clarifying the active step.
-
-Operationally, this means `STEP_GUIDANCE` should be entered only for **current-step clarification intent**.
-If a message includes actual findings, indicates the check was performed, or requests a different diagnostic direction, the request must stay on the normal server-controlled diagnostic path rather than the guidance path.
-
-Where mixed intent is ambiguous, the future implementation should resolve narrowly in favor of **no hidden advancement**:
-- either classify as standard diagnostic input,
-- or ask for clarification,
-- but do not treat a mixed message as pure `STEP_GUIDANCE` if it contains possible evidence.
 
 ### 11.2 Orchestration ownership
 
@@ -311,13 +306,9 @@ For this interaction class, the server must own:
 - continuation injection or equivalent continuation control,
 - output validation against the active procedure scope.
 
-The design intent is explicit:
-`STEP_GUIDANCE` is not a special conversational exemption from server authority.
-It is a bounded explanation path inside the same authority model.
-
 ### 11.3 Expected runtime flow
 
-The intended high-level runtime sequence for a future implementation is:
+The intended high-level runtime sequence is:
 
 1. detect a `STEP_GUIDANCE`-type request,
 2. verify that the request is about the currently active step and does not contain completion evidence,
@@ -328,9 +319,6 @@ The intended high-level runtime sequence for a future implementation is:
 7. return the response while preserving the same active step and same mode,
 8. await technician findings before any completion or progression logic runs.
 
-This flow is intentionally narrow.
-The future implementation should not generalize it into free-form mentoring, off-procedure assistance, or implicit branch selection.
-
 ### 11.4 LLM responsibility vs server responsibility
 
 The LLM may:
@@ -338,7 +326,8 @@ The LLM may:
 - restate the step in clearer technician-facing language,
 - clarify what measurement, connector, fuse, terminal, or observation is being referenced,
 - explain what result to look for,
-- keep the explanation in the session language.
+- keep the explanation in the session language,
+- use concise collaborative phrasing if it remains bounded.
 
 The LLM must not:
 - decide advancement,
@@ -358,12 +347,9 @@ The server must:
 - enforce same-step continuation,
 - reject or repair outputs that violate the response-class contract.
 
-This boundary must stay clean in the future code PR:
-the LLM explains; the server decides state.
-
 ### 11.5 Multilingual continuation handling (EN / RU / ES)
 
-The future implementation must preserve the session language already established for the case.
+The implementation must preserve the session language already established for the case.
 
 For `STEP_GUIDANCE`, continuation selection should therefore be server-owned and language-keyed:
 - English session -> English continuation,
@@ -371,20 +357,6 @@ For `STEP_GUIDANCE`, continuation selection should therefore be server-owned and
 - Spanish session -> Spanish continuation.
 
 The continuation must remain functionally stable across all three languages.
-The translated wording may differ naturally, but the server-owned semantics must remain identical:
-- still on the same step,
-- no advancement,
-- ask the technician to perform the check if needed,
-- request actual findings,
-- keep procedure scope bounded.
-
-The implementation must not allow translation drift to change meaning, for example by accidentally implying:
-- that the step is already complete,
-- that the system has moved on,
-- that a mode transition has occurred,
-- that the technician should start a new unrelated diagnostic path.
-
-The canonical EN / RU / ES continuations in Section 8 remain the contract baseline for this later wiring work.
 
 ### 11.6 Output constraints for `STEP_GUIDANCE`
 
@@ -397,25 +369,9 @@ The runtime response-class contract for `STEP_GUIDANCE` must reject or prevent o
 - unrelated diagnostic expansion,
 - language that treats explanation as proof the check was performed.
 
-The response should stay explanation-first but scope-bounded.
-It may be helpful and technician-friendly, but it must remain visibly subordinate to the active step and must end in a same-step continuation path rather than progression language.
+### 11.7 Minimum test plan
 
-### 11.7 Future implementation touchpoints
-
-The later runtime PR will likely need to touch a small number of runtime surfaces at a high level:
-- route / orchestration layer,
-- current-step clarification detection,
-- response-class handling for `STEP_GUIDANCE`,
-- output validation / repair / rejection behavior,
-- multilingual continuation injection or equivalent continuation enforcement,
-- evaluation / regression coverage for no-advance behavior.
-
-These are touchpoints only, not implementation instructions.
-The design goal is to keep the future PR narrow and auditable.
-
-### 11.8 Minimum test plan for the future implementation PR
-
-At minimum, the later code PR must add tests proving all of the following:
+At minimum, the implementation must add tests proving all of the following:
 - a help request does not advance state,
 - same-step anchoring is preserved before and after the response,
 - EN continuation is correct in function,
@@ -425,25 +381,8 @@ At minimum, the later code PR must add tests proving all of the following:
 - no mode switch occurs,
 - no final-report drift occurs,
 - no authorization drift occurs,
-- unrelated branch drift does not occur.
-
-These tests should primarily validate behavior-contract outcomes rather than brittle wording, except where fixed canonical continuation text or parser-sensitive wording is intentionally part of the contract.
-
-### 11.9 Rollout and risk plan for the future implementation PR
-
-Rollout should start narrow:
-- only current-step clarification,
-- only within approved procedure scope,
-- no general free-form help expansion,
-- no mixed authority between LLM and server.
-
-Risk handling should follow these rules:
-- do not generalize `STEP_GUIDANCE` to all free-form assistance,
-- keep procedure scope strict,
-- verify behavior on real clarification examples,
-- treat any hidden advancement, hidden completion, mode drift, or report drift as an authority defect rather than a wording issue.
-
-The later implementation should be considered unsafe if it makes guidance feel more natural by weakening state authority.
+- unrelated branch drift does not occur,
+- locate/identify questions are answered with bounded useful guidance rather than repeated generic measurement text.
 
 ---
 
@@ -451,3 +390,5 @@ The later implementation should be considered unsafe if it makes guidance feel m
 
 > `STEP_GUIDANCE` may improve clarity for the current step.  
 > It must never become a hidden advancement mechanism.
+
+End of file.

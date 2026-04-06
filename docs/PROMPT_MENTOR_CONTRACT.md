@@ -3,7 +3,7 @@
 
 **Version:** 1.2  
 **Status:** Enforced Contract (Prompt / Mentor Layer)  
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-06
 
 ---
 
