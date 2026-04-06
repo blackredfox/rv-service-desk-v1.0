@@ -1,0 +1,13 @@
+<svg viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- RV Camper outline -->
+  <path d="M4 20C4 17 6 15 9 15H22C24 15 25 16 25 18V22H8C6 22 4 21 4 20Z" stroke="#00CED1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Window -->
+  <rect x="11" y="16.5" width="5" height="3.5" rx="0.5" stroke="#00CED1" stroke-width="1.5" fill="none"/>
+  <!-- Wheel -->
+  <circle cx="11" cy="23" r="3" stroke="#00CED1" stroke-width="1.5" fill="none"/>
+  <circle cx="11" cy="23" r="1" fill="#00CED1"/>
+  <!-- Wrench -->
+  <path d="M26 14L32 14L32 11L35 11L35 14L40 14L40 18L35 18L35 21L32 21L32 18L26 18Z" fill="#FF6B00"/>
+  <!-- Connection line -->
+  <path d="M24 17H26" stroke="#00CED1" stroke-width="2" stroke-linecap="round"/>
+</svg>

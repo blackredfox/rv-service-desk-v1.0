@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { LanguageSelector } from "@/components/language-selector";
+import { AppHeader } from "@/components/app-header";
 import { TermsModal } from "@/components/terms-modal";
 import { LoginScreen } from "@/components/login-screen";
 import { OrgSetupScreen } from "@/components/org-setup-screen";
@@ -15,26 +14,21 @@ import { SupportButton } from "@/components/support-button";
 import { useAuth } from "@/hooks/use-auth";
 import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
+import { apiCreateCase } from "@/lib/api";
+import { analytics } from "@/lib/client-analytics";
 import type { LanguageMode } from "@/lib/api";
 
 type OnboardingStep =
   | "welcome"
   | "auth"
   | "terms"
-  | "no_org" // No organization exists for the user's domain (show create-org or contact-admin)
-  | "not_a_member" // Org exists but user not added (invite-only)
-  | "org_setup" // Create organization
-  | "billing" // Subscribe (if org exists but no subscription)
-  | "blocked" // Access blocked (various reasons)
-  | "admin_onboard" // Admin first-time onboarding (invite team CTA)
+  | "no_org"
+  | "not_a_member"
+  | "org_setup"
+  | "billing"
+  | "blocked"
+  | "admin_onboard"
   | "app";
-
-/**
- * NOTE (maintainability):
- * - We keep onboarding steps as a small state-machine in one place.
- * - No setState calls inside render branches (avoids React warnings + future debugging pain).
- * - B2B flow: welcome -> auth -> terms -> org_setup/billing -> app
- */
 
 function WelcomeScreen(props: { onContinue: () => void }) {
   const { onContinue } = props;
@@ -151,8 +145,6 @@ export default function Home() {
   const { user, loading: authLoading, logout, refresh } = useAuth();
 
   const [step, setStep] = useState<OnboardingStep>(() => {
-    // If user returns from admin page (has session), skip welcome
-    // We'll check properly after auth loads
     return "welcome";
   });
 
@@ -170,8 +162,12 @@ export default function Home() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Admin onboarding flag (show invite team CTA after org setup)
+  // Admin onboarding flag
   const [showAdminOnboarding, setShowAdminOnboarding] = useState(false);
+
+  // Sidebar state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Check for billing callback params AND returning from admin pages
   useEffect(() => {
@@ -180,25 +176,20 @@ export default function Home() {
     const fromAdmin = params.get("from");
     
     if (billingStatus === "success") {
-      // Refresh user data to get updated subscription
       void refresh();
-      // Show admin onboarding after successful billing
       setShowAdminOnboarding(true);
-      // Clean URL
       window.history.replaceState({}, "", window.location.pathname);
     } else if (billingStatus === "cancel") {
-      // Just clean URL
       window.history.replaceState({}, "", window.location.pathname);
     }
     
-    // If returning from admin page, skip welcome and go directly to app
     if (fromAdmin === "admin") {
       setStep("app");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [refresh]);
 
-  // Load local preferences (case + language)
+  // Load local preferences
   useEffect(() => {
     try {
       const storedCaseId = localStorage.getItem("rv:lastCaseId");
@@ -256,7 +247,7 @@ export default function Home() {
     };
   }, [userMenuOpen]);
 
-  // Load terms (version + markdown) + acceptance state
+  // Load terms
   useEffect(() => {
     let cancelled = false;
 
@@ -290,22 +281,14 @@ export default function Home() {
     };
   }, []);
 
-  /**
-   * Compute the expected step based on current state
-   */
   const expectedStepAfterWelcome = useMemo<OnboardingStep>(() => {
-    // Not authenticated
     if (!user) return "auth";
-
-    // Terms not accepted
     if (!termsAccepted) return "terms";
 
     const accessStatus = deriveAccessStatus({ authLoading: false, user });
 
     switch (accessStatus.kind) {
       case "no_org":
-        // If user can create an org, we go straight to org setup.
-        // Otherwise we show a stable "No organization" screen.
         return accessStatus.canCreateOrg ? "org_setup" : "no_org";
       case "not_a_member":
         return "not_a_member";
@@ -321,28 +304,22 @@ export default function Home() {
 
   // Sync step with state
   useEffect(() => {
-    // Do not auto-advance from welcome: user must click Continue.
     if (step === "welcome") return;
 
-    // Use a single derived access status to avoid divergent gating logic.
     const status = deriveAccessStatus({ authLoading, user });
 
-    // During loading: freeze the UI (no redirects, no step changes).
     if (status.kind === "loading") return;
 
-    // Signed out
     if (status.kind === "signed_out") {
       if (step !== "auth") setStep("auth");
       return;
     }
 
-    // Terms gate (after sign-in, before any org/billing decisions)
     if (!termsAccepted) {
       if (step !== "terms") setStep("terms");
       return;
     }
 
-    // Post-terms gating
     if (status.kind === "no_org") {
       const next: OnboardingStep = status.canCreateOrg ? "org_setup" : "no_org";
       if (step !== next) setStep(next);
@@ -364,7 +341,6 @@ export default function Home() {
       return;
     }
 
-    // Ready - go directly to app
     if (
       step === "auth" ||
       step === "terms" ||
@@ -378,11 +354,32 @@ export default function Home() {
     }
   }, [step, user, termsAccepted, authLoading]);
 
-  // Convenience: safe email display (prevents TS 'possibly null')
   const userEmail = user?.email ?? "";
 
-  // Loading gate: keep stable UI while auth/me is unresolved.
-  // No redirects, no step flips during loading.
+  // New case handler for header
+  const handleNewCase = useCallback(async () => {
+    try {
+      const res = await apiCreateCase();
+      setActiveCaseId(res.case.id);
+      void analytics.caseCreated(res.case.id);
+      setMobileMenuOpen(false);
+    } catch {
+      // Error handling is done in sidebar
+    }
+  }, []);
+
+  // Toggle sidebar
+  const handleToggleSidebar = useCallback(() => {
+    // On mobile, toggle drawer
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileMenuOpen((prev) => !prev);
+    } else {
+      // On desktop, toggle collapse
+      setSidebarCollapsed((prev) => !prev);
+    }
+  }, []);
+
+  // Loading gate
   if (authLoading) {
     return (
       <div
@@ -396,7 +393,7 @@ export default function Home() {
     );
   }
 
-  // 1) Welcome (always first)
+  // 1) Welcome
   if (step === "welcome") {
     return <WelcomeScreen onContinue={() => setStep(expectedStepAfterWelcome)} />;
   }
@@ -418,7 +415,6 @@ export default function Home() {
       );
     }
 
-    // If accepted already, step machine will move to start; render nothing for a moment.
     if (termsAccepted) return null;
 
     return (
@@ -444,7 +440,7 @@ export default function Home() {
     );
   }
 
-  // 4) No organization (stable screen)
+  // 4) No organization
   if (step === "no_org") {
     const status = deriveAccessStatus({ authLoading: false, user });
     const canCreateOrg = status.kind === "no_org" ? status.canCreateOrg : false;
@@ -470,7 +466,7 @@ export default function Home() {
     );
   }
 
-  // 4b) Not a member (org exists but user not added)
+  // 4b) Not a member
   if (step === "not_a_member") {
     return (
       <>
@@ -491,7 +487,7 @@ export default function Home() {
     );
   }
 
-  // 5) Organization setup (admin creates org)
+  // 5) Organization setup
   if (step === "org_setup") {
     return (
       <OrgSetupScreen
@@ -504,7 +500,7 @@ export default function Home() {
     );
   }
 
-  // 6) Billing paywall (admin subscribes)
+  // 6) Billing paywall
   if (step === "billing") {
     return (
       <BillingPaywall
@@ -515,7 +511,7 @@ export default function Home() {
     );
   }
 
-  // 7) Blocked screen (various reasons)
+  // 7) Blocked screen
   if (step === "blocked") {
     return (
       <>
@@ -545,224 +541,98 @@ export default function Home() {
     );
   }
 
-  // 8) Admin Onboarding (invite team CTA after billing success)
-  // Now shown as a banner on the main app instead of a separate screen
-  if (step === "app" && showAdminOnboarding && user?.access?.isAdmin) {
-    // We'll show this as a dismissible banner in the app
-    // Fall through to main app render
-  }
-
   // 9) Main app
   return (
-    <div className="flex h-dvh w-full bg-[var(--background)] text-[var(--foreground)]">
-      <Sidebar activeCaseId={activeCaseId} onSelectCase={setActiveCaseId} disabled={false} />
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+      {/* Sticky Header */}
+      <AppHeader
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={handleToggleSidebar}
+        onNewCase={handleNewCase}
+        languageMode={languageMode}
+        onLanguageChange={setLanguageMode}
+        userMenuProps={{
+          userMenuOpen,
+          setUserMenuOpen,
+          userMenuRef,
+          userEmail,
+          user,
+          logout: () => void logout(),
+          onOpenTerms: () => setShowTermsModal(true),
+        }}
+      />
 
-      <div className="flex h-full flex-1 flex-col">
-        {/* Admin Onboarding Banner */}
-        {showAdminOnboarding && user?.access?.isAdmin && (
-          <div
-            data-testid="admin-onboard-banner"
-            className="flex items-center justify-between gap-4 border-b border-green-200 bg-green-50 px-4 py-3 dark:border-green-900/50 dark:bg-green-950/30"
-          >
-            <div className="flex items-center gap-3">
-              <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                {user?.organization?.name || "Organization"} is ready! Invite your team to get started.
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <a
-                href="/admin/members"
-                data-testid="admin-onboard-invite-link"
-                className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-400"
-              >
-                Invite Team
-              </a>
-              <button
-                type="button"
-                onClick={() => setShowAdminOnboarding(false)}
-                data-testid="admin-onboard-dismiss"
-                className="rounded-md px-2 py-1 text-xs text-green-700 hover:bg-green-100 dark:text-green-300 dark:hover:bg-green-900/30"
-              >
-                Dismiss
-              </button>
-            </div>
+      {/* Admin Onboarding Banner */}
+      {showAdminOnboarding && user?.access?.isAdmin && (
+        <div
+          data-testid="admin-onboard-banner"
+          className="flex items-center justify-between gap-4 border-b border-green-200 bg-green-50 px-4 py-3 dark:border-green-900/50 dark:bg-green-950/30"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <svg className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-sm font-medium text-green-800 dark:text-green-200 truncate">
+              {user?.organization?.name || "Organization"} is ready! Invite your team to get started.
+            </span>
           </div>
-        )}
-
-        <header className="flex items-center justify-between border-b border-zinc-200 bg-white/70 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-semibold">RV Service Desk</div>
-            <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">
-              Diagnostic & authorization agent
-            </div>
-            {user?.organization && (
-              <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">
-                • {user.organization.name}
-              </div>
-            )}
-            {termsError ? (
-              <div className="ml-3 text-xs text-red-600 dark:text-red-400">{termsError}</div>
-            ) : null}
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="/admin/members"
+              data-testid="admin-onboard-invite-link"
+              className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-400"
+            >
+              Invite Team
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowAdminOnboarding(false)}
+              data-testid="admin-onboard-dismiss"
+              className="rounded-md px-2 py-1 text-xs text-green-700 hover:bg-green-100 dark:text-green-300 dark:hover:bg-green-900/30"
+            >
+              Dismiss
+            </button>
           </div>
+        </div>
+      )}
 
-          <div className="flex items-center gap-3">
-            {/* User menu */}
-            <div className="relative" ref={userMenuRef}>
-              <button
-                type="button"
-                data-testid="user-menu-button"
-                onClick={() => setUserMenuOpen((v) => !v)}
-                className="
-                  flex items-center gap-2
-                  rounded-md border border-zinc-200 px-2 py-1
-                  text-xs font-medium text-zinc-700 hover:bg-zinc-50
-                  dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900
-                "
-                aria-haspopup="menu"
-                aria-expanded={userMenuOpen}
-              >
-                <span className="block max-w-[160px] truncate">{userEmail || "-"}</span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">▾</span>
-              </button>
-
-              {userMenuOpen ? (
-                <div
-                  role="menu"
-                  aria-label="User menu"
-                  className="
-                    absolute right-0 mt-2 w-56 overflow-hidden rounded-xl
-                    border border-zinc-200 bg-white shadow-lg
-                    dark:border-zinc-800 dark:bg-zinc-950
-                  "
-                >
-                  <div className="px-3 pb-2 pt-3 text-xs font-medium text-zinc-700 dark:text-zinc-200">
-                    <div className="text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Signed in as
-                    </div>
-                    <div className="mt-1 truncate">{userEmail || "-"}</div>
-                    {user?.organization && (
-                      <div className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
-                        {user.organization.name}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="my-1 h-px bg-zinc-200 dark:bg-zinc-800" />
-
-                  {/* Billing portal (admin only) */}
-                  {user?.access.isAdmin && user?.organization?.subscriptionStatus === "active" && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      data-testid="billing-portal-button"
-                      onClick={async () => {
-                        setUserMenuOpen(false);
-                        try {
-                          const res = await fetch("/api/billing/portal", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ returnUrl: window.location.href }),
-                            credentials: "same-origin",
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            window.location.href = data.url;
-                          }
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      className="
-                        block w-full px-3 py-2 text-left text-xs
-                        text-zinc-700 hover:bg-zinc-50
-                        dark:text-zinc-200 dark:hover:bg-zinc-900
-                      "
-                    >
-                      Manage Billing
-                    </button>
-                  )}
-
-                  {/* Admin Members Dashboard (admin only) */}
-                  {user?.access.isAdmin && (
-                    <a
-                      href="/admin/members"
-                      role="menuitem"
-                      data-testid="admin-members-link"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="
-                        block w-full px-3 py-2 text-left text-xs
-                        text-zinc-700 hover:bg-zinc-50
-                        dark:text-zinc-200 dark:hover:bg-zinc-900
-                      "
-                    >
-                      Manage Members
-                    </a>
-                  )}
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      setShowTermsModal(true);
-                    }}
-                    className="
-                      block w-full px-3 py-2 text-left text-xs
-                      text-zinc-700 hover:bg-zinc-50
-                      dark:text-zinc-200 dark:hover:bg-zinc-900
-                    "
-                  >
-                    Terms &amp; Privacy
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-testid="logout-button"
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      void logout();
-                    }}
-                    className="
-                      block w-full px-3 py-2 text-left text-xs font-medium
-                      text-red-600 hover:bg-red-50
-                      dark:text-red-400 dark:hover:bg-red-950/30
-                    "
-                  >
-                    Logout
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <LanguageSelector value={languageMode} onChange={setLanguageMode} />
-            <ThemeToggle />
-          </div>
-        </header>
-
-        <ChatPanel
-          caseId={activeCaseId}
-          languageMode={languageMode}
-          onCaseId={setActiveCaseId}
+      {/* Main content area */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <Sidebar
+          activeCaseId={activeCaseId}
+          onSelectCase={setActiveCaseId}
           disabled={false}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+          isMobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
         />
+
+        <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
+          <ChatPanel
+            caseId={activeCaseId}
+            languageMode={languageMode}
+            onCaseId={setActiveCaseId}
+            disabled={false}
+          />
+        </main>
       </div>
 
+      {/* Terms & Privacy button - positioned to not overlap with support button */}
       <button
         type="button"
         onClick={() => setShowTermsModal(true)}
+        data-testid="terms-privacy-btn"
         className="
-          fixed bottom-2 right-3 z-40
+          fixed bottom-3 left-3 z-30
           text-[9px] italic uppercase
           tracking-wider
-          text-red-600 hover:underline
-          dark:text-red-400
+          text-zinc-500 hover:text-zinc-700 hover:underline
+          dark:text-zinc-500 dark:hover:text-zinc-300
+          md:right-3 md:left-auto
         "
       >
-        TERMS AND PRIVACY
+        Terms and Privacy
       </button>
 
       <TermsModal

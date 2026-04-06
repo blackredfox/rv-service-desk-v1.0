@@ -376,11 +376,11 @@ export async function POST(req: Request) {
     message: routingMessage,
     hasReportRequest: hasBoundedReportRequest,
     priorUserMessages: historyBeforeAppend
-      .filter((msg) => msg.role === "user")
-      .map((msg) => msg.content),
+      .filter((msg: { role: string }) => msg.role === "user")
+      .map((msg: { content: string }) => msg.content),
     hasActiveDiagnosticContext: Boolean(currentContextSnapshot.activeProcedureId),
   });
-  const hasPriorUserEvidence = historyBeforeAppend.some((msg) => msg.role === "user");
+  const hasPriorUserEvidence = historyBeforeAppend.some((msg: { role: string }) => msg.role === "user");
   const requestedReportKind = reportRevisionIntent.reportKind ?? approvedFinalReportIntent.reportKind;
   const readyForImmediateReport = runtimeReportReady || repairSummaryIntent.readyForReportRouting;
   const shouldAskForMissingReportFieldsEarly =
@@ -389,7 +389,7 @@ export async function POST(req: Request) {
       hasPriorUserEvidence ||
       (Boolean(currentContextSnapshot.activeProcedureId) &&
         repairSummaryIntent.currentMessageHasRepairSignal));
-  const missingReportFields = repairSummaryIntent.missingFields.length > 0
+  const missingReportFields: ("complaint" | "findings" | "corrective_action")[] = repairSummaryIntent.missingFields.length > 0
     ? repairSummaryIntent.missingFields
     : ["complaint", "findings", "corrective_action"];
 
@@ -501,11 +501,11 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  const history = stepGuidancePlan
+  const history: Array<{ role: "user" | "assistant"; content: string }> = stepGuidancePlan
     ? []
     : [
-        ...historyBeforeAppend,
-        { role: "user", content: message },
+        ...historyBeforeAppend.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "user" as const, content: message },
       ];
 
   // ── CONTEXT ENGINE: SINGLE FLOW AUTHORITY ─────────────────────────
@@ -814,7 +814,7 @@ export async function POST(req: Request) {
         source: "promoted",
         systemPrompt: buildStepGuidanceClarificationSystemPrompt({
           language: outputPolicy.effective,
-          stepQuestion: promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing),
+          stepQuestion: promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing) ?? "",
           guidance: promotedStepMetadata?.howToCheck,
           continuation: getStepGuidanceContinuation(outputPolicy.effective),
           hasPhotoAttachment: attachmentCount > 0,
