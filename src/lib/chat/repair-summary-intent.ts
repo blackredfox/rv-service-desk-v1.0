@@ -6,6 +6,7 @@ export type RepairSummaryMissingField =
   | "corrective_action";
 
 export type RepairSummaryIntentAssessment = {
+  complaintInferredFromActiveContext: boolean;
   currentMessageHasComplaint: boolean;
   currentMessageHasFindings: boolean;
   currentMessageHasCorrectiveAction: boolean;
@@ -76,6 +77,8 @@ export function assessRepairSummaryIntent(args: {
   const currentMessageHasComplaint = COMPLAINT_PATTERNS.some((pattern) => pattern.test(args.message));
   const currentMessageHasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(args.message));
   const currentMessageHasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(args.message));
+  const currentMessageHasRepairSignal =
+    currentMessageHasComplaint || currentMessageHasFindings || currentMessageHasCorrectiveAction;
   const evidenceText = [
     ...(args.priorUserMessages ?? []),
     args.message,
@@ -83,9 +86,14 @@ export function assessRepairSummaryIntent(args: {
     .filter(Boolean)
     .join("\n");
 
+  const complaintInferredFromActiveContext =
+    Boolean(args.hasActiveDiagnosticContext) &&
+    args.hasReportRequest &&
+    currentMessageHasRepairSignal;
+
   const hasComplaint =
     COMPLAINT_PATTERNS.some((pattern) => pattern.test(evidenceText)) ||
-    Boolean(args.hasActiveDiagnosticContext);
+    complaintInferredFromActiveContext;
   const hasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(evidenceText));
   const hasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(evidenceText));
 
@@ -102,11 +110,11 @@ export function assessRepairSummaryIntent(args: {
   const shouldAskClarification = args.hasReportRequest && !readyForReportRouting;
 
   return {
+    complaintInferredFromActiveContext,
     currentMessageHasComplaint,
     currentMessageHasFindings,
     currentMessageHasCorrectiveAction,
-    currentMessageHasRepairSignal:
-      currentMessageHasComplaint || currentMessageHasFindings || currentMessageHasCorrectiveAction,
+    currentMessageHasRepairSignal,
     hasComplaint,
     hasFindings,
     hasCorrectiveAction,

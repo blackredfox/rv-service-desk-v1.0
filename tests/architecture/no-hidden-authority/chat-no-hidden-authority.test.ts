@@ -22,6 +22,7 @@ const pureBoundaryModules = [
   "src/lib/chat/input-normalization.ts",
   "src/lib/chat/report-intent.ts",
   "src/lib/chat/repair-summary-intent.ts",
+  "src/lib/chat/step-guidance-intent.ts",
 ];
 
 describe("No Hidden Authority — Route Decomposition", () => {

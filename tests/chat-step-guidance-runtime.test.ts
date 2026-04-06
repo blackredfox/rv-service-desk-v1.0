@@ -89,6 +89,10 @@ function getMockClarificationResponse(body: string): string {
     return "Place your meter across the board B+ input and board ground, then compare that reading to battery voltage.\n\nWe are still on this step. After you perform that check, tell me exactly what you found.";
   }
 
+  if (/So how do I measure 12V there\?/i.test(text)) {
+    return "Measure between the board B+ input and ground, then compare that reading to battery voltage before changing anything.\n\nWe are still on this step. After you perform that check, tell me exactly what you found.";
+  }
+
   if (/Is this the right one\?/i.test(text)) {
     return "Match the wire or terminal that actually feeds the board B+ input, not a nearby sensor or signal lead.\n\nWe are still on this step. After you perform that check, tell me exactly what you found.";
   }
@@ -168,6 +172,7 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
       "sg_en_generic_support",
       "sg_en_invalid_fallback",
       "sg_en_progress_after_followup",
+      "sg_en_wh5a_filler_measure",
       "sg_ru_branch_wh5a",
       "sg_ru_branch_wh5a_locate",
       "sg_ru_case_28",
@@ -281,6 +286,20 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     expect(turn.streamText).not.toContain("Current step:");
     expect(turn.streamText).toMatch(/fuse|breaker/i);
     expect(turn.streamText).toMatch(/switch input and output|upstream and downstream/i);
+    expect(turn.streamText).toContain("We are still on this step. After you perform that check, tell me exactly what you found.");
+    expect(context.activeStepId).toBe("wh_5a");
+    expect(context.completedSteps.has("wh_5a")).toBe(false);
+  });
+
+  it("keeps filler-led EN measurement follow-ups sticky on wh_5a without advancing", async () => {
+    const caseId = "sg_en_wh5a_filler_measure";
+    await seedActiveStep(caseId, "gas water heater not working", "wh_5a");
+
+    const turn = await postChat(caseId, "So how do I measure 12V there?");
+    const { getOrCreateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+
+    expect(turn.fetchTriggered).toBe(true);
     expect(turn.streamText).toContain("We are still on this step. After you perform that check, tell me exactly what you found.");
     expect(context.activeStepId).toBe("wh_5a");
     expect(context.completedSteps.has("wh_5a")).toBe(false);

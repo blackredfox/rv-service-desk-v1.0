@@ -57,6 +57,14 @@ describe("classifyStepGuidanceIntent — sticky active-step support", () => {
     expect(classify("А как проверить 12V?")) .not.toBeNull();
   });
 
+  it.each([
+    ["EN", "So how do I measure 12V there?"],
+    ["RU", "А как измерить 12В там?"],
+    ["ES", "Bueno, cómo mido 12V ahí?"],
+  ])("keeps %s filler-led measurement follow-ups on the same step", (_language, message) => {
+    expect(classify(message)).toEqual({ category: "HOW_TO_CHECK" });
+  });
+
   it("returns null when actual findings are reported so normal progression can resume", () => {
     expect(classify("I measured 12.6V at the board input.")).toBeNull();
     expect(classify("12.6V present")).toBeNull();

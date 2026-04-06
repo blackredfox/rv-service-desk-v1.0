@@ -25,8 +25,11 @@ const RETAIL_TRIGGER = "(?:retail|customer[\\s-]*pay|рознич\\S*)";
 
 const APPROVED_FINAL_REPORT_PATTERNS = [
   new RegExp(`(?:write|generate|prepare|make|create)\\s+(?:the\\s+)?(?:(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|service|repair)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:need|want)\\s+(?:a\\s+)?(?:(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|service|repair)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:напиши|сделай|сформируй|подготовь|сгенерируй)\\s+(?:(?:финальн(?:ый|ого)|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|сервисн(?:ый|ого)|ремонтн(?:ый|ого))\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:нужен|нужно|хочу)\\s+(?:(?:финальн\\S*|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|сервисн\\S*|ремонтн\\S*)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:haz|genera|prepara|escribe|crea)\\s+(?:el\\s+)?(?:(?:${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|final|de\\s+servicio|de\\s+reparaci[oó]n)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:quiero|necesito)\\s+(?:un\\s+)?(?:(?:${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|final|de\\s+servicio|de\\s+reparaci[oó]n)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:haz|genera|prepara|escribe|crea)\\s+(?:el\\s+)?(?:reporte|informe|report)\\s+(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER})(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`${WARRANTY_TRIGGER}\\s+${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`${RETAIL_TRIGGER}\\s+${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),

@@ -130,22 +130,6 @@ function buildValidatedStepGuidanceFallback(args: {
   });
 }
 
-function detectStickyStepClarificationOverride(message: string): StepGuidancePlan["intentCategory"] | null {
-  if (/^(?:(?:а|ну|и)\s+)?как(?:\s|$).*(?:12\s*[vв]|напряжен|вольт|мультиметр)/iu.test(message)) {
-    return "HOW_TO_CHECK";
-  }
-
-  if (/^(?:(?:and|so|well)\s+)?how(?:\s|$).*(?:12\s*v|voltage|meter|multimeter)/i.test(message)) {
-    return "HOW_TO_CHECK";
-  }
-
-  if (/^(?:(?:y|bueno|pues)\s+)?c[oó]mo(?:\s|$).*(?:12\s*v|voltaje|mult[ií]metro)/iu.test(message)) {
-    return "HOW_TO_CHECK";
-  }
-
-  return null;
-}
-
 function buildStepGuidanceClarificationSystemPrompt(args: {
   language: Language;
   stepQuestion: string;
@@ -210,12 +194,12 @@ function buildAuthoritativeCompletionOffer(args: {
             "Принято.",
             "Причина подтверждена: неисправный предохранитель в цепи питания водонагревателя.",
             "Ремонт подтверждён: предохранитель заменён, водонагреватель работает штатно.",
-            "Отправьте START FINAL REPORT — и я сформирую отчёт.",
+            "Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.",
           ].join("\n")
         : [
             "Принято.",
             args.isolationFinding ?? "Восстановление после ремонта подтверждено.",
-            "Отправьте START FINAL REPORT — и я сформирую отчёт.",
+            "Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.",
           ].join("\n");
     case "ES":
       return isFuseRepair
@@ -223,12 +207,12 @@ function buildAuthoritativeCompletionOffer(args: {
             "Entendido.",
             "Causa confirmada: fusible defectuoso en el circuito de alimentación del calentador de agua.",
             "Reparación confirmada: se reemplazó el fusible y el calentador funciona normalmente.",
-            "Envía START FINAL REPORT y generaré el informe.",
+            "Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.",
           ].join("\n")
         : [
             "Entendido.",
             args.isolationFinding ?? "La restauración después de la reparación fue confirmada.",
-            "Envía START FINAL REPORT y generaré el informe.",
+            "Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.",
           ].join("\n");
     default:
       return isFuseRepair
@@ -236,12 +220,12 @@ function buildAuthoritativeCompletionOffer(args: {
             "Noted.",
             "Root cause confirmed: failed fuse in the water-heater power path.",
             "Repair confirmed: the fuse was replaced and the water heater is operating normally.",
-            "Send START FINAL REPORT and I will generate the report.",
+            "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
           ].join("\n")
         : [
             "Noted.",
             args.isolationFinding ?? "Repair completion and restored operation have been confirmed.",
-            "Send START FINAL REPORT and I will generate the report.",
+            "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
           ].join("\n");
   }
 }
@@ -459,39 +443,6 @@ export async function POST(req: Request) {
   let stepGuidancePlan: StepGuidancePlan | null = null;
 
   if (currentMode === "diagnostic" && !reportRoutingResponse) {
-    const forcedStickyStepGuidanceCategory = detectStickyStepClarificationOverride(routingMessage);
-    const forcedStickyStepMetadata =
-      forcedStickyStepGuidanceCategory && currentContextSnapshot.activeStepId
-        ? getActiveStepMetadata(
-            ensuredCase.id,
-            currentContextSnapshot.activeStepId,
-            outputPolicy.effective,
-          )
-        : null;
-
-    if (forcedStickyStepMetadata) {
-      stepGuidancePlan = {
-        fallbackResponse: buildValidatedStepGuidanceFallback({
-          language: outputPolicy.effective,
-          stepQuestion: forcedStickyStepMetadata.question,
-          guidance: forcedStickyStepMetadata.howToCheck,
-          logLabel: forcedStickyStepMetadata.id,
-        }),
-        intentCategory: forcedStickyStepGuidanceCategory,
-        metadata: forcedStickyStepMetadata,
-        source: "preclassified",
-        systemPrompt: buildStepGuidanceClarificationSystemPrompt({
-          language: outputPolicy.effective,
-          stepQuestion: forcedStickyStepMetadata.question,
-          guidance: forcedStickyStepMetadata.howToCheck,
-          continuation: getStepGuidanceContinuation(outputPolicy.effective),
-          hasPhotoAttachment: attachmentCount > 0,
-        }),
-      };
-
-      console.log(`[Chat API v2] STEP_GUIDANCE forced-sticky detection for step ${forcedStickyStepMetadata.id} (${forcedStickyStepGuidanceCategory})`);
-    }
-
     const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
     const activeStepBeforeProcessing = contextBeforeProcessing.activeStepId;
     const terminalPhaseBeforeProcessing =
@@ -501,7 +452,7 @@ export async function POST(req: Request) {
       !contextBeforeProcessing.isolationComplete &&
       terminalPhaseBeforeProcessing === "normal";
 
-    if (!stepGuidancePlan && eligibleForStepGuidance) {
+    if (eligibleForStepGuidance) {
       const stepGuidanceMetadata = getActiveStepMetadata(
         ensuredCase.id,
         activeStepBeforeProcessing,
@@ -515,14 +466,9 @@ export async function POST(req: Request) {
             hasPhotoAttachment: attachmentCount > 0,
           })
         : null;
-      const stickyOverrideIntentCategory =
-        !guidanceIntent && stepGuidanceMetadata
-          ? detectStickyStepClarificationOverride(routingMessage)
-          : null;
-
       if (
         stepGuidanceMetadata &&
-        (guidanceIntent || stickyOverrideIntentCategory)
+        guidanceIntent
       ) {
         stepGuidancePlan = {
           fallbackResponse: buildValidatedStepGuidanceFallback({
@@ -531,7 +477,7 @@ export async function POST(req: Request) {
             guidance: stepGuidanceMetadata.howToCheck,
             logLabel: stepGuidanceMetadata.id,
           }),
-          intentCategory: guidanceIntent?.category ?? stickyOverrideIntentCategory!,
+          intentCategory: guidanceIntent.category,
           metadata: stepGuidanceMetadata,
           source: "preclassified",
           systemPrompt: buildStepGuidanceClarificationSystemPrompt({
@@ -543,7 +489,7 @@ export async function POST(req: Request) {
           }),
         };
 
-        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceMetadata.id} (${guidanceIntent?.category ?? stickyOverrideIntentCategory ?? "UNKNOWN"})`);
+        console.log(`[Chat API v2] STEP_GUIDANCE detected for step ${stepGuidanceMetadata.id} (${guidanceIntent.category})`);
       }
     }
   }
@@ -651,9 +597,10 @@ export async function POST(req: Request) {
         "MANDATORY RESPONSE (this turn only):",
         "1. Acknowledge briefly (one line, e.g. 'Принято.' or 'Noted.')",
         "2. State the root cause or repair in 1-2 sentences.",
-        "3. End with exactly: 'Send START FINAL REPORT and I will generate the report.'",
-        "   (Russian: 'Отправь START FINAL REPORT — и я сформирую отчёт.')",
-        "   (Spanish: 'Envía START FINAL REPORT y generaré el informe.')",
+        "3. End with a concise report invitation that accepts either a natural report request or START FINAL REPORT.",
+        "   (English example: 'If you want the report now, ask me to write the report, or send START FINAL REPORT.')",
+        "   (Russian example: 'Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.')",
+        "   (Spanish example: 'Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.')",
         "",
         "CRITICAL RULES:",
         "- Do NOT ask another diagnostic question.",

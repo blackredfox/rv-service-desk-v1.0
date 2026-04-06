@@ -27,8 +27,8 @@ const PHOTO_REFERENCE_PATTERNS = [
 
 const QUESTION_LEAD_PATTERNS = [
   /^(?:where|what|which|how|is|are|can|should|would|do|does|did|this|that|it)\b/i,
-  /^(?:где|что|как|какой|какая|какое|это|этот|эта|он|она|оно)\b/iu,
-  /^(?:d[oó]nde|qu[eé]|c[oó]mo|cu[aá]l|es|este|ese|esta|esa|esto|eso)\b/iu,
+  /^(?:где|что|как|како\S*|это|этот|эта|он|она|оно)(?:\s|$)/iu,
+  /^(?:d[oó]nde|qu[eé]|c[oó]mo|cu[aá]l(?:es)?|es|este|ese|esta|esa|esto|eso)(?:\s|$)/iu,
 ];
 
 const LEADING_FILLER_PATTERNS = [
@@ -38,21 +38,21 @@ const LEADING_FILLER_PATTERNS = [
 ];
 
 const HOW_TO_CHECK_PATTERNS = [
-  /\b(?:how|check|test|measure|verify|inspect|probe|explain|show|tell)\b/i,
-  /\b(?:как|провер|измер|тест|объясн|покажи|подскажи)\b/iu,
-  /\b(?:c[oó]mo|verific|comprob|medir|probar|revis|mostrar|explicar)\b/iu,
+  /\b(?:how|check|test|measure|verify|inspect|probe|explain|show|tell)\w*\b/i,
+  /(?:как|провер\S*|измер\S*|тест\S*|объясн\S*|покажи\S*|подскажи\S*)/iu,
+  /(?:c[oó]mo|verific\S*|comprob\S*|medir\S*|probar\S*|revis\S*|mostrar\S*|explicar\S*)/iu,
 ];
 
 const LOCATE_COMPONENT_PATTERNS = [
   /\b(?:where|location|locate|find)\b/i,
-  /\b(?:где|наход|искать|найти)\b/iu,
-  /\b(?:d[oó]nde|ubicaci[oó]n|encuentr|buscar|queda)\b/iu,
+  /(?:где|наход\S*|искать\S*|найти\S*)/iu,
+  /(?:d[oó]nde|ubicaci[oó]n\S*|encuentr\S*|buscar\S*|queda\S*)/iu,
 ];
 
 const IDENTIFY_POINT_PATTERNS = [
   /\b(?:which|identify|wire|terminal|connector|pin|lead|input|b\+)\b/i,
-  /\b(?:како|определ|провод|контакт|разъ[её]м|клемм|вывод|вход)\b/iu,
-  /\b(?:qu[eé]|identific|cable|terminal|conector|pin|entrada)\b/iu,
+  /(?:како\S*|определ\S*|провод\S*|контакт\S*|разъ[её]м\S*|клемм\S*|вывод\S*|вход\S*)/iu,
+  /(?:qu[eé]|identific\S*|cable\S*|terminal\S*|conector\S*|pin\S*|entrada\S*)/iu,
 ];
 
 const ALTERNATE_CHECK_POINT_PATTERNS = [
@@ -111,12 +111,6 @@ const MEASUREMENT_SUPPORT_PATTERNS = [
   /(?:12\s*[vв]|b\+|voltage|meter|multimeter)/iu,
   /(?:12\s*[vв]|напряжен|мультиметр|вольт)/iu,
   /(?:12\s*[vв]|voltaje|mult[ií]metro)/iu,
-];
-
-const SHORTHAND_SAME_STEP_SUPPORT_PATTERNS = [
-  /^(?:(?:а|ну|и)\s+)?как(?:\s|$).*(?:12\s*[vв]|напряжен|вольт|мультиметр)/iu,
-  /^(?:(?:and|so|well)\s+)?how(?:\s|$).*(?:12\s*v|voltage|meter|multimeter)/i,
-  /^(?:(?:y|bueno|pues)\s+)?c[oó]mo(?:\s|$).*(?:12\s*v|voltaje|mult[ií]metro)/iu,
 ];
 
 const GUIDANCE_EVIDENCE_PATTERNS = [
@@ -242,10 +236,6 @@ function looksLikeSameStepSupport(args: {
     return true;
   }
 
-  if (SHORTHAND_SAME_STEP_SUPPORT_PATTERNS.some((pattern) => pattern.test(message))) {
-    return true;
-  }
-
   if (
     tokenCount <= 6 &&
     (HOW_TO_CHECK_PATTERNS.some((pattern) => pattern.test(message)) ||
@@ -273,10 +263,6 @@ function inferStepGuidanceCategory(message: string, hasPhotoCue: boolean): StepG
 
   if (ALTERNATE_CHECK_POINT_PATTERNS.some((pattern) => pattern.test(message))) {
     return "ALTERNATE_CHECK_POINT";
-  }
-
-  if (SHORTHAND_SAME_STEP_SUPPORT_PATTERNS.some((pattern) => pattern.test(message))) {
-    return "HOW_TO_CHECK";
   }
 
   if (IDENTIFY_POINT_PATTERNS.some((pattern) => pattern.test(message))) {

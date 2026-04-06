@@ -104,6 +104,7 @@ describe("/api/chat water-heater runtime dominance", () => {
       "route_wh5_report_ru_typo",
       "route_wh5_report_en_active_flow",
       "route_wh5_report_es_missing_active_flow",
+      "route_wh5_report_too_early_active_flow",
     ].forEach((caseId) => {
       clearRegistry(caseId);
       clearContext(caseId);
@@ -225,6 +226,7 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.terminalState.phase).toBe("terminal");
     expect(completionTurn.fetchTriggered).toBe(false);
     expect(completionTurn.streamText).toContain("START FINAL REPORT");
+    expect(completionTurn.streamText).toContain("сделать отчёт");
     expect(completionTurn.streamText).not.toContain("wh_5b");
     expect(completionTurn.streamText).not.toContain("Step 6");
     expect(completionTurn.streamText).not.toContain("Status: Isolation not completed");
@@ -248,6 +250,7 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.terminalState.phase).toBe("terminal");
     expect(completionTurn.fetchTriggered).toBe(false);
     expect(completionTurn.streamText).toContain("START FINAL REPORT");
+    expect(completionTurn.streamText).toContain("сделать отчёт");
     expect(completionTurn.streamText).not.toContain("wh_5b");
     expect(completionTurn.streamText).not.toContain("Step 6");
     expect(completionTurn.streamText).not.toContain("Status: Isolation not completed");
@@ -325,6 +328,21 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
     expect(reportTurn.streamText).toContain("solo me faltan estos datos");
     expect(reportTurn.streamText).toContain("qué encontraste exactamente");
+    expect(reportTurn.streamText).not.toContain("wh_5b");
+    expect(reportTurn.streamText).not.toContain("wh_5c");
+  });
+
+  it("does not over-trigger report mode too early during active flow from a bare natural report request", async () => {
+    const caseId = "route_wh5_report_too_early_active_flow";
+    await advanceToWh5(caseId);
+    await postChat(caseId, "нет");
+
+    const reportTurn = await postChat(caseId, "Generate warranty report");
+
+    expect(reportTurn.fetchTriggered).toBe(false);
+    expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    expect(reportTurn.streamText).toContain("missing report details");
+    expect(reportTurn.streamText).toContain("what you found");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });
