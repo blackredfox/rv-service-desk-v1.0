@@ -7,6 +7,10 @@ import {
 import {
   resolveExplicitModeChange,
 } from "@/lib/chat/chat-mode-resolver";
+import {
+  detectApprovedFinalReportIntent,
+  detectReportRevisionIntent,
+} from "@/lib/chat/report-intent";
 
 const pureBoundaryModules = [
   "src/lib/chat/chat-request-preparer.ts",
@@ -16,7 +20,9 @@ const pureBoundaryModules = [
   "src/lib/chat/final-report-flow-service.ts",
   "src/lib/chat/openai-execution-service.ts",
   "src/lib/chat/input-normalization.ts",
+  "src/lib/chat/report-intent.ts",
   "src/lib/chat/repair-summary-intent.ts",
+  "src/lib/chat/step-guidance-intent.ts",
 ];
 
 describe("No Hidden Authority — Route Decomposition", () => {
@@ -94,5 +100,29 @@ describe("No Hidden Authority — Route Decomposition", () => {
 
     expect(source).toMatch(/processContextMessage\(/);
     expect(source).toMatch(/currentMode === "diagnostic"/);
+  });
+
+  it("report intent helpers classify only bounded report signals and expose no flow decisions", () => {
+    const reportIntent = detectApprovedFinalReportIntent("сделай воранти репорт");
+    const reportEditIntent = detectReportRevisionIntent({
+      message: "change total labor to 0.5 hr",
+      hasExistingReport: true,
+    });
+
+    expect(reportIntent).toEqual({
+      matched: true,
+      matchedText: expect.any(String),
+      reportKind: "warranty",
+    });
+    expect(reportEditIntent).toEqual({
+      matched: true,
+      matchedText: expect.any(String),
+      reportKind: undefined,
+    });
+
+    expect(reportIntent).not.toHaveProperty("nextStep");
+    expect(reportIntent).not.toHaveProperty("mode");
+    expect(reportEditIntent).not.toHaveProperty("branch");
+    expect(reportEditIntent).not.toHaveProperty("completionAction");
   });
 });

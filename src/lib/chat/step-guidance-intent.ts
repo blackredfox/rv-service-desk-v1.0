@@ -27,26 +27,32 @@ const PHOTO_REFERENCE_PATTERNS = [
 
 const QUESTION_LEAD_PATTERNS = [
   /^(?:where|what|which|how|is|are|can|should|would|do|does|did|this|that|it)\b/i,
-  /^(?:где|что|как|какой|какая|какое|это|этот|эта|он|она|оно)\b/iu,
-  /^(?:d[oó]nde|qu[eé]|c[oó]mo|cu[aá]l|es|este|ese|esta|esa|esto|eso)\b/iu,
+  /^(?:где|что|как|како\S*|это|этот|эта|он|она|оно)(?:\s|$)/iu,
+  /^(?:d[oó]nde|qu[eé]|c[oó]mo|cu[aá]l(?:es)?|es|este|ese|esta|esa|esto|eso)(?:\s|$)/iu,
+];
+
+const LEADING_FILLER_PATTERNS = [
+  /^(?:and|so|well|uh|um)\s+/i,
+  /^(?:а|ну|и)\s+/iu,
+  /^(?:y|bueno|pues)\s+/iu,
 ];
 
 const HOW_TO_CHECK_PATTERNS = [
-  /\b(?:how|check|test|measure|verify|inspect|probe|explain|show|tell)\b/i,
-  /\b(?:как|провер|измер|тест|объясн|покажи|подскажи)\b/iu,
-  /\b(?:c[oó]mo|verific|comprob|medir|probar|revis|mostrar|explicar)\b/iu,
+  /\b(?:how|check|test|measure|verify|inspect|probe|explain|show|tell)\w*\b/i,
+  /(?:как|провер\S*|измер\S*|тест\S*|объясн\S*|покажи\S*|подскажи\S*)/iu,
+  /(?:c[oó]mo|verific\S*|comprob\S*|medir\S*|probar\S*|revis\S*|mostrar\S*|explicar\S*)/iu,
 ];
 
 const LOCATE_COMPONENT_PATTERNS = [
   /\b(?:where|location|locate|find)\b/i,
-  /\b(?:где|наход|искать|найти)\b/iu,
-  /\b(?:d[oó]nde|ubicaci[oó]n|encuentr|buscar|queda)\b/iu,
+  /(?:где|наход\S*|искать\S*|найти\S*)/iu,
+  /(?:d[oó]nde|ubicaci[oó]n\S*|encuentr\S*|buscar\S*|queda\S*)/iu,
 ];
 
 const IDENTIFY_POINT_PATTERNS = [
   /\b(?:which|identify|wire|terminal|connector|pin|lead|input|b\+)\b/i,
-  /\b(?:како|определ|провод|контакт|разъ[её]м|клемм|вывод|вход)\b/iu,
-  /\b(?:qu[eé]|identific|cable|terminal|conector|pin|entrada)\b/iu,
+  /(?:како\S*|определ\S*|провод\S*|контакт\S*|разъ[её]м\S*|клемм\S*|вывод\S*|вход\S*)/iu,
+  /(?:qu[eé]|identific\S*|cable\S*|terminal\S*|conector\S*|pin\S*|entrada\S*)/iu,
 ];
 
 const ALTERNATE_CHECK_POINT_PATTERNS = [
@@ -101,6 +107,12 @@ const ACTIVE_STEP_REFERENCE_PATTERNS = [
   /(?:\b(?:paso|punto|entrada|cable|terminal|conector|fusible|revisi[oó]n)\b)/iu,
 ];
 
+const MEASUREMENT_SUPPORT_PATTERNS = [
+  /(?:12\s*[vв]|b\+|voltage|meter|multimeter)/iu,
+  /(?:12\s*[vв]|напряжен|мультиметр|вольт)/iu,
+  /(?:12\s*[vв]|voltaje|mult[ií]metro)/iu,
+];
+
 const GUIDANCE_EVIDENCE_PATTERNS = [
   /(?:i\s+)?(?:measured|checked|tested|verified|confirmed|found|got|read|see|saw)\b/i,
   /(?:я\s+)?(?:измерил|проверил|подтвердил|наш[её]л|увидел|заметил)\b/iu,
@@ -145,6 +157,16 @@ function getTokenCount(text: string): number {
   return (text.match(/[\p{L}\p{N}_+/\-]+/gu) ?? []).length;
 }
 
+function normalizeSupportMessage(message: string): string {
+  let normalized = message.trim();
+
+  for (const pattern of LEADING_FILLER_PATTERNS) {
+    normalized = normalized.replace(pattern, "");
+  }
+
+  return normalized.trim();
+}
+
 function hasActiveStepReferenceOverlap(message: string, stepReference: string): boolean {
   const stepTerms = new Set(extractSignificantTerms(stepReference));
   if (stepTerms.size === 0) return false;
@@ -161,7 +183,7 @@ function hasBroadActiveStepReference(message: string, stepReference: string): bo
 }
 
 function containsGuidanceEvidence(message: string): boolean {
-  const trimmed = message.trim();
+  const trimmed = normalizeSupportMessage(message);
 
   if (isQuestionLikeSupportMessage(trimmed) || isShortFragmentFollowUp(trimmed)) {
     return false;
@@ -179,12 +201,12 @@ function looksLikeProgressionOrModeChange(message: string): boolean {
 }
 
 function isQuestionLikeSupportMessage(message: string): boolean {
-  const trimmed = message.trim();
+  const trimmed = normalizeSupportMessage(message);
   return /\?$/.test(trimmed) || QUESTION_LEAD_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
 function isShortFragmentFollowUp(message: string): boolean {
-  const trimmed = message.trim();
+  const trimmed = normalizeSupportMessage(message);
   if (!trimmed) return false;
 
   const tokenCount = getTokenCount(trimmed);
@@ -214,7 +236,20 @@ function looksLikeSameStepSupport(args: {
     return true;
   }
 
+  if (
+    tokenCount <= 6 &&
+    (HOW_TO_CHECK_PATTERNS.some((pattern) => pattern.test(message)) ||
+      LOCATE_COMPONENT_PATTERNS.some((pattern) => pattern.test(message)) ||
+      IDENTIFY_POINT_PATTERNS.some((pattern) => pattern.test(message)))
+  ) {
+    return true;
+  }
+
   if (questionLikeSupport && (hasStepReference || hasVisualCue || tokenCount <= 6)) {
+    return true;
+  }
+
+  if (questionLikeSupport && MEASUREMENT_SUPPORT_PATTERNS.some((pattern) => pattern.test(message))) {
     return true;
   }
 
@@ -260,7 +295,7 @@ export function classifyStepGuidanceIntent(args: {
   hasPhotoAttachment?: boolean;
 }): StepGuidanceIntentResult | null {
   const stepReference = [args.activeStepQuestion, args.activeStepHowToCheck ?? ""].join(" ").trim();
-  const message = args.message.trim();
+  const message = normalizeSupportMessage(args.message);
   const hasPhotoCue = args.hasPhotoAttachment || PHOTO_REFERENCE_PATTERNS.some((pattern) => pattern.test(message));
 
   if (!stepReference) return null;

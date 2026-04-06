@@ -70,10 +70,23 @@ Recommended Corrective Action: Replace water pump assembly.
 Estimated Labor: Isolate and drain line - 0.3 hr. Remove existing pump - 0.4 hr. Install and test replacement pump - 0.5 hr. Total labor: 1.2 hr.
 Required Parts: Water pump assembly.`;
 
+const FINAL_REPORT_TEXT_RU = `${FINAL_REPORT_TEXT}
+
+--- TRANSLATION ---
+
+Жалоба: водяной насос не работает по спецификации. Диагностическая проверка выполнена и итоговое состояние подтверждено.`;
+
+const FINAL_REPORT_TEXT_ES = `${FINAL_REPORT_TEXT}
+
+--- TRANSLATION ---
+
+Queja: la bomba de agua no funciona según especificación. La verificación diagnóstica fue completada y la condición final quedó confirmada.`;
+
 describe("Explicit-only mode transitions (no auto-transition)", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mockFetch.mockReset();
     process.env.OPENAI_API_KEY = "sk-test-mock";
 
     mockGetCurrentUser.mockResolvedValue({ id: "user_123" });
@@ -287,7 +300,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
+        choices: [{ message: { content: language === "RU" ? FINAL_REPORT_TEXT_RU : FINAL_REPORT_TEXT } }],
       }),
     });
 
@@ -304,7 +317,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 
-  it("does not bypass readiness for natural report intent", async () => {
+  it("asks only for missing report data when natural report intent is not ready", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -320,9 +333,214 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
       body: JSON.stringify({ caseId: "case_123", message: "write report" }),
     }));
 
-    await response.text();
+    const streamText = await response.text();
 
     expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(streamText).toContain("missing report details");
+    expect(streamText).toContain("the original complaint");
+  });
+
+  it("uses the report path mid-flow when history + current repair summary make the case ready", async () => {
+    mockStorage.listMessagesForContext.mockResolvedValueOnce([
+      { role: "user", content: "Complaint: Water pump not operating per spec." },
+      { role: "user", content: "Findings: direct 12V was present and the fuse was blown." },
+    ]);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: "case_123",
+        message: "Repair: replaced the fuse and pump works now. write report",
+      }),
+    }));
+
+    const streamText = await response.text();
+
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
+    expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+  });
+});
+
+describe("Post-report natural edit loop", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    process.env.OPENAI_API_KEY = "sk-test-mock";
+
+    mockGetCurrentUser.mockResolvedValue({ id: "user_123" });
+    mockStorage.getCase.mockResolvedValue({ case: null, messages: [] });
+    mockStorage.ensureCase.mockResolvedValue({
+      id: "case_123",
+      title: "Water Pump Case",
+      userId: "user_123",
+      inputLanguage: "EN",
+      languageSource: "AUTO",
+      mode: "diagnostic",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockStorage.listMessagesForContext.mockResolvedValue([
+      { role: "assistant", content: FINAL_REPORT_TEXT },
+    ]);
+    mockStorage.appendMessage.mockResolvedValue({ id: "msg_1" });
+    mockStorage.updateCase.mockResolvedValue({ id: "case_123" });
+    mockGetOrCreateContext.mockReturnValue({
+      caseId: "case_123",
+      activeStepId: null,
+      isolationComplete: false,
+      terminalState: { phase: "normal", faultIdentified: null, correctiveAction: null, restorationConfirmed: null },
+    });
+    mockProcessContextMessage.mockReturnValue({
+      context: {
+        caseId: "case_123",
+        submode: "main",
+        activeStepId: "wp_3",
+        isolationComplete: false,
+        isolationFinding: null,
+        terminalState: { phase: "normal", faultIdentified: null, correctiveAction: null, restorationConfirmed: null },
+      },
+      intent: { type: "MAIN_DIAGNOSTIC" },
+      responseInstructions: {
+        action: "ask_step",
+        constraints: [],
+        antiLoopDirectives: [],
+      },
+      stateChanged: false,
+      notices: [],
+    });
+  });
+
+  it("treats a labor-change request as a report edit when a report already exists", async () => {
+    const updatedReport = FINAL_REPORT_TEXT.replace("Total labor: 1.2 hr", "Total labor: 0.5 hr");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: updatedReport } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: "case_123", message: "change total labor to 0.5 hr" }),
+    }));
+
+    const streamText = await response.text();
+
+    expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).toContain("Total labor: 0.5 hr");
+    expect(streamText).not.toContain("START FINAL REPORT");
+  });
+
+  it("treats add/remove instructions as report edits instead of returning to completion prompts", async () => {
+    const updatedReport = FINAL_REPORT_TEXT.replace(
+      "Required Parts: Water pump assembly.",
+      "Required Parts: Water pump assembly and fuse.",
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: updatedReport } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: "case_123", message: "add that I replaced the fuse" }),
+    }));
+
+    const streamText = await response.text();
+
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
+    expect(mockProcessContextMessage).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).not.toContain("START FINAL REPORT");
+  });
+
+  it("handles RU natural edit requests after a report already exists", async () => {
+    mockStorage.ensureCase.mockResolvedValueOnce({
+      id: "case_123",
+      title: "Water Pump Case",
+      userId: "user_123",
+      inputLanguage: "RU",
+      languageSource: "AUTO",
+      mode: "diagnostic",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockStorage.listMessagesForContext.mockResolvedValueOnce([
+      { role: "assistant", content: FINAL_REPORT_TEXT_RU },
+    ]);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT_RU } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: "case_123", message: "убери это" }),
+    }));
+
+    const streamText = await response.text();
+
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).not.toContain("START FINAL REPORT");
+  });
+
+  it("handles ES natural edit requests after a report already exists", async () => {
+    mockStorage.ensureCase.mockResolvedValueOnce({
+      id: "case_123",
+      title: "Water Pump Case",
+      userId: "user_123",
+      inputLanguage: "ES",
+      languageSource: "AUTO",
+      mode: "diagnostic",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockStorage.listMessagesForContext.mockResolvedValueOnce([
+      { role: "assistant", content: FINAL_REPORT_TEXT },
+    ]);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
+      }),
+    });
+
+    const { POST } = await import("@/app/api/chat/route");
+    const response = await POST(new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId: "case_123", message: "quita eso" }),
+    }));
+
+    const streamText = await response.text();
+
+    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
+    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(streamText).not.toContain("START FINAL REPORT");
   });
 });
 
@@ -330,6 +548,7 @@ describe("Chat final_report labor override (explicit mode only)", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mockFetch.mockReset();
     process.env.OPENAI_API_KEY = "sk-test-mock";
 
     mockGetCurrentUser.mockResolvedValue({ id: "user_123" });

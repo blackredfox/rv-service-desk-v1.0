@@ -6,6 +6,11 @@ export type RepairSummaryMissingField =
   | "corrective_action";
 
 export type RepairSummaryIntentAssessment = {
+  complaintInferredFromActiveContext: boolean;
+  currentMessageHasComplaint: boolean;
+  currentMessageHasFindings: boolean;
+  currentMessageHasCorrectiveAction: boolean;
+  currentMessageHasRepairSignal: boolean;
   hasComplaint: boolean;
   hasFindings: boolean;
   hasCorrectiveAction: boolean;
@@ -19,6 +24,9 @@ const COMPLAINT_PATTERNS = [
   /(?:complaint|issue|problem|customer states?)\s*[:\-]/i,
   /(?:queja|problema)\s*[:\-]/iu,
   /(?:жалоб|проблема|неисправност)\s*[:\-]?/iu,
+  /(?:water\s+heater|heater|boiler)\s+(?:not\s+working|inoperative|not\s+heating)/i,
+  /(?:водонагревател|бойлер)\S*\s+(?:не\s+работ|не\s+гре)/iu,
+  /(?:calentador|boiler)\s+(?:no\s+funciona|no\s+calienta)/iu,
   /slide(?:[\s-]*out| room)?/i,
   /(?:water\s+l(?:ea|ee)k(?:ing)?|leak(?:ing)?\s+into)/i,
   /(?:not\s+attached|loose|detached)/i,
@@ -31,6 +39,9 @@ const FINDING_PATTERNS = [
   /(?:finding|findings|found|inspection)\s*[:\-]/i,
   /(?:hallazgo|hallazgos|encontr[ée])\s*[:\-]?/iu,
   /(?:найдено|обнаружено|осмотр)\s*[:\-]?/iu,
+  /(?:i\s+found|found\s+that|the\s+fuse\s+was\s+(?:open|bad|blown|failed))/i,
+  /(?:я\s+наш[её]л|предохранител\S*\s+(?:не\s+работал|неисправ|перегорел|сгорел))/iu,
+  /(?:encontr[eé]|hall[eé]|el\s+fusible\s+estaba\s+(?:abierto|dañado|quemado))/iu,
   /only\s+\d+\s+screws?/i,
   /no\s+(?:silicone|sealant)/i,
   /только\s+\d+\s+(?:саморез|шуруп)/iu,
@@ -43,6 +54,10 @@ const CORRECTIVE_ACTION_PATTERNS = [
   /(?:repair|repaired|fix(?:ed)?|corrective\s+action|action\s+taken)\s*[:\-]/i,
   /(?:reparaci[oó]n|acci[oó]n\s+correctiva|reparado)\s*[:\-]?/iu,
   /(?:ремонт|исправлено|выполнено)\s*[:\-]?/iu,
+  /(?:replaced|changed|swapped)\s+(?:the\s+)?(?:fuse|breaker|part)/i,
+  /(?:replaced|changed|swapped|fixed)\s+(?:it|that)/i,
+  /(?:заменил|поменял)\s+(?:предохранител|детал|узел)/iu,
+  /(?:reemplaz[eé]|cambi[eé])\s+(?:el\s+)?(?:fusible|componente|pieza)/iu,
   /(?:added|installed|secured|reattached)\b/i,
   /appl(?:y|ied)\s+(?:silicone|sealant)/i,
   /(?:добавил|установил|закрепил|прикрутил|нан[её]с)/iu,
@@ -56,10 +71,31 @@ function dedupeMissingFields(fields: RepairSummaryMissingField[]): RepairSummary
 export function assessRepairSummaryIntent(args: {
   message: string;
   hasReportRequest: boolean;
+  priorUserMessages?: string[];
+  hasActiveDiagnosticContext?: boolean;
 }): RepairSummaryIntentAssessment {
-  const hasComplaint = COMPLAINT_PATTERNS.some((pattern) => pattern.test(args.message));
-  const hasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(args.message));
-  const hasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(args.message));
+  const currentMessageHasComplaint = COMPLAINT_PATTERNS.some((pattern) => pattern.test(args.message));
+  const currentMessageHasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(args.message));
+  const currentMessageHasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(args.message));
+  const currentMessageHasRepairSignal =
+    currentMessageHasComplaint || currentMessageHasFindings || currentMessageHasCorrectiveAction;
+  const evidenceText = [
+    ...(args.priorUserMessages ?? []),
+    args.message,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const complaintInferredFromActiveContext =
+    Boolean(args.hasActiveDiagnosticContext) &&
+    args.hasReportRequest &&
+    currentMessageHasRepairSignal;
+
+  const hasComplaint =
+    COMPLAINT_PATTERNS.some((pattern) => pattern.test(evidenceText)) ||
+    complaintInferredFromActiveContext;
+  const hasFindings = FINDING_PATTERNS.some((pattern) => pattern.test(evidenceText));
+  const hasCorrectiveAction = CORRECTIVE_ACTION_PATTERNS.some((pattern) => pattern.test(evidenceText));
 
   const summarySignalCount = [hasComplaint, hasFindings, hasCorrectiveAction].filter(Boolean).length;
   const hasStructuredSummarySignals = summarySignalCount >= 2;
@@ -71,12 +107,14 @@ export function assessRepairSummaryIntent(args: {
   ]);
 
   const readyForReportRouting = args.hasReportRequest && hasComplaint && hasFindings && hasCorrectiveAction;
-  const shouldAskClarification =
-    !readyForReportRouting &&
-    args.hasReportRequest &&
-    hasStructuredSummarySignals;
+  const shouldAskClarification = args.hasReportRequest && !readyForReportRouting;
 
   return {
+    complaintInferredFromActiveContext,
+    currentMessageHasComplaint,
+    currentMessageHasFindings,
+    currentMessageHasCorrectiveAction,
+    currentMessageHasRepairSignal,
     hasComplaint,
     hasFindings,
     hasCorrectiveAction,
@@ -122,10 +160,10 @@ export function buildRepairSummaryClarificationResponse(args: {
 
   switch (args.language) {
     case "RU":
-      return `Прежде чем я направлю это в отчёт, мне нужно одно уточнение: подтвердите ${fieldsText}?`;
+      return `Чтобы сформировать отчёт сейчас, мне нужны только недостающие данные: подтвердите ${fieldsText}?`;
     case "ES":
-      return `Antes de pasar esto al informe, necesito una sola aclaración: ¿puedes confirmar ${fieldsText}?`;
+      return `Para generar el informe ahora, solo me faltan estos datos: ¿puedes confirmar ${fieldsText}?`;
     default:
-      return `Before I route this to the report path, I need one clarification: can you confirm ${fieldsText}?`;
+      return `To generate the report now, I only need the missing report details: can you confirm ${fieldsText}?`;
   }
 }
