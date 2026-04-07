@@ -87,6 +87,7 @@ import {
   normalizeRoutingInput,
   assessRepairSummaryIntent,
   buildRepairSummaryClarificationResponse,
+  type RepairSummaryMissingField,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -389,7 +390,7 @@ export async function POST(req: Request) {
       hasPriorUserEvidence ||
       (Boolean(currentContextSnapshot.activeProcedureId) &&
         repairSummaryIntent.currentMessageHasRepairSignal));
-  const missingReportFields = repairSummaryIntent.missingFields.length > 0
+  const missingReportFields: RepairSummaryMissingField[] = repairSummaryIntent.missingFields.length > 0
     ? repairSummaryIntent.missingFields
     : ["complaint", "findings", "corrective_action"];
 
