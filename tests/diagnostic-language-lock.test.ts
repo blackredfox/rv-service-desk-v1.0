@@ -84,4 +84,26 @@ describe("Diagnostic language lock regression", () => {
     expect(fallback).toContain("Какой уровень в LP-баке");
     expect(fallback).not.toMatch(/\b(Guided Diagnostics|Progress|Step)\b/);
   });
+
+  it("RU roof AC metadata stays localized once subtype is explicit", async () => {
+    const { initializeCase, buildRegistryContext, getActiveStepMetadata, clearRegistry } = await import(
+      "@/lib/diagnostic-registry"
+    );
+
+    const caseId = "diag-lang-lock-roof-ac";
+    clearRegistry(caseId);
+    initializeCase(caseId, "крышный кондиционер не охлаждает");
+
+    const context = buildRegistryContext(caseId, "ac_1", "RU");
+    const metadata = getActiveStepMetadata(caseId, "ac_1", "RU");
+
+    expect(context).toContain("Крышный кондиционер");
+    expect(context).toContain("Когда AC включён, компрессор пытается запуститься");
+    expect(context).not.toContain("Roof AC / Heat Pump");
+    expect(context).not.toContain("When AC is turned on");
+
+    expect(metadata?.procedureName).toBe("Крышный кондиционер");
+    expect(metadata?.question).toContain("Когда AC включён, компрессор пытается запуститься");
+    expect(metadata?.question).not.toContain("When AC is turned on");
+  });
 });

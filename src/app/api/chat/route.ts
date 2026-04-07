@@ -1,4 +1,4 @@
-import { storage } from "@/lib/storage";
+import { storage, type ChatMessage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import {
   type CaseMode,
@@ -20,6 +20,11 @@ import {
   getBranchState,
   exitBranch,
 } from "@/lib/diagnostic-registry";
+import {
+  detectSystem,
+  hasSpecificRoofAcEvidence,
+  isBroadAcFamilyMessage,
+} from "@/lib/diagnostic-procedures";
 import {
   processMessage as processContextMessage,
   getOrCreateContext,
@@ -87,6 +92,7 @@ import {
   normalizeRoutingInput,
   assessRepairSummaryIntent,
   buildRepairSummaryClarificationResponse,
+  type RepairSummaryMissingField,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -262,6 +268,17 @@ function buildReportRevisionPromptConstraint(message: string): string {
   ].join("\n");
 }
 
+function buildAcSubtypeClarificationResponse(language: Language): string {
+  switch (language) {
+    case "RU":
+      return "Чтобы выбрать правильную процедуру по AC, уточните тип узла: это крышный кондиционер, кондиционер кабины, крышный кондиционер с тепловым насосом или другой вариант?";
+    case "ES":
+      return "Para elegir el procedimiento correcto del AC, confirma qué tipo de unidad es: ¿AC de techo, AC del tablero/cabina, AC de techo con bomba de calor u otro tipo?";
+    default:
+      return "Before I choose the correct AC procedure, confirm what type of unit it is: roof AC, dash/cab AC, roof AC with heat pump, or another type?";
+  }
+}
+
 function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete" | "terminalState"> | null | undefined): boolean {
   return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
@@ -338,7 +355,8 @@ export async function POST(req: Request) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
-  const historyBeforeAppend = await loadChatHistory(ensuredCase.id);
+  const historyBeforeAppend: Pick<ChatMessage, "role" | "content">[] =
+    await loadChatHistory(ensuredCase.id);
   const existingReportInContext = shouldTreatAsFinalReportForOverride(
     currentMode,
     historyBeforeAppend,
@@ -389,9 +407,22 @@ export async function POST(req: Request) {
       hasPriorUserEvidence ||
       (Boolean(currentContextSnapshot.activeProcedureId) &&
         repairSummaryIntent.currentMessageHasRepairSignal));
-  const missingReportFields = repairSummaryIntent.missingFields.length > 0
+  const missingReportFields: RepairSummaryMissingField[] = repairSummaryIntent.missingFields.length > 0
     ? repairSummaryIntent.missingFields
     : ["complaint", "findings", "corrective_action"];
+  const storedRoofAcEvidenceMessage =
+    historyBeforeAppend.find((msg) => hasSpecificRoofAcEvidence(msg.content))?.content ?? null;
+  const needsAcSubtypeClarification =
+    currentMode === "diagnostic" &&
+    !hasBoundedReportRequest &&
+    !currentContextSnapshot.activeProcedureId &&
+    detectSystem(routingMessage) === null &&
+    isBroadAcFamilyMessage(routingMessage) &&
+    !hasSpecificRoofAcEvidence(routingMessage) &&
+    !storedRoofAcEvidenceMessage;
+  const directDiagnosticResponse = needsAcSubtypeClarification
+    ? buildAcSubtypeClarificationResponse(outputPolicy.effective)
+    : null;
 
   const modeResolution = pendingFinalReportCommand;
   if (existingReportInContext && precomputedLaborOverride.isLaborOverrideRequest) {
@@ -442,7 +473,7 @@ export async function POST(req: Request) {
 
   let stepGuidancePlan: StepGuidancePlan | null = null;
 
-  if (currentMode === "diagnostic" && !reportRoutingResponse) {
+  if (currentMode === "diagnostic" && !reportRoutingResponse && !directDiagnosticResponse) {
     const contextBeforeProcessing = getOrCreateContext(ensuredCase.id);
     const activeStepBeforeProcessing = contextBeforeProcessing.activeStepId;
     const terminalPhaseBeforeProcessing =
@@ -501,7 +532,7 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  const history = stepGuidancePlan
+  const history: Pick<ChatMessage, "role" | "content">[] = stepGuidancePlan
     ? []
     : [
         ...historyBeforeAppend,
@@ -515,12 +546,20 @@ export async function POST(req: Request) {
   let activeStepMetadata: RegistryActiveStepMetadata | null = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
 
-  if (currentMode === "diagnostic" && !stepGuidancePlan && !reportRoutingResponse) {
+  if (currentMode === "diagnostic" && !stepGuidancePlan && !reportRoutingResponse && !directDiagnosticResponse) {
     if (!STRICT_CONTEXT_ENGINE) {
       console.error("[Chat API v2] STRICT_CONTEXT_ENGINE is disabled — this is not supported in production");
     }
 
-    const initResult = initializeCase(ensuredCase.id, routingMessage);
+    const initResult = initializeCase(
+      ensuredCase.id,
+      storedRoofAcEvidenceMessage &&
+        !currentContextSnapshot.activeProcedureId &&
+        detectSystem(routingMessage) === null &&
+        isBroadAcFamilyMessage(routingMessage)
+        ? storedRoofAcEvidenceMessage
+        : routingMessage,
+    );
     if (initResult.procedure && initResult.preCompletedSteps.length > 0) {
       console.log(`[Chat API v2] Procedure catalog: ${initResult.procedure.displayName}, initial steps: ${initResult.preCompletedSteps.join(", ")}`);
       for (const stepId of initResult.preCompletedSteps) {
@@ -814,7 +853,7 @@ export async function POST(req: Request) {
         source: "promoted",
         systemPrompt: buildStepGuidanceClarificationSystemPrompt({
           language: outputPolicy.effective,
-          stepQuestion: promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing),
+          stepQuestion: (promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing))!,
           guidance: promotedStepMetadata?.howToCheck,
           continuation: getStepGuidanceContinuation(outputPolicy.effective),
           hasPhotoAttachment: attachmentCount > 0,
@@ -970,7 +1009,7 @@ export async function POST(req: Request) {
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
-        const directRoutingResponse = reportRoutingResponse;
+        const directRoutingResponse = reportRoutingResponse ?? directDiagnosticResponse;
 
         if (directRoutingResponse) {
           emitToken(directRoutingResponse);
