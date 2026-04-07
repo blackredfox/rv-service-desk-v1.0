@@ -1,15 +1,24 @@
-<svg viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- RV Camper body outline -->
-  <path d="M8 28C8 24 11 20 16 20H42C46 20 48 22 48 26V30H14C10 30 8 29 8 28Z" stroke="#00CED1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Window -->
-  <rect x="20" y="22" width="8" height="5" rx="1" stroke="#00CED1" stroke-width="2" fill="none"/>
-  <!-- Door hint -->
-  <path d="M36 22V28" stroke="#00CED1" stroke-width="1.5" stroke-linecap="round"/>
+<svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- RV Camper - faithful to original logo -->
+  <!-- Main body outline -->
+  <path d="M6 32C6 26 10 22 16 22L18 14C19 12 21 10 24 10H38C42 10 44 13 44 16V22H50C54 22 56 24 56 28V36H12C8 36 6 34 6 32Z" stroke="#00CED1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Window (rounded rectangle) -->
+  <rect x="22" y="14" width="10" height="8" rx="2" stroke="#00CED1" stroke-width="2.5" fill="none"/>
+  <!-- Door line -->
+  <path d="M40 18V32" stroke="#00CED1" stroke-width="2" stroke-linecap="round"/>
   <!-- Wheel -->
-  <circle cx="18" cy="31" r="4" stroke="#00CED1" stroke-width="2" fill="none"/>
-  <circle cx="18" cy="31" r="1.5" fill="#00CED1"/>
-  <!-- Wrench integrated -->
-  <path d="M48 22H56V19H60V22H68V26H60V29H56V26H48V22Z" fill="#FF6B00"/>
-  <!-- Text: RV Service Desk -->
-  <text x="76" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="currentColor">RV Service Desk</text>
+  <circle cx="18" cy="38" r="6" stroke="#00CED1" stroke-width="2.5" fill="none"/>
+  <circle cx="18" cy="38" r="2" fill="#00CED1"/>
+  <!-- Hitch/connector -->
+  <path d="M6 30H2" stroke="#00CED1" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Wrench - orange, integrated with RV -->
+  <path d="M54 24H64V20H68V24H78V28H68V32H64V28H54V24Z" fill="#FF6B00"/>
+  <!-- Wrench jaw detail -->
+  <path d="M78 22L82 18M78 30L82 34" stroke="#FF6B00" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Text: RV SERVICE in orange -->
+  <text x="90" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#FF6B00">RV SERVICE</text>
+  <!-- Text: DESK in cyan -->
+  <text x="90" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#00CED1">DESK</text>
 </svg>

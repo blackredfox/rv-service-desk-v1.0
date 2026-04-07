@@ -10,7 +10,6 @@ import { OrgSetupScreen } from "@/components/org-setup-screen";
 import { BillingPaywall } from "@/components/billing-paywall";
 import { AccessBlockedScreen } from "@/components/access-blocked";
 import { NoOrganizationScreen } from "@/components/no-organization";
-import { SupportButton } from "@/components/support-button";
 import { useAuth } from "@/hooks/use-auth";
 import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
@@ -448,42 +447,24 @@ export default function Home() {
     const message = status.kind === "no_org" ? status.message : undefined;
 
     return (
-      <>
-        <NoOrganizationScreen
+      <NoOrganizationScreen
           message={message}
           canCreateOrg={canCreateOrg}
           defaultDomain={defaultDomain}
           onCreateOrg={() => setStep("org_setup")}
         />
-        <SupportButton
-          accountData={{
-            email: user?.email,
-            accessReason: user?.access?.reason,
-            accessAllowed: user?.access?.allowed,
-          }}
-        />
-      </>
     );
   }
 
   // 4b) Not a member
   if (step === "not_a_member") {
     return (
-      <>
-        <AccessBlockedScreen
+      <AccessBlockedScreen
           reason="not_a_member"
           message={user?.access?.message || "Contact your administrator to be added."}
           isAdmin={false}
           onLogout={() => void logout()}
         />
-        <SupportButton
-          accountData={{
-            email: user?.email,
-            accessReason: "not_a_member",
-            accessAllowed: false,
-          }}
-        />
-      </>
     );
   }
 
@@ -514,8 +495,7 @@ export default function Home() {
   // 7) Blocked screen
   if (step === "blocked") {
     return (
-      <>
-        <AccessBlockedScreen
+      <AccessBlockedScreen
           reason={user?.access?.reason || "unknown"}
           message={user?.access?.message}
           isAdmin={user?.access?.isAdmin}
@@ -524,20 +504,6 @@ export default function Home() {
           }}
           onLogout={() => void logout()}
         />
-        <SupportButton
-          accountData={{
-            email: user?.email,
-            orgId: user?.organization?.id,
-            orgName: user?.organization?.name,
-            memberRole: user?.membership?.role,
-            memberStatus: user?.membership?.status,
-            seatCount: user?.organization?.activeSeatCount,
-            seatLimit: user?.organization?.seatLimit,
-            accessReason: user?.access?.reason,
-            accessAllowed: user?.access?.allowed,
-          }}
-        />
-      </>
     );
   }
 
@@ -618,17 +584,16 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Terms & Privacy link - anchored bottom-left, clear of support button */}
+      {/* Terms & Privacy link - bottom-right, orange/red color */}
       <button
         type="button"
         onClick={() => setShowTermsModal(true)}
         data-testid="terms-privacy-btn"
         className="
-          fixed bottom-4 left-4 z-30
+          fixed bottom-4 right-4 z-30
           px-2 py-1 rounded
-          text-[10px] font-medium uppercase tracking-wide
-          text-cyan-700 hover:text-cyan-800 hover:bg-cyan-50
-          dark:text-cyan-400 dark:hover:text-cyan-300 dark:hover:bg-cyan-950/30
+          text-[11px] font-bold uppercase tracking-wide
+          text-[#FF6B00] hover:text-orange-400 hover:underline
           transition-colors
         "
       >
@@ -640,19 +605,6 @@ export default function Home() {
         title="Terms of Use & Privacy Notice"
         markdown={termsMarkdown}
         onClose={() => setShowTermsModal(false)}
-      />
-
-      {/* Support Button */}
-      <SupportButton
-        accountData={{
-          email: user?.email,
-          orgId: user?.organization?.id,
-          orgName: user?.organization?.name,
-          memberRole: user?.membership?.role,
-          memberStatus: user?.membership?.status,
-          accessReason: user?.access?.reason,
-          accessAllowed: user?.access?.allowed,
-        }}
       />
     </div>
   );
