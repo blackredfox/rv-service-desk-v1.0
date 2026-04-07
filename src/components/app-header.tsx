@@ -1,7 +1,6 @@
 "use client";
 
 import { RefObject, useState } from "react";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { LanguageMode } from "@/lib/api";
 import type { AuthUser } from "@/hooks/use-auth";
@@ -130,7 +129,7 @@ export function AppHeader({
         data-testid="app-header"
         className="
           sticky top-0 z-40
-          flex h-16 items-center justify-between
+          flex h-20 items-center justify-between
           border-b border-zinc-800 bg-zinc-900 px-3
           md:px-4
         "
@@ -162,14 +161,11 @@ export function AppHeader({
             </button>
           )}
 
-          {/* Logo - faithful to original brand */}
-          <Image
-            src="/logo.svg"
+          {/* Logo - official brand image */}
+          <img
+            src="/logo.jpg"
             alt="RV Service Desk"
-            width={160}
-            height={40}
-            className="h-10 w-auto"
-            priority
+            className="h-14 w-auto"
           />
 
           {/* New Case CTA - PRIMARY BUTTON (orange) */}
