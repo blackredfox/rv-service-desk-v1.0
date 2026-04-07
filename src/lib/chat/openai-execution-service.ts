@@ -229,7 +229,6 @@ export async function executePrimaryChatCompletion(args: {
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
   finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
-  fallbackPreamble?: string;
   model: string;
   requestStartedAt: number;
 }): Promise<PrimaryChatExecutionResult> {
@@ -386,7 +385,6 @@ export async function executePrimaryChatCompletion(args: {
         activeStepMetadata: args.activeStepMetadata,
         activeStepId: args.activeStepId,
         finalReportAuthorityFacts: args.finalReportAuthorityFacts,
-        fallbackPreamble: args.fallbackPreamble,
       });
 
       args.emitToken(fallbackResponse);

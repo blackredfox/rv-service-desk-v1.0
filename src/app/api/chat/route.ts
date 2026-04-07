@@ -94,6 +94,7 @@ import {
   normalizeRoutingInput,
   assessRepairSummaryIntent,
   buildRepairSummaryClarificationResponse,
+  buildAuthoritativeStepFallback,
   type RepairSummaryMissingField,
 } from "@/lib/chat";
 
@@ -283,23 +284,7 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
 
 const AC_SUBTYPE_SYSTEMS = new Set(["roof_ac", "cab_ac", "roof_ac_heat_pump"]);
 
-function lowercaseFirstLetter(text: string): string {
-  return text.replace(/^\p{L}/u, (char) => char.toLowerCase());
-}
-
-function buildAcSubtypeResolutionPreamble(language: Language, procedureName: string): string {
-  const resolvedName = lowercaseFirstLetter(procedureName.trim());
-  switch (language) {
-    case "RU":
-      return `Принято. Проверим ${resolvedName} по шагам.`;
-    case "ES":
-      return `Entendido. Revisaremos ${resolvedName} paso a paso.`;
-    default:
-      return `Understood. We'll check ${resolvedName} step by step.`;
-  }
-}
-
-function shouldUseAcSubtypeResolutionPreamble(args: {
+function shouldRenderAuthoritativeAcSubtypeResolution(args: {
   historyBeforeAppend: Pick<ChatMessage, "role" | "content">[];
   language: Language;
   detectedSystem: string | null;
@@ -629,7 +614,7 @@ export async function POST(req: Request) {
   let contextEngineDirectives = "";
   let activeStepMetadata: RegistryActiveStepMetadata | null = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
-  let primaryFallbackPreamble: string | undefined;
+  let authoritativeAcSubtypeResolutionResponse: string | null = null;
 
   if (currentMode === "diagnostic" && !stepGuidancePlan && !reportRoutingResponse && !directDiagnosticResponse) {
     if (!STRICT_CONTEXT_ENGINE) {
@@ -907,16 +892,17 @@ export async function POST(req: Request) {
 
     const resolvedSystemForTurn = detectSystem(routingMessage);
     if (
-      shouldUseAcSubtypeResolutionPreamble({
+      shouldRenderAuthoritativeAcSubtypeResolution({
         historyBeforeAppend,
         language: outputPolicy.effective,
         detectedSystem: resolvedSystemForTurn,
         activeStepMetadata,
       })
     ) {
-      primaryFallbackPreamble = buildAcSubtypeResolutionPreamble(
+      authoritativeAcSubtypeResolutionResponse = buildAuthoritativeStepFallback(
+        activeStepMetadata,
+        activeStepMetadata?.id,
         outputPolicy.effective,
-        activeStepMetadata!.procedureName,
       );
     }
 
@@ -1110,10 +1096,11 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
 
         const directRoutingResponse = reportRoutingResponse ?? directDiagnosticResponse;
+        const directAuthoritativeResponse = authoritativeAcSubtypeResolutionResponse;
 
-        if (directRoutingResponse) {
-          emitToken(directRoutingResponse);
-          full = directRoutingResponse;
+        if (directRoutingResponse || directAuthoritativeResponse) {
+          full = directRoutingResponse ?? directAuthoritativeResponse ?? "";
+          emitToken(full);
 
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
@@ -1134,6 +1121,15 @@ export async function POST(req: Request) {
               },
               DEFAULT_CONFIG,
             );
+          }
+
+          if (currentMode === "diagnostic" && engineResult && directAuthoritativeResponse) {
+            finalizeDiagnosticPersistence({
+              caseId: ensuredCase.id,
+              mode: currentMode,
+              engineResult,
+              responseText: full,
+            });
           }
 
           controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
@@ -1274,7 +1270,6 @@ export async function POST(req: Request) {
           activeStepMetadata: activeStepMetadata as ChatActiveStepMetadata | null,
           activeStepId: engineResult?.context.activeStepId ?? undefined,
           finalReportAuthorityFacts,
-          fallbackPreamble: primaryFallbackPreamble,
           model: getModelForMode(currentMode),
           requestStartedAt,
         });

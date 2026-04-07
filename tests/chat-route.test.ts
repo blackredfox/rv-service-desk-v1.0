@@ -559,7 +559,7 @@ describe("Chat API Route", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("treats RU cab AC clarification as authoritative and avoids roof AC routing", async () => {
+    it("renders the authoritative RU cab AC active step directly after subtype clarification without roof AC drift", async () => {
       process.env.OPENAI_API_KEY = "sk-test-mock";
 
       const caseId = "case_ru_ac_case39";
@@ -600,23 +600,13 @@ describe("Chat API Route", () => {
         id: "msg_ru_ac_case39",
         caseId,
         role: "assistant",
-        content: "Принято.",
+        content: "Кондиционер кабины — Пошаговая диагностика",
         language: "RU",
         createdAt: new Date().toISOString(),
       } as never);
 
-      const mockStreamData = `data: {"choices":[{"delta":{"content":"Принято. Проверим кондиционер кабины по шагам."}}]}\n\ndata: [DONE]\n\n`;
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        body: new ReadableStream({
-          start(controller) {
-            controller.enqueue(new TextEncoder().encode(mockStreamData));
-            controller.close();
-          },
-        }),
-      });
-
       const { POST } = await import("@/app/api/chat/route");
+      const { getOrCreateContext } = await import("@/lib/context-engine");
 
       const response = await POST(new Request("http://localhost/api/chat", {
         method: "POST",
@@ -626,15 +616,17 @@ describe("Chat API Route", () => {
       const streamText = await response.text();
 
       expect(response.status).toBe(200);
-      expect(mockFetch).toHaveBeenCalled();
-      expect(streamText).toContain("Проверим кондиционер кабины");
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(streamText).toContain("Кондиционер кабины — Пошаговая диагностика");
+      expect(streamText).toContain("Шаг cab_1: Когда кондиционер кабины включён");
+      expect(streamText).not.toContain("Крышный кондиционер — Пошаговая диагностика");
+      expect(streamText).not.toContain("Шаг ac_1:");
+      expect(streamText).not.toContain('"type":"validation_fallback"');
+      expect(streamText).not.toContain('"type":"validation","valid":false');
 
-      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
-      const payload = JSON.parse(firstCall.body as string);
-      expect(payload.messages[0].content).toContain("Кондиционер кабины (STANDARD)");
-      expect(payload.messages[0].content).toContain("ТЕКУЩИЙ ШАГ: cab_1");
-      expect(payload.messages[0].content).not.toContain("Крышный кондиционер (STANDARD)");
-      expect(payload.messages[0].content).not.toContain("ТЕКУЩИЙ ШАГ: ac_1");
+      const context = getOrCreateContext(caseId);
+      expect(context.activeProcedureId).toBe("cab_ac");
+      expect(context.activeStepId).toBe("cab_1");
     });
   });
 });

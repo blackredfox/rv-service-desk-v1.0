@@ -145,7 +145,6 @@ export function buildPrimaryFallbackResponse(args: {
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
   finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
-  fallbackPreamble?: string;
 }): string {
   const hasDriftOrStepViolation =
     isDiagnosticDriftViolation(args.validation.violations) ||
@@ -159,7 +158,6 @@ export function buildPrimaryFallbackResponse(args: {
       args.activeStepMetadata,
       args.activeStepId,
       args.outputLanguage,
-      args.fallbackPreamble,
     );
   }
 

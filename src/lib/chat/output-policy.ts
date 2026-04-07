@@ -261,7 +261,6 @@ export function buildAuthoritativeStepFallback(
   stepMetadata: { id: string; question: string; procedureName: string; progress: { completed: number; total: number } } | null,
   fallbackStepId?: string,
   language: Language = "EN",
-  preamble?: string,
 ): string {
   const labels =
     language === "RU"
@@ -291,19 +290,16 @@ export function buildAuthoritativeStepFallback(
   if (!stepMetadata) {
     // No metadata available — use generic fallback
     const stepLabel = fallbackStepId ? ` (${fallbackStepId})` : "";
-    return [preamble?.trim(), `${labels.guidedDiagnostics}${stepLabel}: ${labels.genericQuestion}`]
-      .filter(Boolean)
-      .join("\n\n");
+    return `${labels.guidedDiagnostics}${stepLabel}: ${labels.genericQuestion}`;
   }
   
   // Build authoritative response with exact step question
   const lines = [
-    preamble?.trim() ?? "",
     `${stepMetadata.procedureName} — ${labels.guidedDiagnostics}`,
     `${labels.progress}: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} ${labels.stepsCompleted}`,
     ``,
     `${labels.step} ${stepMetadata.id}: ${stepMetadata.question}`,
-  ].filter(Boolean);
+  ];
   
   return lines.join("\n");
 }
