@@ -378,7 +378,7 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
   },
   roof_ac: {
     displayName: {
-      RU: "Крышный кондиционер / тепловой насос",
+      RU: "Крышный кондиционер",
     },
     steps: {
       ac_1: {

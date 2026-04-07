@@ -97,12 +97,12 @@ describe("Diagnostic language lock regression", () => {
     const context = buildRegistryContext(caseId, "ac_1", "RU");
     const metadata = getActiveStepMetadata(caseId, "ac_1", "RU");
 
-    expect(context).toContain("Крышный кондиционер / тепловой насос");
+    expect(context).toContain("Крышный кондиционер");
     expect(context).toContain("Когда AC включён, компрессор пытается запуститься");
     expect(context).not.toContain("Roof AC / Heat Pump");
     expect(context).not.toContain("When AC is turned on");
 
-    expect(metadata?.procedureName).toBe("Крышный кондиционер / тепловой насос");
+    expect(metadata?.procedureName).toBe("Крышный кондиционер");
     expect(metadata?.question).toContain("Когда AC включён, компрессор пытается запуститься");
     expect(metadata?.question).not.toContain("When AC is turned on");
   });
