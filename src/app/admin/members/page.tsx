@@ -75,9 +75,6 @@ export default function AdminMembersPage() {
   // Use local count when we have members loaded, fallback to org's stored value
   const activeSeatCount = members.length > 0 ? localActiveSeatCount : (user?.organization?.activeSeatCount || 0);
   
-  // Check if we can add more members
-  const canAddMember = activeSeatCount < seatLimit;
-
   const fetchMembers = useCallback(async () => {
     try {
       setLoading(true);

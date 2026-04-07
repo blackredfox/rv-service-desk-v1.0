@@ -509,8 +509,6 @@ describe("Admin Members API", () => {
       }));
 
       // First test: demoting when there's only 1 admin
-      const { PATCH } = await import("@/app/api/org/members/route");
-
       // Reset to have only 1 admin
       vi.doMock("@/lib/firestore", () => ({
         getMemberByUid: vi.fn(() =>

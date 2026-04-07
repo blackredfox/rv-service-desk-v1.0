@@ -169,7 +169,6 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
     const localId = `local_${Date.now()}`;
     const assistantMessageId = `${localId}_assistant`;
     const now = new Date().toISOString();
-    const isDraftStart = !caseId;
 
     // Capture and clear attachments before sending
     const currentAttachments = [...photoAttachments];
@@ -226,17 +225,12 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
       void analytics.chatSent(caseId ?? undefined);
 
       let serverCaseId: string | null = null;
-      let caseCreatedTracked = false;
       let pendingTurnLanguage: TurnLanguageBadge | null = null;
 
       const onEvent = (ev: ChatSseEvent) => {
         if (ev.type === "case") {
           const newId = ev.caseId ?? null;
           serverCaseId = newId;
-          if (isDraftStart && newId && !caseCreatedTracked) {
-            caseCreatedTracked = true;
-            void analytics.caseCreated(newId);
-          }
           onCaseId(newId);
           return;
         }
