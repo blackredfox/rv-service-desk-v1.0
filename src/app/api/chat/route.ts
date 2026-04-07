@@ -281,6 +281,43 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
   }
 }
 
+const AC_SUBTYPE_SYSTEMS = new Set(["roof_ac", "cab_ac", "roof_ac_heat_pump"]);
+
+function lowercaseFirstLetter(text: string): string {
+  return text.replace(/^\p{L}/u, (char) => char.toLowerCase());
+}
+
+function buildAcSubtypeResolutionPreamble(language: Language, procedureName: string): string {
+  const resolvedName = lowercaseFirstLetter(procedureName.trim());
+  switch (language) {
+    case "RU":
+      return `Принято. Проверим ${resolvedName} по шагам.`;
+    case "ES":
+      return `Entendido. Revisaremos ${resolvedName} paso a paso.`;
+    default:
+      return `Understood. We'll check ${resolvedName} step by step.`;
+  }
+}
+
+function shouldUseAcSubtypeResolutionPreamble(args: {
+  historyBeforeAppend: Pick<ChatMessage, "role" | "content">[];
+  language: Language;
+  detectedSystem: string | null;
+  activeStepMetadata: RegistryActiveStepMetadata | null;
+}): boolean {
+  const lastAssistantMessage = [...args.historyBeforeAppend]
+    .reverse()
+    .find((msg) => msg.role === "assistant")
+    ?.content
+    ?.trim();
+
+  if (!lastAssistantMessage) return false;
+  if (!args.detectedSystem || !AC_SUBTYPE_SYSTEMS.has(args.detectedSystem)) return false;
+  if (!args.activeStepMetadata || args.activeStepMetadata.progress.completed !== 0) return false;
+
+  return lastAssistantMessage === buildAcSubtypeClarificationResponse(args.language).trim();
+}
+
 function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete" | "terminalState"> | null | undefined): boolean {
   return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
@@ -592,6 +629,7 @@ export async function POST(req: Request) {
   let contextEngineDirectives = "";
   let activeStepMetadata: RegistryActiveStepMetadata | null = null;
   let finalReportAuthorityFacts: FinalReportAuthorityFacts | null = null;
+  let primaryFallbackPreamble: string | undefined;
 
   if (currentMode === "diagnostic" && !stepGuidancePlan && !reportRoutingResponse && !directDiagnosticResponse) {
     if (!STRICT_CONTEXT_ENGINE) {
@@ -865,6 +903,21 @@ export async function POST(req: Request) {
     );
     if (activeStepMetadata) {
       console.log(`[Chat API v2] Active step: ${activeStepMetadata.id} (${activeStepMetadata.progress.completed}/${activeStepMetadata.progress.total})`);
+    }
+
+    const resolvedSystemForTurn = detectSystem(routingMessage);
+    if (
+      shouldUseAcSubtypeResolutionPreamble({
+        historyBeforeAppend,
+        language: outputPolicy.effective,
+        detectedSystem: resolvedSystemForTurn,
+        activeStepMetadata,
+      })
+    ) {
+      primaryFallbackPreamble = buildAcSubtypeResolutionPreamble(
+        outputPolicy.effective,
+        activeStepMetadata!.procedureName,
+      );
     }
 
     const terminalPhaseAfterProcessing =
@@ -1221,6 +1274,7 @@ export async function POST(req: Request) {
           activeStepMetadata: activeStepMetadata as ChatActiveStepMetadata | null,
           activeStepId: engineResult?.context.activeStepId ?? undefined,
           finalReportAuthorityFacts,
+          fallbackPreamble: primaryFallbackPreamble,
           model: getModelForMode(currentMode),
           requestStartedAt,
         });
