@@ -40,6 +40,12 @@ describe("detectSystem", () => {
     expect(detectSystem("heat pump not heating or cooling")).toBe("roof_ac");
   });
 
+  it("detects explicit dash/cab AC evidence without collapsing to roof AC", async () => {
+    const { detectSystem } = await import("@/lib/diagnostic-procedures");
+    expect(detectSystem("dash AC not cooling")).toBe("cab_ac");
+    expect(detectSystem("кондиционер кабины")).toBe("cab_ac");
+  });
+
   it("detects LP gas", async () => {
     const { detectSystem } = await import("@/lib/diagnostic-procedures");
     expect(detectSystem("LP gas system issue, no flame")).toBe("lp_gas");
@@ -107,6 +113,15 @@ describe("getProcedure", () => {
     expect(proc).not.toBeNull();
     expect(proc!.system).toBe("water_pump");
     expect(proc!.steps.length).toBeGreaterThan(0);
+  });
+
+  it("returns cab_ac procedure", async () => {
+    const { getProcedure } = await import("@/lib/diagnostic-procedures");
+    const proc = getProcedure("cab_ac");
+    expect(proc).not.toBeNull();
+    expect(proc!.system).toBe("cab_ac");
+    expect(proc!.displayName).toBe("Dash / Cab AC");
+    expect(proc!.steps[0]?.id).toBe("cab_1");
   });
 
   it("returns lp_gas procedure with correct step order", async () => {

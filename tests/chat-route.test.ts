@@ -558,5 +558,83 @@ describe("Chat API Route", () => {
       expect(streamText).not.toContain("Roof AC / Heat Pump");
       expect(mockFetch).not.toHaveBeenCalled();
     });
+
+    it("treats RU cab AC clarification as authoritative and avoids roof AC routing", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const caseId = "case_ru_ac_case39";
+      const { clearRegistry } = await import("@/lib/diagnostic-registry");
+      const { clearContext } = await import("@/lib/context-engine");
+      clearRegistry(caseId);
+      clearContext(caseId);
+
+      const mockCase = {
+        id: caseId,
+        title: "RU AC Case 39",
+        userId: "user_123",
+        inputLanguage: "RU",
+        languageSource: "AUTO",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue({
+        id: "user_123",
+        email: "test@example.com",
+        plan: "FREE",
+        status: "ACTIVE",
+      } as never);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([
+        {
+          role: "user",
+          content: "Не работает AC",
+        },
+        {
+          role: "assistant",
+          content: "Чтобы выбрать правильную процедуру по AC, уточните тип узла: это крышный кондиционер, кондиционер кабины, крышный кондиционер с тепловым насосом или другой вариант?",
+        },
+      ] as never);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_ru_ac_case39",
+        caseId,
+        role: "assistant",
+        content: "Принято.",
+        language: "RU",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const mockStreamData = `data: {"choices":[{"delta":{"content":"Принято. Проверим кондиционер кабины по шагам."}}]}\n\ndata: [DONE]\n\n`;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(mockStreamData));
+            controller.close();
+          },
+        }),
+      });
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const response = await POST(new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId, message: "кондиционер кабины" }),
+      }));
+      const streamText = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(mockFetch).toHaveBeenCalled();
+      expect(streamText).toContain("Проверим кондиционер кабины");
+
+      const firstCall = mockFetch.mock.calls[0][1] as RequestInit;
+      const payload = JSON.parse(firstCall.body as string);
+      expect(payload.messages[0].content).toContain("Кондиционер кабины (STANDARD)");
+      expect(payload.messages[0].content).toContain("ТЕКУЩИЙ ШАГ: cab_1");
+      expect(payload.messages[0].content).not.toContain("Крышный кондиционер (STANDARD)");
+      expect(payload.messages[0].content).not.toContain("ТЕКУЩИЙ ШАГ: ac_1");
+    });
   });
 });
