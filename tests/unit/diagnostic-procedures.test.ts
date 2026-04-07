@@ -27,9 +27,17 @@ describe("detectSystem", () => {
     expect(detectSystem("Furnace won't ignite")).toBe("furnace");
   });
 
-  it("detects roof AC", async () => {
+  it("does not auto-lock broad AC complaints to roof AC", async () => {
     const { detectSystem } = await import("@/lib/diagnostic-procedures");
-    expect(detectSystem("AC not cooling")).toBe("roof_ac");
+    expect(detectSystem("AC not cooling")).toBeNull();
+    expect(detectSystem("Не работает AC")).toBeNull();
+  });
+
+  it("detects explicit roof AC / heat pump evidence", async () => {
+    const { detectSystem } = await import("@/lib/diagnostic-procedures");
+    expect(detectSystem("roof AC not cooling")).toBe("roof_ac");
+    expect(detectSystem("крышный кондиционер не охлаждает")).toBe("roof_ac");
+    expect(detectSystem("heat pump not heating or cooling")).toBe("roof_ac");
   });
 
   it("detects LP gas", async () => {

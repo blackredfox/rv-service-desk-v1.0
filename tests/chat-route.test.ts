@@ -511,5 +511,52 @@ describe("Chat API Route", () => {
         })
       );
     });
+
+    it("should ask a bounded RU AC subtype clarification without locking roof AC", async () => {
+      process.env.OPENAI_API_KEY = "sk-test-mock";
+
+      const mockCase = {
+        id: "case_ru_ac_1",
+        title: "RU AC Case",
+        userId: "user_123",
+        inputLanguage: "RU",
+        languageSource: "AUTO",
+        mode: "diagnostic",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(getCurrentUser).mockResolvedValue({
+        id: "user_123",
+        email: "test@example.com",
+        plan: "FREE",
+        status: "ACTIVE",
+      } as never);
+      vi.mocked(storage.ensureCase).mockResolvedValue(mockCase as never);
+      vi.mocked(storage.listMessagesForContext).mockResolvedValue([]);
+      vi.mocked(storage.appendMessage).mockResolvedValue({
+        id: "msg_ru_ac_1",
+        caseId: "case_ru_ac_1",
+        role: "assistant",
+        content: "Чтобы выбрать правильную процедуру по AC, уточните тип узла",
+        language: "RU",
+        createdAt: new Date().toISOString(),
+      } as never);
+
+      const { POST } = await import("@/app/api/chat/route");
+
+      const response = await POST(new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Не работает AC" }),
+      }));
+      const streamText = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(streamText).toContain('"outputEffective":"RU"');
+      expect(streamText).toContain("Чтобы выбрать правильную процедуру по AC, уточните тип узла");
+      expect(streamText).not.toContain("Roof AC / Heat Pump");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
   });
 });
