@@ -20,16 +20,12 @@ type Props = {
   accountData?: AccountData;
 };
 
-const SUPPORT_EMAIL = "support@rvservicedesk.com";
-
 /**
- * Floating support button - positioned in bottom-right corner
- * with adequate spacing from other elements
+ * Floating support button with modal for contact + copy account details
  */
 export function SupportButton({ accountData }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [emailCopied, setEmailCopied] = useState(false);
   const pathname = usePathname();
 
   const appVersion = accountData?.appVersion || process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0";
@@ -63,58 +59,39 @@ export function SupportButton({ accountData }: Props) {
     return lines.join("\n");
   }
 
-  async function copyToClipboard(text: string): Promise<boolean> {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      try {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-  }
-
   async function handleCopyAccountDetails() {
-    const success = await copyToClipboard(formatAccountDetails());
-    if (success) {
+    try {
+      await navigator.clipboard.writeText(formatAccountDetails());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for browsers without clipboard API
+      const textarea = document.createElement("textarea");
+      textarea.value = formatAccountDetails();
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   }
 
-  async function handleCopyEmail() {
-    const success = await copyToClipboard(SUPPORT_EMAIL);
-    if (success) {
-      setEmailCopied(true);
-      setTimeout(() => setEmailCopied(false), 2000);
-    }
-  }
-
   return (
     <>
-      {/* Floating Button - bottom right with safe spacing */}
+      {/* Floating Button */}
       <button
         type="button"
         onClick={() => setIsOpen(true)}
         data-testid="support-button"
         aria-label="Get support"
         className="
-          fixed bottom-4 right-4 z-40
-          flex h-11 w-11 items-center justify-center
-          rounded-full bg-cyan-600 text-white shadow-lg
-          hover:bg-cyan-700
-          transition-all hover:scale-105
-          md:h-12 md:w-12
+          fixed bottom-4 right-4 z-50
+          flex h-12 w-12 items-center justify-center
+          rounded-full bg-zinc-900 text-white shadow-lg
+          hover:bg-zinc-800
+          dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white
+          transition-transform hover:scale-105
         "
       >
         <svg
@@ -135,7 +112,7 @@ export function SupportButton({ accountData }: Props) {
       {/* Modal Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end justify-end p-4 sm:items-center sm:justify-center"
           onClick={() => setIsOpen(false)}
         >
           {/* Backdrop */}
@@ -147,9 +124,8 @@ export function SupportButton({ accountData }: Props) {
             data-testid="support-modal"
             className="
               relative w-full max-w-sm
-              rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl
+              rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl
               dark:border-zinc-800 dark:bg-zinc-950
-              max-h-[90vh] overflow-y-auto
             "
           >
             {/* Close button */}
@@ -178,65 +154,22 @@ export function SupportButton({ accountData }: Props) {
             </p>
 
             <div className="mt-5 space-y-3">
-              {/* Email Support - mailto link */}
+              {/* Contact Support */}
               <a
-                href={`mailto:${SUPPORT_EMAIL}`}
+                href="mailto:support@rvservicedesk.com"
                 data-testid="support-email-link"
                 className="
                   flex w-full items-center justify-center gap-2
-                  rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white
+                  rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white
                   hover:bg-zinc-800
                   dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white
-                  transition-colors
                 "
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                Email Support
+                Contact Support
               </a>
-
-              {/* Copy Email - reliable fallback */}
-              <button
-                type="button"
-                onClick={handleCopyEmail}
-                data-testid="copy-support-email-button"
-                className="
-                  flex w-full items-center justify-center gap-2
-                  rounded-lg border border-cyan-500 bg-cyan-50 px-4 py-2.5 text-sm font-medium text-cyan-700
-                  hover:bg-cyan-100
-                  dark:border-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 dark:hover:bg-cyan-950/60
-                  transition-colors
-                "
-              >
-                {emailCopied ? (
-                  <>
-                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Email Copied!
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Copy {SUPPORT_EMAIL}
-                  </>
-                )}
-              </button>
-
-              {/* Divider */}
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-2 text-xs text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
-                    Additional info
-                  </span>
-                </div>
-              </div>
 
               {/* Copy Account Details */}
               <button
@@ -245,10 +178,9 @@ export function SupportButton({ accountData }: Props) {
                 data-testid="copy-account-details-button"
                 className="
                   flex w-full items-center justify-center gap-2
-                  rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700
+                  rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700
                   hover:bg-zinc-50
                   dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900
-                  transition-colors
                 "
               >
                 {copied ? (
@@ -256,7 +188,7 @@ export function SupportButton({ accountData }: Props) {
                     <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Details Copied!
+                    Copied!
                   </>
                 ) : (
                   <>
