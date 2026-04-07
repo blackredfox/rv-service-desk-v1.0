@@ -8,6 +8,7 @@ import { SupportButton } from "@/components/support-button";
 type Member = {
   id: string;
   email: string;
+  displayName?: string;
   role: "admin" | "member";
   status: "active" | "inactive" | "pending";
   createdAt: string;
@@ -52,9 +53,11 @@ export default function AdminMembersPage() {
   // Add member form
   const [showAddForm, setShowAddForm] = useState(false);
   const [addEmail, setAddEmail] = useState("");
+  const [addDisplayName, setAddDisplayName] = useState("");
   const [addRole, setAddRole] = useState<"member" | "admin">("member");
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [draftDisplayNames, setDraftDisplayNames] = useState<Record<string, string>>({});
 
   // Update member state
   const [updateLoading, setUpdateLoading] = useState<string | null>(null);
@@ -72,9 +75,6 @@ export default function AdminMembersPage() {
   // Use local count when we have members loaded, fallback to org's stored value
   const activeSeatCount = members.length > 0 ? localActiveSeatCount : (user?.organization?.activeSeatCount || 0);
   
-  // Check if we can add more members
-  const canAddMember = activeSeatCount < seatLimit;
-
   const fetchMembers = useCallback(async () => {
     try {
       setLoading(true);
@@ -87,7 +87,13 @@ export default function AdminMembersPage() {
       }
 
       const data = await res.json();
-      setMembers(data.members || []);
+      const nextMembers = data.members || [];
+      setMembers(nextMembers);
+      setDraftDisplayNames(
+        Object.fromEntries(
+          nextMembers.map((member: Member) => [member.id, member.displayName ?? ""])
+        )
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load members");
     } finally {
@@ -143,7 +149,11 @@ export default function AdminMembersPage() {
       const res = await fetch("/api/org/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: addEmail.trim().toLowerCase(), role: addRole }),
+        body: JSON.stringify({
+          email: addEmail.trim().toLowerCase(),
+          displayName: addDisplayName.trim(),
+          role: addRole,
+        }),
         credentials: "same-origin",
       });
 
@@ -154,6 +164,7 @@ export default function AdminMembersPage() {
 
       // Success - refresh both members list and auth context (for seat counter)
       setAddEmail("");
+      setAddDisplayName("");
       setAddRole("member");
       setShowAddForm(false);
       await Promise.all([fetchMembers(), refresh()]);
@@ -164,7 +175,7 @@ export default function AdminMembersPage() {
     }
   }
 
-  async function handleUpdateMember(memberId: string, update: { status?: string; role?: string }) {
+  async function handleUpdateMember(memberId: string, update: { status?: string; role?: string; displayName?: string }) {
     setUpdateLoading(memberId);
 
     try {
@@ -447,6 +458,25 @@ export default function AdminMembersPage() {
                         "
                       />
                     </div>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                        Display Name
+                      </label>
+                      <input
+                        type="text"
+                        value={addDisplayName}
+                        onChange={(e) => setAddDisplayName(e.target.value)}
+                        data-testid="add-member-display-name"
+                        disabled={addLoading}
+                        placeholder="Optional name for the header"
+                        className="
+                          w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm
+                          outline-none focus:ring-2 focus:ring-zinc-300
+                          disabled:cursor-not-allowed disabled:opacity-50
+                          dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700
+                        "
+                      />
+                    </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                         Role
@@ -484,6 +514,7 @@ export default function AdminMembersPage() {
                         onClick={() => {
                           setShowAddForm(false);
                           setAddEmail("");
+                          setAddDisplayName("");
                           setAddError(null);
                         }}
                         disabled={addLoading}
@@ -559,18 +590,28 @@ export default function AdminMembersPage() {
                     const isCurrentUser = member.email === user?.email;
                     const isLastAdmin = member.role === "admin" && adminCount <= 1;
                     const isUpdating = updateLoading === member.id;
+                    const displayNameValue = draftDisplayNames[member.id] ?? "";
+                    const displayNameDirty = displayNameValue !== (member.displayName ?? "");
 
                     return (
                       <li
                         key={member.id}
                         data-testid={`member-row-${member.id}`}
-                        className="flex items-center justify-between gap-4 px-4 py-3"
+                        className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
+                            {member.displayName ? (
+                              <span
+                                data-testid={`member-display-name-${member.id}`}
+                                className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+                              >
+                                {member.displayName}
+                              </span>
+                            ) : null}
                             <span
                               data-testid={`member-email-${member.id}`}
-                              className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50"
+                              className="truncate text-sm font-medium text-zinc-500 dark:text-zinc-400"
                             >
                               {member.email}
                             </span>
@@ -606,6 +647,54 @@ export default function AdminMembersPage() {
                             <span className="text-zinc-400">
                               Added {new Date(member.createdAt).toLocaleDateString()}
                             </span>
+                          </div>
+
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <div className="sm:max-w-xs sm:flex-1">
+                              <label
+                                htmlFor={`member-display-name-input-${member.id}`}
+                                className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                              >
+                                Display name
+                              </label>
+                              <input
+                                id={`member-display-name-input-${member.id}`}
+                                type="text"
+                                value={displayNameValue}
+                                onChange={(e) =>
+                                  setDraftDisplayNames((prev) => ({
+                                    ...prev,
+                                    [member.id]: e.target.value,
+                                  }))
+                                }
+                                data-testid={`member-display-name-input-${member.id}`}
+                                disabled={isUpdating}
+                                placeholder="Optional header name"
+                                className="
+                                  w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm
+                                  outline-none focus:ring-2 focus:ring-zinc-300
+                                  disabled:cursor-not-allowed disabled:opacity-50
+                                  dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700
+                                "
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateMember(member.id, {
+                                  displayName: displayNameValue,
+                                })
+                              }
+                              data-testid={`save-display-name-${member.id}`}
+                              disabled={isUpdating || !displayNameDirty}
+                              className="
+                                rounded-md border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700
+                                hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50
+                                dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900
+                              "
+                            >
+                              {isUpdating ? "Saving..." : "Save name"}
+                            </button>
                           </div>
                         </div>
 

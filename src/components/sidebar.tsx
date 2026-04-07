@@ -7,6 +7,7 @@ import { formatTimeLeft, getUrgencyTier } from "@/lib/retention";
 
 type Props = {
   activeCaseId: string | null;
+  hasActiveDraft?: boolean;
   onSelectCase: (caseId: string | null) => void;
   disabled?: boolean;
   collapsed?: boolean;
@@ -17,6 +18,7 @@ type Props = {
 
 export function Sidebar({
   activeCaseId,
+  hasActiveDraft = false,
   onSelectCase,
   disabled,
   collapsed = false,
@@ -53,24 +55,24 @@ export function Sidebar({
 
   useEffect(() => {
     void refresh().then((cs) => {
-      if (!activeCaseId && cs.length > 0) {
+      if (!activeCaseId && !hasActiveDraft && cs.length > 0) {
         onSelectCase(cs[0].id);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hasActiveDraft]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       void refresh().then((cs) => {
-        if (!activeCaseId && cs.length > 0) {
+        if (!activeCaseId && !hasActiveDraft && cs.length > 0) {
           onSelectCase(cs[0].id);
         }
       });
     }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [hasActiveDraft, query]);
 
   async function onDelete(caseId: string) {
     if (!confirm("Delete this case?")) return;

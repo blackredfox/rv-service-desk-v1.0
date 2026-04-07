@@ -11,23 +11,29 @@
  * @see https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7
  */
 
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
+import type { PrismaClient } from "@prisma/client";
+import type { Pool } from "pg";
 
 declare global {
   var __prismaClient: PrismaClient | null | undefined;
   var __prismaPool: Pool | undefined;
 }
 
-function buildClient(): PrismaClient | null {
+async function buildClient(): Promise<PrismaClient | null> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.warn("[db] DATABASE_URL is not set — running without database.");
+    globalThis.__prismaClient = null;
     return null;
   }
 
   try {
+    const [{ PrismaClient }, { PrismaPg }, { Pool }] = await Promise.all([
+      import("@prisma/client"),
+      import("@prisma/adapter-pg"),
+      import("pg"),
+    ]);
+
     const pool = new Pool({ connectionString: url });
     const adapter = new PrismaPg(pool);
     const client = new PrismaClient({ adapter });
@@ -36,7 +42,14 @@ function buildClient(): PrismaClient | null {
     globalThis.__prismaClient = client;
     return client;
   } catch (err) {
-    console.error("[db] Failed to initialise Prisma client:", err);
+    const message = err instanceof Error ? err.message : String(err);
+
+    if (message.includes(".prisma/client/default")) {
+      console.warn("[db] Prisma client is not generated — falling back to memory storage.");
+    } else {
+      console.error("[db] Failed to initialise Prisma client:", err);
+    }
+
     globalThis.__prismaClient = null;
     return null;
   }

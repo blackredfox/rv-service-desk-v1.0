@@ -47,9 +47,11 @@ export async function GET() {
     const sanitized = members.map(m => ({
       id: m.id,
       email: m.email,
+      displayName: m.displayName,
       role: m.role,
       status: m.status,
       createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
     }));
     
     return NextResponse.json({ members: sanitized });
@@ -66,6 +68,7 @@ export async function GET() {
 
 type InviteMemberBody = {
   email?: string;
+  displayName?: string;
   role?: "admin" | "member";
 };
 
@@ -116,6 +119,7 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => null)) as InviteMemberBody | null;
     
     const email = body?.email?.trim().toLowerCase();
+    const displayName = body?.displayName?.trim();
     const role = body?.role || "member";
     
     if (!email) {
@@ -153,6 +157,7 @@ export async function POST(req: Request) {
       orgId: org.id,
       uid: `pending_${Date.now()}`, // Temporary UID until user signs up
       email,
+      displayName,
       role,
       status: "active",
     });
@@ -174,6 +179,7 @@ export async function POST(req: Request) {
       member: {
         id: newMember.id,
         email: newMember.email,
+        displayName: newMember.displayName,
         role: newMember.role,
         status: newMember.status,
       },
@@ -192,6 +198,7 @@ export async function POST(req: Request) {
 
 type UpdateMemberBody = {
   memberId?: string;
+  displayName?: string;
   status?: "active" | "inactive";
   role?: "admin" | "member";
 };
@@ -221,6 +228,8 @@ export async function PATCH(req: Request) {
     const body = (await req.json().catch(() => null)) as UpdateMemberBody | null;
     
     const memberId = body?.memberId;
+    const hasDisplayName = body !== null && Object.prototype.hasOwnProperty.call(body, "displayName");
+    const displayName = hasDisplayName ? (body?.displayName ?? "").trim() : undefined;
     const status = body?.status;
     const role = body?.role;
     
@@ -228,8 +237,8 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "memberId is required" }, { status: 400 });
     }
     
-    if (!status && !role) {
-      return NextResponse.json({ error: "status or role is required" }, { status: 400 });
+    if (!status && !role && !hasDisplayName) {
+      return NextResponse.json({ error: "status, role, or displayName is required" }, { status: 400 });
     }
     
     // Get the member to update
@@ -273,6 +282,7 @@ export async function PATCH(req: Request) {
     const updateData: Partial<OrgMember> = {};
     if (status) updateData.status = status;
     if (role) updateData.role = role;
+    if (hasDisplayName) updateData.displayName = displayName;
     
     await updateMember(memberId, updateData);
     

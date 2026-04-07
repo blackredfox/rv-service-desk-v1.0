@@ -39,6 +39,7 @@ export type OrgMember = {
   orgId: string;
   uid: string;
   email: string;
+  displayName?: string;
   role: MemberRole;
   status: MemberStatus;
   createdAt: string;
@@ -172,17 +173,20 @@ export async function createMember(data: {
   orgId: string;
   uid: string;
   email: string;
+  displayName?: string;
   role?: MemberRole;
   status?: MemberStatus;
 }): Promise<OrgMember> {
   const db = getFirestore();
   const now = new Date().toISOString();
+  const displayName = data.displayName?.trim();
   
   const memberRef = db.collection("orgMembers").doc();
   const member: Omit<OrgMember, "id"> = {
     orgId: data.orgId,
     uid: data.uid,
     email: data.email.toLowerCase(),
+    ...(displayName ? { displayName } : {}),
     role: data.role || "member",
     status: data.status || "active",
     createdAt: now,
@@ -205,8 +209,16 @@ export async function updateMember(
   data: Partial<Omit<OrgMember, "id">>
 ): Promise<void> {
   const db = getFirestore();
+  const updates = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as Partial<Omit<OrgMember, "id">>;
+
+  if (Object.prototype.hasOwnProperty.call(data, "displayName")) {
+    updates.displayName = (data.displayName ?? "").trim();
+  }
+
   await db.collection("orgMembers").doc(memberId).update({
-    ...data,
+    ...updates,
     updatedAt: new Date().toISOString(),
   });
 }

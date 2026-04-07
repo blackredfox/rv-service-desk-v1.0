@@ -68,21 +68,7 @@ describe("Cases API Routes", () => {
   });
 
   describe("POST /api/cases", () => {
-    it("should create case with user ownership", async () => {
-      const mockUser = { id: "user_123", email: "test@example.com", plan: "FREE" as const, status: "ACTIVE" as const };
-      const mockCase = {
-        id: "case_new",
-        title: "New Case",
-        userId: "user_123",
-        inputLanguage: "EN",
-        languageSource: "AUTO",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
-      vi.mocked(storage.createCase).mockResolvedValue(mockCase as never);
-
+    it("should reject empty draft creation attempts", async () => {
       const { POST } = await import("@/app/api/cases/route");
 
       const req = new Request("http://localhost/api/cases", {
@@ -94,12 +80,9 @@ describe("Cases API Routes", () => {
       const response = await POST(req);
       const data = await response.json();
 
-      expect(response.status).toBe(201);
-      expect(data.case.id).toBe("case_new");
-      expect(storage.createCase).toHaveBeenCalledWith({
-        title: "New Case",
-        userId: "user_123",
-      });
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("first meaningful message");
+      expect(storage.createCase).not.toHaveBeenCalled();
     });
   });
 

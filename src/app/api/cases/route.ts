@@ -14,15 +14,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  try {
-    const user = await getCurrentUser();
-    const body = (await req.json().catch(() => null)) as { title?: string } | null;
-    const created = await storage.createCase({ 
-      title: body?.title,
-      userId: user?.id,
-    });
-    return NextResponse.json({ case: created }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Failed to create case" }, { status: 500 });
-  }
+  await req.json().catch(() => null);
+  return NextResponse.json(
+    { error: "Cases are created only after the first meaningful message is sent." },
+    { status: 400 }
+  );
 }

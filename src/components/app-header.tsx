@@ -27,6 +27,29 @@ type Props = {
 
 const SUPPORT_EMAIL = "support@rvservicedesk.com";
 
+export function getCompactEmailLabel(email: string): string {
+  const trimmed = email.trim();
+  if (!trimmed) return "-";
+
+  const [localPart] = trimmed.split("@");
+  const safeLocal = localPart || trimmed;
+
+  if (safeLocal.length <= 18) {
+    return safeLocal;
+  }
+
+  return `${safeLocal.slice(0, 12)}…${safeLocal.slice(-3)}`;
+}
+
+export function getHeaderIdentityLabel(displayName?: string | null, email?: string | null): string {
+  const trimmedDisplayName = displayName?.trim();
+  if (trimmedDisplayName) {
+    return trimmedDisplayName;
+  }
+
+  return getCompactEmailLabel(email ?? "");
+}
+
 export function AppHeader({
   sidebarCollapsed,
   onToggleSidebar,
@@ -50,6 +73,7 @@ export function AppHeader({
   const [emailCopied, setEmailCopied] = useState(false);
   const [detailsCopied, setDetailsCopied] = useState(false);
   const pathname = usePathname();
+  const headerIdentity = getHeaderIdentityLabel(user?.displayName, userEmail);
 
   const languageLabels: Record<LanguageMode, string> = {
     AUTO: "Auto",
@@ -206,8 +230,8 @@ export function AppHeader({
               aria-haspopup="menu"
               aria-expanded={userMenuOpen}
             >
-              <span className="hidden max-w-[120px] truncate md:block">
-                {userEmail || "-"}
+              <span data-testid="header-user-identity" className="hidden max-w-[140px] truncate md:block">
+                {headerIdentity}
               </span>
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -228,7 +252,7 @@ export function AppHeader({
                   <div className="text-[10px] uppercase tracking-wider text-zinc-500">
                     Signed in as
                   </div>
-                  <div className="mt-1 truncate text-[#00CED1]">{userEmail || "-"}</div>
+                  <div data-testid="user-menu-full-email" className="mt-1 truncate text-[#00CED1]">{userEmail || "-"}</div>
                   {user?.organization && (
                     <div className="mt-1 text-[10px] text-zinc-400">
                       {user.organization.name}
