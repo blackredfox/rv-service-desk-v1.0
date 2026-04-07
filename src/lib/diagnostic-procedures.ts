@@ -76,6 +76,15 @@ const ROOF_AC_SPECIFIC_PATTERNS = [
   /bomba\s+de\s+calor/i,
 ];
 
+const CAB_AC_SPECIFIC_PATTERNS = [
+  /(?:dash|cab|cabin)\s*(?:ac|a\/c|air\s*condition(?:er|ing)?)/i,
+  /(?:ac|a\/c|air\s*condition(?:er|ing)?).*(?:dash|cab|cabin)/i,
+  /кондиционер\s+кабин/i,
+  /кабин\S*\s+кондицион/i,
+  /aire\s+acondicionado\s+de\s+(?:cabina|tablero)/i,
+  /(?:ac|aire\s+acondicionado).*(?:cabina|tablero)/i,
+];
+
 const BROAD_AC_FAMILY_PATTERNS = [
   /(?:ac|a\/c).*(?:not\s+cool(?:ing)?|not\s+working|issue|problem|dead|inoperative|broken|no\s+cool(?:ing)?)/i,
   /(?:not\s+cool(?:ing)?|not\s+working|issue|problem|dead|inoperative|broken|no\s+cool(?:ing)?).*(?:ac|a\/c)/i,
@@ -88,6 +97,10 @@ const BROAD_AC_FAMILY_PATTERNS = [
 
 export function hasSpecificRoofAcEvidence(message: string): boolean {
   return ROOF_AC_SPECIFIC_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+export function hasSpecificCabAcEvidence(message: string): boolean {
+  return CAB_AC_SPECIFIC_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 export function isBroadAcFamilyMessage(message: string): boolean {
@@ -128,6 +141,7 @@ const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
   ]},
   { system: "inverter_converter", patterns: [/inverter/i, /converter/i, /инвертер|инвертор|конвертер|конвертор/i] },
   { system: "furnace", patterns: [/furnace/i, /heater(?!\s*pump)/i, /печ[ьк]/i, /калориф/i, /horno/i, /calefacc/i] },
+  { system: "cab_ac", patterns: CAB_AC_SPECIFIC_PATTERNS },
   { system: "roof_ac", patterns: ROOF_AC_SPECIFIC_PATTERNS },
   { system: "ice_maker", patterns: [
     /ice\s*maker/i,
@@ -459,6 +473,62 @@ const PROCEDURE_LOCALIZATIONS: Partial<Record<string, LocalizedProcedureContent>
         },
         howToCheck: {
           RU: "Откройте коробку управления и наблюдайте за светодиодами платы во время запроса на охлаждение. Зафиксируйте точную последовательность мигания, постоянный свет или отображаемый код.",
+        },
+      },
+    },
+  },
+  cab_ac: {
+    displayName: {
+      RU: "Кондиционер кабины",
+      ES: "A/C de cabina/tablero",
+    },
+    steps: {
+      cab_1: {
+        question: {
+          RU: "Когда кондиционер кабины включён, работает ли вентилятор и есть ли поток воздуха из дефлекторов панели?",
+        },
+        howToCheck: {
+          RU: "Включите кондиционер кабины, выберите обдув в панель и увеличьте скорость вентилятора. Подтвердите, что из дефлекторов идёт устойчивый поток воздуха.",
+        },
+      },
+      cab_2: {
+        question: {
+          RU: "При запросе AC включается ли муфта компрессора? Слышен щелчок или видно притягивание тарелки муфты?",
+        },
+        howToCheck: {
+          RU: "На работающем двигателе запросите AC и наблюдайте за шкивом компрессора. Муфта должна включиться со щелчком, а передняя тарелка должна начать вращаться вместе со шкивом.",
+        },
+      },
+      cab_3: {
+        question: {
+          RU: "Настройки HVAC верные: AC включён, вентилятор работает, температура установлена на холод, режим направлен в дефлекторы панели?",
+        },
+        howToCheck: {
+          RU: "Проверьте панель управления: кнопка A/C активна, температура установлена на минимум, режим выбран panel/vent, а рециркуляция включена, если она доступна.",
+        },
+      },
+      cab_4: {
+        question: {
+          RU: "Конденсор и его обдув в норме? Работает ли вентилятор конденсора/охлаждения и не забит ли передний теплообменник?",
+        },
+        howToCheck: {
+          RU: "При включённом AC проверьте переднюю часть автомобиля: вентилятор должен работать, а конденсор не должен быть забит грязью, насекомыми или мусором.",
+        },
+      },
+      cab_5: {
+        question: {
+          RU: "Есть ли напряжение на разъёме муфты компрессора при включённом кондиционере кабины? Точное значение?",
+        },
+        howToCheck: {
+          RU: "Измерьте DC-напряжение на разъёме муфты компрессора при активном запросе AC. Обычно должно появляться напряжение бортсети.",
+        },
+      },
+      cab_6: {
+        question: {
+          RU: "Каковы показания по давлению хладагента на низкой/высокой стороне, или давление явно низкое / выровнено?",
+        },
+        howToCheck: {
+          RU: "Подключите манометрический коллектор к сервисным портам и снимите показания при работающем AC. Если манометров нет, сообщите хотя бы, выглядит ли система пустой или давления одинаковые.",
         },
       },
     },
@@ -1059,7 +1129,7 @@ reg({
 
 reg({
   system: "roof_ac",
-  displayName: "Roof AC / Heat Pump",
+  displayName: "Roof AC",
   complex: true,
   variant: "STANDARD",
   steps: [
@@ -1132,6 +1202,80 @@ reg({
       prerequisites: [],
       matchPatterns: [/(?:error|fault|code|led|light).*(?:\d+|no|none|blink)/i],
       howToCheck: "Open the control box and watch the board LEDs during the cooling call. Record the exact flash pattern, steady light state, or displayed code.",
+    },
+  ],
+});
+
+// ── Dash / Cab AC ───────────────────────────────────────────────────
+
+reg({
+  system: "cab_ac",
+  displayName: "Dash / Cab AC",
+  complex: true,
+  variant: "STANDARD",
+  steps: [
+    {
+      id: "cab_1",
+      question: "When dash/cab AC is turned on, does the blower run and is there airflow from the dash vents?",
+      prerequisites: [],
+      matchPatterns: [
+        /(?:blower|fan|airflow|vent|deflector).*(?:run|running|work|working|yes|no|none|weak|strong)/i,
+        /(?:вентилятор|поток|воздух|дефлектор).*(?:есть|нет|работ|слаб|сильн)/i,
+      ],
+      howToCheck: "Turn the cab AC on, select dash vents, and set blower speed high. Confirm whether steady airflow is coming from the dash outlets.",
+    },
+    {
+      id: "cab_2",
+      question: "With cab AC requested, does the compressor clutch engage? Any click or clutch plate movement?",
+      prerequisites: ["cab_1", "cab_3"],
+      matchPatterns: [
+        /(?:compressor|clutch).*(?:engage|click|spin|move|yes|no|on|off)/i,
+        /(?:муфт|компрессор).*(?:включ|щелч|крут|да|нет)/i,
+      ],
+      howToCheck: "With the engine running and AC commanded on, watch the compressor pulley. The clutch plate should pull in with a click and rotate with the pulley.",
+    },
+    {
+      id: "cab_3",
+      question: "HVAC controls set correctly — AC on, blower on, temperature full cold, mode directed to dash vents?",
+      prerequisites: [],
+      matchPatterns: [
+        /(?:controls?|settings?|mode|temp|temperature|cool|cold|a\/c).*(?:correct|set|on|off|min|max)/i,
+        /(?:настройк|режим|температур|кнопк).*(?:правил|вкл|выкл|холод)/i,
+      ],
+      howToCheck: "Check the HVAC panel: A/C enabled, blower operating, temperature set to full cold, and the outlet mode directed to the dash vents. Enable recirculation if available.",
+    },
+    {
+      id: "cab_4",
+      question: "Condenser airflow normal? Is the condenser/engine cooling fan operating and is the front heat exchanger clear?",
+      prerequisites: ["cab_2"],
+      matchPatterns: [
+        /(?:condenser|cooling\s*fan|radiator\s*fan|airflow).*(?:normal|good|ok|blocked|dirty|working|running|yes|no)/i,
+        /(?:конденсор|обдув|вентилятор).*(?:норм|работ|нет|да|забит|гряз)/i,
+      ],
+      howToCheck: "With AC on, inspect the condenser and front cooling package. Confirm the fan operates normally and that the condenser face is not blocked by dirt or debris.",
+    },
+    {
+      id: "cab_5",
+      question: "Is voltage present at the compressor clutch connector when cab AC is commanded on? Exact reading?",
+      prerequisites: ["cab_2"],
+      matchPatterns: [
+        /(?:\d+(?:\.\d+)?)\s*v(?:olts?|dc)?/i,
+        /(?:voltage|power).*(?:compressor|clutch|connector)/i,
+        /(?:напряжени|питани).*(?:муфт|компрессор)/i,
+      ],
+      howToCheck: "Measure DC voltage at the compressor-clutch connector while cab AC is requested. Battery/system voltage should appear when the clutch is commanded on.",
+    },
+    {
+      id: "cab_6",
+      question: "What are the low-side/high-side refrigerant pressure readings, or is pressure obviously low/equalized?",
+      prerequisites: ["cab_2"],
+      matchPatterns: [
+        /(?:\d+)\s*(?:psi|bar)/i,
+        /(?:low|high)\s*side/i,
+        /(?:refrigerant|pressure).*(?:low|high|equal|equalized)/i,
+        /(?:давлен|хладагент).*(?:низк|высок|равн)/i,
+      ],
+      howToCheck: "Connect a manifold gauge set to the service ports and record the low- and high-side readings with AC running. If gauges are unavailable, report whether the system appears empty or pressures stay equalized.",
     },
   ],
 });

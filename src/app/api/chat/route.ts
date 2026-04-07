@@ -411,7 +411,9 @@ export async function POST(req: Request) {
     ? repairSummaryIntent.missingFields
     : ["complaint", "findings", "corrective_action"];
   const storedRoofAcEvidenceMessage =
-    historyBeforeAppend.find((msg) => hasSpecificRoofAcEvidence(msg.content))?.content ?? null;
+    historyBeforeAppend.find(
+      (msg) => msg.role === "user" && hasSpecificRoofAcEvidence(msg.content),
+    )?.content ?? null;
   const needsAcSubtypeClarification =
     currentMode === "diagnostic" &&
     !hasBoundedReportRequest &&
