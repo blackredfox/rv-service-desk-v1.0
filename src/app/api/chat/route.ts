@@ -1,4 +1,4 @@
-import { storage } from "@/lib/storage";
+import { storage, type ChatMessage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import {
   type CaseMode,
@@ -339,7 +339,8 @@ export async function POST(req: Request) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });
   }
 
-  const historyBeforeAppend = await loadChatHistory(ensuredCase.id);
+  const historyBeforeAppend: Pick<ChatMessage, "role" | "content">[] =
+    await loadChatHistory(ensuredCase.id);
   const existingReportInContext = shouldTreatAsFinalReportForOverride(
     currentMode,
     historyBeforeAppend,
@@ -502,7 +503,7 @@ export async function POST(req: Request) {
     userId: user?.id,
   });
 
-  const history = stepGuidancePlan
+  const history: Pick<ChatMessage, "role" | "content">[] = stepGuidancePlan
     ? []
     : [
         ...historyBeforeAppend,
@@ -815,7 +816,7 @@ export async function POST(req: Request) {
         source: "promoted",
         systemPrompt: buildStepGuidanceClarificationSystemPrompt({
           language: outputPolicy.effective,
-          stepQuestion: promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing),
+          stepQuestion: (promotedStepMetadata?.question ?? getActiveStepQuestion(ensuredCase.id, stepIdBeforeProcessing))!,
           guidance: promotedStepMetadata?.howToCheck,
           continuation: getStepGuidanceContinuation(outputPolicy.effective),
           hasPhotoAttachment: attachmentCount > 0,
