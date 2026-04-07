@@ -5,6 +5,7 @@ import { createContext, useContext } from "react";
 export type AuthUser = {
   id: string;
   email: string;
+  displayName?: string;
   // Organization info
   organization: {
     id: string;

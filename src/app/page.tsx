@@ -13,8 +13,6 @@ import { NoOrganizationScreen } from "@/components/no-organization";
 import { useAuth } from "@/hooks/use-auth";
 import { deriveAccessStatus } from "@/lib/access-status";
 import { fetchTerms, loadTermsAcceptance, storeTermsAcceptance } from "@/lib/terms";
-import { apiCreateCase } from "@/lib/api";
-import { analytics } from "@/lib/client-analytics";
 import type { LanguageMode } from "@/lib/api";
 
 type OnboardingStep =
@@ -155,6 +153,7 @@ export default function Home() {
   const [showTermsModal, setShowTermsModal] = useState(false);
 
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [draftToken, setDraftToken] = useState(0);
   const [languageMode, setLanguageMode] = useState<LanguageMode>("AUTO");
 
   // User menu (header)
@@ -357,14 +356,9 @@ export default function Home() {
 
   // New case handler for header
   const handleNewCase = useCallback(async () => {
-    try {
-      const res = await apiCreateCase();
-      setActiveCaseId(res.case.id);
-      void analytics.caseCreated(res.case.id);
-      setMobileMenuOpen(false);
-    } catch {
-      // Error handling is done in sidebar
-    }
+    setDraftToken((prev) => prev + 1);
+    setActiveCaseId(null);
+    setMobileMenuOpen(false);
   }, []);
 
   // Toggle sidebar
@@ -577,6 +571,7 @@ export default function Home() {
         <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
           <ChatPanel
             caseId={activeCaseId}
+            draftToken={draftToken}
             languageMode={languageMode}
             onCaseId={setActiveCaseId}
             disabled={false}

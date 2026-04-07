@@ -67,6 +67,7 @@ describe("Member Claim on First Sign-Up", () => {
             orgId: "org_123",
             uid: "pending_1234567890", // Placeholder UID from admin add
             email: "member@company.com",
+            displayName: "Alex Tech",
             role: "member",
             status: "active",
             createdAt: "2024-01-01T00:00:00.000Z",
@@ -117,6 +118,7 @@ describe("Member Claim on First Sign-Up", () => {
 
       expect(response.status).toBe(200);
       expect(data.access.allowed).toBe(true);
+      expect(data.displayName).toBe("Alex Tech");
       expect(data.membership.role).toBe("member");
       
       // Verify updateMember was called to claim the membership

@@ -22,6 +22,7 @@ import { analytics } from "@/lib/client-analytics";
 
 type Props = {
   caseId: string | null;
+  draftToken: number;
   languageMode: LanguageMode;
   onCaseId: (caseId: string | null) => void;
   disabled?: boolean;
@@ -32,7 +33,7 @@ type TurnLanguageBadge = {
   outputEffective: "EN" | "RU" | "ES";
 };
 
-export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
+export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,6 +57,14 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
   const handleVoiceTranscript = useCallback((text: string) => {
     setInput((prev) => (prev ? `${prev} ${text}` : text));
   }, []);
+
+  useEffect(() => {
+    setInput("");
+    setError(null);
+    setPhotoAttachments([]);
+    setReportCopied(false);
+    setCopiedMessageId(null);
+  }, [caseId, draftToken]);
 
   // Get the latest assistant report (if exists)
   // Report is identified by having structured content (multiple sections)
@@ -96,6 +105,9 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       setTurnLanguageByMessageId({});
       return;
     }
+
+    setMessages([]);
+    setTurnLanguageByMessageId({});
 
     const id = caseId;
     let cancelled = false;
@@ -157,6 +169,7 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
     const localId = `local_${Date.now()}`;
     const assistantMessageId = `${localId}_assistant`;
     const now = new Date().toISOString();
+    const isDraftStart = !caseId;
 
     // Capture and clear attachments before sending
     const currentAttachments = [...photoAttachments];
@@ -213,12 +226,17 @@ export function ChatPanel({ caseId, languageMode, onCaseId, disabled }: Props) {
       void analytics.chatSent(caseId ?? undefined);
 
       let serverCaseId: string | null = null;
+      let caseCreatedTracked = false;
       let pendingTurnLanguage: TurnLanguageBadge | null = null;
 
       const onEvent = (ev: ChatSseEvent) => {
         if (ev.type === "case") {
           const newId = ev.caseId ?? null;
           serverCaseId = newId;
+          if (isDraftStart && newId && !caseCreatedTracked) {
+            caseCreatedTracked = true;
+            void analytics.caseCreated(newId);
+          }
           onCaseId(newId);
           return;
         }

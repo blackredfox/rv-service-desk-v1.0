@@ -165,6 +165,7 @@ describe("Admin Members API", () => {
           orgId: "org_123",
           uid: "pending_123",
           email: "newuser@company.com",
+          displayName: "Alex Service",
           role: "member",
           status: "active",
         })
@@ -222,7 +223,7 @@ describe("Admin Members API", () => {
       const req = new Request("http://localhost/api/org/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "newuser@company.com", role: "member" }),
+        body: JSON.stringify({ email: "newuser@company.com", displayName: "Alex Service", role: "member" }),
       });
 
       const response = await POST(req);
@@ -231,11 +232,13 @@ describe("Admin Members API", () => {
       expect(response.status).toBe(201);
       expect(data.member.status).toBe("active");
       expect(data.member.email).toBe("newuser@company.com");
+      expect(data.member.displayName).toBe("Alex Service");
 
       // Verify createMember was called with status: "active"
       expect(mockCreateMember).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "newuser@company.com",
+          displayName: "Alex Service",
           role: "member",
           status: "active",
         })
@@ -656,6 +659,94 @@ describe("Admin Members API", () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(mockUpdateMember).toHaveBeenCalledWith("member_456", { status: "inactive" });
+    });
+
+    it("should allow updating display name without changing role or status", async () => {
+      vi.resetModules();
+
+      const mockUpdateMember = vi.fn(() => Promise.resolve());
+
+      vi.doMock("@/lib/firestore", () => ({
+        getMemberByUid: vi.fn(() =>
+          Promise.resolve({
+            id: "admin_member_123",
+            orgId: "org_123",
+            uid: "admin_uid",
+            email: "admin@company.com",
+            role: "admin",
+            status: "active",
+          })
+        ),
+        getOrganization: vi.fn(() =>
+          Promise.resolve({
+            id: "org_123",
+            name: "Test Org",
+            domains: ["company.com"],
+            subscriptionStatus: "active",
+            seatLimit: 10,
+            activeSeatCount: 2,
+          })
+        ),
+        getOrgMembers: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: "admin_member_123",
+              orgId: "org_123",
+              uid: "admin_uid",
+              email: "admin@company.com",
+              role: "admin",
+              status: "active",
+            },
+            {
+              id: "member_456",
+              orgId: "org_123",
+              uid: "member_uid",
+              email: "member@company.com",
+              displayName: "",
+              role: "member",
+              status: "active",
+            },
+          ])
+        ),
+        updateMember: mockUpdateMember,
+        recalculateActiveSeatCount: vi.fn(),
+      }));
+
+      vi.doMock("next/headers", () => ({
+        cookies: vi.fn(() =>
+          Promise.resolve({
+            get: vi.fn((name: string) => {
+              if (name === "rv_session") return { value: "test_session" };
+              return undefined;
+            }),
+            set: vi.fn(),
+            delete: vi.fn(),
+          })
+        ),
+      }));
+
+      vi.doMock("@/lib/firebase-admin", () => ({
+        getFirebaseAuth: vi.fn(() => ({
+          verifySessionCookie: vi.fn(() =>
+            Promise.resolve({ uid: "admin_uid", email: "admin@company.com" })
+          ),
+        })),
+      }));
+
+      const { PATCH } = await import("@/app/api/org/members/route");
+
+      const req = new Request("http://localhost/api/org/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: "member_456", displayName: "Field Tech" }),
+      });
+
+      const response = await PATCH(req);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(mockUpdateMember).toHaveBeenCalledWith("member_456", { displayName: "Field Tech" });
     });
   });
 });

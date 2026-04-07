@@ -22,6 +22,7 @@ const REQUIRE_SUBSCRIPTION = process.env.REQUIRE_SUBSCRIPTION !== "false";
 export type MeResponse = {
   id: string;
   email: string;
+  displayName?: string;
   // Organization info
   organization: {
     id: string;
@@ -155,6 +156,7 @@ export async function GET() {
     const response: MeResponse = {
       id: uid,
       email,
+      displayName: member?.displayName?.trim() || undefined,
       organization: org ? {
         id: org.id,
         name: org.name,
