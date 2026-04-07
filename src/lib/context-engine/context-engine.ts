@@ -16,6 +16,8 @@ import type {
   Submode,
   Mode,
   LaborState,
+  DiagnosticStateSnapshot,
+  RecentStepResolution,
 } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import { detectIntent, describeIntent, isClarificationRequest } from "./intent-router";
@@ -228,6 +230,66 @@ function updateTerminalState(
   };
 }
 
+function cloneDecisionPath(context: DiagnosticContext) {
+  return context.branchState.decisionPath.map((entry) => ({ ...entry }));
+}
+
+function cloneTopicStack(context: DiagnosticContext) {
+  return context.topicStack.map((entry) => ({ ...entry }));
+}
+
+function cloneTerminalState(context: DiagnosticContext) {
+  return {
+    phase: context.terminalState.phase,
+    faultIdentified: context.terminalState.faultIdentified
+      ? { ...context.terminalState.faultIdentified }
+      : null,
+    correctiveAction: context.terminalState.correctiveAction
+      ? { ...context.terminalState.correctiveAction }
+      : null,
+    restorationConfirmed: context.terminalState.restorationConfirmed
+      ? { ...context.terminalState.restorationConfirmed }
+      : null,
+  };
+}
+
+function captureDiagnosticStateSnapshot(context: DiagnosticContext): DiagnosticStateSnapshot {
+  return {
+    activeStepId: context.activeStepId,
+    completedSteps: [...context.completedSteps],
+    unableSteps: [...context.unableSteps],
+    askedSteps: [...context.askedSteps],
+    branchState: {
+      activeBranchId: context.branchState.activeBranchId,
+      decisionPath: cloneDecisionPath(context),
+      lockedOutBranches: [...context.branchState.lockedOutBranches],
+    },
+    terminalState: cloneTerminalState(context),
+    isolationComplete: context.isolationComplete,
+    isolationFinding: context.isolationFinding,
+    isolationInvalidated: context.isolationInvalidated,
+    replanReason: context.replanReason,
+    submode: context.submode,
+    previousSubmode: context.previousSubmode,
+    topicStack: cloneTopicStack(context),
+  };
+}
+
+function buildRecentStepResolution(args: {
+  context: DiagnosticContext;
+  stepId: string;
+  resolution: RecentStepResolution["resolution"];
+  technicianMessage: string;
+}): RecentStepResolution {
+  return {
+    stepId: args.stepId,
+    resolution: args.resolution,
+    technicianMessage: args.technicianMessage,
+    capturedAt: new Date().toISOString(),
+    snapshot: captureDiagnosticStateSnapshot(args.context),
+  };
+}
+
 // ── Context Store ───────────────────────────────────────────────────
 
 const contextStore = new Map<string, DiagnosticContext>();
@@ -275,6 +337,7 @@ export function createContext(
     contradictions: [],
     lastAgentActions: [],
     consecutiveFallbacks: 0,
+    recentStepResolution: null,
     isolationComplete: false,
     isolationFinding: null,
     isolationInvalidated: false,
@@ -312,6 +375,9 @@ export function getOrCreateContext(
         correctiveAction: null,
         restorationConfirmed: null,
       };
+    }
+    if (existing.recentStepResolution === undefined) {
+      existing.recentStepResolution = null;
     }
     // Update system/classification if provided and not already set
     if (initialSystem && !existing.primarySystem) {
@@ -412,6 +478,12 @@ export function processMessage(
     if (context.activeStepId) {
       if (intent.type === "UNABLE_TO_VERIFY") {
         const completedStepId = context.activeStepId;
+        context.recentStepResolution = buildRecentStepResolution({
+          context,
+          stepId: completedStepId,
+          resolution: "unable",
+          technicianMessage: message,
+        });
         context.unableSteps.add(completedStepId);
         registryMarkStepUnable(caseId, completedStepId); // Sync to registry
         notices.push(`Step ${completedStepId} marked as UNABLE`);
@@ -437,6 +509,12 @@ export function processMessage(
         // MAIN_DIAGNOSTIC, ALREADY_ANSWERED, or diagnostic-context CONFIRMATION
         // Technician answered the current step — mark it complete
         const completedStepId = context.activeStepId;
+        context.recentStepResolution = buildRecentStepResolution({
+          context,
+          stepId: completedStepId,
+          resolution: "completed",
+          technicianMessage: message,
+        });
         context.completedSteps.add(completedStepId);
         registryMarkStepCompleted(caseId, completedStepId); // Sync to registry
         notices.push(`Step ${completedStepId} marked as COMPLETED`);
@@ -723,6 +801,46 @@ export function markIsolationComplete(caseId: string, finding: string): void {
   context.isolationComplete = true;
   context.isolationFinding = finding;
   updateContext(context);
+}
+
+export function restoreRecentStepResolution(caseId: string): RecentStepResolution | null {
+  const context = getContext(caseId);
+  const recent = context?.recentStepResolution;
+  if (!context || !recent) return null;
+
+  const snapshot = recent.snapshot;
+  context.activeStepId = snapshot.activeStepId;
+  context.completedSteps = new Set(snapshot.completedSteps);
+  context.unableSteps = new Set(snapshot.unableSteps);
+  context.askedSteps = new Set(snapshot.askedSteps);
+  context.branchState = {
+    activeBranchId: snapshot.branchState.activeBranchId,
+    decisionPath: snapshot.branchState.decisionPath.map((entry) => ({ ...entry })),
+    lockedOutBranches: new Set(snapshot.branchState.lockedOutBranches),
+  };
+  context.terminalState = {
+    phase: snapshot.terminalState.phase,
+    faultIdentified: snapshot.terminalState.faultIdentified
+      ? { ...snapshot.terminalState.faultIdentified }
+      : null,
+    correctiveAction: snapshot.terminalState.correctiveAction
+      ? { ...snapshot.terminalState.correctiveAction }
+      : null,
+    restorationConfirmed: snapshot.terminalState.restorationConfirmed
+      ? { ...snapshot.terminalState.restorationConfirmed }
+      : null,
+  };
+  context.isolationComplete = snapshot.isolationComplete;
+  context.isolationFinding = snapshot.isolationFinding;
+  context.isolationInvalidated = snapshot.isolationInvalidated;
+  context.replanReason = snapshot.replanReason;
+  context.submode = snapshot.submode;
+  context.previousSubmode = snapshot.previousSubmode;
+  context.topicStack = snapshot.topicStack.map((entry) => ({ ...entry }));
+  context.recentStepResolution = null;
+
+  updateContext(context);
+  return recent;
 }
 
 // ── Fact Management ─────────────────────────────────────────────────

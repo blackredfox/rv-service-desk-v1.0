@@ -1,3 +1,44 @@
+# PRD — NEO TASK Evidence Integrity + Step/State Consistency
+
+## Original problem statement
+Fix guided diagnostics evidence corruption and step/state consistency bugs in RV Service Desk with a narrow PR focused on:
+- evidence-grounded recap/summary behavior
+- correct fact-to-step attribution
+- immediate correction handling (for example `115В` then `ой, 12В`)
+- stable active-step progression / numbering
+- no premature recap or final-report readiness while evidence is unresolved
+- no user-visible repair/debug leakage such as `[System] Repairing output...`
+
+## Architecture decisions
+- Added a correction snapshot in the context engine so the last resolved diagnostic step can be restored before re-processing an immediate technician correction.
+- Added registry step-state restore support so context and registry stay aligned during correction handling.
+- Made technician evidence normalization correction-aware in the fact pack so corrected values replace superseded ones for downstream grounding.
+- Tightened diagnostic step validation to reject off-step recap/finding drift.
+- Buffered OpenAI attempt output until validation passes, preventing invalid first-pass text and repair artifacts from leaking to the user.
+
+## Implemented
+- Route-level immediate correction detection and restore-before-routing logic in `src/app/api/chat/route.ts`
+- Context snapshot capture/restore for recent step resolution in `src/lib/context-engine/*`
+- Registry restore helper in `src/lib/diagnostic-registry.ts`
+- Correction-aware evidence normalization in `src/lib/fact-pack.ts`
+- Off-step recap/finding validation in `src/lib/mode-validators.ts`
+- Buffered validation/retry emission in `src/lib/chat/openai-execution-service.ts`
+- Focused regressions for Cases 39–41 plus supporting unit tests
+
+## Prioritized backlog
+### P0
+- Keep this PR narrow and land only the evidence-integrity / step-state fixes
+
+### P1
+- Add more correction-intent coverage for additional languages / phrasing variants beyond the immediate patterns covered here
+- Add broader transcript fixtures for multi-turn AC and water-heater diagnostic corrections
+
+### P2
+- Improve repository-wide TypeScript health; `tsc --noEmit` still reports unrelated pre-existing errors outside this PR scope
+
+## Next tasks
+- Commit the focused runtime + regression changes
+- If needed, add a second pass of transcript-based fixtures for adjacent diagnostic procedures using the same correction snapshot path
 # PRD / Task Handoff
 
 ## Original problem statement

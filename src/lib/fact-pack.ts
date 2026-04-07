@@ -34,7 +34,7 @@ export type FinalReportAuthorityFacts = {
 
 // Patterns that indicate test results with measurements
 const TEST_RESULT_PATTERNS = [
-  /(\d+(?:\.\d+)?)\s*(?:v|volts?|vdc|vac)\b/i,
+  /(\d+(?:\.\d+)?)\s*(?:v|в|volts?|vdc|vac)(?=$|[\s.,;:!?])/iu,
   /(\d+(?:\.\d+)?)\s*(?:a|amps?|ma)\b/i,
   /(\d+(?:\.\d+)?)\s*(?:ohms?|Ω|kohm|megohm)\b/i,
   /(\d+(?:\.\d+)?)\s*(?:psi|bar|kpa)\b/i,
@@ -58,6 +58,36 @@ const SYMPTOM_PATTERNS = [
   /не\s+(?:работает|включается|запускается|охлаждает|греет)/i,
   /no\s+(?:funciona|enciende|arranca|enfría|calienta)/i,
 ];
+
+const IMMEDIATE_CORRECTION_PATTERNS = [
+  /^(?:actually|sorry|correction|i\s+mean|i\s+meant|wait|hold\s+on|no[,\s]+i\s+mean)\b/i,
+  /^(?:ой|точнее|вернее|исправлюсь|поправка|не[,\s]+то|подожди)(?=$|[\s,.:;!?-])/iu,
+  /^(?:perd[oó]n|correcci[oó]n|quise\s+decir|mejor\s+dicho|espera)(?=$|[\s,.:;!?-])/iu,
+];
+
+function isImmediateCorrectionMessage(message: string): boolean {
+  const trimmed = message.trim();
+  return IMMEDIATE_CORRECTION_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+export function getResolvedTechnicianMessages(
+  history: Array<{ role: string; content: string }>,
+): string[] {
+  const resolved: string[] = [];
+
+  for (const msg of history) {
+    if (msg.role !== "user") continue;
+
+    if (isImmediateCorrectionMessage(msg.content) && resolved.length > 0) {
+      resolved[resolved.length - 1] = msg.content;
+      continue;
+    }
+
+    resolved.push(msg.content);
+  }
+
+  return resolved;
+}
 
 /**
  * Extract verified facts from a single user message.
@@ -109,9 +139,8 @@ export function buildFactPack(
 ): FactPack {
   const allFacts: Fact[] = [];
 
-  for (const msg of history) {
-    if (msg.role !== "user") continue;
-    const facts = extractFacts(msg.content);
+  for (const content of getResolvedTechnicianMessages(history)) {
+    const facts = extractFacts(content);
     allFacts.push(...facts);
   }
 
@@ -208,8 +237,8 @@ function inferComplaintFromHistory(history: Array<{ role: string; content: strin
   const symptom = pack.facts.find((fact) => fact.category === "symptom");
   if (symptom) return symptom.text;
 
-  const firstUser = history.find((msg) => msg.role === "user" && msg.content.trim().length > 0);
-  return firstUser?.content.trim();
+  const firstUser = getResolvedTechnicianMessages(history).find((content) => content.trim().length > 0);
+  return firstUser?.trim();
 }
 
 export function deriveFinalReportAuthorityFacts(
@@ -221,10 +250,7 @@ export function deriveFinalReportAuthorityFacts(
     return complaint ? { complaint } : null;
   }
 
-  const latestUserMessages = history
-    .filter((msg) => msg.role === "user")
-    .slice(-6)
-    .map((msg) => msg.content);
+  const latestUserMessages = getResolvedTechnicianMessages(history).slice(-6);
 
   const combinedEvidence = [
     context.terminalState.faultIdentified?.text,

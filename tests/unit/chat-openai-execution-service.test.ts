@@ -73,7 +73,8 @@ describe("OpenAI Execution Service", () => {
     });
 
     expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
-    expect(emitted.some((token) => token.includes("Repairing output"))).toBe(true);
+    expect(emitted.some((token) => token.includes("Repairing output"))).toBe(false);
+    expect(emitted.some((token) => token.includes("Complaint: Test"))).toBe(false);
     expect(result.emittedValidationFallback).toBe(true);
     expect(result.response).toContain("Step wp_2");
   });
@@ -146,7 +147,8 @@ describe("OpenAI Execution Service", () => {
     });
 
     expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
-    expect(emitted.some((token) => token.includes("Repairing clarification"))).toBe(true);
+    expect(emitted.some((token) => token.includes("Repairing clarification"))).toBe(false);
+    expect(emitted.some((token) => token.includes("Understood."))).toBe(false);
     expect(result.emittedValidationFallback).toBe(true);
     expect(result.response).toBe(fallbackResponse);
   });

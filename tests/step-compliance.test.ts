@@ -57,6 +57,16 @@ describe("Step Compliance Validation", () => {
       // Should flag because it references wh_g_5 when active is wp_1
       expect(result.violations.some(v => v.includes("STEP_COMPLIANCE") || v.includes("wrong step"))).toBe(true);
     });
+
+    it("rejects off-step recap findings before the active question", () => {
+      const result = validateStepCompliance(
+        "Bulging capacitor and overheating are already confirmed. What voltage do you measure at the compressor clutch connector?",
+        "cab_5",
+        "Is voltage present at the compressor clutch connector when cab AC is commanded on? Exact reading?"
+      );
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("off-step recap"))).toBe(true);
+    });
   });
 
   describe("isStepAnswered (contextual completion)", () => {

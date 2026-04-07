@@ -75,6 +75,34 @@ export type TerminalState = {
   restorationConfirmed: { text: string; detectedAt: string } | null;
 };
 
+export type DiagnosticStateSnapshot = {
+  activeStepId: string | null;
+  completedSteps: string[];
+  unableSteps: string[];
+  askedSteps: string[];
+  branchState: {
+    activeBranchId: string | null;
+    decisionPath: BranchDecision[];
+    lockedOutBranches: string[];
+  };
+  terminalState: TerminalState;
+  isolationComplete: boolean;
+  isolationFinding: string | null;
+  isolationInvalidated: boolean;
+  replanReason: string | null;
+  submode: Submode;
+  previousSubmode: Submode | null;
+  topicStack: TopicStackEntry[];
+};
+
+export type RecentStepResolution = {
+  stepId: string;
+  resolution: "completed" | "unable";
+  technicianMessage: string;
+  capturedAt: string;
+  snapshot: DiagnosticStateSnapshot;
+};
+
 // ── Intent Types ────────────────────────────────────────────────────
 
 export type Intent =
@@ -203,6 +231,9 @@ export type DiagnosticContext = {
   // Loop detection
   lastAgentActions: AgentAction[];
   consecutiveFallbacks: number;
+
+  // Immediate correction support
+  recentStepResolution: RecentStepResolution | null;
   
   // Isolation state
   isolationComplete: boolean;

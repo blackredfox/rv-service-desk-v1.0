@@ -688,6 +688,44 @@ export function validateStepCompliance(
       `Active step is ${activeStepId}.`
     );
   }
+
+  const genericAckPatterns = [
+    /^(?:ok|okay|understood|got\s+it|noted|thanks|thank\s+you|принято|понял|ясно|хорошо|de\s+acuerdo|entendido|vale)\.?$/i,
+  ];
+  const findingCuePatterns = [
+    /\b(?:summary|recap|confirmed|found|observed|shows|indicates|means|root\s+cause|verified|bulg(?:e|ing)|overheat(?:ed|ing)?|burnt?|failed|blocked|damaged|low\s+pressure|no\s+voltage)\b/i,
+    /(?:итог|сводк|подтвержд|обнаруж|значит|указывает|вздул|перегрев|сгорел|неисправ|забит|поврежд|давлени|напряжени)/i,
+    /(?:resumen|confirmad|observad|indica|significa|causa|sobrecalent|quemad|dañad|bloquead|presi[oó]n|voltaje)/i,
+  ];
+  const declarativeSegments = responseText
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  for (const segment of declarativeSegments) {
+    if (segment.includes("?")) continue;
+    if (genericAckPatterns.some((pattern) => pattern.test(segment))) continue;
+
+    const segmentTerms = segment
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}_]+/u)
+      .filter((word) => word.length >= 3);
+    if (segmentTerms.length === 0) continue;
+
+    const overlapCount = segmentTerms.filter((term) => questionKeyTerms.includes(term)).length;
+    const overlapRatio = overlapCount / segmentTerms.length;
+    const hasFindingCue = findingCuePatterns.some((pattern) => pattern.test(segment));
+    const isSubstantive = segment.length >= 40 || segmentTerms.length >= 6 || hasFindingCue;
+
+    if (isSubstantive && hasFindingCue && overlapRatio < 0.25) {
+      violations.push(
+        `STEP_COMPLIANCE: Response contains off-step recap or finding text before the active question. ` +
+        `Keep content tied to ${activeStepId}.`
+      );
+      break;
+    }
+  }
   
   return {
     valid: violations.length === 0,

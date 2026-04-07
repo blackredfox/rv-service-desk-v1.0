@@ -472,6 +472,23 @@ export function markStepUnable(caseId: string, stepId: string): void {
   entry.askedStepIds.add(stepId); // Also mark as asked
 }
 
+export function restoreStepState(caseId: string, snapshot: {
+  completedStepIds: string[];
+  unableStepIds: string[];
+  askedStepIds: string[];
+  activeBranchId: string | null;
+  decisionPath: Array<{ stepId: string; branchId: string | null; reason: string; timestamp: string }>;
+  lockedOutBranches: string[];
+}): void {
+  const entry = ensureEntry(caseId);
+  entry.completedStepIds = new Set(snapshot.completedStepIds);
+  entry.unableStepIds = new Set(snapshot.unableStepIds);
+  entry.askedStepIds = new Set(snapshot.askedStepIds);
+  entry.activeBranchId = snapshot.activeBranchId;
+  entry.decisionPath = snapshot.decisionPath.map((decision) => ({ ...decision }));
+  entry.lockedOutBranches = new Set(snapshot.lockedOutBranches);
+}
+
 /**
  * Get the next available step ID for this case.
  * Uses branch-aware resolution (P1.5).

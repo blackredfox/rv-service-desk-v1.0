@@ -87,6 +87,20 @@ describe("buildFactPack", () => {
     expect(pack.facts.length).toBeGreaterThanOrEqual(3);
     expect(pack.summary).toContain("12.4");
   });
+
+  it("treats an immediate correction as replacing the prior technician reading", async () => {
+    const { buildFactPack } = await import("@/lib/fact-pack");
+    const history = [
+      { role: "user", content: "да, 115В" },
+      { role: "assistant", content: "Шаг 6: Какие показания давления?" },
+      { role: "user", content: "ой, 12В" },
+    ];
+
+    const pack = buildFactPack(history);
+
+    expect(pack.summary).toContain("12В");
+    expect(pack.summary).not.toContain("115В");
+  });
 });
 
 // ── buildFactLockConstraint ─────────────────────────────────────────

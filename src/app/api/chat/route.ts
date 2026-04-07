@@ -19,6 +19,7 @@ import {
   processResponseForBranch,
   getBranchState,
   exitBranch,
+  restoreStepState,
 } from "@/lib/diagnostic-registry";
 import {
   detectSystem,
@@ -38,6 +39,7 @@ import {
   checkLoopViolation,
   suggestLoopRecovery,
   markStepCompleted as markContextStepCompleted,
+  restoreRecentStepResolution,
   recordAgentAction,
   type ContextEngineResult,
   type DiagnosticContext,
@@ -283,6 +285,27 @@ function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete"
   return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
 
+const IMMEDIATE_CORRECTION_PATTERNS = [
+  /^(?:actually|sorry|correction|i\s+mean|i\s+meant|wait|hold\s+on|no[,\s]+i\s+mean)\b/i,
+  /^(?:ой|точнее|вернее|исправлюсь|поправка|не[,\s]+то|подожди)(?=$|[\s,.:;!?-])/iu,
+  /^(?:perd[oó]n|correcci[oó]n|quise\s+decir|mejor\s+dicho|espera)(?=$|[\s,.:;!?-])/iu,
+];
+
+const CORRECTION_VALUE_PATTERNS = [
+  /\d+(?:\.\d+)?\s*(?:v|в|volts?|amps?|a|ohms?|psi|bar|wc)(?=$|[\s.,;:!?])/iu,
+  /^(?:yes|no|да|нет|si|sí|present|absent|on|off)\b/iu,
+];
+
+function looksLikeImmediateAnswerCorrection(message: string): boolean {
+  const trimmed = message.trim();
+  if (!trimmed) return false;
+
+  return (
+    IMMEDIATE_CORRECTION_PATTERNS.some((pattern) => pattern.test(trimmed)) &&
+    CORRECTION_VALUE_PATTERNS.some((pattern) => pattern.test(trimmed))
+  );
+}
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
@@ -349,7 +372,29 @@ export async function POST(req: Request) {
 
   const storedMode = ensuredCase.mode ?? "diagnostic";
   let currentMode: CaseMode = resolveStoredCaseMode(ensuredCase.mode);
-  const currentContextSnapshot = getOrCreateContext(ensuredCase.id);
+  let currentContextSnapshot = getOrCreateContext(ensuredCase.id);
+
+  if (
+    currentMode === "diagnostic" &&
+    currentContextSnapshot.recentStepResolution &&
+    looksLikeImmediateAnswerCorrection(routingMessage)
+  ) {
+    const restoredResolution = restoreRecentStepResolution(ensuredCase.id);
+    if (restoredResolution) {
+      restoreStepState(ensuredCase.id, {
+        completedStepIds: restoredResolution.snapshot.completedSteps,
+        unableStepIds: restoredResolution.snapshot.unableSteps,
+        askedStepIds: restoredResolution.snapshot.askedSteps,
+        activeBranchId: restoredResolution.snapshot.branchState.activeBranchId,
+        decisionPath: restoredResolution.snapshot.branchState.decisionPath,
+        lockedOutBranches: restoredResolution.snapshot.branchState.lockedOutBranches,
+      });
+      currentContextSnapshot = getOrCreateContext(ensuredCase.id);
+      console.log(
+        `[Chat API v2] Immediate correction restored step ${restoredResolution.stepId} before re-processing technician evidence`,
+      );
+    }
+  }
 
   if (currentMode !== storedMode) {
     await storage.updateCase(ensuredCase.id, { mode: currentMode });

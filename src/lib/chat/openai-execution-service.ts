@@ -36,6 +36,23 @@ type HistoryMessage = {
 
 type TokenEmitter = (token: string) => void;
 
+type BufferedCompletion = {
+  emitToken: TokenEmitter;
+  flush: (target: TokenEmitter, content?: string) => void;
+};
+
+function createBufferedCompletion(): BufferedCompletion {
+  const chunks: string[] = [];
+  return {
+    emitToken: (token: string) => {
+      chunks.push(token);
+    },
+    flush: (target: TokenEmitter, content?: string) => {
+      target(content ?? chunks.join(""));
+    },
+  };
+}
+
 export type PrimaryChatExecutionResult = {
   response: string;
   validation: ValidationResult;
@@ -80,11 +97,12 @@ export async function executeStepGuidanceCompletion(args: {
   };
 
   const firstStart = Date.now();
+  let firstBuffer = createBufferedCompletion();
   let result = await callOpenAI(
     args.apiKey,
     openAiBody,
     args.signal,
-    args.emitToken,
+    firstBuffer.emitToken,
   );
 
   logTiming("openai_call", {
@@ -104,8 +122,6 @@ export async function executeStepGuidanceCompletion(args: {
   logValidation(validation, { caseId: args.caseId, mode: "diagnostic" });
 
   if ((result.error || !validation.valid) && !args.isAborted()) {
-    args.emitToken("\n\n[System] Repairing clarification...\n\n");
-
     const correctionInstruction = [
       buildCorrectionInstruction(
         result.error
@@ -131,11 +147,12 @@ export async function executeStepGuidanceCompletion(args: {
     };
 
     const retryStart = Date.now();
+    const retryBuffer = createBufferedCompletion();
     result = await callOpenAI(
       args.apiKey,
       retryBody,
       args.signal,
-      args.emitToken,
+      retryBuffer.emitToken,
     );
 
     logTiming("openai_call", {
@@ -170,10 +187,22 @@ export async function executeStepGuidanceCompletion(args: {
         emittedValidationFallback: true,
       };
     }
+
+    const repairedResponse = enforceLanguagePolicy(result.response, args.langPolicy);
+    retryBuffer.flush(args.emitToken, repairedResponse);
+
+    return {
+      response: repairedResponse,
+      validation,
+      emittedValidationFallback: false,
+    };
   }
 
+  const finalResponse = enforceLanguagePolicy(result.response, args.langPolicy);
+  firstBuffer.flush(args.emitToken, finalResponse);
+
   return {
-    response: enforceLanguagePolicy(result.response, args.langPolicy),
+    response: finalResponse,
     validation,
     emittedValidationFallback: false,
   };
@@ -214,11 +243,12 @@ export async function executePrimaryChatCompletion(args: {
   };
 
   const primaryFirstStart = Date.now();
+  let firstBuffer = createBufferedCompletion();
   let result = await callOpenAI(
     args.apiKey,
     openAiBody,
     args.signal,
-    args.emitToken,
+    firstBuffer.emitToken,
   );
 
   logTiming("openai_call", {
@@ -274,8 +304,6 @@ export async function executePrimaryChatCompletion(args: {
       violations: validation.violations.length,
     });
 
-    args.emitToken("\n\n[System] Repairing output...\n\n");
-
     const correctionInstruction = buildPrimaryCorrectionInstruction({
       validation,
       activeStepMetadata: args.activeStepMetadata,
@@ -300,11 +328,12 @@ export async function executePrimaryChatCompletion(args: {
     });
 
     const primaryRetryStart = Date.now();
+    const retryBuffer = createBufferedCompletion();
     result = await callOpenAI(
       args.apiKey,
       retryBody,
       args.signal,
-      args.emitToken,
+      retryBuffer.emitToken,
     );
 
     logTiming("openai_call", {
@@ -366,10 +395,22 @@ export async function executePrimaryChatCompletion(args: {
         emittedValidationFallback: true,
       };
     }
+
+    const repairedResponse = enforceLanguagePolicy(result.response, args.langPolicy);
+    retryBuffer.flush(args.emitToken, repairedResponse);
+
+    return {
+      response: repairedResponse,
+      validation,
+      emittedValidationFallback: false,
+    };
   }
 
+  const finalResponse = enforceLanguagePolicy(result.response, args.langPolicy);
+  firstBuffer.flush(args.emitToken, finalResponse);
+
   return {
-    response: enforceLanguagePolicy(result.response, args.langPolicy),
+    response: finalResponse,
     validation,
     emittedValidationFallback: false,
   };
@@ -413,11 +454,13 @@ export async function executeLaborOverrideCompletion(args: {
   });
 
   const overrideFirstStart = Date.now();
+  let firstBuffer = createBufferedCompletion();
+  let bufferToFlush = firstBuffer;
   let overrideResult = await callOpenAI(
     args.apiKey,
     plan.overrideBody,
     args.signal,
-    args.emitToken,
+    firstBuffer.emitToken,
   );
 
   logTiming("openai_call", {
@@ -473,8 +516,6 @@ export async function executeLaborOverrideCompletion(args: {
           validation.laborValidation.violations.length,
       });
 
-      args.emitToken("\n\n[System] Repairing output...\n\n");
-
       const correctionInstruction = buildLaborOverrideRetryInstruction({
         modeViolations: validation.modeValidation.violations,
         laborViolations: validation.laborValidation.violations,
@@ -495,11 +536,12 @@ export async function executeLaborOverrideCompletion(args: {
       });
 
       const overrideRetryStart = Date.now();
+      const retryBuffer = createBufferedCompletion();
       overrideResult = await callOpenAI(
         args.apiKey,
         retryBody,
         args.signal,
-        args.emitToken,
+        retryBuffer.emitToken,
       );
 
       logTiming("openai_call", {
@@ -532,6 +574,11 @@ export async function executeLaborOverrideCompletion(args: {
           path: "labor_override_retry",
           validateMs: Date.now() - retryValidateStart,
         });
+
+        if (validation.modeValidation.valid && validation.laborValidation.valid) {
+          overrideContent = enforceLanguagePolicy(overrideContent, args.langPolicy);
+          bufferToFlush = retryBuffer;
+        }
       }
     }
 
@@ -570,6 +617,8 @@ export async function executeLaborOverrideCompletion(args: {
       args.emitToken(fallback);
       return { response: fallback };
     }
+
+    bufferToFlush.flush(args.emitToken, overrideContent);
 
     return { response: overrideContent };
   }

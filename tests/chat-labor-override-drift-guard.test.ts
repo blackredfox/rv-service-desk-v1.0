@@ -207,6 +207,6 @@ describe("Labor override detection + diagnostic drift guard", () => {
     const latestAssistant = assistantMessages.at(-1) ?? "";
     expect(latestAssistant).toContain("?");
     expect(__test__.looksLikeFinalReport(latestAssistant)).toBe(false);
-    expect(streamText).toContain("[System] Repairing output...");
+    expect(streamText).not.toContain("[System] Repairing output...");
   });
 });
