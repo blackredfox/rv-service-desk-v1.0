@@ -30,8 +30,6 @@ export type {
   BranchDecision,
   TerminalPhase,
   TerminalState,
-  DiagnosticStateSnapshot,
-  RecentStepResolution,
 } from "./types";
 
 export { DEFAULT_CONFIG } from "./types";
@@ -53,7 +51,6 @@ export {
   markStepUnable,
   setActiveStep,
   markIsolationComplete,
-  restoreRecentStepResolution,
   
   // Fact management
   addFact,

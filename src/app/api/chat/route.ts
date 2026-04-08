@@ -39,12 +39,12 @@ import {
   checkLoopViolation,
   suggestLoopRecovery,
   markStepCompleted as markContextStepCompleted,
-  restoreRecentStepResolution,
   recordAgentAction,
   type ContextEngineResult,
   type DiagnosticContext,
   DEFAULT_CONFIG,
 } from "@/lib/context-engine";
+import { restoreRecentStepResolution } from "@/lib/context-engine/context-engine";
 import {
   buildFactLockConstraint,
   buildFinalReportAuthorityConstraint,
