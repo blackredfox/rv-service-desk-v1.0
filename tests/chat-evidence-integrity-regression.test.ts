@@ -107,7 +107,7 @@ describe("/api/chat evidence integrity regressions", () => {
 
     const { clearRegistry } = await import("@/lib/diagnostic-registry");
     const { clearContext } = await import("@/lib/context-engine");
-    ["ei_case39", "ei_case40", "ei_case41"].forEach((caseId) => {
+    ["ei_case39", "ei_case40", "ei_case41", "ei_case42"].forEach((caseId) => {
       clearRegistry(caseId);
       clearContext(caseId);
     });
@@ -222,5 +222,44 @@ describe("/api/chat evidence integrity regressions", () => {
     expect(context.recentStepResolution?.stepId).toBe("cab_5");
     expect(correctionPayload.messages[0].content).toContain("ТЕКУЩИЙ ШАГ: cab_6");
     expect(correctionPayload.messages[0].content).not.toContain("ТЕКУЩИЙ ШАГ: cab_4");
+  });
+
+  it("Case-42: follow-up technician hypothesis reopens unresolved evidence instead of staying report-ready", async () => {
+    const caseId = "ei_case42";
+    await seedCabStep(caseId, "cab_5");
+
+    const { getOrCreateContext, updateContext } = await import("@/lib/context-engine");
+    const context = getOrCreateContext(caseId);
+    updateContext({
+      ...context,
+      activeProcedureId: "cab_ac",
+      primarySystem: "cab_ac",
+      activeStepId: null,
+      isolationComplete: true,
+      isolationFinding: "Verified restoration — cab ac: clutch feed restored",
+      terminalState: {
+        phase: "terminal",
+        faultIdentified: { text: "compressor clutch feed fault", detectedAt: new Date().toISOString() },
+        correctiveAction: { text: "restored clutch feed", detectedAt: new Date().toISOString() },
+        restorationConfirmed: { text: "cab AC started cooling", detectedAt: new Date().toISOString() },
+      },
+    });
+
+    queueAssistantResponses(
+      "Понял. Это пока гипотеза, поэтому вернёмся к диагностике. Шаг 5: Есть ли напряжение на разъёме муфты компрессора при включённом кондиционере кабины? Точное значение?",
+    );
+
+    const turn = await postChat(caseId, "может, проблема всё-таки в муфте компрессора, это пока не подтверждено");
+    const updatedContext = getOrCreateContext(caseId);
+    const hypothesisFetch = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
+    const hypothesisPayload = JSON.parse(String(hypothesisFetch.body));
+
+    expect(turn.streamText).not.toContain("START FINAL REPORT");
+    expect(turn.streamText).not.toContain("[System] Repairing output...");
+    expect(turn.streamText).toContain("Шаг 5");
+    expect(updatedContext.isolationComplete).toBe(false);
+    expect(updatedContext.terminalState.phase).toBe("normal");
+    expect(updatedContext.activeStepId).toBe("cab_5");
+    expect(hypothesisPayload.messages[0].content).toContain("REPLAN NOTICE");
   });
 });

@@ -76,6 +76,11 @@ const NEW_EVIDENCE_PATTERNS: Array<{ pattern: RegExp; type: EvidenceType }> = [
   // Technician dispute
   { pattern: /(?:that'?s\s+not|can'?t\s+be|doesn'?t\s+make\s+sense|are\s+you\s+sure|that'?s\s+wrong)/i, type: "technician_dispute" },
   { pattern: /(?:I\s+don'?t\s+(?:think|agree)|no\s+way|impossible)/i, type: "technician_dispute" },
+
+  // Follow-up hypothesis / speculative technician theory
+  { pattern: /(?:maybe|perhaps|probably|i\s+think|i\s+suspect|could\s+be|might\s+be).{0,80}(?:fuse|relay|board|motor|pump|compressor|capacitor|connector|wiring|clutch|pressure|voltage|fault|issue|problem)/i, type: "follow_up_hypothesis" },
+  { pattern: /(?:может(?:\s+быть)?|возможно|кажется|думаю|похоже|подозреваю).{0,80}(?:предохранител|реле|плата|мотор|насос|компрессор|конденсатор|разъ[её]м|проводк|муфт|давлен|напряжен|неисправ|проблем)/iu, type: "follow_up_hypothesis" },
+  { pattern: /(?:quiz[aá]|tal\s+vez|puede\s+que|creo\s+que|parece\s+que|sospecho).{0,80}(?:fusible|rel[eé]|placa|motor|bomba|compresor|condensador|conector|cableado|embrague|presi[oó]n|voltaje|falla|problema)/iu, type: "follow_up_hypothesis" },
   
   // New observation (check last - least specific)
   { pattern: /(?:I\s+also|also\s+noticed|another\s+thing|by\s+the\s+way|oh\s+and)/i, type: "new_observation" },

@@ -85,6 +85,13 @@ export function shouldReplan(
         };
       }
     }
+
+    if (evidenceCheck.evidenceType === "follow_up_hypothesis") {
+      return {
+        shouldReplan: true,
+        reason: `Technician follow-up hypothesis reopened unresolved evidence: ${message.slice(0, 100)}`,
+      };
+    }
   }
   
   return { shouldReplan: false };
@@ -103,8 +110,16 @@ export function executeReplan(
   const updatedContext: DiagnosticContext = {
     ...context,
     isolationComplete: false,
+    isolationFinding: null,
     isolationInvalidated: true,
     replanReason: replanResult.reason || "New evidence invalidated prior conclusion",
+    activeStepId: null,
+    terminalState: {
+      phase: "normal",
+      faultIdentified: null,
+      correctiveAction: null,
+      restorationConfirmed: null,
+    },
     updatedAt: now,
   };
   

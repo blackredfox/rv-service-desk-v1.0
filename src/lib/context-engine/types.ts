@@ -120,6 +120,7 @@ export type EvidenceType =
   | "physical_damage"      // hole, leak, crack, burn
   | "measurement_change"   // different reading than before
   | "technician_dispute"   // "that can't be right"
+  | "follow_up_hypothesis" // speculative technician hypothesis that re-opens evidence
   | "new_observation";     // "I also noticed..."
 
 // ── Fact & Evidence ─────────────────────────────────────────────────

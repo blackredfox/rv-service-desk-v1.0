@@ -128,6 +128,16 @@ const NEGATIVE_RESTORATION: RegExp[] = [
   /^(?:нет|no|nope|nah)$/i,
 ];
 
+const SPECULATIVE_HYPOTHESIS_PATTERNS: RegExp[] = [
+  /(?:maybe|perhaps|probably|i\s+think|i\s+suspect|could\s+be|might\s+be)/i,
+  /(?:может(?:\s+быть)?|возможно|кажется|думаю|похоже|подозреваю)/iu,
+  /(?:quiz[aá]|tal\s+vez|puede\s+que|creo\s+que|parece\s+que|sospecho)/iu,
+];
+
+function isSpeculativeHypothesisMessage(message: string): boolean {
+  return SPECULATIVE_HYPOTHESIS_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 type TerminalStateUpdate = {
   changed: boolean;
   previousPhase: TerminalPhase;
@@ -159,6 +169,11 @@ function updateTerminalState(
   // Require minimum diagnostic work before considering terminal conditions
   const totalDone = context.completedSteps.size + context.unableSteps.size;
   if (totalDone < MIN_STEPS_FOR_COMPLETION) {
+    return { changed: false, previousPhase, newPhase: ts.phase };
+  }
+
+  // Guard evidence integrity: speculative hypotheses must not advance terminal state.
+  if (isSpeculativeHypothesisMessage(message)) {
     return { changed: false, previousPhase, newPhase: ts.phase };
   }
 
@@ -433,9 +448,10 @@ export function processMessage(
   const intent = detectIntent(message);
   console.log(`[ContextEngine] Intent: ${describeIntent(intent)}`);
   
-  // 2. Check for replan triggers (only if isolation was complete AND not terminal)
-  // P1.7: Terminal state must not be undone by replan
-  if (config.enableReplan && context.isolationComplete && context.terminalState.phase !== "terminal") {
+  // 2. Check for replan triggers whenever isolation was previously considered complete.
+  // Evidence integrity wins: new evidence or a follow-up hypothesis must reopen the state,
+  // even if the prior completion path had already reached terminal.
+  if (config.enableReplan && context.isolationComplete) {
     const replanResult = shouldReplan(message, context);
     if (replanResult.shouldReplan) {
       console.log(`[ContextEngine] Replan triggered: ${replanResult.reason}`);
