@@ -117,6 +117,10 @@ const TECHNICAL_CONTEXT_PATTERNS = [
   /(?:motor|pump|fan|compressor|voltage|volts?|v\b|dc|ac|power|battery|runs?|works?|operates?|apply|bypass|jump|direct)/i,
   /(?:check|test|measure|verify|inspect|read|reading)/i,
   /(?:when|if|after|before|with|without)\s+(?:I|you|we)/i,
+  // Cyrillic measurement units (Russian: В=volts, мВ=millivolts, Ом=ohms, А=amps, Вт=watts)
+  /\d+(?:[.,]\d+)?\s*(?:В|мВ|Ом|кОм|А|мА|Вт|кВт|бар|кПа|атм)(?=$|[\s.,;:!?\-)])/u,
+  // Spanish measurement units
+  /\d+(?:[.,]\d+)?\s*(?:voltios|amperios|ohmios)\b/i,
 ];
 
 // ── Intent Detection ────────────────────────────────────────────────

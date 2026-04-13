@@ -214,6 +214,7 @@ describe("/api/chat evidence integrity regressions", () => {
     const correctionFetch = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
     const correctionPayload = JSON.parse(String(correctionFetch.body));
 
+    // Core state expectations
     expect(correctionTurn.streamText).not.toContain("START FINAL REPORT");
     expect(correctionTurn.streamText).not.toContain("[System] Repairing output...");
     expect(context.mode).toBe("diagnostic");
@@ -222,6 +223,12 @@ describe("/api/chat evidence integrity regressions", () => {
     expect(context.recentStepResolution?.stepId).toBe("cab_5");
     expect(correctionPayload.messages[0].content).toContain("ТЕКУЩИЙ ШАГ: cab_6");
     expect(correctionPayload.messages[0].content).not.toContain("ТЕКУЩИЙ ШАГ: cab_4");
+
+    // Intent correctness: correction with Cyrillic measurement unit must NOT be
+    // misclassified as a labor confirmation — it should be treated as diagnostic
+    const { detectIntent } = await import("@/lib/context-engine/intent-router");
+    const correctionIntent = detectIntent("ой, 12В");
+    expect(correctionIntent.type).not.toBe("CONFIRMATION");
   });
 
   it("Case-42: follow-up technician hypothesis reopens unresolved evidence instead of staying report-ready", async () => {
@@ -261,5 +268,52 @@ describe("/api/chat evidence integrity regressions", () => {
     expect(updatedContext.terminalState.phase).toBe("normal");
     expect(updatedContext.activeStepId).toBe("cab_5");
     expect(hypothesisPayload.messages[0].content).toContain("REPLAN NOTICE");
+  });
+
+  it("Intent regression: Cyrillic measurement units are recognized as technical context, not labor confirmations", async () => {
+    const { detectIntent } = await import("@/lib/context-engine/intent-router");
+
+    // Messages containing Cyrillic measurement values must NOT be classified as CONFIRMATION
+    const techMessages = [
+      "12В",         // 12 volts (Russian)
+      "да, 12В",     // yes, 12V
+      "ой, 12В",     // oops, 12V (correction)
+      "115В",        // 115 volts
+      "220В",        // 220 volts
+      "500мВ",       // 500 millivolts
+      "4.7кОм",      // 4.7 kilohms
+    ];
+
+    for (const msg of techMessages) {
+      const intent = detectIntent(msg);
+      expect(intent.type, `"${msg}" must not be classified as CONFIRMATION`).not.toBe("CONFIRMATION");
+    }
+
+    // Standalone labor-range numbers WITHOUT Cyrillic units should still be CONFIRMATION
+    const laborMessages = ["2.5", "3 часа"];
+    for (const msg of laborMessages) {
+      const intent = detectIntent(msg);
+      expect(intent.type, `"${msg}" should be CONFIRMATION`).toBe("CONFIRMATION");
+    }
+  });
+
+  it("Repair artifact regression: no internal scaffolding text leaks to user output across all turn types", async () => {
+    const caseId = "ei_case39";
+    await seedCabStep(caseId, "cab_4");
+
+    // Simulate LLM accidentally emitting repair artifacts in first response
+    queueAssistantResponses(
+      "[System] Repairing output... Шаг 5: Есть ли напряжение на разъёме муфты компрессора?",
+      "Шаг 5: Есть ли напряжение на разъёме муфты компрессора при включённом кондиционере кабины?",
+    );
+
+    const turn = await postChat(caseId, "нет");
+
+    // The validation/retry path must filter the artifact from the first response
+    expect(turn.streamText).not.toContain("[System]");
+    expect(turn.streamText).not.toContain("Repairing");
+    expect(turn.streamText).not.toContain("[Repair");
+    expect(turn.streamText).not.toContain("[Debug");
+    expect(turn.streamText).not.toContain("[Fallback");
   });
 });

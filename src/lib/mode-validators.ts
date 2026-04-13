@@ -234,6 +234,24 @@ function containsIsolationCompleteLanguage(text: string): boolean {
 }
 
 /**
+ * Check if output contains internal repair/debug scaffolding text.
+ * These artifacts must never reach the technician.
+ */
+const REPAIR_ARTIFACT_PATTERNS = [
+  /\[System\]/i,
+  /\[Repair/i,
+  /\[Debug/i,
+  /\[Fallback/i,
+  /\[Internal/i,
+  /Repairing\s+output/i,
+  /Repairing\s+clarification/i,
+];
+
+function containsRepairArtifact(text: string): boolean {
+  return REPAIR_ARTIFACT_PATTERNS.some(p => p.test(text));
+}
+
+/**
  * Validate diagnostic mode output
  * 
  * Guided Diagnostics format allows:
@@ -247,6 +265,11 @@ function containsIsolationCompleteLanguage(text: string): boolean {
  */
 export function validateDiagnosticOutput(text: string): ValidationResult {
   const violations: string[] = [];
+
+  // CRITICAL: Must not contain internal repair/debug scaffolding markers
+  if (containsRepairArtifact(text)) {
+    violations.push("REPAIR_ARTIFACT: Output contains internal repair/debug scaffolding text that must not be visible to the technician.");
+  }
 
   // CRITICAL: Must not look like a final report — checked FIRST, always
   if (looksLikeFinalReport(text)) {
@@ -677,8 +700,23 @@ export function validateStepCompliance(
     );
   }
   
+  // Detect duplicate step numbering (e.g., "Шаг 6: ... Шаг 6: ..." or "Step 5: ... Step 5: ...")
+  const stepLabelPattern = /(?:Шаг|Step|Paso)\s+(\d+)/giu;
+  const stepLabelMatches = [...responseText.matchAll(stepLabelPattern)];
+  if (stepLabelMatches.length >= 2) {
+    const labels = stepLabelMatches.map(m => m[1]);
+    const duplicateLabels = labels.filter((label, i) => labels.indexOf(label) !== i);
+    if (duplicateLabels.length > 0) {
+      violations.push(
+        `STEP_COMPLIANCE: Duplicate step numbering detected (Step ${duplicateLabels[0]} appears ${
+          labels.filter(l => l === duplicateLabels[0]).length
+        } times). Each step label must appear at most once.`
+      );
+    }
+  }
+
   // Check for explicit step ID references that don't match
-  const stepIdPattern = /\b(wh|wp|furn|ac|ref|so|lv|ic|e12|eac|lpg|awn|ca)_\w+\b/gi;
+  const stepIdPattern = /\b(wh|wp|furn|ac|ref|so|lv|ic|e12|eac|lpg|awn|ca|cab)_\w+\b/gi;
   const mentionedSteps = responseText.match(stepIdPattern) || [];
   const wrongSteps = mentionedSteps.filter(s => s.toLowerCase() !== activeStepId.toLowerCase());
   
