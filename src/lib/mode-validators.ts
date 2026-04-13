@@ -715,8 +715,10 @@ export function validateStepCompliance(
     }
   }
 
-  // Check for explicit step ID references that don't match
-  const stepIdPattern = /\b(wh|wp|furn|ac|ref|so|lv|ic|e12|eac|lpg|awn|ca|cab)_\w+\b/gi;
+  // Check for explicit step ID references that don't match.
+  // Generic pattern: any word_word sequence that looks like a procedure step ID.
+  // This avoids maintaining a manual prefix allow-list that drifts as procedures are added.
+  const stepIdPattern = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gi;
   const mentionedSteps = responseText.match(stepIdPattern) || [];
   const wrongSteps = mentionedSteps.filter(s => s.toLowerCase() !== activeStepId.toLowerCase());
   
