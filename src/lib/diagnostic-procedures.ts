@@ -113,6 +113,21 @@ const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
     /hydronic\s*(?:heat|heating|system)/i,
     /diesel\s*hydronic/i,
   ]},
+  // Tongue jack / electric jack MUST be before inverter_converter
+  // to prevent "electric" token from misrouting into converter flow
+  { system: "tongue_jack", patterns: [
+    /tongue\s*jack/i,
+    /electric\s*(?:tongue\s*)?jack/i,
+    /(?:front|передн\S*)\s*(?:jack|джек|домкрат)/i,
+    /jack\s*(?:lippert|lci|barker|venture|ultra[\s-]?fab|bulldog)/i,
+    /(?:lippert|lci|barker|venture|ultra[\s-]?fab|bulldog)\s*(?:tongue\s*)?jack/i,
+    /(?:\d{3,5}[\s-]*lb)\s*(?:electric\s*)?(?:tongue\s*)?jack/i,
+    /(?:electric\s*)?(?:tongue\s*)?jack\s*(?:\d{3,5}[\s-]*lb)/i,
+    /язычков\S*\s*домкрат/i,
+    /электр\S*\s*(?:tongue\s*)?(?:jack|джек|домкрат)/i,
+    /домкрат\s*(?:язычков|передн|электр|tongue)/i,
+    /gato\s*(?:eléctrico|de\s*lengüeta)/i,
+  ]},
   // Water heater MUST be before furnace (more specific pattern)
   { system: "water_heater", patterns: [
     /water\s*heater/i, 
@@ -124,7 +139,17 @@ const SYSTEM_PATTERNS: Array<{ system: string; patterns: RegExp[] }> = [
     /atwood.*(?:gas|water)/i,
     /(?:gas|propane|lp).*water\s*heater/i,
   ]},
-  { system: "water_pump", patterns: [/water\s*pump/i, /водяно[йе]\s*насос/i, /bomba\s*de\s*agua/i, /fresh\s*water\s*pump/i] },
+  { system: "water_pump", patterns: [
+    /water\s*pump/i,
+    /водяно\S*\s*насос/i,
+    /насос\S*\s*вод/i,
+    /помп\S*\s*вод/i,
+    /водян\S*\s*помп/i,
+    /bomba\s*de\s*agua/i,
+    /fresh\s*water\s*pump/i,
+    /насос\s+(?:не\s+)?работа/i,
+    /(?:water|вод\S*)\s*(?:pump|насос|помп)/i,
+  ] },
   { system: "lp_gas", patterns: [/lp\s*gas|propane|gas\s*(?:system|leak|line|valve|regulator)/i, /газ(?:ов)?/i, /gas\s*(?:lp|propano)/i] },
   { system: "slide_out", patterns: [/slide[\s-]*out/i, /слайд/i, /slide\s*room/i] },
   { system: "leveling", patterns: [/level(?:ing|er)?\s*(?:system|jack)/i, /jack\s*system/i, /выравнива/i, /nivelaci/i] },

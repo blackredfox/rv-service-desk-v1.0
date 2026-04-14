@@ -50,6 +50,29 @@ import type { TerminalPhase, TerminalState } from "./types";
 
 const MIN_STEPS_FOR_COMPLETION = 1;
 
+// ── Unresolved diagnostic signal patterns ──────────────────────────
+// These patterns indicate the diagnostic path is still unresolved.
+// When matched, they BLOCK FAULT_PATTERNS from triggering in the same
+// message, preventing premature fault_candidate / terminal transitions.
+const UNRESOLVED_DIAGNOSTIC_PATTERNS: RegExp[] = [
+  // EN: intermittent / inconclusive behavior
+  /(?:starts?\s+(?:then|but|and)\s+(?:stops?|shuts?\s+off|cuts?\s+out|dies|fails?))/i,
+  /(?:tries?\s+to\s+(?:start|run)\s+(?:then|but)\s+(?:stops?|shuts?\s+off|fails?))/i,
+  /(?:works?\s+(?:briefly|intermittent|sometimes|for\s+a\s+(?:moment|second|few)))/i,
+  /(?:cycles?\s+(?:on\s+and\s+off|off\s+and\s+on))/i,
+  /(?:(?:shuts?|cuts?|turns?)\s+(?:off|down)\s+after\s+(?:a\s+)?(?:few|couple|several|\d+)\s+(?:seconds?|minutes?))/i,
+  /(?:not\s+sure\s+(?:what|why|if))/i,
+  /(?:need\s+to\s+(?:check|test|verify)\s+(?:more|further|again))/i,
+  // RU: intermittent / inconclusive
+  /(?:запускается\s+(?:и|но|потом)\s+(?:глохнет|останавливается|отключается|выключается))/i,
+  /(?:пытается\s+запуститься\s+(?:и|но|потом)\s+(?:глохнет|выключается))/i,
+  /(?:работает\s+(?:кратковременно|недолго|несколько\s+секунд))/i,
+  /(?:включается\s+и\s+(?:сразу\s+)?выключается)/i,
+  // ES: intermittent / inconclusive
+  /(?:arranca\s+(?:y|pero)\s+(?:se\s+apaga|para|falla))/i,
+  /(?:funciona\s+(?:brevemente|intermitente|por\s+(?:un\s+momento|unos?\s+segundos?)))/i,
+];
+
 const RESTORATION_PATTERNS: RegExp[] = [
   // English: "after [repair] ... works/running/operational"
   /after.{0,80}(?:fix|repair|replac|restor|reconnect|rewir|splicin|replacing|repairing|fixing|restoring|reconnecting|rewiring).{0,100}(?:work(?:ing|s)?|operational|functional|running|heating|firing|started|back\s+up)/i,
@@ -160,12 +183,18 @@ function updateTerminalState(
     return { changed: false, previousPhase, newPhase: ts.phase };
   }
 
+  // ── Block premature fault/terminal when unresolved diagnostic signals present ──
+  // If the message describes an unresolved/intermittent condition, do NOT
+  // progress toward terminal state — the diagnostic path is still open.
+  const hasUnresolvedSignal = UNRESOLVED_DIAGNOSTIC_PATTERNS.some(p => p.test(message));
+
   const now = new Date().toISOString();
   let changed = false;
 
   // ── Phase 1: Check full RESTORATION_PATTERNS ───────────────────────
   // These require repair action + operational confirmation → all 3 conditions implied
-  if (!ts.restorationConfirmed) {
+  // Blocked when unresolved diagnostic signal is present
+  if (!ts.restorationConfirmed && !hasUnresolvedSignal) {
     for (const pattern of RESTORATION_PATTERNS) {
       if (pattern.test(message)) {
         const text = message.slice(0, 120).replace(/\s+/g, " ").trim();
@@ -183,7 +212,9 @@ function updateTerminalState(
 
   // ── Phase 2: Check FAULT_PATTERNS ─────────────────────────────────
   // Records fault, moves to fault_candidate (ONE restoration check allowed)
-  if (!ts.faultIdentified) {
+  // Blocked when unresolved diagnostic signal is present — intermittent
+  // behavior must not be treated as a confirmed fault.
+  if (!ts.faultIdentified && !hasUnresolvedSignal) {
     for (const pattern of FAULT_PATTERNS) {
       if (pattern.test(message)) {
         ts.faultIdentified = {

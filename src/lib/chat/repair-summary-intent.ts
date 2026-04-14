@@ -33,6 +33,13 @@ const COMPLAINT_PATTERNS = [
   /(?:filtraci[oó]n\s+de\s+agua|entra\s+agua)/iu,
   /(?:протечк|утечк).*вод/iu,
   /(?:не\s+закрепл|болтаетс)/iu,
+  // Water pump / generic equipment "not working" complaints
+  /(?:water\s+pump|pump)\s+(?:not\s+working|inoperative|dead|no\s+response)/i,
+  /(?:водяно\S*\s+насос|насос\S*\s+вод\S*)\s+не\s+работ/iu,
+  /(?:bomba\s+de\s+agua)\s+(?:no\s+funciona)/iu,
+  // Specific equipment complaints (not generic "X не работает" to avoid matching findings like "fuse не работает")
+  /(?:water\s+pump|furnace|ac|air\s+condition|refrigerator|inverter|converter|slide|jack|awning)\s+(?:not\s+working|inoperative|dead|issue|problem)/i,
+  /(?:насос|печь|кондиционер|холодильник|инвертер|конвертер|слайд|домкрат|маркиз)\S*\s+не\s+работ/iu,
 ];
 
 const FINDING_PATTERNS = [
@@ -48,6 +55,15 @@ const FINDING_PATTERNS = [
   /(?:нет|без)\s+(?:силикон|герметик)/iu,
   /solo\s+\d+\s+tornillos?/iu,
   /sin\s+(?:silicona|sellador)/iu,
+  // Diagnostic test result findings (technician verified something)
+  /(?:checked|tested|measured|verified)\s+(?:voltage|power|current|continuity)/i,
+  /(?:проверил|измерил|подключил)\s+(?:ток|напряжени|питани|напрямую)/iu,
+  /(?:есть|нет)\s+\d+\s*(?:в(?:олт)?|v(?:olt)?)/iu,
+  /(?:подключил|подал)\s+(?:\d+\s*в(?:олт)?|питани|напряжени)\s+напрямую/iu,
+  /direct\s*(?:power|voltage)\s*(?:test|applied|connected)/i,
+  // Generic finding patterns for pump/equipment diagnostics
+  /(?:pump|motor|unit)\s+(?:is\s+)?(?:dead|not\s+respond|not\s+work|inoperative)/i,
+  /(?:насос|мотор|узел)\S*\s+(?:не\s+рабоч|не\s+реагир|мёртв|не\s+отвеча)/iu,
 ];
 
 const CORRECTIVE_ACTION_PATTERNS = [
@@ -62,6 +78,16 @@ const CORRECTIVE_ACTION_PATTERNS = [
   /appl(?:y|ied)\s+(?:silicone|sealant)/i,
   /(?:добавил|установил|закрепил|прикрутил|нан[её]с)/iu,
   /(?:agregu[eé]|instal[eé]|asegur[eé]|apliqu[eé]|sell[eé])/iu,
+  // Replacement recommendation / conclusion patterns
+  /(?:requires?|needs?)\s+replacement/i,
+  /(?:требует|нужна|необходима)\s+замен/iu,
+  /(?:necesita|requiere)\s+reemplazo/iu,
+  /(?:replaced|заменил|поменял)\s+(?:the\s+)?(?:pump|motor|unit|насос|мотор|узел|помп)/iu,
+  /(?:recommend|рекоменд)\S*\s+(?:replac|замен)/iu,
+  // Generic repair/replace conclusions
+  /(?:не\s+рабочий|не\s+рабочая|неисправ\S*)\s+и\s+(?:требует|нужна|необходима)/iu,
+  /(?:need(?:s|ed)?\s+to\s+(?:be\s+)?replac)/i,
+  /(?:замена\s+(?:насос|помп|мотор|узел))/iu,
 ];
 
 function dedupeMissingFields(fields: RepairSummaryMissingField[]): RepairSummaryMissingField[] {

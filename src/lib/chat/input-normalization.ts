@@ -19,6 +19,9 @@ export function normalizeRoutingInput(message: string): NormalizedRoutingInput {
     .replace(/[ \t]+/g, " ")
     .replace(/\s*\n\s*/g, "\n")
     .replace(/\s*([,.;:!?])\s*/g, "$1 ")
+    // Normalize common Cyrillic typos relevant to system detection
+    .replace(/водяноя/gi, "водяной")
+    .replace(/насосс/gi, "насос")
     .replace(/\s+/g, " ")
     .trim();
 
