@@ -11,6 +11,14 @@ import { join } from "path";
 // Case modes
 export type CaseMode = "diagnostic" | "authorization" | "final_report" | "labor_confirmation";
 
+// Runtime output surfaces
+export type OutputSurface =
+  | "diagnostic"
+  | "authorization_ready"
+  | "portal_cause"
+  | "shop_final_report"
+  | "labor_confirmation";
+
 // Default memory window (last N messages to include)
 export const DEFAULT_MEMORY_WINDOW = 12;
 
@@ -71,6 +79,24 @@ export const PROHIBITED_WORDS = [
 // Cache for prompt files
 let promptCache: Record<string, string> | null = null;
 
+const PORTAL_CAUSE_SURFACE_PROMPT = `PORTAL CAUSE SURFACE
+
+Generate the Portal Cause only.
+
+This surface is distinct from:
+- authorization-ready output
+- shop final report
+
+MANDATORY OUTPUT RULES:
+- concise cause text only
+- plain text only
+- no shop-report section headers
+- no numbered lists
+- no tables
+- no follow-up questions
+- no authorization-request wording unless separately required
+- do not invent facts beyond technician-verified evidence`;
+
 /**
  * Load all prompt files into memory (cached)
  */
@@ -93,20 +119,95 @@ function loadPrompts(): Record<string, string> {
 /**
  * Get the mode prompt for a given mode
  */
-function getModePrompt(mode: CaseMode): string {
-  const prompts = loadPrompts();
+export function resolveOutputSurfaceForMode(args: {
+  mode: CaseMode;
+  requestedSurface?: OutputSurface | null;
+}): OutputSurface {
+  switch (args.mode) {
+    case "authorization":
+      return "authorization_ready";
+    case "final_report":
+      return args.requestedSurface === "portal_cause"
+        ? "portal_cause"
+        : "shop_final_report";
+    case "labor_confirmation":
+      return "labor_confirmation";
+    default:
+      return "diagnostic";
+  }
+}
 
-  switch (mode) {
+function getModePrompt(mode: CaseMode, outputSurface?: OutputSurface): string {
+  const prompts = loadPrompts();
+  const resolvedSurface = resolveOutputSurfaceForMode({
+    mode,
+    requestedSurface: outputSurface,
+  });
+
+  switch (resolvedSurface) {
     case "diagnostic":
       return prompts.MODE_DIAGNOSTIC;
-    case "authorization":
+    case "authorization_ready":
       return prompts.MODE_AUTHORIZATION;
-    case "final_report":
+    case "portal_cause":
+      return PORTAL_CAUSE_SURFACE_PROMPT;
+    case "shop_final_report":
       return prompts.MODE_FINAL_REPORT;
     case "labor_confirmation":
       return prompts.MODE_LABOR_CONFIRMATION;
     default:
       return prompts.MODE_DIAGNOSTIC;
+  }
+}
+
+export function buildOutputSurfaceDirective(args: {
+  mode: CaseMode;
+  outputSurface?: OutputSurface;
+}): string {
+  const resolvedSurface = resolveOutputSurfaceForMode({
+    mode: args.mode,
+    requestedSurface: args.outputSurface,
+  });
+
+  switch (resolvedSurface) {
+    case "authorization_ready":
+      return `OUTPUT SURFACE (MANDATORY):
+Active surface: authorization_ready.
+Generate authorization-ready output only.
+This is NOT Portal Cause and NOT Shop Final Report.
+Use concise approval-safe wording.
+Do NOT use shop-report section headers.`;
+    case "portal_cause":
+      return `OUTPUT SURFACE (MANDATORY):
+Active surface: portal_cause.
+Generate the Portal Cause only.
+This is NOT authorization-ready output and NOT Shop Final Report.
+Use concise plain-text cause wording.
+Do NOT use shop-report section headers or numbered lists.`;
+    case "shop_final_report":
+      return `OUTPUT SURFACE (MANDATORY):
+Active surface: shop_final_report.
+Generate the complete Shop Final Report only.
+This is NOT Portal Cause and NOT authorization-ready output.
+Required headers:
+Complaint:
+Diagnostic Procedure:
+Verified Condition:
+Recommended Corrective Action:
+Estimated Labor:
+Required Parts:`;
+    case "labor_confirmation":
+      return `OUTPUT SURFACE (MANDATORY):
+Active surface: labor_confirmation.
+Generate labor-confirmation text only.
+Do NOT generate authorization-ready output, Portal Cause, or Shop Final Report.`;
+    default:
+      return `OUTPUT SURFACE (MANDATORY):
+Active surface: diagnostic.
+Use natural technician-facing diagnostic dialogue inside the current legal state.
+Do NOT generate authorization-ready output.
+Do NOT generate Portal Cause.
+Do NOT generate Shop Final Report.`;
   }
 }
 
@@ -264,10 +365,11 @@ Do not use English unless the output language is English.`;
  */
 export function composePrompt(args: {
   mode: CaseMode;
+  outputSurface?: OutputSurface;
   dialogueLanguage?: string;
   additionalConstraints?: string;
 }): string {
-  const { mode, dialogueLanguage, additionalConstraints } = args;
+  const { mode, outputSurface, dialogueLanguage, additionalConstraints } = args;
   const prompts = loadPrompts();
 
   const parts: string[] = [
@@ -275,7 +377,11 @@ export function composePrompt(args: {
     "",
     "---",
     "",
-    getModePrompt(mode),
+    getModePrompt(mode, outputSurface),
+    "",
+    "---",
+    "",
+    buildOutputSurfaceDirective({ mode, outputSurface }),
   ];
 
   // Add HARD language directive if provided
@@ -308,13 +414,22 @@ export function composePrompt(args: {
  */
 export function composePromptV2(args: {
   mode: CaseMode;
+  outputSurface?: OutputSurface;
   inputDetected: string;
   outputEffective: string;
   includeTranslation?: boolean;
   translationLanguage?: string;
   additionalConstraints?: string;
 }): string {
-  const { mode, inputDetected, outputEffective, includeTranslation, translationLanguage, additionalConstraints } = args;
+  const {
+    mode,
+    outputSurface,
+    inputDetected,
+    outputEffective,
+    includeTranslation,
+    translationLanguage,
+    additionalConstraints,
+  } = args;
   const prompts = loadPrompts();
 
   const parts: string[] = [
@@ -322,8 +437,13 @@ export function composePromptV2(args: {
     "",
     "---",
     "",
-    getModePrompt(mode),
+    getModePrompt(mode, outputSurface),
   ];
+
+  parts.push("");
+  parts.push("---");
+  parts.push("");
+  parts.push(buildOutputSurfaceDirective({ mode, outputSurface }));
 
   // Add v2 language directive with separate input/output languages
   // Translation behavior is driven by LanguagePolicy (declarative)

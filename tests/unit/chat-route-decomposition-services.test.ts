@@ -41,6 +41,7 @@ import {
 import {
   getModelForMode,
   resolveExplicitModeChange,
+  resolveOutputSurface,
   resolveStoredCaseMode,
 } from "@/lib/chat/chat-mode-resolver";
 import {
@@ -166,6 +167,15 @@ describe("Chat Route Decomposition Services", () => {
     expect(getModelForMode("authorization")).toContain("gpt-5.2");
   });
 
+  it("resolves output surfaces without adding route-side flow authority", () => {
+    expect(resolveOutputSurface({ mode: "diagnostic" })).toBe("diagnostic");
+    expect(resolveOutputSurface({ mode: "authorization" })).toBe("authorization_ready");
+    expect(resolveOutputSurface({ mode: "final_report" })).toBe("shop_final_report");
+    expect(
+      resolveOutputSurface({ mode: "final_report", requestedSurface: "portal_cause" }),
+    ).toBe("portal_cause");
+  });
+
   it("changes modes only on explicit commands", () => {
     expect(resolveExplicitModeChange("diagnostic", "I think we're done, make the report")).toEqual({
       currentMode: "diagnostic",
@@ -191,6 +201,7 @@ describe("Chat Route Decomposition Services", () => {
 
     const prompt = buildChatSystemPrompt({
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       trackedInputLanguage: "EN",
       outputPolicy: { mode: "AUTO", effective: "EN", strategy: "auto" },
       langPolicy: { mode: "AUTO", primaryOutput: "EN", includeTranslation: false },
@@ -205,10 +216,29 @@ describe("Chat Route Decomposition Services", () => {
     expect(prompt.additionalConstraints).toContain("PROCEDURE");
   });
 
+  it("builds a portal-cause prompt without collapsing into shop final report format", () => {
+    const prompt = buildChatSystemPrompt({
+      mode: "final_report",
+      outputSurface: "portal_cause",
+      trackedInputLanguage: "EN",
+      outputPolicy: { mode: "AUTO", effective: "EN", strategy: "auto" },
+      langPolicy: { mode: "AUTO", primaryOutput: "EN", includeTranslation: false },
+      contextEngineDirectives: "",
+      procedureContext: "",
+      factLockConstraint: "",
+      attachmentCount: 0,
+    });
+
+    expect(prompt.systemPrompt).toContain("Generate the Portal Cause only.");
+    expect(prompt.systemPrompt).toContain("Active surface: portal_cause.");
+    expect(prompt.systemPrompt).not.toContain("Complaint:\nDiagnostic Procedure:");
+  });
+
   it("validates primary responses and builds authoritative correction/fallback text", () => {
     const validation = validatePrimaryResponse({
       response: `Complaint: Test\nDiagnostic Procedure: Test\nVerified Condition: Test\nRecommended Corrective Action: Test\nEstimated Labor: 1 hr\nRequired Parts: none`,
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       trackedInputLanguage: "EN",
       includeTranslation: false,
       activeStepMetadata: {
@@ -223,6 +253,7 @@ describe("Chat Route Decomposition Services", () => {
 
     const correction = buildPrimaryCorrectionInstruction({
       validation,
+      outputSurface: "diagnostic",
       activeStepMetadata: {
         id: "wp_2",
         question: "What voltage do you measure at the water pump input?",
@@ -240,6 +271,7 @@ describe("Chat Route Decomposition Services", () => {
         violations: ["STEP_COMPLIANCE: wrong step rendered"],
       },
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       outputLanguage: "EN",
       langPolicy: { mode: "AUTO", primaryOutput: "EN", includeTranslation: false },
       activeStepMetadata: {

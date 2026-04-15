@@ -6,6 +6,7 @@ import {
 } from "@/lib/chat/response-validation-service";
 import {
   resolveExplicitModeChange,
+  resolveOutputSurface,
 } from "@/lib/chat/chat-mode-resolver";
 import {
   detectApprovedFinalReportIntent,
@@ -76,6 +77,7 @@ describe("No Hidden Authority — Route Decomposition", () => {
         violations: ["STEP_COMPLIANCE: wrong step rendered"],
       },
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       outputLanguage: "EN",
       langPolicy: { mode: "AUTO", primaryOutput: "EN", includeTranslation: false },
       activeStepMetadata: {
@@ -102,6 +104,15 @@ describe("No Hidden Authority — Route Decomposition", () => {
     expect(source).toMatch(/currentMode === "diagnostic"/);
   });
 
+  it("output-surface resolution stays bounded to mode plus explicit surface hint", () => {
+    expect(resolveOutputSurface({ mode: "diagnostic" })).toBe("diagnostic");
+    expect(resolveOutputSurface({ mode: "authorization" })).toBe("authorization_ready");
+    expect(resolveOutputSurface({ mode: "final_report" })).toBe("shop_final_report");
+    expect(
+      resolveOutputSurface({ mode: "final_report", requestedSurface: "portal_cause" }),
+    ).toBe("portal_cause");
+  });
+
   it("report intent helpers classify only bounded report signals and expose no flow decisions", () => {
     const reportIntent = detectApprovedFinalReportIntent("сделай воранти репорт");
     const reportEditIntent = detectReportRevisionIntent({
@@ -113,11 +124,13 @@ describe("No Hidden Authority — Route Decomposition", () => {
       matched: true,
       matchedText: expect.any(String),
       reportKind: "warranty",
+      requestedSurface: "shop_final_report",
     });
     expect(reportEditIntent).toEqual({
       matched: true,
       matchedText: expect.any(String),
       reportKind: undefined,
+      requestedSurface: "shop_final_report",
     });
 
     expect(reportIntent).not.toHaveProperty("nextStep");

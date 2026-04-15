@@ -9,14 +9,17 @@ export type ApprovedFinalReportIntent = {
   matched: boolean;
   matchedText?: string;
   reportKind?: ReportKind;
+  requestedSurface?: RequestedFinalOutputSurface;
 };
 
 export type ReportKind = "generic" | "warranty" | "retail";
+export type RequestedFinalOutputSurface = "shop_final_report" | "portal_cause";
 
 export type ReportRevisionIntent = {
   matched: boolean;
   matchedText?: string;
   reportKind?: ReportKind;
+  requestedSurface?: RequestedFinalOutputSurface;
 };
 
 const REPORT_TRIGGER_NOUN = "(?:report|репорт|reporte|informe|отч[её]т)";
@@ -100,6 +103,7 @@ export function detectApprovedFinalReportIntent(message: string): ApprovedFinalR
       matched: true,
       matchedText: normalizeMatchedText(matchedText),
       reportKind: inferReportKind(candidateMessage),
+      requestedSurface: "shop_final_report",
     };
   }
 
@@ -129,5 +133,6 @@ export function detectReportRevisionIntent(args: {
     matched: true,
     matchedText: normalizeMatchedText(candidateMessage),
     reportKind,
+    requestedSurface: "shop_final_report",
   };
 }

@@ -158,6 +158,48 @@ describe("Mode Validators", () => {
       expect(result.valid).toBe(false);
       expect(result.violations.some(v => v.includes("AUTHORIZATION_DRIFT"))).toBe(true);
     });
+
+    it("should reject portal-cause-style text on the authorization-ready surface", async () => {
+      const { validateAuthorizationOutput } = await import("@/lib/mode-validators");
+
+      const result = validateAuthorizationOutput(
+        "Technician-verified portal cause: open neutral found at the water heater control input."
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("AUTHORIZATION_SURFACE_MISMATCH"))).toBe(true);
+    });
+  });
+
+  describe("portal cause surface validation", () => {
+    it("should pass valid portal cause output", async () => {
+      const { validateOutput } = await import("@/lib/mode-validators");
+
+      const result = validateOutput(
+        "Technician-verified portal cause: Open neutral found in the 12V feed to the water heater control board.",
+        "final_report",
+        false,
+        "EN",
+        "portal_cause",
+      );
+
+      expect(result.valid).toBe(true);
+    });
+
+    it("should reject shop final report structure on portal_cause surface", async () => {
+      const { validateOutput } = await import("@/lib/mode-validators");
+
+      const result = validateOutput(
+        "Complaint: Water heater fault.\nDiagnostic Procedure: Verified 12V input.\nVerified Condition: Open neutral confirmed.\nRecommended Corrective Action: Repair the harness.\nEstimated Labor: 1.0 hr\nRequired Parts: Harness repair materials.",
+        "final_report",
+        false,
+        "EN",
+        "portal_cause",
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes("shop final report headers"))).toBe(true);
+    });
   });
 
   describe("validateFinalReportOutput", () => {
@@ -248,6 +290,15 @@ Required Parts: Water pump assembly, inlet/outlet hose clamps.
         "final_report"
       );
       expect(reportResult.valid).toBe(false);
+
+      const portalCauseResult = validateOutput(
+        "Technician-verified portal cause: Open circuit found in the water pump power feed.",
+        "final_report",
+        false,
+        "EN",
+        "portal_cause",
+      );
+      expect(portalCauseResult.valid).toBe(true);
     });
 
     it("should reject empty output", async () => {

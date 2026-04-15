@@ -1,5 +1,5 @@
 import type { Language, LanguagePolicy } from "@/lib/lang";
-import type { CaseMode } from "@/lib/prompt-composer";
+import type { CaseMode, OutputSurface } from "@/lib/prompt-composer";
 import { validateLaborSum } from "@/lib/labor-store";
 import {
   buildCorrectionInstruction,
@@ -13,6 +13,7 @@ import {
   buildAuthoritativeStepFallback,
   buildDiagnosticDriftCorrectionInstruction,
   buildFinalReportFallback,
+  buildPortalCauseFallback,
   extractPrimaryReportBlock,
   isDiagnosticDriftViolation,
 } from "@/lib/chat/output-policy";
@@ -41,6 +42,7 @@ export type ActiveStepMetadata = {
 export function validatePrimaryResponse(args: {
   response: string;
   mode: CaseMode;
+  outputSurface: OutputSurface;
   trackedInputLanguage: Language;
   outputLanguage?: Language;
   includeTranslation: boolean;
@@ -53,15 +55,16 @@ export function validatePrimaryResponse(args: {
     args.mode,
     args.includeTranslation,
     args.translationLanguage,
+    args.outputSurface,
   );
 
   validation = applyDiagnosticModeValidationGuard(
     validation,
-    args.mode,
+    args.outputSurface === "diagnostic" ? args.mode : "final_report",
     args.response,
   );
 
-  if (args.mode === "diagnostic") {
+  if (args.outputSurface === "diagnostic") {
     const langValidation = validateLanguageConsistency(
       args.response,
       expectedOutputLanguage,
@@ -100,6 +103,7 @@ export function validatePrimaryResponse(args: {
  */
 export function buildPrimaryCorrectionInstruction(args: {
   validation: ValidationResult;
+  outputSurface: OutputSurface;
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
 }): string {
@@ -130,6 +134,42 @@ export function buildPrimaryCorrectionInstruction(args: {
     );
   }
 
+  if (args.outputSurface === "portal_cause") {
+    correctionInstructionParts.push(
+      [
+        "OUTPUT SURFACE REPAIR (MANDATORY):",
+        "- Active output surface is PORTAL_CAUSE.",
+        "- Do NOT output shop-report section headers.",
+        "- Do NOT output authorization-ready request wording.",
+        "- Generate concise portal-cause text only.",
+      ].join("\n"),
+    );
+  }
+
+  if (args.outputSurface === "shop_final_report") {
+    correctionInstructionParts.push(
+      [
+        "OUTPUT SURFACE REPAIR (MANDATORY):",
+        "- Active output surface is SHOP_FINAL_REPORT.",
+        "- Output the complete shop final report only.",
+        "- Use the required section headers in order.",
+        "- Do NOT output portal-cause-only formatting.",
+      ].join("\n"),
+    );
+  }
+
+  if (args.outputSurface === "authorization_ready") {
+    correctionInstructionParts.push(
+      [
+        "OUTPUT SURFACE REPAIR (MANDATORY):",
+        "- Active output surface is AUTHORIZATION_READY.",
+        "- Generate authorization-ready wording only.",
+        "- Do NOT output shop-report headers.",
+        "- Do NOT output portal-cause-only formatting.",
+      ].join("\n"),
+    );
+  }
+
   return correctionInstructionParts.join("\n");
 }
 
@@ -139,6 +179,7 @@ export function buildPrimaryCorrectionInstruction(args: {
 export function buildPrimaryFallbackResponse(args: {
   validation: ValidationResult;
   mode: CaseMode;
+  outputSurface: OutputSurface;
   outputLanguage: Language;
   langPolicy: LanguagePolicy;
   translationLanguage?: Language;
@@ -153,7 +194,7 @@ export function buildPrimaryFallbackResponse(args: {
       violation.includes("LANGUAGE_MISMATCH"),
     );
 
-  if (args.mode === "diagnostic" && hasDriftOrStepViolation) {
+  if (args.outputSurface === "diagnostic" && hasDriftOrStepViolation) {
     return buildAuthoritativeStepFallback(
       args.activeStepMetadata,
       args.activeStepId,
@@ -161,11 +202,20 @@ export function buildPrimaryFallbackResponse(args: {
     );
   }
 
-  if (args.mode === "diagnostic") {
+  if (args.outputSurface === "diagnostic") {
     return getSafeFallback(args.mode, args.outputLanguage);
   }
 
-  if (args.mode === "final_report") {
+  if (args.outputSurface === "portal_cause") {
+    return buildPortalCauseFallback({
+      policy: args.langPolicy,
+      translationLanguage: args.translationLanguage,
+      complaint: args.finalReportAuthorityFacts?.complaint,
+      finding: args.finalReportAuthorityFacts?.verifiedCondition,
+    });
+  }
+
+  if (args.outputSurface === "shop_final_report") {
     return buildFinalReportFallback({
       policy: args.langPolicy,
       translationLanguage: args.translationLanguage,
@@ -175,6 +225,10 @@ export function buildPrimaryFallbackResponse(args: {
       correctiveAction: args.finalReportAuthorityFacts?.correctiveAction,
       requiredParts: args.finalReportAuthorityFacts?.requiredParts,
     });
+  }
+
+  if (args.outputSurface === "authorization_ready") {
+    return getSafeFallback("authorization", args.outputLanguage);
   }
 
   return getSafeFallback(args.mode, args.outputLanguage);
@@ -198,6 +252,7 @@ export function validateLaborOverrideResponse(args: {
     "final_report",
     args.includeTranslation,
     args.translationLanguage,
+    "shop_final_report",
   );
 
   modeValidation = applyDiagnosticModeValidationGuard(

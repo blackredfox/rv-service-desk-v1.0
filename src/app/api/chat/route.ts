@@ -2,6 +2,7 @@ import { storage, type ChatMessage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import {
   type CaseMode,
+  type OutputSurface,
 } from "@/lib/prompt-composer";
 import {
   isStepAnswered,
@@ -73,6 +74,7 @@ import {
   ensureChatCase,
   resolveStoredCaseMode,
   resolveExplicitModeChange,
+  resolveOutputSurface,
   getModelForMode,
   buildChatSystemPrompt,
   executePrimaryChatCompletion,
@@ -400,6 +402,8 @@ export async function POST(req: Request) {
   });
   const hasPriorUserEvidence = historyBeforeAppend.some((msg) => msg.role === "user");
   const requestedReportKind = reportRevisionIntent.reportKind ?? approvedFinalReportIntent.reportKind;
+  const requestedOutputSurface =
+    reportRevisionIntent.requestedSurface ?? approvedFinalReportIntent.requestedSurface;
   const readyForImmediateReport = runtimeReportReady || repairSummaryIntent.readyForReportRouting;
   const shouldAskForMissingReportFieldsEarly =
     repairSummaryIntent.shouldAskClarification &&
@@ -472,6 +476,11 @@ export async function POST(req: Request) {
       console.log("[Chat API v2] Final report command blocked — readiness not satisfied");
     }
   }
+
+  let currentOutputSurface: OutputSurface = resolveOutputSurface({
+    mode: currentMode,
+    requestedSurface: requestedOutputSurface,
+  });
 
   let stepGuidancePlan: StepGuidancePlan | null = null;
 
@@ -906,6 +915,10 @@ export async function POST(req: Request) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
       reportPromptConstraint = buildReportTypePromptConstraint(requestedReportKind);
+      currentOutputSurface = resolveOutputSurface({
+        mode: currentMode,
+        requestedSurface: requestedOutputSurface,
+      });
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
     } else if (hasBoundedReportRequest && currentMode === "diagnostic") {
       reportRoutingResponse = buildRepairSummaryClarificationResponse({
@@ -918,7 +931,11 @@ export async function POST(req: Request) {
 
   // ── FACT LOCK ─────────────────────────────────────────────────────
   let factLockConstraint = "";
-  if (currentMode === "final_report") {
+  if (currentOutputSurface === "authorization_ready") {
+    factLockConstraint = buildFactLockConstraint(history);
+  }
+
+  if (currentOutputSurface === "shop_final_report" || currentOutputSurface === "portal_cause") {
     const reportContext = getOrCreateContext(ensuredCase.id);
     finalReportAuthorityFacts = deriveFinalReportAuthorityFacts(history, reportContext);
     factLockConstraint = [
@@ -954,6 +971,7 @@ export async function POST(req: Request) {
   const composePromptStart = Date.now();
   const { systemPrompt } = buildChatSystemPrompt({
     mode: currentMode,
+    outputSurface: currentOutputSurface,
     trackedInputLanguage,
     outputPolicy,
     langPolicy,
@@ -1010,6 +1028,7 @@ export async function POST(req: Request) {
         })));
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
+        controller.enqueue(encoder.encode(sseEncode({ type: "output_surface", surface: currentOutputSurface })));
 
         const directRoutingResponse = reportRoutingResponse ?? directDiagnosticResponse;
 
@@ -1122,7 +1141,12 @@ export async function POST(req: Request) {
         }
 
         // ── LABOR OVERRIDE PATH ─────────────────────────────────────
-        if (isLaborOverrideRequest && requestedLaborHours !== null && requestedLaborHoursText) {
+        if (
+          currentOutputSurface === "shop_final_report" &&
+          isLaborOverrideRequest &&
+          requestedLaborHours !== null &&
+          requestedLaborHoursText
+        ) {
           console.log(
             `[Chat API v2] Final report labor override requested: total=${requestedLaborHoursText} hr`
           );
@@ -1162,6 +1186,7 @@ export async function POST(req: Request) {
           apiKey,
           caseId: ensuredCase.id,
           mode: currentMode,
+          outputSurface: currentOutputSurface,
           systemPrompt,
           history,
           message,

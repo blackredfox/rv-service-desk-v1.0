@@ -70,6 +70,7 @@ export {
 export {
   resolveStoredCaseMode,
   resolveExplicitModeChange,
+  resolveOutputSurface,
   getModelForMode,
 } from "./chat-mode-resolver";
 

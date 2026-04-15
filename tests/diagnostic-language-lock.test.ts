@@ -41,6 +41,7 @@ describe("Diagnostic language lock regression", () => {
         "Step wh_2: LP tank level — gauge reading or weight check? Main tank valve fully open?",
       ].join("\n"),
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       trackedInputLanguage: "RU",
       outputLanguage: "RU",
       includeTranslation: false,
@@ -66,6 +67,7 @@ describe("Diagnostic language lock regression", () => {
         violations: ["LANGUAGE_MISMATCH: leaked English step"],
       },
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       outputLanguage: "RU",
       langPolicy: { mode: "AUTO", primaryOutput: "EN", includeTranslation: false },
       activeStepMetadata: {

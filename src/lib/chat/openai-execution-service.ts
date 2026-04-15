@@ -1,5 +1,5 @@
 import type { Language, LanguagePolicy } from "@/lib/lang";
-import type { CaseMode } from "@/lib/prompt-composer";
+import type { CaseMode, OutputSurface } from "@/lib/prompt-composer";
 import {
   buildCorrectionInstruction,
   logValidation,
@@ -186,6 +186,7 @@ export async function executePrimaryChatCompletion(args: {
   apiKey: string;
   caseId: string;
   mode: CaseMode;
+  outputSurface: OutputSurface;
   systemPrompt: string;
   history: HistoryMessage[];
   message: string;
@@ -251,6 +252,7 @@ export async function executePrimaryChatCompletion(args: {
   let validation = validatePrimaryResponse({
     response: result.response,
     mode: args.mode,
+    outputSurface: args.outputSurface,
     trackedInputLanguage: args.trackedInputLanguage,
     outputLanguage: args.outputLanguage,
     includeTranslation: args.langPolicy.includeTranslation,
@@ -278,6 +280,7 @@ export async function executePrimaryChatCompletion(args: {
 
     const correctionInstruction = buildPrimaryCorrectionInstruction({
       validation,
+      outputSurface: args.outputSurface,
       activeStepMetadata: args.activeStepMetadata,
       activeStepId: args.activeStepId,
     });
@@ -321,6 +324,7 @@ export async function executePrimaryChatCompletion(args: {
       validation = validatePrimaryResponse({
         response: result.response,
         mode: args.mode,
+        outputSurface: args.outputSurface,
         trackedInputLanguage: args.trackedInputLanguage,
         outputLanguage: args.outputLanguage,
         includeTranslation: args.langPolicy.includeTranslation,
@@ -350,6 +354,7 @@ export async function executePrimaryChatCompletion(args: {
       const fallbackResponse = buildPrimaryFallbackResponse({
         validation,
         mode: args.mode,
+        outputSurface: args.outputSurface,
         outputLanguage: args.outputLanguage,
         langPolicy: args.langPolicy,
         translationLanguage: args.translationLanguage,
