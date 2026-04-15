@@ -205,9 +205,9 @@ describe("Guided Diagnostics State Machine", () => {
       const promptContent = readFileSync(promptPath, "utf-8");
       
       expect(promptContent).toContain("no information");
-      expect(promptContent).toContain("UNKNOWN");
-      expect(promptContent).toContain("next diagnostic step");
-      expect(promptContent).toContain("Do NOT repeat the same question");
+      expect(promptContent).toContain("accept it");
+      expect(promptContent).toMatch(/server-provided next legal state|active legal state/i);
+      expect(promptContent).toMatch(/do not repeat a question already marked complete or closed by runtime/i);
     });
   });
 });
@@ -335,10 +335,11 @@ Isolation complete. Conditions met. Transitioning to Final Report Mode.
       // Should NOT have auto-transition instructions
       expect(promptContent).not.toContain("[TRANSITION: FINAL_REPORT]");
       
-      // Should have explicit-only transition rules
-      expect(promptContent).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
-      expect(promptContent).toContain("START FINAL REPORT");
-      expect(promptContent).toContain("CANNOT automatically switch to final_report mode");
+      // Should preserve server-owned transition boundaries without old label wording
+      expect(promptContent).toContain("MODE TRANSITIONS:");
+      expect(promptContent).toMatch(/never switch modes on your own/i);
+      expect(promptContent).toMatch(/server-approved explicit command or approved alias path already resolved by runtime/i);
+      expect(promptContent).toMatch(/do not generate a final report or portal cause from diagnostic mode/i);
     });
   });
 });
