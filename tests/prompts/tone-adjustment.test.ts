@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *
  * Verifies:
  * - SYSTEM_PROMPT_BASE.txt: no over-polite patterns
- * - MODE_PROMPT_DIAGNOSTIC.txt: no "Thank you" defaults, has registry rules
+ * - MODE_PROMPT_DIAGNOSTIC.txt: no "Thank you" defaults, has semantic diagnostic-boundary rules
  * - Professional, neutral communication style enforced
  * - Prompt checks use contract-shape assertions where exact historical wording
  *   is not required by the active contract
@@ -61,7 +61,7 @@ describe("Tone Adjustment - Prompt Files", () => {
     expectNoWarmDefaultAcknowledgment(content);
   });
 
-  it("MODE_PROMPT_DIAGNOSTIC: has procedure and registry rules", async () => {
+  it("MODE_PROMPT_DIAGNOSTIC: has semantic procedure and runtime-boundary rules", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const content = readFileSync(
@@ -69,12 +69,13 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).toContain("PROCEDURE IS LAW");
-    expect(content).toContain("DIAGNOSTIC REGISTRY RULES");
-    expect(content).toContain("NEVER repeat a question");
+    expect(content).toContain("server-bounded, not server-scripted");
+    expect(content).toMatch(/active diagnostic procedure|runtime context/i);
+    expect(content).toMatch(/do not invent steps|do not.*reorder the procedure|do not.*switch systems/i);
+    expect(content).toMatch(/do not repeat a question already marked complete or closed by runtime/i);
   });
 
-  it("MODE_PROMPT_DIAGNOSTIC: has key findings rules (acknowledge but continue)", async () => {
+  it("MODE_PROMPT_DIAGNOSTIC: preserves grounded diagnostic wording instead of scripted labels", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const content = readFileSync(
@@ -82,20 +83,13 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).toContain("KEY FINDINGS");
-
-
-    // Contract-shape assertions:
-    // 1) key findings must be acknowledged
-    // 2) diagnostics must continue rather than terminate on a single finding
-    expect(content).toMatch(/acknowledge/i);
-    expect(content).toMatch(/continue/i);
-
-    // Guard against accidental termination semantics
-    expect(content).toMatch(/does NOT end diagnostics|CONTINUE diagnostics|CONTINUE with remaining diagnostic steps/i);
+    expect(content).toMatch(/factual and grounded/i);
+    expect(content).toMatch(/do not invent or overstate conclusions/i);
+    expect(content).toMatch(/do not turn grounded diagnostic replies into bureaucratic approval language/i);
+    expect(content).toMatch(/metadata.*not mandatory spoken headers/i);
   });
 
-  it("MODE_PROMPT_DIAGNOSTIC: enforces explicit-only mode transitions", async () => {
+  it("MODE_PROMPT_DIAGNOSTIC: enforces server-owned transition boundaries", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const content = readFileSync(
@@ -103,13 +97,12 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).toContain("MODE TRANSITION RULES (EXPLICIT ONLY)");
-    expect(content).toContain("CANNOT automatically switch to final_report mode");
-    expect(content).toContain("START FINAL REPORT");
-    expect(content).not.toContain("[TRANSITION: FINAL_REPORT]");
+    expect(content).toMatch(/never switch modes on your own/i);
+    expect(content).toMatch(/server-approved explicit command or approved alias path already resolved by runtime/i);
+    expect(content).toMatch(/do not generate a final report or portal cause from diagnostic mode/i);
   });
 
-  it("MODE_PROMPT_DIAGNOSTIC: allows at most one-word acknowledgment", async () => {
+  it("MODE_PROMPT_DIAGNOSTIC: keeps concise acknowledgment behavior", async () => {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const content = readFileSync(
@@ -117,8 +110,8 @@ describe("Tone Adjustment - Prompt Files", () => {
       "utf-8",
     );
 
-    expect(content).toMatch(/one short/i);
-    expect(content).toMatch(/"\w+\."/);
+    expect(content).toMatch(/use at most one short acknowledgment/i);
+    expect(content).toMatch(/no filler|no motivational chatter|no status-screen bureaucracy/i);
   });
 });
 
@@ -154,5 +147,17 @@ describe("Tone Adjustment - Behavior", () => {
     );
 
     expect(content).toMatch(/never.*invent.*assume facts/i);
+  });
+
+  it("SYSTEM_PROMPT_BASE: preserves manufacturer-consistent path fidelity", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const content = readFileSync(
+      join(process.cwd(), "prompts/system/SYSTEM_PROMPT_BASE.txt"),
+      "utf-8",
+    );
+
+    expect(content).toMatch(/manufacturer-specific equipment identity/i);
+    expect(content).toMatch(/manufacturer-consistent diagnostic path/i);
   });
 });

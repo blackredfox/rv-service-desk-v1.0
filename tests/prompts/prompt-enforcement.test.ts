@@ -57,7 +57,8 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
       });
 
       expect(prompt).toContain("DIAGNOSTIC MODE");
-      expect(prompt).toContain("PROCEDURE IS LAW");
+      expect(prompt).toContain("server-bounded, not server-scripted");
+      expect(prompt).toMatch(/active diagnostic procedure|runtime context|active legal step/i);
       expect(prompt).toContain("All dialogue MUST be in Spanish");
     });
 
@@ -86,7 +87,7 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
 
     it("should contain WORDING SAFETY section", () => {
       expect(SYSTEM_BASE).toContain("WORDING SAFETY:");
-      expect(SYSTEM_BASE).toContain("denial-triggering words");
+      expect(SYSTEM_BASE).toMatch(/denial-trigger.*formal final-output surfaces/i);
       expect(SYSTEM_BASE).toContain("broken");
       expect(SYSTEM_BASE).toContain("failed");
       expect(SYSTEM_BASE).toContain("defective");
@@ -113,87 +114,75 @@ describe("Runtime System Prompt (SYSTEM_PROMPT_BASE.txt)", () => {
   });
 
   describe("MODE_PROMPT_DIAGNOSTIC.txt content", () => {
-    it("should list complex equipment", () => {
-      expect(MODE_DIAGNOSTIC).toContain("COMPLEX SYSTEMS");
-      expect(MODE_DIAGNOSTIC).toContain("Roof AC / heat pumps");
-      expect(MODE_DIAGNOSTIC).toContain("Furnaces");
-      expect(MODE_DIAGNOSTIC).toContain("Slide-out systems");
-      expect(MODE_DIAGNOSTIC).toContain("Leveling systems");
-      expect(MODE_DIAGNOSTIC).toContain("Inverters / converters");
-      expect(MODE_DIAGNOSTIC).toContain("Refrigerators");
+    it("should enforce the accepted server-bounded diagnostic doctrine", () => {
+      expect(MODE_DIAGNOSTIC).toContain("server-bounded, not server-scripted");
+      expect(MODE_DIAGNOSTIC).toMatch(/active diagnostic procedure|runtime context/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/active legal step\s*\/\s*branch|active legal step/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/metadata.*not mandatory spoken headers/i);
     });
 
-    it("should enforce step-by-step procedure rule", () => {
-      expect(MODE_DIAGNOSTIC).toContain("PROCEDURE IS LAW");
-      expect(MODE_DIAGNOSTIC).toContain(
-        "Do NOT invent diagnostic steps outside the procedure",
-      );
-      expect(MODE_DIAGNOSTIC).toContain(
-        "Do NOT ask about systems other than the one being diagnosed",
-      );
-      expect(MODE_DIAGNOSTIC).toContain(
-        "MODE TRANSITION RULES (EXPLICIT ONLY)",
-      );
-      expect(MODE_DIAGNOSTIC).toContain("Do NOT auto-switch modes");
-
-      // Contract-shape assertions:
-      // the prompt must bind questioning to the active procedure
-      // and must prohibit inventing off-procedure steps
+    it("should bind questioning to active procedure and runtime state", () => {
       expect(MODE_DIAGNOSTIC).toMatch(
         /active diagnostic procedure|active procedure/i,
       );
       expect(MODE_DIAGNOSTIC).toMatch(
-        /only ask questions that exist as steps/i,
+        /only ask about the active legal step|active legal step\s*\/\s*branch/i,
       );
       expect(MODE_DIAGNOSTIC).toMatch(
-        /do not invent diagnostic steps outside the procedure/i,
-      );
-    });
-
-    it("should prohibit unauthorized actions in diagnostic mode", () => {
-      expect(MODE_DIAGNOSTIC).toContain(
-        "MODE TRANSITION RULES (EXPLICIT ONLY)",
+        /do not invent steps/i,
       );
       expect(MODE_DIAGNOSTIC).toMatch(
-        /cannot automatically switch to final_report mode|do NOT auto-switch modes/i,
+        /do not.*reorder the procedure/i,
       );
-      expect(MODE_DIAGNOSTIC).toMatch(/do not invent diagnostic steps/i);
       expect(MODE_DIAGNOSTIC).toMatch(
-        /do not skip prerequisites|cannot be asked|must be followed in order/i,
+        /do not.*switch systems/i,
       );
     });
 
-    it("should contain POST-REPAIR RULE", () => {
-      expect(MODE_DIAGNOSTIC).toContain("POST-REPAIR RULE");
+    it("should preserve diagnostic-form discipline and transition boundaries", () => {
       expect(MODE_DIAGNOSTIC).toMatch(
-        /return to diagnostics|guided diagnostics/i,
+        /one concise diagnostic question max|ask at most one concise diagnostic question/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /narrow restoration confirmation/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /do not generate a final report or portal cause/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /never switch modes on your own/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /server-approved explicit command or approved alias path already resolved by runtime/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /do not recommend repair\/replacement or estimate labor unless runtime has selected a legal formal output surface/i,
       );
     });
 
-    it("should contain MECHANICAL SYSTEM RULE", () => {
-      expect(MODE_DIAGNOSTIC).toContain("MECHANICAL SYSTEM RULE");
-
-      // Contract-shape assertions:
-      // direct-power success means the motor is treated as functional
-      expect(MODE_DIAGNOSTIC).toMatch(/direct power|powered directly/i);
-      expect(MODE_DIAGNOSTIC).toMatch(/motor (ok|functional)/i);
+    it("should preserve factual grounded wording and post-repair guardrails", () => {
+      expect(MODE_DIAGNOSTIC).toMatch(/factual and grounded/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/do not invent or overstate conclusions/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/bureaucratic approval language/i);
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /post-repair message shows the repair did not restore operation/i,
+      );
+      expect(MODE_DIAGNOSTIC).toMatch(
+        /return to diagnostics/i,
+      );
     });
 
-    it("should contain CONSUMER APPLIANCE RULE", () => {
-      expect(MODE_DIAGNOSTIC).toContain("CONSUMER APPLIANCE RULE");
-      expect(MODE_DIAGNOSTIC).toContain("TVs, microwaves, stereos");
-      expect(MODE_DIAGNOSTIC).toContain("non-repairable");
+    it("should preserve mechanical and consumer-appliance guardrails", () => {
+      expect(MODE_DIAGNOSTIC).toMatch(/direct[- ]power|powered directly/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/motor itself is not the verified failed component/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/consumer appliances/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/non-repairable unit-level condition/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/stay aligned to that verified state/i);
     });
 
-    it("should enforce RV terminology and battery-type question", () => {
-      expect(MODE_DIAGNOSTIC).toContain("converter/charger");
-      expect(MODE_DIAGNOSTIC).toContain("battery type/bank");
-      expect(MODE_DIAGNOSTIC).toContain("lead-acid vs lithium");
-    });
-
-    it("should limit non-complex unit teardown", () => {
-      expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX UNIT REPAIR LIMITS");
-      expect(MODE_DIAGNOSTIC).toContain("unit-level replacement");
+    it("should preserve manufacturer-consistent path fidelity", () => {
+      expect(MODE_DIAGNOSTIC).toMatch(/manufacturer-specific equipment identity/i);
+      expect(MODE_DIAGNOSTIC).toMatch(/manufacturer-consistent diagnostic path/i);
     });
   });
 
@@ -520,18 +509,18 @@ describe("API Contract", () => {
   });
 });
 
-describe("Complex Equipment Classification (from MODE_PROMPT_DIAGNOSTIC)", () => {
+describe("Complex Equipment Classification (from active prompt contracts)", () => {
   it("should list all complex equipment types", () => {
-    expect(MODE_DIAGNOSTIC).toContain("Roof AC / heat pumps");
-    expect(MODE_DIAGNOSTIC).toContain("Furnaces");
-    expect(MODE_DIAGNOSTIC).toContain("Slide-out systems");
-    expect(MODE_DIAGNOSTIC).toContain("Leveling systems");
-    expect(MODE_DIAGNOSTIC).toContain("Inverters / converters");
-    expect(MODE_DIAGNOSTIC).toContain("Refrigerators");
+    expect(SYSTEM_BASE).toContain("Roof AC / Air conditioners / Heat pumps");
+    expect(SYSTEM_BASE).toContain("Furnaces");
+    expect(SYSTEM_BASE).toContain("Slide-out systems");
+    expect(SYSTEM_BASE).toContain("Leveling systems");
+    expect(SYSTEM_BASE).toContain("Inverters / Converters");
+    expect(SYSTEM_BASE).toContain("Refrigerators");
   });
 
   it("should list water pump as NON-complex equipment", () => {
-    expect(MODE_DIAGNOSTIC).toContain("NON-COMPLEX SYSTEMS");
-    expect(MODE_DIAGNOSTIC).toContain("Water pumps");
+    expect(SYSTEM_BASE).toContain("water pumps");
+    expect(SYSTEM_BASE).toContain("can have individual parts replaced");
   });
 });
