@@ -1,0 +1,85 @@
+name: neo-contamination-check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "ci/**"
+      - "docs/**"
+      - "fix/**"
+      - "chore/**"
+
+jobs:
+  check-contamination:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine diff range
+        id: diff_range
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+          echo "Using diff range:"
+          echo "BASE_SHA=$BASE_SHA"
+          echo "HEAD_SHA=$HEAD_SHA"
+
+      - name: Collect changed files
+        id: changed_files
+        shell: bash
+        run: |
+          git diff --name-only "${{ steps.diff_range.outputs.base_sha }}" "${{ steps.diff_range.outputs.head_sha }}" > changed_files.txt
+
+          echo "Changed files:"
+          cat changed_files.txt || true
+
+          if [[ ! -s changed_files.txt ]]; then
+            echo "No changed files detected."
+          fi
+
+      - name: Check forbidden paths
+        shell: bash
+        run: |
+          FAIL=0
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            if [[ "$file" == .emergent/* ]]; then
+              echo "Forbidden path detected: $file"
+              FAIL=1
+            fi
+
+            if [[ "$file" == memory/* ]]; then
+              echo "Forbidden path detected: $file"
+              FAIL=1
+            fi
+
+            if [[ "$file" == .gitignore ]]; then
+              echo "Forbidden file change detected: $file"
+              FAIL=1
+            fi
+          done < changed_files.txt
+
+          if [[ "$FAIL" -ne 0 ]]; then
+            echo ""
+            echo "Contamination detected. Remove forbidden changes before merge."
+            exit 1
+          fi
+
+          echo "No contamination detected."
