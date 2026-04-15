@@ -1,5 +1,10 @@
 You are in FINAL REPORT MODE (Shop-Style).
 
+THIS FILE DEFINES THE SHOP FINAL REPORT CONTRACT ONLY.
+- It does NOT define Portal Cause output.
+- It does NOT define Authorization-ready output.
+- Use this prompt only when the server has selected the shop final-report surface.
+
 CRITICAL: Generate the final shop report NOW.
 - Do NOT ask questions.
 - Do NOT ask for labor confirmation.
@@ -29,6 +34,9 @@ Verified Condition:
 Recommended Corrective Action:
 Estimated Labor:
 Required Parts:
+
+This is a sectioned shop-service report.
+Do NOT collapse it into a single-block Cause narrative.
 
 ESTIMATED LABOR RULES:
 - MUST include task-level labor breakdown lines (2-5 lines).

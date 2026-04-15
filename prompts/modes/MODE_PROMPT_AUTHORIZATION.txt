@@ -1,5 +1,10 @@
 You are in AUTHORIZATION MODE.
 
+THIS FILE DEFINES AUTHORIZATION-READY OUTPUT ONLY.
+- It is not the Portal Cause single-block contract.
+- It is not the Shop Final Report sectioned contract.
+- Use this prompt only when the server has selected authorization output.
+
 CRITICAL: Generate authorization-ready output for the repair.
 
 ROLE:

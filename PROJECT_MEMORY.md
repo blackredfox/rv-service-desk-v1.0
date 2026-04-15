@@ -5,7 +5,7 @@
 **Status:** Official Project Memory (Product + Technical)  
 **Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
 
-**Last updated:** 2026-04-06
+**Last updated:** 2026-04-15
 
 ---
 
@@ -109,9 +109,10 @@ Modes are **internal** and not shown in UI as “workflow statuses”.
 
 ### 5.1 Modes
 1. **Diagnostic Mode (default)**
-   - Asks one question at a time (when diagnostics are needed).
+   - Server-bounded, not server-scripted.
+   - Asks one question at a time when diagnostics are still legally active.
    - Records facts only.
-   - No conclusions/recommendations unless the contract explicitly allows a bounded summary.
+   - No final output unless the contract explicitly allows a bounded completion / readiness summary.
    - Dialogue stays in technician’s language (EN/RU/ES).
 
 2. **Authorization Mode**
@@ -120,8 +121,16 @@ Modes are **internal** and not shown in UI as “workflow statuses”.
    - Conservative wording, no guarantees.
 
 3. **Final Report Mode**
-   - Produces the final shop-style report format (fixed sections).
+   - Produces the final **shop final report** format (fixed sections).
    - Output is English-first + translated copy.
+
+### 5.1a Diagnostic doctrine (canonical)
+Diagnostic mode is **server-bounded, not server-scripted**.
+
+Meaning:
+- server/runtime owns active system, equipment family, procedure routing, step/branch state, completion state, truth boundaries, safety boundaries, and output legality,
+- the LLM owns natural diagnostic phrasing, concise senior-tech tone, bounded same-step support, and grounded summaries,
+- server metadata such as `System / Classification / Mode / Status / Step` are runtime data, not mandatory assistant speech format.
 
 ### 5.2 Mode transitions (Hard Rule)
 Mode changes are **server-authoritative only** and must never be inferred freely from meaning.
@@ -185,7 +194,18 @@ Not allowed:
 
 ## 7) Output Formats (Fixed)
 
-### 7.1 Final Report (Shop-style, copy/paste-ready)
+### 7.1 Output-surface doctrine
+The system has **multiple final-output contracts**.
+
+They are different output surfaces, not interchangeable wording variants:
+- **Authorization-ready output** → approval-safe authorization text
+- **Portal Cause** → single-block portal/customer-facing cause narrative
+- **Shop Final Report** → sectioned shop-service report
+
+The server decides which surface is legal for the current state.
+The LLM must not choose the surface on its own.
+
+### 7.2 Shop Final Report (copy/paste-ready)
 Plain text, no numbering, no tables.
 
 Sections (exact order):
@@ -196,7 +216,7 @@ Sections (exact order):
 - Estimated Labor
 - Required Parts
 
-### 7.2 Portal-Cause Output (when allowed)
+### 7.3 Portal-Cause Output (when allowed)
 Single English block, no headers, no numbering, paragraphs separated by blank lines, then translation block.
 
 Paragraph order (fixed):
@@ -215,8 +235,13 @@ Paragraph order (fixed):
 
 ## 8) Safety / Wording Guardrails
 
-### 8.1 Prohibited words (Service Authorization wording)
-The assistant must avoid denial-trigger words in Service Authorization phrasing:
+### 8.1 Prohibited words (authorization / portal / final-output surfaces)
+The assistant must avoid denial-trigger words in:
+- authorization-ready output,
+- Portal Cause output,
+- Shop Final Report output.
+
+Restricted words:
 - broken
 - failed
 - defective
@@ -226,7 +251,12 @@ The assistant must avoid denial-trigger words in Service Authorization phrasing:
 - misadjusted
 - leaking
 
-Technician may use them; the assistant **internally normalizes** to neutral technical language without asking the technician to rephrase.
+Diagnostic dialogue is different:
+- the assistant should stay factual and grounded,
+- it must not invent stronger conclusions than the evidence supports,
+- but it does **not** need to force warranty-safe rewrite behavior into ordinary technician dialogue.
+
+Technician may use restricted words; the assistant normalizes them when generating authorization / portal / final-output text.
 
 ### 8.2 Approved technical language (examples)
 - not operating per spec
@@ -515,6 +545,8 @@ Prompts may influence wording, tone, and constrained explanation quality, but th
 - branch switching,
 - terminal-state inference.
 
+Prompts also must not impose a mandatory bureaucratic reply frame when runtime only needs a bounded natural diagnostic response.
+
 Those belong to explicit runtime logic.
 
 ---
@@ -576,6 +608,10 @@ Not allowed in route helpers or extracted boundary modules:
 - fallback diagnostic state machine,
 - hidden branch logic,
 - hidden completion inference.
+
+Canonical clarification:
+- server is allowed to bound the response,
+- server is not allowed to over-author every diagnostic sentence unless a deterministic fallback / legality path explicitly requires it.
 
 ### 12.6 Safe decomposition principle
 Route decomposition is allowed and desirable for maintainability, but only if:

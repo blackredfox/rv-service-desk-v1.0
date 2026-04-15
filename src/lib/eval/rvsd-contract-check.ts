@@ -6,6 +6,14 @@ import {
   validateLanguageConsistency,
 } from "@/lib/mode-validators";
 
+/**
+ * Doctrine note (docs-only alignment PR):
+ * This checker currently validates runtime modes, including the shop-style
+ * `final_report` contract. Portal Cause is now documented as a separate
+ * final-output surface in docs/DIAGNOSTIC_MODE_BOUNDARIES.md and must be added
+ * here in the next runtime PR rather than conflated with `final_report`.
+ */
+
 export type RVSDContractMode = "diagnostic" | "final_report" | "authorization";
 
 export type RVSDContractCheckInput = {

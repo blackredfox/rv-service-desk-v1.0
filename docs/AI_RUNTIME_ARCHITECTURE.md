@@ -6,7 +6,9 @@
 This document describes the **AI orchestration pipeline** used by RV Service Desk.
 
 The system is **not** an autonomous chatbot.
-All AI behavior is controlled by server-side orchestration.
+The system is **server-bounded, not server-scripted**.
+The server controls legality, state, and truth boundaries.
+The LLM controls natural phrasing inside those boundaries.
 
 ---
 
@@ -133,6 +135,9 @@ The LLM is responsible only for:
 - producing translation
 - formatting final outputs
 
+Runtime metadata such as system / classification / mode / status / step are grounding inputs,
+not mandatory default speech format.
+
 The LLM does **not decide diagnostic logic**.
 
 ---
@@ -205,7 +210,12 @@ LLM
 → language generation
 
 Server
-→ validation, normalization, and enforcement
+→ validation, normalization, legality, and enforcement
+
+Canonical doctrine:
+- server bounds the legal response,
+- server does not need to author every normal diagnostic sentence,
+- the LLM may speak naturally as long as it stays inside the active legal state.
 
 This separation prevents AI systems from drifting into uncontrolled chatbot behavior or brittle ritual-command UX.
 
@@ -220,7 +230,7 @@ Uncontrolled AI systems often produce:
 - unpredictable workflows
 - robotic or brittle interaction patterns
 
-RV Service Desk uses **server-controlled AI orchestration** to ensure:
+RV Service Desk uses **server-bounded AI orchestration** to ensure:
 
 - deterministic diagnostic flow
 - safe authorization text

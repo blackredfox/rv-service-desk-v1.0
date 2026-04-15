@@ -94,7 +94,13 @@ function countQuestions(text: string): number {
 }
 
 /**
- * Check if Cause format is correct
+ * Legacy Cause-style format check.
+ *
+ * Doctrine alignment note:
+ * this validator still reflects the older single-block Cause contract for the
+ * `final_report` state. The next runtime PR must reconcile this with the now
+ * explicit Portal Cause vs Shop Final Report split documented in
+ * docs/DIAGNOSTIC_MODE_BOUNDARIES.md.
  *
  * @param includeTranslation - Whether a translation section is expected (from LanguagePolicy).
  */
@@ -171,7 +177,7 @@ export function validateResponse(args: {
   }
   
   if (currentState === "final_report") {
-    // Rule: Must have proper Cause format (translation separator depends on policy)
+    // Legacy rule: currently checks Cause-style format while final-output doctrine is being separated.
     const causeCheck = isCauseFormatCorrect(response, includeTranslation);
     if (!causeCheck.valid) {
       violations.push(...causeCheck.issues.map(i => `FORMAT_VIOLATION: ${i}`));

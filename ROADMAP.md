@@ -2,7 +2,7 @@
 ## ROADMAP
 
 **Version:** 1.3  
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-15  
 **Status:** Active Execution Plan
 
 ---
@@ -507,11 +507,11 @@ Web version:
 
 # 6. Immediate Next Actions
 
-1. Update contract docs (DONE / IN PROGRESS)
-2. Expand benchmark with current real failures
-3. Implement natural report-intent handling
-4. Implement stronger step-guidance locate/identify behavior
-5. Add dirty-input normalization
+1. Complete doctrine alignment for diagnostic boundaries and final-output surfaces
+2. Apply the runtime follow-up PR from the documented file map (prompt assembly / response shaping / validators / route orchestration)
+3. Expand benchmark with the aligned doctrine and current real failures
+4. Implement natural report-intent handling against the clarified output-surface rules
+5. Implement stronger step-guidance locate/identify behavior without server-scripted drift
 6. Only then continue major route.ts decomposition
 
 ---

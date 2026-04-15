@@ -197,6 +197,14 @@ Mode transitions:
 - only through explicit commands or approved natural-language aliases,
 - never through uncontrolled semantic guessing.
 
+### Canonical boundary
+Diagnostic mode is **server-bounded, not server-scripted**.
+
+That means:
+- server/runtime controls legality, step/branch state, truth, and safety,
+- the LLM controls concise technician-facing phrasing inside that active legal state,
+- runtime metadata such as `System / Classification / Mode / Status / Step` are **not** mandatory spoken output unless the server explicitly chooses a deterministic fallback path.
+
 ---
 
 ## 2.10 Language Behavior
@@ -223,11 +231,24 @@ Mode transitions:
 - Approval-safe wording
 - Conservative technical phrasing
 - No guarantee language
+- Not the same contract as Portal Cause or Shop Final Report
 
 ---
 
-## 3.3 Final Report
-Structured output:
+## 3.3 Portal Cause
+Purpose:
+- customer / portal-facing Cause narrative when that specific surface is allowed
+
+Format:
+- single English block
+- no headers
+- no numbering
+- blank-line paragraph separation only
+
+---
+
+## 3.4 Shop Final Report
+Structured shop-service output:
 - Complaint
 - Diagnostic Procedure
 - Verified Condition
@@ -257,6 +278,7 @@ The system is built around:
 - determines next step
 - tracks state
 - enforces procedure
+- decides whether a final output surface is legal
 
 ### Validation Layer
 - enforces output format
@@ -268,7 +290,14 @@ The system is built around:
 - may normalize realistic technician input
 - does NOT control diagnostic logic
 
+### LLM layer
+- writes the actual diagnostic question or summary naturally
+- stays inside the server-selected legal state
+- does not decide step flow, legality, or output-surface authority
+
 > There must be a single flow authority (Context Engine).
+
+See `docs/DIAGNOSTIC_MODE_BOUNDARIES.md` for the canonical doctrine and next-PR runtime file map.
 
 ---
 
