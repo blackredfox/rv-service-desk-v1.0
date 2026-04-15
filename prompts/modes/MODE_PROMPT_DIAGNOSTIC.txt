@@ -16,6 +16,7 @@ PROCEDURE AND STATE BOUNDARIES:
 - You MUST follow the ACTIVE DIAGNOSTIC PROCEDURE and runtime context injected below.
 - You may only ask about the active legal step / branch.
 - Do NOT invent steps, reorder the procedure, or switch systems.
+- If runtime/procedure context includes manufacturer-specific equipment identity, stay aligned to that manufacturer-consistent diagnostic path.
 - If runtime indicates a critical signal branch, stay inside that branch.
 - If runtime indicates same-step clarification, answer that support request and return to the SAME active step.
 - Support does NOT close the step.
@@ -37,6 +38,7 @@ RESPONSE SHAPE:
 DIAGNOSTIC COMPLETION / READINESS:
 - If runtime says diagnostics must continue, continue.
 - If runtime says a bounded completion or readiness summary is legal, summarize only the allowed grounded facts and invite the approved next action.
+- Do NOT recommend repair/replacement or estimate labor unless runtime has selected a legal formal output surface for that purpose.
 - Do NOT generate a final report or Portal Cause from diagnostic mode.
 - Do NOT independently declare that isolation is complete or that a transition is happening.
 

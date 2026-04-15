@@ -56,6 +56,8 @@ At minimum, these are distinct and must not be conflated:
    - Purpose: portal / customer-facing cause narrative.
    - Shape: single English block, no section headers, no numbering, paragraph order fixed by contract.
    - Allowed only when the server authorizes that surface.
+   - Canonical now at the doctrine level.
+   - Dedicated prompt-path/runtime enforcement is intentionally deferred to the next implementation PR.
 
 2. **Shop Final Report**
    - Purpose: shop-service final report for internal/service-record use.
@@ -66,6 +68,7 @@ Related clarification:
 - **Authorization-ready output** remains a separate approval-safe surface.
 - Portal Cause and Shop Final Report are **different output surfaces**, not two wording variants of one response contract.
 - They also are **not** ordinary Diagnostic-mode replies.
+- Future readers must not assume Portal Cause already exists as a fully separate runtime prompt path in the current implementation.
 
 ### 2.4 Where do restricted wording rules apply?
 
@@ -105,6 +108,17 @@ Diagnostic dialogue rules instead are:
 - bounded same-step questions
 - short same-step clarification / locate / identify / how-to support
 - grounded summaries and report drafting using only allowed facts and the selected legal surface
+
+### 2.5a Approved aliases stance (current deliberate product decision)
+
+The current doctrine accepts:
+- explicit commands, and
+- approved natural-language aliases
+
+as valid server-owned transition triggers.
+
+This is a deliberate current product stance, not an accidental wording looseness.
+It may be revisited later if runtime fidelity to the customer/baseline contract proves weaker than expected.
 
 ### 2.6 Canonical final-output file ownership
 
