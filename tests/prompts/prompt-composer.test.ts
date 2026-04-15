@@ -24,7 +24,8 @@ describe("Prompt Files", () => {
     expect(content).toContain("NOT a chatbot");
     expect(content).toContain("LANGUAGE RULES");
     expect(content).toContain("WORDING SAFETY");
-    expect(content).toContain("denial-triggering words");
+    expect(content).toMatch(/denial-trigger.*formal final-output surfaces/i);
+    expect(content).toMatch(/manufacturer-specific equipment identity/i);
   });
 
   it("should have MODE_PROMPT_DIAGNOSTIC.txt", () => {
@@ -33,11 +34,17 @@ describe("Prompt Files", () => {
 
     const content = readFileSync(path, "utf-8");
     expect(content).toContain("DIAGNOSTIC MODE");
-    expect(content).toContain("COMPLEX SYSTEMS");
-    expect(content).toContain("PROCEDURE IS LAW");
-    expect(content).toContain("POST-REPAIR RULE");
-    expect(content).toContain("MECHANICAL SYSTEM RULE");
-    expect(content).toContain("CONSUMER APPLIANCE RULE");
+    expect(content).toContain("server-bounded, not server-scripted");
+    expect(content).toMatch(/active diagnostic procedure|runtime context/i);
+    expect(content).toMatch(/do not invent steps|do NOT invent steps/i);
+    expect(content).toMatch(/reorder the procedure/i);
+    expect(content).toMatch(/switch systems/i);
+    expect(content).toMatch(/do not generate a final report or portal cause/i);
+    expect(content).toMatch(/never switch modes on your own/i);
+    expect(content).toMatch(/repair did not restore operation.*return to diagnostics|return to diagnostics if runtime directs that path/i);
+    expect(content).toMatch(/direct-power success means the motor itself is not the verified failed component/i);
+    expect(content).toMatch(/consumer appliances/i);
+    expect(content).toMatch(/non-repairable unit-level condition/i);
   });
 
   it("should have MODE_PROMPT_AUTHORIZATION.txt", () => {
