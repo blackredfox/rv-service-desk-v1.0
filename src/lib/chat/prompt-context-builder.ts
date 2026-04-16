@@ -1,6 +1,7 @@
 import {
   composePromptV2,
   type CaseMode,
+  type OutputSurface,
 } from "@/lib/prompt-composer";
 import type {
   Language,
@@ -22,6 +23,7 @@ export function buildAdditionalConstraints(parts: string[]): string | undefined 
  */
 export function buildChatSystemPrompt(args: {
   mode: CaseMode;
+  outputSurface: OutputSurface;
   trackedInputLanguage: Language;
   outputPolicy: OutputLanguagePolicyV2;
   langPolicy: LanguagePolicy;
@@ -43,6 +45,7 @@ export function buildChatSystemPrompt(args: {
 
   const baseSystemPrompt = composePromptV2({
     mode: args.mode,
+    outputSurface: args.outputSurface,
     inputDetected: args.trackedInputLanguage,
     outputEffective: args.outputPolicy.effective,
     includeTranslation: args.langPolicy.includeTranslation,

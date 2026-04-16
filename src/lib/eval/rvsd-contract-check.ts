@@ -1,15 +1,18 @@
 import type { Language } from "@/lib/lang";
 import {
-  validateAuthorizationOutput,
+  validateAuthorizationReadyOutput,
   validateDiagnosticOutput,
-  validateFinalReportOutput,
+  validateShopFinalReportOutput,
   validateLanguageConsistency,
 } from "@/lib/mode-validators";
+import { resolveOutputSurfaceForMode, type OutputSurface } from "@/lib/prompt-composer";
+import { validatePortalCauseOutput } from "@/lib/output-validator";
 
 export type RVSDContractMode = "diagnostic" | "final_report" | "authorization";
 
 export type RVSDContractCheckInput = {
   mode: RVSDContractMode;
+  outputSurface?: OutputSurface;
   responseText: string;
   dialogueLanguage?: Language;
   includeTranslation?: boolean;
@@ -93,8 +96,8 @@ function classifyDiagnosticViolations(
   }
 }
 
-function classifyFinalReportViolations(
-  result: ReturnType<typeof validateFinalReportOutput>,
+function classifyShopFinalReportViolations(
+  result: ReturnType<typeof validateShopFinalReportOutput>,
   violations: string[],
 ) {
   for (const violation of result.violations) {
@@ -110,19 +113,44 @@ function classifyFinalReportViolations(
   }
 }
 
+function classifyPortalCauseViolations(
+  result: ReturnType<typeof validatePortalCauseOutput>,
+  violations: string[],
+) {
+  for (const violation of result.violations) {
+    if (violation.includes("FORMAT_VIOLATION")) {
+      pushUnique(violations, "CONTRACT_PORTAL_CAUSE_STRUCTURE");
+    }
+    if (violation.includes("Translation should be in")) {
+      pushUnique(violations, "CONTRACT_PORTAL_CAUSE_LANGUAGE_POLICY");
+    }
+  }
+}
+
 function buildChecks(violations: string[]): RVSDContractCheckResult["checks"] {
   return {
     modeClassValid: !violations.some((v) =>
-      ["CONTRACT_DIAGNOSTIC_DRIFT", "CONTRACT_AUTHORIZATION_DRIFT"].includes(v),
+      [
+        "CONTRACT_DIAGNOSTIC_DRIFT",
+        "CONTRACT_AUTHORIZATION_DRIFT",
+        "CONTRACT_AUTHORIZATION_SURFACE_MISMATCH",
+        "CONTRACT_PORTAL_CAUSE_STRUCTURE",
+        "CONTRACT_FINAL_REPORT_STRUCTURE",
+      ].includes(v),
     ),
     structureValid: !violations.some((v) =>
-      ["CONTRACT_QUESTION_SHAPE", "CONTRACT_FINAL_REPORT_STRUCTURE"].includes(v),
+      [
+        "CONTRACT_QUESTION_SHAPE",
+        "CONTRACT_FINAL_REPORT_STRUCTURE",
+        "CONTRACT_PORTAL_CAUSE_STRUCTURE",
+      ].includes(v),
     ),
     languagePolicyValid: !violations.some((v) =>
       [
         "CONTRACT_LANGUAGE_POLICY_MISMATCH",
         "CONTRACT_DIAGNOSTIC_TRANSLATION_FORBIDDEN",
         "CONTRACT_FINAL_REPORT_LANGUAGE_POLICY",
+        "CONTRACT_PORTAL_CAUSE_LANGUAGE_POLICY",
       ].includes(v),
     ),
     transitionRuleValid: !violations.includes("CONTRACT_EXPLICIT_TRANSITION_REQUIRED"),
@@ -151,6 +179,10 @@ export function checkExplicitTransitionDoctrine(args: {
 export function rvsdContractCheck(args: RVSDContractCheckInput): RVSDContractCheckResult {
   const violations: string[] = [];
   const responseText = args.responseText ?? "";
+  const outputSurface = resolveOutputSurfaceForMode({
+    mode: args.mode,
+    requestedSurface: args.outputSurface,
+  });
 
   if (args.mode === "diagnostic") {
     classifyDiagnosticViolations(validateDiagnosticOutput(responseText), violations);
@@ -169,18 +201,29 @@ export function rvsdContractCheck(args: RVSDContractCheckInput): RVSDContractChe
     transitionCheck.violations.forEach((violation) => pushUnique(violations, violation));
   }
 
-  if (args.mode === "final_report") {
+  if (outputSurface === "shop_final_report") {
     const includeTranslation = args.includeTranslation ?? (args.dialogueLanguage ? args.dialogueLanguage !== "EN" : true);
-    classifyFinalReportViolations(
-      validateFinalReportOutput(responseText, includeTranslation, args.dialogueLanguage),
+    classifyShopFinalReportViolations(
+      validateShopFinalReportOutput(responseText, includeTranslation, args.dialogueLanguage),
       violations,
     );
   }
 
-  if (args.mode === "authorization") {
-    const authorizationResult = validateAuthorizationOutput(responseText);
+  if (outputSurface === "portal_cause") {
+    const includeTranslation = args.includeTranslation ?? (args.dialogueLanguage ? args.dialogueLanguage !== "EN" : true);
+    classifyPortalCauseViolations(
+      validatePortalCauseOutput(responseText, includeTranslation, args.dialogueLanguage),
+      violations,
+    );
+  }
+
+  if (outputSurface === "authorization_ready") {
+    const authorizationResult = validateAuthorizationReadyOutput(responseText);
     if (hasFinalReportShape(responseText) || authorizationResult.violations.some((v) => v.includes("AUTHORIZATION_DRIFT"))) {
       pushUnique(violations, "CONTRACT_AUTHORIZATION_DRIFT");
+    }
+    if (authorizationResult.violations.some((v) => v.includes("AUTHORIZATION_SURFACE_MISMATCH"))) {
+      pushUnique(violations, "CONTRACT_AUTHORIZATION_SURFACE_MISMATCH");
     }
     if (authorizationResult.violations.some((v) => v.includes("PROHIBITED_WORDS"))) {
       pushUnique(violations, "CONTRACT_AUTHORIZATION_PROHIBITED_WORDING");
@@ -195,7 +238,7 @@ export function rvsdContractCheck(args: RVSDContractCheckInput): RVSDContractChe
     violations,
     checks,
     summary: passed
-      ? `PASS: ${args.mode} contract satisfied`
-      : `FAIL: ${args.mode} contract violated (${violations.join(", ")})`,
+      ? `PASS: ${outputSurface} contract satisfied`
+      : `FAIL: ${outputSurface} contract violated (${violations.join(", ")})`,
   };
 }

@@ -2,6 +2,7 @@ import { storage, type ChatMessage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 import {
   type CaseMode,
+  type OutputSurface,
 } from "@/lib/prompt-composer";
 import {
   isStepAnswered,
@@ -73,6 +74,7 @@ import {
   ensureChatCase,
   resolveStoredCaseMode,
   resolveExplicitModeChange,
+  resolveOutputSurface,
   getModelForMode,
   buildChatSystemPrompt,
   executePrimaryChatCompletion,
@@ -91,8 +93,6 @@ import {
   classifyStepGuidanceIntent,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
-  buildRepairSummaryClarificationResponse,
-  type RepairSummaryMissingField,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -236,6 +236,18 @@ function buildAuthoritativeCompletionOffer(args: {
   }
 }
 
+function buildTranscriptDerivedDraftConstraint(): string {
+  return [
+    "REPORT ASSEMBLY (MANDATORY):",
+    "- Assemble the final report draft yourself from the case transcript and technician-verified facts.",
+    "- Propose each section (Complaint, Diagnostic Procedure, Verified Condition, Recommended Corrective Action, Estimated Labor with breakdown lines, Required Parts) using what the technician has already reported in-conversation.",
+    "- Do NOT ask the technician to author or re-author the complaint, findings, or performed repair.",
+    "- Do NOT ask questionnaire-style questions before generating the draft.",
+    "- The technician will review and correct the draft if needed; proposing items is your job.",
+    "- If a specific item is truly not inferable from the transcript, use a conservative shop-style placeholder rather than asking a question.",
+  ].join("\n");
+}
+
 function buildReportTypePromptConstraint(reportKind?: ReportKind): string {
   switch (reportKind) {
     case "warranty":
@@ -276,6 +288,22 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
       return "Para elegir el procedimiento correcto del AC, confirma qué tipo de unidad es: ¿AC de techo, AC del tablero/cabina, AC de techo con bomba de calor u otro tipo?";
     default:
       return "Before I choose the correct AC procedure, confirm what type of unit it is: roof AC, dash/cab AC, roof AC with heat pump, or another type?";
+  }
+}
+
+/**
+ * Build a deterministic response when the technician requests a final report
+ * but diagnostics are still in progress (isolation not complete).
+ * Remains in diagnostic mode and directs the technician to continue.
+ */
+function buildDiagnosticsNotReadyResponse(language: Language): string {
+  switch (language) {
+    case "RU":
+      return "Диагностика ещё не завершена. Давайте продолжим с текущего шага, прежде чем формировать отчёт.";
+    case "ES":
+      return "El diagnóstico aún no está completo. Continuemos con el paso actual antes de generar el informe.";
+    default:
+      return "Diagnostics are not yet complete. Let\u2019s continue with the current step before generating the report.";
   }
 }
 
@@ -400,16 +428,14 @@ export async function POST(req: Request) {
   });
   const hasPriorUserEvidence = historyBeforeAppend.some((msg) => msg.role === "user");
   const requestedReportKind = reportRevisionIntent.reportKind ?? approvedFinalReportIntent.reportKind;
+  const requestedOutputSurface =
+    reportRevisionIntent.requestedSurface ?? approvedFinalReportIntent.requestedSurface;
   const readyForImmediateReport = runtimeReportReady || repairSummaryIntent.readyForReportRouting;
-  const shouldAskForMissingReportFieldsEarly =
-    repairSummaryIntent.shouldAskClarification &&
-    (repairSummaryIntent.hasStructuredSummarySignals ||
-      hasPriorUserEvidence ||
-      (Boolean(currentContextSnapshot.activeProcedureId) &&
-        repairSummaryIntent.currentMessageHasRepairSignal));
-  const missingReportFields: RepairSummaryMissingField[] = repairSummaryIntent.missingFields.length > 0
-    ? repairSummaryIntent.missingFields
-    : ["complaint", "findings", "corrective_action"];
+  // NOTE: We never ask the technician to author complaint/findings/performed
+  // repair as the default path. When a report request arrives, either the
+  // assistant assembles the draft from the transcript (ready case), or we
+  // hold in diagnostics (not-ready case).
+  void hasPriorUserEvidence;
   const storedRoofAcEvidenceMessage =
     historyBeforeAppend.find(
       (msg) => msg.role === "user" && hasSpecificRoofAcEvidence(msg.content),
@@ -427,7 +453,33 @@ export async function POST(req: Request) {
     : null;
 
   const modeResolution = pendingFinalReportCommand;
-  if (existingReportInContext && precomputedLaborOverride.isLaborOverrideRequest) {
+  // When a final report already exists AND the technician sends a narrow
+  // line-item edit (e.g. "исправь - <item>: 0.3 ч"), prefer the REPORT
+  // REVISION path over the broad LABOR TOTAL OVERRIDE path. This prevents
+  // the post-final "If you want the report now... / START FINAL REPORT"
+  // restart loop observed in Case-58 when the labor-total regex falsely
+  // captures a per-line labor correction.
+  const postFinalLineEdit =
+    existingReportInContext &&
+    reportRevisionIntent.matched &&
+    (reportRevisionIntent.isLineEdit ?? false);
+
+  if (postFinalLineEdit) {
+    reportPromptConstraint = [
+      buildReportTypePromptConstraint(requestedReportKind),
+      buildReportRevisionPromptConstraint(message),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (currentMode !== "final_report") {
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (post-final line-item revision)`);
+    } else {
+      console.log(`[Chat API v2] Mode held as final_report (post-final line-item revision)`);
+    }
+  } else if (existingReportInContext && precomputedLaborOverride.isLaborOverrideRequest) {
     currentMode = "final_report";
     console.log(`[Chat API v2] Mode held in-memory as final_report (existing report labor override)`);
   } else if (existingReportInContext && (reportRevisionIntent.matched || approvedFinalReportIntent.matched)) {
@@ -445,20 +497,27 @@ export async function POST(req: Request) {
     }
   } else if (hasBoundedReportRequest) {
     if (readyForImmediateReport) {
-      reportPromptConstraint = buildReportTypePromptConstraint(requestedReportKind);
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       if (currentMode !== "final_report") {
         currentMode = "final_report";
         await storage.updateCase(ensuredCase.id, { mode: currentMode });
         console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (report request routed by readiness)`);
       }
-    } else if (shouldAskForMissingReportFieldsEarly) {
-      reportRoutingResponse = buildRepairSummaryClarificationResponse({
-        language: outputPolicy.effective,
-        missingFields: [...missingReportFields],
-      });
-      console.log(`[Chat API v2] Report request blocked — missing report fields: ${missingReportFields.join(", ")}`);
+    } else if (Boolean(currentContextSnapshot.activeProcedureId) && !runtimeReportReady) {
+      // Active diagnostic procedure with isolation not complete.
+      // Do NOT fall to repair-summary questionnaire — defer to post-context-engine
+      // where the context engine may resolve readiness.
+      console.log(`[Chat API v2] Report request deferred — active procedure, isolation not complete`);
     }
+    // No other branch: we NEVER ask the technician to author
+    // complaint / findings / performed repair as the default. When report
+    // becomes ready, the assistant assembles the draft from the transcript.
   } else if (modeResolution.changed) {
     const reportReadyBeforeTransition =
       modeResolution.nextMode !== "final_report" ||
@@ -472,6 +531,11 @@ export async function POST(req: Request) {
       console.log("[Chat API v2] Final report command blocked — readiness not satisfied");
     }
   }
+
+  let currentOutputSurface: OutputSurface = resolveOutputSurface({
+    mode: currentMode,
+    requestedSurface: requestedOutputSurface,
+  });
 
   let stepGuidancePlan: StepGuidancePlan | null = null;
 
@@ -757,7 +821,7 @@ export async function POST(req: Request) {
       const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
       if (isStepAnswered(routingMessage, stepQuestion)) {
         // Technician's message answers the step — mark it complete
-        registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
+        registryMarkStepCompleted(ensuredCase.id, currentActiveStep, routingMessage);
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
         console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match, hardening backup)`);
 
@@ -890,6 +954,21 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
 
+    // ── ANTI-INVITATION DIRECTIVE ───────────────────────────────────────
+    // When isolation is NOT complete, explicitly prohibit the LLM from
+    // inviting or suggesting final report generation.
+    if (!engineResult.context.isolationComplete && engineResult.context.terminalState?.phase === "normal") {
+      const antiInvitationDirective = [
+        "PROHIBITION (MANDATORY):",
+        "- Isolation is NOT complete. Diagnostics are still in progress.",
+        "- Do NOT suggest or mention generating a final report.",
+        "- Do NOT suggest or mention START FINAL REPORT.",
+        "- Do NOT say the technician can request a report.",
+        "- Continue with the active diagnostic step only.",
+      ].join("\n");
+      contextEngineDirectives = [contextEngineDirectives, antiInvitationDirective].filter(Boolean).join("\n\n");
+    }
+
     const shouldSuppressProcedureContext =
       engineResult.context.isolationComplete ||
       engineResult.context.terminalState?.phase !== "normal";
@@ -905,20 +984,32 @@ export async function POST(req: Request) {
     if (hasBoundedReportRequest && currentMode === "diagnostic" && isFinalReportReady(engineResult.context)) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
-      reportPromptConstraint = buildReportTypePromptConstraint(requestedReportKind);
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      currentOutputSurface = resolveOutputSurface({
+        mode: currentMode,
+        requestedSurface: requestedOutputSurface,
+      });
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
     } else if (hasBoundedReportRequest && currentMode === "diagnostic") {
-      reportRoutingResponse = buildRepairSummaryClarificationResponse({
-        language: outputPolicy.effective,
-        missingFields: [...missingReportFields],
-      });
-      console.log(`[Chat API v2] Report request still missing data after context processing: ${missingReportFields.join(", ")}`);
+      // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
+      // Stay in diagnostic mode and continue from the correct legal state.
+      reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);
+      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved`);
     }
   }
 
   // ── FACT LOCK ─────────────────────────────────────────────────────
   let factLockConstraint = "";
-  if (currentMode === "final_report") {
+  if (currentOutputSurface === "authorization_ready") {
+    factLockConstraint = buildFactLockConstraint(history);
+  }
+
+  if (currentOutputSurface === "shop_final_report" || currentOutputSurface === "portal_cause") {
     const reportContext = getOrCreateContext(ensuredCase.id);
     finalReportAuthorityFacts = deriveFinalReportAuthorityFacts(history, reportContext);
     factLockConstraint = [
@@ -945,8 +1036,14 @@ export async function POST(req: Request) {
       : null;
 
   const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
-  const isLaborOverrideRequest = laborOverride.isLaborOverrideRequest;
-  const requestedLaborHours = laborOverride.requestedLaborHours;
+  // Post-final line-item revisions are NOT labor-total overrides — they must
+  // flow through the primary completion path with the REPORT REVISION prompt
+  // so the LLM patches the existing report line-by-line instead of rewriting
+  // the Estimated Labor section to a single-item total.
+  const isLaborOverrideRequest = postFinalLineEdit
+    ? false
+    : laborOverride.isLaborOverrideRequest;
+  const requestedLaborHours = postFinalLineEdit ? null : laborOverride.requestedLaborHours;
   const requestedLaborHoursText =
     requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
 
@@ -954,6 +1051,7 @@ export async function POST(req: Request) {
   const composePromptStart = Date.now();
   const { systemPrompt } = buildChatSystemPrompt({
     mode: currentMode,
+    outputSurface: currentOutputSurface,
     trackedInputLanguage,
     outputPolicy,
     langPolicy,
@@ -1010,6 +1108,7 @@ export async function POST(req: Request) {
         })));
 
         controller.enqueue(encoder.encode(sseEncode({ type: "mode", mode: currentMode })));
+        controller.enqueue(encoder.encode(sseEncode({ type: "output_surface", surface: currentOutputSurface })));
 
         const directRoutingResponse = reportRoutingResponse ?? directDiagnosticResponse;
 
@@ -1122,7 +1221,12 @@ export async function POST(req: Request) {
         }
 
         // ── LABOR OVERRIDE PATH ─────────────────────────────────────
-        if (isLaborOverrideRequest && requestedLaborHours !== null && requestedLaborHoursText) {
+        if (
+          currentOutputSurface === "shop_final_report" &&
+          isLaborOverrideRequest &&
+          requestedLaborHours !== null &&
+          requestedLaborHoursText
+        ) {
           console.log(
             `[Chat API v2] Final report labor override requested: total=${requestedLaborHoursText} hr`
           );
@@ -1162,6 +1266,7 @@ export async function POST(req: Request) {
           apiKey,
           caseId: ensuredCase.id,
           mode: currentMode,
+          outputSurface: currentOutputSurface,
           systemPrompt,
           history,
           message,

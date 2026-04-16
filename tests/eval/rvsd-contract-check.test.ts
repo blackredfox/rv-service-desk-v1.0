@@ -88,6 +88,34 @@ describe("rvsd-contract-check v1", () => {
     expect(result.checks.languagePolicyValid).toBe(false);
   });
 
+  it("passes a valid portal cause surface", () => {
+    const result = rvsdContractCheck({
+      mode: "final_report",
+      outputSurface: "portal_cause",
+      responseText: RVSD_CONTRACT_FIXTURES.portalCauseValid,
+      dialogueLanguage: "RU",
+      includeTranslation: true,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.violations).toEqual([]);
+    expect(result.checks.structureValid).toBe(true);
+  });
+
+  it("flags portal cause collapsed into shop final report structure", () => {
+    const result = rvsdContractCheck({
+      mode: "final_report",
+      outputSurface: "portal_cause",
+      responseText: RVSD_CONTRACT_FIXTURES.portalCauseCollapsedToShopReport,
+      dialogueLanguage: "EN",
+      includeTranslation: false,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.violations).toContain("CONTRACT_PORTAL_CAUSE_STRUCTURE");
+    expect(result.checks.structureValid).toBe(false);
+  });
+
   it("flags authorization drift into final report structure", () => {
     const result = rvsdContractCheck({
       mode: "authorization",
@@ -98,6 +126,17 @@ describe("rvsd-contract-check v1", () => {
     expect(result.passed).toBe(false);
     expect(result.violations).toContain("CONTRACT_AUTHORIZATION_DRIFT");
     expect(result.checks.modeClassValid).toBe(false);
+  });
+
+  it("flags authorization-ready output that is not actually authorization-ready", () => {
+    const result = rvsdContractCheck({
+      mode: "authorization",
+      responseText: "Technician-verified portal cause: Open neutral at the heater control input.",
+      dialogueLanguage: "EN",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.violations).toContain("CONTRACT_AUTHORIZATION_SURFACE_MISMATCH");
   });
 
   it("exposes the explicit transition doctrine as a deterministic helper", () => {

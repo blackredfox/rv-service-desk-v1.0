@@ -46,6 +46,17 @@ Required Parts: Fuse.
 Complaint: Water heater ignition fault.
 Diagnostic Procedure: Verified 12V supply and checked the control-board fuse.`,
 
+  portalCauseValid: `Technician-verified portal cause: Open neutral confirmed in the 12V feed to the water heater control board.
+--- TRANSLATION ---
+Подтверждённая техником причина для портала: Обрыв нейтрали подтверждён в цепи питания 12V к плате управления водонагревателя.`,
+
+  portalCauseCollapsedToShopReport: `Complaint: Water heater ignition fault.
+Diagnostic Procedure: Verified 12V supply and checked the control-board fuse.
+Verified Condition: Open neutral confirmed in the 12V feed.
+Recommended Corrective Action: Repair the harness.
+Estimated Labor: Total labor: 0.6 hr.
+Required Parts: Harness repair materials.`,
+
   authorizationDrift: `Complaint: Water heater will not ignite.
 Diagnostic Procedure: Verified 12V supply.
 Verified Condition: Heater remains inoperative.

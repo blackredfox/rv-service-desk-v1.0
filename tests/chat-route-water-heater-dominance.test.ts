@@ -157,27 +157,32 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(finalTurn.payload.messages[0].content).toContain("wh_5a");
   });
 
-  it("route no-ignition branch does not loop on wh_6a after repeated negative answers", async () => {
+  it("route critical no-12V at wh_6a overrides no_ignition and pivots to no_12v_supply (wh_5a)", async () => {
     const caseId = "route_wh6_loop";
     await advanceToWh5(caseId);
     await postChat(caseId, "да, 12.6 В есть");
 
     const { getOrCreateContext } = await import("@/lib/context-engine");
-    const { getNextStepId } = await import("@/lib/diagnostic-registry");
+    const { getNextStepId, getBranchState } = await import("@/lib/diagnostic-registry");
 
     expect(getOrCreateContext(caseId).activeStepId).toBe("wh_6");
 
+    // "нет" at wh_6 triggers no_ignition → wh_6a
     await postChat(caseId, "нет");
     expect(getOrCreateContext(caseId).activeStepId).toBe("wh_6a");
     expect(getNextStepId(caseId)).toBe("wh_6a");
+    expect(getBranchState(caseId).activeBranchId).toBe("no_ignition");
 
+    // "нет" at wh_6a (no 12V at igniter module) is a CRITICAL signal: the
+    // system must leave the generic no_ignition checklist and pivot into the
+    // no_12v_supply branch to diagnose why the required 12V is absent.
     await postChat(caseId, "нет");
-    expect(getOrCreateContext(caseId).activeStepId).toBe("wh_6b");
-    expect(getNextStepId(caseId)).toBe("wh_6b");
-
-    await postChat(caseId, "нет");
-    expect(getOrCreateContext(caseId).activeStepId).toBe("wh_6c");
-    expect(getNextStepId(caseId)).toBe("wh_6c");
+    expect(getBranchState(caseId).activeBranchId).toBe("no_12v_supply");
+    expect(getOrCreateContext(caseId).activeStepId).toBe("wh_5a");
+    expect(getNextStepId(caseId)).toBe("wh_5a");
+    // Must NOT continue the generic downstream checklist
+    expect(getOrCreateContext(caseId).activeStepId).not.toBe("wh_6b");
+    expect(getOrCreateContext(caseId).activeStepId).not.toBe("wh_6c");
   });
 
   it("route keeps the normal positive ignition path when wh_5 confirms 12V", async () => {
@@ -314,7 +319,7 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });
 
-  it("asks only for missing report fields during active flow when ES report request is still incomplete", async () => {
+  it("blocks ES report request during active diagnostic flow — diagnostics not ready", async () => {
     const caseId = "route_wh5_report_es_missing_active_flow";
     await advanceToWh5(caseId);
     await postChat(caseId, "no");
@@ -326,13 +331,13 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    expect(reportTurn.streamText).toContain("solo me faltan estos datos");
-    expect(reportTurn.streamText).toContain("qué encontraste exactamente");
+    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    expect(reportTurn.streamText).toContain("no est");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });
 
-  it("does not over-trigger report mode too early during active flow from a bare natural report request", async () => {
+  it("blocks bare natural report request during active diagnostic flow — diagnostics not ready", async () => {
     const caseId = "route_wh5_report_too_early_active_flow";
     await advanceToWh5(caseId);
     await postChat(caseId, "нет");
@@ -341,8 +346,8 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    expect(reportTurn.streamText).toContain("missing report details");
-    expect(reportTurn.streamText).toContain("what you found");
+    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    expect(reportTurn.streamText).toContain("not yet complete");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });

@@ -152,6 +152,41 @@ Partes requeridas: El número de parte se confirmará en el mostrador de servici
 }
 
 /**
+ * Build Portal Cause fallback when the active legal surface is portal_cause.
+ */
+export function buildPortalCauseFallback(args: {
+  policy: LanguagePolicy;
+  translationLanguage?: Language;
+  complaint?: string;
+  finding?: string;
+}): string {
+  const englishCause = args.finding?.trim()
+    ? `Technician-verified portal cause: ${args.finding.trim()}`
+    : args.complaint?.trim()
+    ? `Technician-verified portal cause is not fully established yet. Current complaint on record: ${args.complaint.trim()}`
+    : "Technician-verified portal cause is not fully established yet. Additional verified findings are required.";
+
+  if (!args.policy.includeTranslation || !args.translationLanguage || args.translationLanguage === "EN") {
+    return englishCause;
+  }
+
+  const translation =
+    args.translationLanguage === "RU"
+      ? args.finding?.trim()
+        ? `Подтверждённая техником причина для портала: ${args.finding.trim()}`
+        : args.complaint?.trim()
+        ? `Причина для портала ещё не установлена полностью. Текущая зарегистрированная жалоба: ${args.complaint.trim()}`
+        : "Причина для портала ещё не установлена полностью. Требуются дополнительные подтверждённые данные."
+      : args.finding?.trim()
+      ? `Causa del portal verificada por el técnico: ${args.finding.trim()}`
+      : args.complaint?.trim()
+      ? `La causa del portal todavía no está totalmente establecida. Queja registrada actualmente: ${args.complaint.trim()}`
+      : "La causa del portal todavía no está totalmente establecida. Se requieren hallazgos verificados adicionales.";
+
+  return `${englishCause}\n\n${TRANSLATION_SEPARATOR}\n\n${translation}`;
+}
+
+/**
  * Format labor hours for fallback display.
  */
 function formatLaborHoursForFallback(hours: number): string {

@@ -5,9 +5,10 @@
  * Violations are caught and handled with retry/fallback logic.
  */
 
-import type { CaseMode } from "./prompt-composer";
-import { PROHIBITED_WORDS } from "./prompt-composer";
+import type { CaseMode, OutputSurface } from "./prompt-composer";
+import { PROHIBITED_WORDS, resolveOutputSurfaceForMode } from "./prompt-composer";
 import { detectLanguage, getLanguageChoiceFallback, type Language } from "./lang";
+import { validatePortalCauseOutput } from "./output-validator";
 
 export type ValidationResult = {
   valid: boolean;
@@ -72,6 +73,18 @@ const STEP_GUIDANCE_DRIFT_PATTERNS = [
   /autorizaci[oó]n/i,
   /siguiente\s+paso/i,
   /informe\s+final/i,
+];
+
+const AUTHORIZATION_READY_PATTERNS = [
+  /authorization/i,
+  /authorisation/i,
+  /authorize/i,
+  /approval/i,
+  /pre-authorization/i,
+  /repair\s+authorization/i,
+  /авторизац/i,
+  /autorizaci[oó]n/i,
+  /aprobaci[oó]n/i,
 ];
 
 function findHeaderIndex(text: string, header: string): number {
@@ -391,6 +404,13 @@ export function validateLanguageConsistency(
  * Validate authorization mode output
  */
 export function validateAuthorizationOutput(text: string): ValidationResult {
+  return validateAuthorizationReadyOutput(text);
+}
+
+/**
+ * Validate authorization-ready surface output.
+ */
+export function validateAuthorizationReadyOutput(text: string): ValidationResult {
   const violations: string[] = [];
 
   // Must not contain prohibited words
@@ -404,11 +424,19 @@ export function validateAuthorizationOutput(text: string): ValidationResult {
     violations.push("AUTHORIZATION_DRIFT: Output contains translation separator (final report format)");
   }
 
+  if (looksLikeFinalReport(text)) {
+    violations.push("AUTHORIZATION_DRIFT: Output contains shop final report structure");
+  }
+
+  if (!AUTHORIZATION_READY_PATTERNS.some((pattern) => pattern.test(text))) {
+    violations.push("AUTHORIZATION_SURFACE_MISMATCH: Output does not read as authorization-ready text");
+  }
+
   return {
     valid: violations.length === 0,
     violations,
     suggestion: violations.length > 0
-      ? "Generate authorization text without denial-trigger words or final report format."
+      ? "Generate authorization-ready text without denial-trigger words or shop-report structure."
       : undefined,
   };
 }
@@ -425,7 +453,7 @@ export function validateAuthorizationOutput(text: string): ValidationResult {
  *                             Defaults to true for backward compatibility.
  * @param translationLanguage - Expected translation language (dialogue language)
  */
-export function validateFinalReportOutput(
+export function validateShopFinalReportOutput(
   text: string,
   includeTranslation: boolean = true,
   translationLanguage?: Language
@@ -501,6 +529,8 @@ export function validateFinalReportOutput(
   };
 }
 
+export const validateFinalReportOutput = validateShopFinalReportOutput;
+
 /**
  * Validate labor confirmation mode output
  * 
@@ -550,19 +580,27 @@ export function validateOutput(
   text: string,
   mode: CaseMode,
   includeTranslation?: boolean,
-  translationLanguage?: Language
+  translationLanguage?: Language,
+  outputSurface?: OutputSurface,
 ): ValidationResult {
   if (!text || !text.trim()) {
     return { valid: false, violations: ["EMPTY_OUTPUT: Response is empty"] };
   }
 
-  switch (mode) {
+  const resolvedSurface = resolveOutputSurfaceForMode({
+    mode,
+    requestedSurface: outputSurface,
+  });
+
+  switch (resolvedSurface) {
     case "diagnostic":
       return validateDiagnosticOutput(text);
-    case "authorization":
-      return validateAuthorizationOutput(text);
-    case "final_report":
-      return validateFinalReportOutput(text, includeTranslation, translationLanguage);
+    case "authorization_ready":
+      return validateAuthorizationReadyOutput(text);
+    case "portal_cause":
+      return validatePortalCauseOutput(text, includeTranslation, translationLanguage);
+    case "shop_final_report":
+      return validateShopFinalReportOutput(text, includeTranslation, translationLanguage);
     case "labor_confirmation":
       return validateLaborConfirmationOutput(text);
     default:

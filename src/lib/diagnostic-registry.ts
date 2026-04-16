@@ -52,6 +52,8 @@ type DiagnosticEntry = {
   decisionPath: Array<{ stepId: string; branchId: string | null; reason: string; timestamp: string }>;
   /** P1.5: Branches that are locked out */
   lockedOutBranches: Set<string>;
+  /** Subtype exclusions: subtypeGate values to skip (e.g. "combo" when gas-only) */
+  subtypeExclusions: Set<string>;
 };
 
 const registry = new Map<string, DiagnosticEntry>();
@@ -74,10 +76,76 @@ function ensureEntry(caseId: string): DiagnosticEntry {
       activeBranchId: null,
       decisionPath: [],
       lockedOutBranches: new Set(),
+      // Subtype exclusions
+      subtypeExclusions: new Set(),
     };
     registry.set(caseId, entry);
   }
   return entry;
+}
+
+// ── Subtype exclusion detection ──────────────────────────────────────
+
+/**
+ * Detect subtype exclusions from technician's response.
+ *
+ * Broad patterns (e.g. "gas only", "только газ") only fire on the type-identification
+ * step (wh_1) to avoid false positives on unrelated steps.
+ *
+ * Explicit non-combo assertions (e.g. "не COMBO", "not combo", "no es combo") are
+ * detected on ANY step — the technician's statement that the unit is not combo is
+ * authoritative and must immediately block combo-only steps, including wh_11 itself.
+ * This prevents the agent from repeatedly re-asking combo-only steps after the
+ * technician has explicitly ruled the subtype out.
+ */
+const GAS_ONLY_EXCLUSION_PATTERNS = [
+  /(?:gas|lp|propane)\s*only/i,
+  /(?:только\s*)?(?:газ|lp|пропан)(?:\s*только)?/i,
+  // Explicit gas/LP without mention of electric or combo
+  /^(?:gas|lp|propane)$/i,
+  /^(?:газ|пропан)$/i,
+];
+
+/**
+ * Explicit non-combo assertions — fire on ANY step, not just wh_1.
+ * Covers English, Russian (Cyrillic "комби/комбо/COMBO" forms including mixed-script),
+ * and Spanish. Authoritative: technician is explicitly ruling combo out.
+ */
+const EXPLICIT_NOT_COMBO_PATTERNS = [
+  /\bnot?\s*combo\b/i,
+  /\bnot?\s*(?:a\s+)?combination\b/i,
+  // Russian: "не комби", "не комбо", "не COMBO" (mixed-script), "не комбинированный"
+  /не\s*(?:комби|комбо|combo|комбинир)/i,
+  // Spanish: "no combo", "no es combo"
+  /\bno\s*(?:es\s*)?combo\b/i,
+];
+
+const COMBO_EXCLUSION_PATTERNS = [
+  /(?:electric\s*only|only\s*electric)/i,
+  /(?:только\s*)?электрич/i,
+];
+
+export function detectSubtypeExclusions(stepId: string, message: string): string[] {
+  const exclusions: string[] = [];
+
+  // Explicit non-combo assertion — ANY step
+  if (EXPLICIT_NOT_COMBO_PATTERNS.some((p) => p.test(message))) {
+    exclusions.push("combo");
+  }
+
+  // Broad subtype inference — only on wh_1 (type identification)
+  if (stepId === "wh_1") {
+    if (GAS_ONLY_EXCLUSION_PATTERNS.some((p) => p.test(message))) {
+      if (!exclusions.includes("combo")) exclusions.push("combo");
+    }
+
+    // Electric-only → could exclude gas steps in the future
+    if (COMBO_EXCLUSION_PATTERNS.some(p => p.test(message))) {
+      // For now, no specific exclusions needed for electric-only
+    }
+  }
+
+  return exclusions;
 }
 
 // ── Answered detection ──────────────────────────────────────────────
@@ -275,6 +343,18 @@ export function processUserMessage(caseId: string, message: string, activeStepId
   // Reset transient flag
   entry.howToCheckRequested = false;
 
+  // Always detect subtype exclusions from the raw message, regardless of
+  // whether the step is completed or how-to-check is requested. Explicit
+  // non-combo assertions must be honored anywhere in the transcript so
+  // combo-only steps cannot be repeated after the technician rules them out.
+  const exclusionsFromThisMessage = detectSubtypeExclusions(activeStepId ?? "", message);
+  for (const exclusion of exclusionsFromThisMessage) {
+    if (!entry.subtypeExclusions.has(exclusion)) {
+      entry.subtypeExclusions.add(exclusion);
+      console.log(`[DiagnosticRegistry] Subtype exclusion added (message scan): "${exclusion}"`);
+    }
+  }
+
   // If the technician asks "how to check?" — do NOT close the step, just flag it
   if (isHowToCheck) {
     entry.howToCheckRequested = true;
@@ -367,6 +447,7 @@ export function buildRegistryContext(
       entry.unableStepIds,
       entry.activeBranchId,
       entry.lockedOutBranches,
+      entry.subtypeExclusions,
     )?.id;
 
     return buildProcedureContext(
@@ -454,13 +535,44 @@ export function clearRegistry(caseId: string): void {
 }
 
 /**
+ * Scan a raw technician message for subtype assertions (e.g. explicit "not combo")
+ * independent of step completion. Runs on every message so exclusions take effect
+ * even when the step is not completed (e.g. clarification, unclassified replies).
+ */
+export function scanMessageForSubtypeAssertions(caseId: string, message: string): string[] {
+  const entry = registry.get(caseId);
+  if (!entry) return [];
+  const added: string[] = [];
+  // Pass empty stepId so only step-agnostic (explicit) patterns fire
+  const exclusions = detectSubtypeExclusions("", message);
+  for (const exclusion of exclusions) {
+    if (!entry.subtypeExclusions.has(exclusion)) {
+      entry.subtypeExclusions.add(exclusion);
+      added.push(exclusion);
+      console.log(`[DiagnosticRegistry] Subtype exclusion added (transcript scan): "${exclusion}"`);
+    }
+  }
+  return added;
+}
+
+/**
  * Mark a step as completed in the registry.
  * Called by context-engine when technician answers a step.
+ * Also detects subtype exclusions from the response if available.
  */
-export function markStepCompleted(caseId: string, stepId: string): void {
+export function markStepCompleted(caseId: string, stepId: string, technicianMessage?: string): void {
   const entry = ensureEntry(caseId);
   entry.completedStepIds.add(stepId);
   entry.askedStepIds.add(stepId); // Also mark as asked to prevent re-asking
+
+  // Detect subtype exclusions from the technician's response
+  if (technicianMessage) {
+    const exclusions = detectSubtypeExclusions(stepId, technicianMessage);
+    for (const exclusion of exclusions) {
+      entry.subtypeExclusions.add(exclusion);
+      console.log(`[DiagnosticRegistry] Subtype exclusion added: "${exclusion}" (from step ${stepId})`);
+    }
+  }
 }
 
 /**
@@ -474,20 +586,21 @@ export function markStepUnable(caseId: string, stepId: string): void {
 
 /**
  * Get the next available step ID for this case.
- * Uses branch-aware resolution (P1.5).
+ * Uses branch-aware resolution (P1.5) with subtype gating.
  * Returns null if all steps complete or no procedure.
  */
 export function getNextStepId(caseId: string): string | null {
   const entry = registry.get(caseId);
   if (!entry?.procedure) return null;
   
-  // Use branch-aware step resolution
+  // Use branch-aware step resolution with subtype exclusions
   const step = getNextStepBranchAware(
     entry.procedure,
     entry.completedStepIds,
     entry.unableStepIds,
     entry.activeBranchId,
     entry.lockedOutBranches,
+    entry.subtypeExclusions,
   );
   return step?.id ?? null;
 }
@@ -495,6 +608,12 @@ export function getNextStepId(caseId: string): string | null {
 /**
  * Process technician response and check for branch triggers.
  * If a branch is triggered, updates the branch state and returns the new branch info.
+ *
+ * From the main flow, any matching branch trigger enters its branch normally.
+ * From within an active branch, only CRITICAL branches are allowed to override
+ * the currently active branch. A critical branch represents a causally dominant
+ * finding (e.g. a required power supply is missing) that must take precedence
+ * over the generic downstream checklist of the current branch.
  */
 export function processResponseForBranch(
   caseId: string,
@@ -503,17 +622,33 @@ export function processResponseForBranch(
 ): { branchEntered: ProcedureBranch | null; lockedOut: string[] } {
   const entry = registry.get(caseId);
   if (!entry?.procedure) return { branchEntered: null, lockedOut: [] };
-  
-  // Only check for branch triggers from main flow
-  if (entry.activeBranchId !== null) {
-    return { branchEntered: null, lockedOut: [] };
-  }
-  
+
   const triggeredBranch = detectBranchTrigger(entry.procedure, stepId, technicianResponse);
   if (!triggeredBranch) {
     return { branchEntered: null, lockedOut: [] };
   }
-  
+
+  // Already in a branch — only a CRITICAL branch may override
+  if (entry.activeBranchId !== null) {
+    if (!triggeredBranch.critical) {
+      return { branchEntered: null, lockedOut: [] };
+    }
+    if (entry.activeBranchId === triggeredBranch.id) {
+      // Already in the critical branch — nothing to do
+      return { branchEntered: null, lockedOut: [] };
+    }
+    // Override: exit the current branch before entering the critical one.
+    const previousBranch = entry.activeBranchId;
+    entry.activeBranchId = null;
+    entry.decisionPath.push({
+      stepId,
+      branchId: null,
+      reason: `Overridden by critical branch ${triggeredBranch.id}: exiting ${previousBranch}`,
+      timestamp: new Date().toISOString(),
+    });
+    console.log(`[DiagnosticRegistry] Critical branch override: exiting ${previousBranch} → entering ${triggeredBranch.id}`);
+  }
+
   // Check if this branch is locked out (mutual exclusivity)
   if (entry.lockedOutBranches.has(triggeredBranch.id)) {
     console.log(`[DiagnosticRegistry] Branch ${triggeredBranch.id} is locked out, not entering`);

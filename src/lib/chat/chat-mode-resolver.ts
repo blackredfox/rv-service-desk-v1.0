@@ -1,4 +1,9 @@
-import { detectModeCommand, type CaseMode } from "@/lib/prompt-composer";
+import {
+  detectModeCommand,
+  resolveOutputSurfaceForMode,
+  type CaseMode,
+  type OutputSurface,
+} from "@/lib/prompt-composer";
 
 const MODELS = {
   diagnostic: "gpt-5-mini-2025-08-07",
@@ -40,6 +45,20 @@ export function resolveExplicitModeChange(
     nextMode: commandMode,
     changed: true,
   };
+}
+
+/**
+ * Resolve the active runtime output surface without changing transition doctrine.
+ * Surface selection stays mode-bounded unless an already-approved surface hint is supplied.
+ */
+export function resolveOutputSurface(args: {
+  mode: CaseMode;
+  requestedSurface?: OutputSurface | null;
+}): OutputSurface {
+  return resolveOutputSurfaceForMode({
+    mode: args.mode,
+    requestedSurface: args.requestedSurface,
+  });
 }
 
 /**

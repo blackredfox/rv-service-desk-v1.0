@@ -52,6 +52,7 @@ describe("OpenAI Execution Service", () => {
       apiKey: "sk-test",
       caseId: "case_1",
       mode: "diagnostic",
+      outputSurface: "diagnostic",
       systemPrompt: "system",
       history: [],
       message: "water pump not working",

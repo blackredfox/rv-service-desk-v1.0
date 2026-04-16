@@ -23,6 +23,15 @@ const ENGLISH_PATTERNS = [
 // Translation separator
 const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
 
+const FINAL_REPORT_HEADERS = [
+  "Complaint",
+  "Diagnostic Procedure",
+  "Verified Condition",
+  "Recommended Corrective Action",
+  "Estimated Labor",
+  "Required Parts",
+];
+
 // Cyrillic detection for Russian
 const CYRILLIC_RE = /[\u0400-\u04FF]/;
 
@@ -98,7 +107,7 @@ function countQuestions(text: string): number {
  *
  * @param includeTranslation - Whether a translation section is expected (from LanguagePolicy).
  */
-function isCauseFormatCorrect(text: string, includeTranslation: boolean = true): { valid: boolean; issues: string[] } {
+function isPortalCauseFormatCorrect(text: string, includeTranslation: boolean = true): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
   
   if (includeTranslation) {
@@ -128,6 +137,102 @@ function isCauseFormatCorrect(text: string, includeTranslation: boolean = true):
   return { valid: issues.length === 0, issues };
 }
 
+function hasShopFinalReportShape(text: string): boolean {
+  const headerCount = FINAL_REPORT_HEADERS.filter((header) =>
+    new RegExp(`^\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`, "im").test(text),
+  ).length;
+
+  return headerCount >= 2;
+}
+
+function validateShopFinalReportSurface(args: {
+  response: string;
+  dialogueLanguage: Language;
+  includeTranslation: boolean;
+}): ValidationResult {
+  const violations: string[] = [];
+
+  if (!hasShopFinalReportShape(args.response)) {
+    violations.push("FORMAT_VIOLATION: Missing shop final report section headers");
+  }
+
+  if (args.includeTranslation && !args.response.includes(TRANSLATION_SEPARATOR)) {
+    violations.push("FORMAT_VIOLATION: Missing '--- TRANSLATION ---' separator");
+  }
+
+  if (!args.includeTranslation && args.response.includes(TRANSLATION_SEPARATOR)) {
+    violations.push("FORMAT_VIOLATION: EN mode must not include '--- TRANSLATION ---' block");
+  }
+
+  return {
+    valid: violations.length === 0,
+    violations,
+  };
+}
+
+export function validatePortalCauseOutput(
+  text: string,
+  includeTranslation: boolean = true,
+  translationLanguage?: Language,
+): ValidationResult {
+  const issues: string[] = [];
+  const causeCheck = isPortalCauseFormatCorrect(text, includeTranslation);
+
+  if (!causeCheck.valid) {
+    issues.push(...causeCheck.issues.map((issue) => `FORMAT_VIOLATION: ${issue}`));
+  }
+
+  if (hasShopFinalReportShape(text)) {
+    issues.push("FORMAT_VIOLATION: Portal Cause must not use shop final report headers");
+  }
+
+  if (/authorization|authorisation|авторизац|autorizaci[oó]n/i.test(text)) {
+    issues.push("FORMAT_VIOLATION: Portal Cause must not use authorization-ready wording");
+  }
+
+  if (includeTranslation && translationLanguage && text.includes(TRANSLATION_SEPARATOR)) {
+    const [, translationPart = ""] = text.split(TRANSLATION_SEPARATOR);
+    if (translationPart.trim() && !isTextInLanguage(translationPart, translationLanguage)) {
+      issues.push(`FORMAT_VIOLATION: Translation should be in ${translationLanguage}`);
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    violations: issues,
+  };
+}
+
+type OutputValidatorSurface =
+  | DiagnosticState
+  | "DIAGNOSTICS"
+  | "CAUSE_OUTPUT"
+  | "portal_cause"
+  | "shop_final_report"
+  | "authorization_ready";
+
+function normalizeOutputSurface(currentState: OutputValidatorSurface):
+  | "diagnostic"
+  | "portal_cause"
+  | "shop_final_report"
+  | "authorization_ready" {
+  switch (currentState) {
+    case "DIAGNOSTICS":
+    case "diagnostic":
+      return "diagnostic";
+    case "CAUSE_OUTPUT":
+    case "portal_cause":
+      return "portal_cause";
+    case "authorization_ready":
+      return "authorization_ready";
+    case "final_report":
+    case "shop_final_report":
+      return "shop_final_report";
+    default:
+      return "diagnostic";
+  }
+}
+
 /**
  * Validate AI response against rules
  *
@@ -136,18 +241,19 @@ function isCauseFormatCorrect(text: string, includeTranslation: boolean = true):
  */
 export function validateResponse(args: {
   response: string;
-  currentState: DiagnosticState;
+  currentState: OutputValidatorSurface;
   dialogueLanguage: Language;
   includeTranslation?: boolean;
 }): ValidationResult {
   const { response, currentState, dialogueLanguage, includeTranslation = true } = args;
   const violations: string[] = [];
+  const outputSurface = normalizeOutputSurface(currentState);
   
   if (!response || !response.trim()) {
     return { valid: true, violations: [] };
   }
   
-  if (currentState === "diagnostic") {
+  if (outputSurface === "diagnostic") {
     // Rule: English is FORBIDDEN during diagnostics (except EN dialogue)
     if (containsEnglishDuringDiagnostics(response, dialogueLanguage)) {
       violations.push(`LANG_VIOLATION: English detected during diagnostic state (dialogue: ${dialogueLanguage})`);
@@ -170,31 +276,24 @@ export function validateResponse(args: {
     }
   }
   
-  if (currentState === "final_report") {
-    // Rule: Must have proper Cause format (translation separator depends on policy)
-    const causeCheck = isCauseFormatCorrect(response, includeTranslation);
-    if (!causeCheck.valid) {
-      violations.push(...causeCheck.issues.map(i => `FORMAT_VIOLATION: ${i}`));
+  if (outputSurface === "portal_cause") {
+    return validatePortalCauseOutput(response, includeTranslation, dialogueLanguage);
+  }
+
+  if (outputSurface === "shop_final_report") {
+    return validateShopFinalReportSurface({
+      response,
+      dialogueLanguage,
+      includeTranslation,
+    });
+  }
+
+  if (outputSurface === "authorization_ready") {
+    if (hasShopFinalReportShape(response)) {
+      violations.push("FORMAT_VIOLATION: Authorization-ready output must not use shop final report headers");
     }
-    
-    // Rule: If has separator, check both parts
-    if (response.includes(TRANSLATION_SEPARATOR)) {
-      const [englishPart, translationPart] = response.split(TRANSLATION_SEPARATOR);
-      
-      // English part should be in English
-      if (englishPart && dialogueLanguage !== "EN") {
-        const isEnglish = countEnglishWords(englishPart) > 5;
-        if (!isEnglish) {
-          violations.push("FORMAT_VIOLATION: Cause text before separator should be in English");
-        }
-      }
-      
-      // Translation part should be in dialogue language
-      if (translationPart && dialogueLanguage !== "EN") {
-        if (!isTextInLanguage(translationPart, dialogueLanguage)) {
-          violations.push(`FORMAT_VIOLATION: Translation should be in ${dialogueLanguage}`);
-        }
-      }
+    if (!/authorization|authorisation|авторизац|autorizaci[oó]n|approval/i.test(response)) {
+      violations.push("FORMAT_VIOLATION: Authorization-ready output must read as authorization text");
     }
   }
   

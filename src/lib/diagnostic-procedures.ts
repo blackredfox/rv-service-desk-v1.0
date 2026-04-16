@@ -27,6 +27,8 @@ export type DiagnosticStep = {
   howToCheck?: string;
   /** Branch ID this step belongs to (null = main flow) */
   branchId?: string;
+  /** Subtype gate: step is only valid when this subtype is NOT excluded (e.g. "combo") */
+  subtypeGate?: string;
 };
 
 /**
@@ -40,12 +42,25 @@ export type ProcedureBranch = {
   displayName: string;
   /** Step that can trigger entry to this branch */
   triggerStepId: string;
+  /**
+   * Additional step IDs that can also trigger this branch (same trigger pattern).
+   * Used for critical signals that may be asserted at multiple diagnostic checkpoints
+   * (e.g. "no 12V" can be asserted at wh_5, wh_6a, or wh_8a).
+   */
+  additionalTriggerStepIds?: string[];
   /** Pattern in technician response that triggers this branch */
   triggerPattern: RegExp;
   /** First step when entering this branch */
   entryStepId: string;
   /** Branch IDs that cannot be active simultaneously */
   mutuallyExclusive: string[];
+  /**
+   * Critical branches represent causally dominant findings (e.g. missing required
+   * power). A critical branch may override an already-active branch when its
+   * trigger pattern matches at one of its trigger step IDs, because the less
+   * causal generic branch must yield to the upstream root-cause investigation.
+   */
+  critical?: boolean;
 };
 
 export type DiagnosticProcedure = {
@@ -958,6 +973,7 @@ reg({
         /combo.*(?:electric|element)/i,
       ],
       howToCheck: "With electric mode ON, measure 120VAC at the heating element terminals. Element resistance should be 10-16 ohms.",
+      subtypeGate: "combo",
     },
     // Step 12: High limit / ECO reset
     {
@@ -1011,6 +1027,13 @@ reg({
       id: "no_12v_supply",
       displayName: "No 12V Supply",
       triggerStepId: "wh_5",
+      // Critical signal: a missing 12V supply may also be reported at wh_6a
+      // (igniter module 12V check) or wh_8a (gas valve solenoid 12V check).
+      // In either case the causal question is the same: why is the required
+      // 12V absent? We must override the current generic branch and enter
+      // no_12v_supply to diagnose the upstream power feed.
+      additionalTriggerStepIds: ["wh_6a", "wh_8a"],
+      critical: true,
       triggerPattern: /(?:\b(?:no|without)\b.{0,20}(?:12v|12\s*volt|voltage|dc\s*power|power)|\b0(?:\.0+)?\s*v(?:olts?|dc)?\b|(?:нет|отсутств(?:ует|уют)).{0,20}(?:12\s*в|12v|напряжени|питани)|(?:напряжени|питани).{0,20}(?:нет|отсутств)|^\s*(?:no|nope|nah|нет|неа)\s*[.!?]*\s*$)/i,
       entryStepId: "wh_5a",
       mutuallyExclusive: [],
@@ -2000,11 +2023,15 @@ export function getNextStepBranchAware(
   unableIds: Set<string>,
   activeBranchId: string | null,
   lockedOutBranches: Set<string>,
+  subtypeExclusions?: Set<string>,
 ): DiagnosticStep | null {
   const doneOrSkipped = new Set([...completedIds, ...unableIds]);
 
   for (const step of procedure.steps) {
     if (doneOrSkipped.has(step.id)) continue;
+
+    // Subtype gating: skip steps whose subtypeGate is in the exclusion set
+    if (step.subtypeGate && subtypeExclusions?.has(step.subtypeGate)) continue;
 
     // Branch filtering
     const stepBranch = step.branchId ?? null;
@@ -2030,7 +2057,10 @@ export function getNextStepBranchAware(
 
 /**
  * Detect if a technician response triggers a branch.
- * 
+ *
+ * A branch is considered triggered when the response matches the branch's
+ * triggerPattern AT one of its trigger step IDs (primary or any additional).
+ *
  * @returns The branch to enter, or null if no branch is triggered
  */
 export function detectBranchTrigger(
@@ -2039,14 +2069,15 @@ export function detectBranchTrigger(
   technicianResponse: string,
 ): ProcedureBranch | null {
   if (!procedure.branches) return null;
-  
+
   for (const branch of procedure.branches) {
-    if (branch.triggerStepId !== stepId) continue;
+    const triggerStepIds = [branch.triggerStepId, ...(branch.additionalTriggerStepIds ?? [])];
+    if (!triggerStepIds.includes(stepId)) continue;
     if (branch.triggerPattern.test(technicianResponse)) {
       return branch;
     }
   }
-  
+
   return null;
 }
 
