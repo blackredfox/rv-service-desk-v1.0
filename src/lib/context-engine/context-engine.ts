@@ -29,6 +29,7 @@ import {
   processResponseForBranch as registryProcessResponseForBranch,
   exitBranch as registryExitBranch,
   scanMessageForSubtypeAssertions as registryScanSubtypeAssertions,
+  getActiveProcedure as registryGetActiveProcedure,
 } from "../diagnostic-registry";
 
 // Re-export config
@@ -381,6 +382,29 @@ export function processMessage(
   if (newSubtypeExclusions.length > 0) {
     notices.push(`Subtype exclusions added: ${newSubtypeExclusions.join(", ")}`);
     stateChanged = true;
+
+    // If the currently active step is gated by a subtype that was just excluded
+    // (e.g. wh_11 is combo-only and the technician just said "это не COMBO"),
+    // the step must not be served or re-served. Mark it unable and let the
+    // registry resolve the next eligible step through the normal subtype-aware
+    // getNextStepId path.
+    if (context.activeStepId) {
+      const procedure = registryGetActiveProcedure(caseId);
+      const activeStep = procedure?.steps.find((s) => s.id === context.activeStepId);
+      if (
+        activeStep?.subtypeGate &&
+        newSubtypeExclusions.includes(activeStep.subtypeGate)
+      ) {
+        const skipped = context.activeStepId;
+        context.unableSteps.add(skipped);
+        registryMarkStepUnable(caseId, skipped);
+        const nextId = registryGetNextStepId(caseId);
+        context.activeStepId = nextId;
+        notices.push(
+          `Active step ${skipped} force-skipped (subtype '${activeStep.subtypeGate}' excluded); next=${nextId ?? "none"}`,
+        );
+      }
+    }
   }
   
   // 2. Check for replan triggers (only if isolation was complete AND not terminal)

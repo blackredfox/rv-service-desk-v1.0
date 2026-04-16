@@ -608,6 +608,12 @@ export function getNextStepId(caseId: string): string | null {
 /**
  * Process technician response and check for branch triggers.
  * If a branch is triggered, updates the branch state and returns the new branch info.
+ *
+ * From the main flow, any matching branch trigger enters its branch normally.
+ * From within an active branch, only CRITICAL branches are allowed to override
+ * the currently active branch. A critical branch represents a causally dominant
+ * finding (e.g. a required power supply is missing) that must take precedence
+ * over the generic downstream checklist of the current branch.
  */
 export function processResponseForBranch(
   caseId: string,
@@ -616,17 +622,33 @@ export function processResponseForBranch(
 ): { branchEntered: ProcedureBranch | null; lockedOut: string[] } {
   const entry = registry.get(caseId);
   if (!entry?.procedure) return { branchEntered: null, lockedOut: [] };
-  
-  // Only check for branch triggers from main flow
-  if (entry.activeBranchId !== null) {
-    return { branchEntered: null, lockedOut: [] };
-  }
-  
+
   const triggeredBranch = detectBranchTrigger(entry.procedure, stepId, technicianResponse);
   if (!triggeredBranch) {
     return { branchEntered: null, lockedOut: [] };
   }
-  
+
+  // Already in a branch — only a CRITICAL branch may override
+  if (entry.activeBranchId !== null) {
+    if (!triggeredBranch.critical) {
+      return { branchEntered: null, lockedOut: [] };
+    }
+    if (entry.activeBranchId === triggeredBranch.id) {
+      // Already in the critical branch — nothing to do
+      return { branchEntered: null, lockedOut: [] };
+    }
+    // Override: exit the current branch before entering the critical one.
+    const previousBranch = entry.activeBranchId;
+    entry.activeBranchId = null;
+    entry.decisionPath.push({
+      stepId,
+      branchId: null,
+      reason: `Overridden by critical branch ${triggeredBranch.id}: exiting ${previousBranch}`,
+      timestamp: new Date().toISOString(),
+    });
+    console.log(`[DiagnosticRegistry] Critical branch override: exiting ${previousBranch} → entering ${triggeredBranch.id}`);
+  }
+
   // Check if this branch is locked out (mutual exclusivity)
   if (entry.lockedOutBranches.has(triggeredBranch.id)) {
     console.log(`[DiagnosticRegistry] Branch ${triggeredBranch.id} is locked out, not entering`);
