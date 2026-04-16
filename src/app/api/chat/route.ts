@@ -93,8 +93,6 @@ import {
   classifyStepGuidanceIntent,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
-  buildRepairSummaryClarificationResponse,
-  type RepairSummaryMissingField,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -236,6 +234,18 @@ function buildAuthoritativeCompletionOffer(args: {
             "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
           ].join("\n");
   }
+}
+
+function buildTranscriptDerivedDraftConstraint(): string {
+  return [
+    "REPORT ASSEMBLY (MANDATORY):",
+    "- Assemble the final report draft yourself from the case transcript and technician-verified facts.",
+    "- Propose each section (Complaint, Diagnostic Procedure, Verified Condition, Recommended Corrective Action, Estimated Labor with breakdown lines, Required Parts) using what the technician has already reported in-conversation.",
+    "- Do NOT ask the technician to author or re-author the complaint, findings, or performed repair.",
+    "- Do NOT ask questionnaire-style questions before generating the draft.",
+    "- The technician will review and correct the draft if needed; proposing items is your job.",
+    "- If a specific item is truly not inferable from the transcript, use a conservative shop-style placeholder rather than asking a question.",
+  ].join("\n");
 }
 
 function buildReportTypePromptConstraint(reportKind?: ReportKind): string {
@@ -421,15 +431,11 @@ export async function POST(req: Request) {
   const requestedOutputSurface =
     reportRevisionIntent.requestedSurface ?? approvedFinalReportIntent.requestedSurface;
   const readyForImmediateReport = runtimeReportReady || repairSummaryIntent.readyForReportRouting;
-  const shouldAskForMissingReportFieldsEarly =
-    repairSummaryIntent.shouldAskClarification &&
-    (repairSummaryIntent.hasStructuredSummarySignals ||
-      hasPriorUserEvidence ||
-      (Boolean(currentContextSnapshot.activeProcedureId) &&
-        repairSummaryIntent.currentMessageHasRepairSignal));
-  const missingReportFields: RepairSummaryMissingField[] = repairSummaryIntent.missingFields.length > 0
-    ? repairSummaryIntent.missingFields
-    : ["complaint", "findings", "corrective_action"];
+  // NOTE: We never ask the technician to author complaint/findings/performed
+  // repair as the default path. When a report request arrives, either the
+  // assistant assembles the draft from the transcript (ready case), or we
+  // hold in diagnostics (not-ready case).
+  void hasPriorUserEvidence;
   const storedRoofAcEvidenceMessage =
     historyBeforeAppend.find(
       (msg) => msg.role === "user" && hasSpecificRoofAcEvidence(msg.content),
@@ -465,7 +471,12 @@ export async function POST(req: Request) {
     }
   } else if (hasBoundedReportRequest) {
     if (readyForImmediateReport) {
-      reportPromptConstraint = buildReportTypePromptConstraint(requestedReportKind);
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       if (currentMode !== "final_report") {
         currentMode = "final_report";
@@ -477,14 +488,10 @@ export async function POST(req: Request) {
       // Do NOT fall to repair-summary questionnaire — defer to post-context-engine
       // where the context engine may resolve readiness.
       console.log(`[Chat API v2] Report request deferred — active procedure, isolation not complete`);
-    } else if (shouldAskForMissingReportFieldsEarly) {
-      // No active procedure or isolation already complete — ask for missing fields
-      reportRoutingResponse = buildRepairSummaryClarificationResponse({
-        language: outputPolicy.effective,
-        missingFields: [...missingReportFields],
-      });
-      console.log(`[Chat API v2] Report request blocked — missing report fields: ${missingReportFields.join(", ")}`);
     }
+    // No other branch: we NEVER ask the technician to author
+    // complaint / findings / performed repair as the default. When report
+    // becomes ready, the assistant assembles the draft from the transcript.
   } else if (modeResolution.changed) {
     const reportReadyBeforeTransition =
       modeResolution.nextMode !== "final_report" ||
@@ -951,7 +958,12 @@ export async function POST(req: Request) {
     if (hasBoundedReportRequest && currentMode === "diagnostic" && isFinalReportReady(engineResult.context)) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
-      reportPromptConstraint = buildReportTypePromptConstraint(requestedReportKind);
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       currentOutputSurface = resolveOutputSurface({
         mode: currentMode,
         requestedSurface: requestedOutputSurface,
