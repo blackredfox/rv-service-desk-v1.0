@@ -1,9 +1,9 @@
 # RV Service Desk
 ## ARCHITECTURE_RULES.md
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Enforced engineering rules (PR review gate)  
-**Last updated:** 2026-04-06
+**Last updated:** 2026-04-16
 
 ---
 
@@ -13,6 +13,10 @@
 This document defines **internal architecture invariants** and **non-negotiable engineering rules** that prevent regressions.
 
 If `API_SCHEMA.md` tells us *what the system exposes*, this file tells us *how the system must be built*.
+
+The customer-approved prompt is the canonical behavioral algorithm.
+`docs/CUSTOMER_BEHAVIOR_SPEC.md` is the normalized internal mirror for that behavior.
+If any internal architecture rule conflicts with the customer behavior spec, the customer behavior spec wins and this file must be updated.
 
 ---
 
@@ -93,6 +97,7 @@ LLM must **not** be used to determine:
 Server may:
 
 - enforce mode transitions via explicit commands and approved aliases
+- enforce server-owned legality-gated CTA/button transitions that map to the same approved trigger classes
 - validate output format (English-first + translation block)
 - enforce gating decisions from Context Engine
 - retry/repair missing translation
@@ -106,6 +111,7 @@ Server must **not**:
 - implement a second diagnostic state machine
 - “repair” step logic via heuristics
 - allow uncontrolled semantic mode switching from vague meaning
+- default unresolved diagnostics into questionnaire-first report collection
 
 ---
 
@@ -128,6 +134,14 @@ The server must **not**:
 - infer modes from vague meaning,
 - guess that “they probably want a report now,”
 - switch mode without an approved trigger path.
+
+## Rule M1b — Future report/action CTA is server-owned only
+
+A future `START FINAL REPORT` or authorization CTA/button is acceptable only if:
+- the control is server-owned,
+- legality/readiness gates are already satisfied server-side,
+- the CTA resolves to the same approved transition class as an explicit command/alias,
+- the client does not gain independent mode authority.
 
 ## Rule M1a — Natural report / authorization aliases are controlled, not open-ended
 
@@ -154,6 +168,12 @@ Edit behavior must not re-enter diagnostic sequencing unless the technician expl
 ---
 
 # 5) Output Contract Enforcement
+
+## Rule O0 — Output surfaces are distinct
+
+Authorization-ready output, Portal-Cause output, and Shop Final Report are separate output surfaces.
+
+They must not be collapsed into one generic report-generation path or one questionnaire-first collection flow.
 
 ## Rule O1 — English-first + Translation block must be guaranteed
 
@@ -191,9 +211,24 @@ For complex systems, if isolation is incomplete:
 
 Gate satisfaction conditions are Context Engine-owned.
 
+## Rule G1a — Incomplete isolation continues diagnostics
+
+If isolation is not complete:
+- continue diagnostics,
+- state that isolation is not complete when relevant,
+- do not switch the user into questionnaire-first report collection as a fallback.
+
 ---
 
 # 7) Procedure Discipline
+
+## Rule P0 — Manufacturer procedure priority
+
+When the identified unit has an approved manufacturer-specific diagnostic procedure available, that procedure has priority over the generic/standard procedure.
+
+If manufacturer data is missing or a manufacturer procedure is unavailable:
+- diagnostics must continue with the approved standard procedure,
+- the system must not block waiting for manufacturer details.
 
 ## Rule P1 — Procedure is law
 
@@ -280,8 +315,10 @@ Any PR touching chat, orchestration, or procedures must pass:
 
 ### Checklist D — Guardrails preserved
 - [ ] complex gating stays strict
+- [ ] incomplete isolation continues diagnostics instead of report-questionnaire fallback
 - [ ] post-repair returns to diagnostics when required
 - [ ] mechanical “direct power test” prevents motor replacement
+- [ ] manufacturer procedure priority is preserved when applicable
 
 ### Checklist E — Guidance behavior bounded
 - [ ] locate / identify guidance stays within active step/branch

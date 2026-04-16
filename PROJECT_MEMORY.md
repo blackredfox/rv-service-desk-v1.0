@@ -1,11 +1,11 @@
 # RV Service Desk
 ## PROJECT_MEMORY.md
 
-**Version:** 1.3  
+**Version:** 1.4  
 **Status:** Official Project Memory (Product + Technical)  
 **Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
 
-**Last updated:** 2026-04-06
+**Last updated:** 2026-04-16
 
 ---
 
@@ -156,6 +156,7 @@ Allowed:
 - state that diagnostics appear complete,
 - state that final report generation is available,
 - state that authorization-ready text can be generated,
+- surface a future server-owned, legality-gated CTA/button for the next allowed report/authorization action,
 - honor a server-approved natural-language report/authorization alias when readiness/gating conditions are satisfied.
 
 Not allowed:
@@ -185,6 +186,8 @@ Not allowed:
 
 ## 7) Output Formats (Fixed)
 
+Portal-Cause output, Shop Final Report, and Authorization-ready output are **distinct surfaces** and must never be collapsed into one generic “report”.
+
 ### 7.1 Final Report (Shop-style, copy/paste-ready)
 Plain text, no numbering, no tables.
 
@@ -210,6 +213,15 @@ Paragraph order (fixed):
 - Task-level breakdown
 - Each task includes hours
 - Total labor stated
+
+### 7.3 Authorization-ready Output (distinct surface)
+Authorization-ready output is its own surface for approval-safe corrective action or explicitly bounded isolation work.
+
+Hard rules:
+- it is **not** Portal-Cause output,
+- it is **not** the Shop Final Report,
+- it must stay conservative and approval-safe,
+- it must only appear when the applicable authorization gate is satisfied.
 
 ---
 
@@ -275,6 +287,7 @@ C) technician explicitly requests preliminary authorization based on partial iso
 When in Guided Diagnostics or Diagnostic Form behavior:
 - MUST NOT generate Portal-Cause unless A/B/C is met.
 - If not met: continue diagnostics and state isolation is not complete.
+- Do **not** default unresolved diagnostics into questionnaire-first report collection.
 
 ### 9.4 Post-repair guardrail (critical)
 If a previously authorized repair did NOT restore operation:
@@ -421,6 +434,11 @@ This is allowed only if:
 
 **Principle:** *Procedure is law.*
 
+### Manufacturer diagnostic priority (critical)
+- When the unit is identified well enough and an approved manufacturer-specific diagnostic procedure exists, that manufacturer procedure has priority over the generic/standard procedure.
+- If manufacturer information is missing or a manufacturer procedure is unavailable, continue diagnostics with the approved standard procedure.
+- Missing manufacturer detail must not block diagnostics, but it also must not demote an available manufacturer procedure below a generic flow.
+
 Diagnostics are governed by explicit system procedures with:
 - strict step ordering,
 - prerequisites (no skipping),
@@ -492,7 +510,11 @@ Post-completion questioning is a contract breach when:
 ## 11) Prompt Architecture & Version Truth
 
 ### 11.1 Customer prompt (source of truth)
-Customer-approved behavior originates from the evolving RV Service Desk runtime prompt contract and must be normalized into product/runtime docs rather than left as isolated prompt wording.
+The customer-approved prompt is the canonical behavioral algorithm.
+
+`docs/CUSTOMER_BEHAVIOR_SPEC.md` is the normalized internal documentation mirror for that algorithm.
+
+If any internal product/runtime document conflicts with the customer behavior spec, the customer behavior spec wins and the internal docs must be reconciled to it.
 
 ### 11.2 System prompt (production)
 Production system prompt is a structured normalization of the customer behavior contract.
