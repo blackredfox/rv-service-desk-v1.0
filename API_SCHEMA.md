@@ -1,13 +1,15 @@
 # RV Service Desk
 ## API_SCHEMA.md
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Scope:** MVP API schema for a web-based RV Service Desk (case-based chat, session-only artifacts, explicit mode commands, language enforcement).
+
+**Canonical behavior source:** the customer-approved behavioral algorithm, normalized in `docs/CUSTOMER_BEHAVIOR_SPEC.md`. If schema wording and customer behavior doctrine diverge, the customer behavior doctrine wins and the schema must be reconciled.
 
 **Principles:**
 - Text-first MVP.
 - Images/audio/files are **session-only** (never stored).
-- Mode transitions are **explicit** (never inferred).
+- Mode transitions are **server-owned explicit trigger paths** (explicit commands, approved aliases, or future server-owned legality-gated CTA events; never meaning-only inference).
 - Server validates output format (English-first + translation block; gating rules).
 - Persistence is text-only (cases + messages + final outputs).
 
@@ -88,7 +90,7 @@ Status codes:
 }
 ```
 
-**Rule:** mode changes only via explicit technician command.
+**Rule:** mode changes only via a server-owned approved trigger path.
 
 ### 2.4 Session Artifacts (session-only)
 Artifacts are never stored; they only exist inside one request.
@@ -177,6 +179,11 @@ Purpose:
 - validate output rules (mode, language blocks, gating)
 - return agent response + current state
 
+Behavioral notes:
+- Authorization-ready output, Portal-Cause output, and Shop Final Report are distinct response surfaces.
+- If isolation is not complete, the response must remain diagnostic and continue diagnostics.
+- Unresolved diagnostics must not be converted into questionnaire-first report collection.
+
 Request:
 ```json
 {
@@ -217,7 +224,7 @@ Response (200):
 ```
 
 Mode transition rules (server-side):
-- Explicit commands only (allow-list; exact/near-exact match after case/whitespace normalization only).
+- Approved trigger paths only (explicit commands and approved aliases after bounded normalization).
 - Final Report aliases:
   - START FINAL REPORT
   - FINAL REPORT
@@ -234,11 +241,14 @@ Mode transition rules (server-side):
   - RU: ЗАПРОС АВТОРИЗАЦИИ, АВТОРИЗАЦИЯ, ПРЕАВТОРИЗАЦИЯ
   - ES: SOLICITAR AUTORIZACIÓN, AUTORIZACIÓN, PREAUTORIZACIÓN
 - Otherwise keep current mode.
+- A future `START FINAL REPORT` button/CTA is acceptable only as a server-owned, legality-gated UX trigger that resolves to the same approved transition class.
 
 Hard boundaries:
 - server must never infer mode transitions from meaning
 - server must validate English-first + translation block when in final outputs
 - server must enforce diagnostic gates for complex systems
+- when a manufacturer-specific approved diagnostic procedure is available for the identified unit, it has priority over a generic procedure
+- if manufacturer data is incomplete or unavailable, diagnostics continue with the approved standard procedure rather than blocking
 
 ---
 

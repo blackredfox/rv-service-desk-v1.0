@@ -50,6 +50,7 @@ A valid procedure includes:
 This means:
 - the assistant does NOT blindly follow “next step by number”
 - the assistant follows **causal diagnostic logic within the procedure**
+- when an approved manufacturer-specific procedure is available for the identified unit, that procedure takes priority over a generic path
 
 ---
 
@@ -132,6 +133,10 @@ Instead, it:
 - applies readiness/gating rules,
 - and preserves runtime authority.
 
+If isolation is not complete:
+- diagnostics continue,
+- the system does NOT fall back into questionnaire-first report collection.
+
 ---
 
 ## 2.7 Assistant as Pro-Tech Support (Bounded)
@@ -211,6 +216,8 @@ Mode transitions:
 
 # 3. Output Types
 
+Authorization text, Portal Cause, and Final Report are distinct output surfaces.
+
 ## 3.1 Diagnostic Interaction
 - One question at a time
 - Structured progression
@@ -226,7 +233,14 @@ Mode transitions:
 
 ---
 
-## 3.3 Final Report
+## 3.3 Portal Cause
+- Separate from authorization text
+- Separate from final report
+- Used only when the required diagnostic gate is satisfied
+
+---
+
+## 3.4 Final Report
 Structured output:
 - Complaint
 - Diagnostic Procedure
