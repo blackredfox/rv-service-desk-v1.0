@@ -287,7 +287,7 @@ describe("Dirty-input report routing", () => {
     expect(streamText).toContain('"type":"mode","mode":"final_report"');
   });
 
-  it("asks only for the missing report fields when dirty input summary is incomplete", async () => {
+  it("does not ask the technician to re-author complaint/findings/repair when dirty input summary is incomplete", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide wall leak.",
@@ -302,18 +302,21 @@ describe("Dirty-input report routing", () => {
     }));
 
     const streamText = await response.text();
-    const questionCount = (streamText.match(/\?/g) ?? []).length;
 
-    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockInitializeCase).not.toHaveBeenCalled();
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain("missing report details");
-    expect(streamText).toContain("what repair you completed");
-    expect(questionCount).toBe(1);
+    // The assistant must NEVER default to asking the technician to
+    // author complaint / findings / performed repair. This is the
+    // core "no questionnaire-first authored report flow" rule.
+    expect(streamText).not.toContain("missing report details");
+    expect(streamText).not.toContain("what repair you completed");
+    expect(streamText).not.toContain("what you found");
+    expect(streamText).not.toContain("the original complaint");
+    expect(streamText).not.toContain("какой ремонт был фактически выполнен");
+    expect(streamText).not.toContain("что именно было обнаружено");
+    expect(streamText).not.toContain("исходную жалобу");
+    expect(streamText).not.toContain("qué reparación completaste");
   });
 
-  it("does not bypass readiness for explicit START FINAL REPORT when repair data is still missing", async () => {
+  it("does not ask the technician to re-author the repair for explicit START FINAL REPORT when data is incomplete", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide wall leak.",
@@ -329,11 +332,10 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockInitializeCase).not.toHaveBeenCalled();
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).not.toContain("START FINAL REPORT");
-    expect(streamText).toContain("какой ремонт был фактически выполнен");
+    // No questionnaire-first authored report flow.
+    expect(streamText).not.toContain("какой ремонт был фактически выполнен");
+    expect(streamText).not.toContain("что именно было обнаружено");
+    expect(streamText).not.toContain("исходную жалобу");
+    expect(streamText).not.toContain("missing report details");
   });
 });

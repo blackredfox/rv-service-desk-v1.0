@@ -87,19 +87,37 @@ function ensureEntry(caseId: string): DiagnosticEntry {
 // ── Subtype exclusion detection ──────────────────────────────────────
 
 /**
- * Detect subtype exclusions from technician's response to a type-identification step.
- * For example, if the technician says "gas only" or "not combo" at wh_1,
- * "combo" is excluded from future steps.
+ * Detect subtype exclusions from technician's response.
+ *
+ * Broad patterns (e.g. "gas only", "только газ") only fire on the type-identification
+ * step (wh_1) to avoid false positives on unrelated steps.
+ *
+ * Explicit non-combo assertions (e.g. "не COMBO", "not combo", "no es combo") are
+ * detected on ANY step — the technician's statement that the unit is not combo is
+ * authoritative and must immediately block combo-only steps, including wh_11 itself.
+ * This prevents the agent from repeatedly re-asking combo-only steps after the
+ * technician has explicitly ruled the subtype out.
  */
 const GAS_ONLY_EXCLUSION_PATTERNS = [
   /(?:gas|lp|propane)\s*only/i,
   /(?:только\s*)?(?:газ|lp|пропан)(?:\s*только)?/i,
-  /not?\s*combo/i,
-  /не\s*комби/i,
-  /no\s*(?:es\s*)?combo/i,
   // Explicit gas/LP without mention of electric or combo
   /^(?:gas|lp|propane)$/i,
   /^(?:газ|пропан)$/i,
+];
+
+/**
+ * Explicit non-combo assertions — fire on ANY step, not just wh_1.
+ * Covers English, Russian (Cyrillic "комби/комбо/COMBO" forms including mixed-script),
+ * and Spanish. Authoritative: technician is explicitly ruling combo out.
+ */
+const EXPLICIT_NOT_COMBO_PATTERNS = [
+  /\bnot?\s*combo\b/i,
+  /\bnot?\s*(?:a\s+)?combination\b/i,
+  // Russian: "не комби", "не комбо", "не COMBO" (mixed-script), "не комбинированный"
+  /не\s*(?:комби|комбо|combo|комбинир)/i,
+  // Spanish: "no combo", "no es combo"
+  /\bno\s*(?:es\s*)?combo\b/i,
 ];
 
 const COMBO_EXCLUSION_PATTERNS = [
@@ -108,19 +126,23 @@ const COMBO_EXCLUSION_PATTERNS = [
 ];
 
 export function detectSubtypeExclusions(stepId: string, message: string): string[] {
-  // Only check for subtype at wh_1 (system type identification step)
-  if (stepId !== "wh_1") return [];
-
   const exclusions: string[] = [];
 
-  // Gas-only → exclude combo steps
-  if (GAS_ONLY_EXCLUSION_PATTERNS.some(p => p.test(message))) {
+  // Explicit non-combo assertion — ANY step
+  if (EXPLICIT_NOT_COMBO_PATTERNS.some((p) => p.test(message))) {
     exclusions.push("combo");
   }
 
-  // Electric-only → could exclude gas steps in the future
-  if (COMBO_EXCLUSION_PATTERNS.some(p => p.test(message))) {
-    // For now, no specific exclusions needed for electric-only
+  // Broad subtype inference — only on wh_1 (type identification)
+  if (stepId === "wh_1") {
+    if (GAS_ONLY_EXCLUSION_PATTERNS.some((p) => p.test(message))) {
+      if (!exclusions.includes("combo")) exclusions.push("combo");
+    }
+
+    // Electric-only → could exclude gas steps in the future
+    if (COMBO_EXCLUSION_PATTERNS.some(p => p.test(message))) {
+      // For now, no specific exclusions needed for electric-only
+    }
   }
 
   return exclusions;
@@ -321,6 +343,18 @@ export function processUserMessage(caseId: string, message: string, activeStepId
   // Reset transient flag
   entry.howToCheckRequested = false;
 
+  // Always detect subtype exclusions from the raw message, regardless of
+  // whether the step is completed or how-to-check is requested. Explicit
+  // non-combo assertions must be honored anywhere in the transcript so
+  // combo-only steps cannot be repeated after the technician rules them out.
+  const exclusionsFromThisMessage = detectSubtypeExclusions(activeStepId ?? "", message);
+  for (const exclusion of exclusionsFromThisMessage) {
+    if (!entry.subtypeExclusions.has(exclusion)) {
+      entry.subtypeExclusions.add(exclusion);
+      console.log(`[DiagnosticRegistry] Subtype exclusion added (message scan): "${exclusion}"`);
+    }
+  }
+
   // If the technician asks "how to check?" — do NOT close the step, just flag it
   if (isHowToCheck) {
     entry.howToCheckRequested = true;
@@ -498,6 +532,27 @@ export function getRegistryEntry(caseId: string): DiagnosticEntry | undefined {
  */
 export function clearRegistry(caseId: string): void {
   registry.delete(caseId);
+}
+
+/**
+ * Scan a raw technician message for subtype assertions (e.g. explicit "not combo")
+ * independent of step completion. Runs on every message so exclusions take effect
+ * even when the step is not completed (e.g. clarification, unclassified replies).
+ */
+export function scanMessageForSubtypeAssertions(caseId: string, message: string): string[] {
+  const entry = registry.get(caseId);
+  if (!entry) return [];
+  const added: string[] = [];
+  // Pass empty stepId so only step-agnostic (explicit) patterns fire
+  const exclusions = detectSubtypeExclusions("", message);
+  for (const exclusion of exclusions) {
+    if (!entry.subtypeExclusions.has(exclusion)) {
+      entry.subtypeExclusions.add(exclusion);
+      added.push(exclusion);
+      console.log(`[DiagnosticRegistry] Subtype exclusion added (transcript scan): "${exclusion}"`);
+    }
+  }
+  return added;
 }
 
 /**

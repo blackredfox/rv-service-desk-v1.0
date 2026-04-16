@@ -28,6 +28,7 @@ import {
   getNextStepId as registryGetNextStepId,
   processResponseForBranch as registryProcessResponseForBranch,
   exitBranch as registryExitBranch,
+  scanMessageForSubtypeAssertions as registryScanSubtypeAssertions,
 } from "../diagnostic-registry";
 
 // Re-export config
@@ -94,6 +95,11 @@ const FAULT_PATTERNS: RegExp[] = [
   /разрыв\s+(?:проводки|провода|цепи)/i,
   // Russian: "повреждение проводки" (wiring damage)
   /повреждение\s+(?:проводки|провода)/i,
+  // Russian: "целостность проводки/провода/цепи ... нарушена" — wiring integrity compromised
+  /целостност[ьи]\s+(?:проводки|провода|цепи).{0,40}наруш/i,
+  /наруш(?:ена|ение)\s+целостност[ьи]\s+(?:проводки|провода|цепи)/i,
+  // Russian: "проводка нарушена / повреждена / оборвана"
+  /(?:проводк[аи]|провод[ао]?)\s+(?:наруш[а-яё]+|поврежд[а-яё]+|оборван[а-яё]*)/i,
   // Russian: destructive finding + component — NO \b (Cyrillic not in \w, \b is unreliable)
   /(?:^|[\s,—])(?:сгорел|оплавился|вздулся|перегорел|подгорел|расплавился|заклинил|неисправ[а-яё]+)(?:$|[\s,—]).{0,60}(?:плата|мотор|двигатель|реле|клапан|насос|модуль|конденсатор|компрессор|контроллер)/i,
   // Russian: component + destructive finding
@@ -366,6 +372,16 @@ export function processMessage(
   // 1. Detect intent
   const intent = detectIntent(message);
   console.log(`[ContextEngine] Intent: ${describeIntent(intent)}`);
+
+  // 1a. Transcript-wide subtype assertion scan.
+  // Explicit non-combo assertions ("это не COMBO", "not combo", "no es combo")
+  // apply regardless of the current step and must block combo-only steps from
+  // being served or re-served, including the step the assertion was made on.
+  const newSubtypeExclusions = registryScanSubtypeAssertions(caseId, message);
+  if (newSubtypeExclusions.length > 0) {
+    notices.push(`Subtype exclusions added: ${newSubtypeExclusions.join(", ")}`);
+    stateChanged = true;
+  }
   
   // 2. Check for replan triggers (only if isolation was complete AND not terminal)
   // P1.7: Terminal state must not be undone by replan
