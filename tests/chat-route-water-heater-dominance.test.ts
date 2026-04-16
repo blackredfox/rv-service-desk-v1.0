@@ -314,7 +314,7 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });
 
-  it("asks only for missing report fields during active flow when ES report request is still incomplete", async () => {
+  it("blocks ES report request during active diagnostic flow — diagnostics not ready", async () => {
     const caseId = "route_wh5_report_es_missing_active_flow";
     await advanceToWh5(caseId);
     await postChat(caseId, "no");
@@ -326,13 +326,13 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    expect(reportTurn.streamText).toContain("solo me faltan estos datos");
-    expect(reportTurn.streamText).toContain("qué encontraste exactamente");
+    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    expect(reportTurn.streamText).toContain("no est");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });
 
-  it("does not over-trigger report mode too early during active flow from a bare natural report request", async () => {
+  it("blocks bare natural report request during active diagnostic flow — diagnostics not ready", async () => {
     const caseId = "route_wh5_report_too_early_active_flow";
     await advanceToWh5(caseId);
     await postChat(caseId, "нет");
@@ -341,8 +341,8 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    expect(reportTurn.streamText).toContain("missing report details");
-    expect(reportTurn.streamText).toContain("what you found");
+    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    expect(reportTurn.streamText).toContain("not yet complete");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });

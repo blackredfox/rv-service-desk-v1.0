@@ -317,14 +317,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 
-  it("asks only for missing report data when natural report intent is not ready", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: "Continue diagnostics." } }],
-      }),
-    });
-
+  it("blocks report request when diagnostics are not ready (no questionnaire fallback)", async () => {
     const { POST } = await import("@/app/api/chat/route");
 
     const response = await POST(new Request("http://localhost/api/chat", {
@@ -337,8 +330,8 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
 
     expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(streamText).toContain("missing report details");
-    expect(streamText).toContain("the original complaint");
+    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    expect(streamText).toContain("Diagnostics are not yet complete");
   });
 
   it("uses the report path mid-flow when history + current repair summary make the case ready", async () => {

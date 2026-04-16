@@ -27,6 +27,8 @@ export type DiagnosticStep = {
   howToCheck?: string;
   /** Branch ID this step belongs to (null = main flow) */
   branchId?: string;
+  /** Subtype gate: step is only valid when this subtype is NOT excluded (e.g. "combo") */
+  subtypeGate?: string;
 };
 
 /**
@@ -958,6 +960,7 @@ reg({
         /combo.*(?:electric|element)/i,
       ],
       howToCheck: "With electric mode ON, measure 120VAC at the heating element terminals. Element resistance should be 10-16 ohms.",
+      subtypeGate: "combo",
     },
     // Step 12: High limit / ECO reset
     {
@@ -2000,11 +2003,15 @@ export function getNextStepBranchAware(
   unableIds: Set<string>,
   activeBranchId: string | null,
   lockedOutBranches: Set<string>,
+  subtypeExclusions?: Set<string>,
 ): DiagnosticStep | null {
   const doneOrSkipped = new Set([...completedIds, ...unableIds]);
 
   for (const step of procedure.steps) {
     if (doneOrSkipped.has(step.id)) continue;
+
+    // Subtype gating: skip steps whose subtypeGate is in the exclusion set
+    if (step.subtypeGate && subtypeExclusions?.has(step.subtypeGate)) continue;
 
     // Branch filtering
     const stepBranch = step.branchId ?? null;
