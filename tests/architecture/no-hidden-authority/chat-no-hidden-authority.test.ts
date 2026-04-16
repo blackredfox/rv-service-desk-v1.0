@@ -131,6 +131,7 @@ describe("No Hidden Authority — Route Decomposition", () => {
       matchedText: expect.any(String),
       reportKind: undefined,
       requestedSurface: "shop_final_report",
+      isLineEdit: false,
     });
 
     expect(reportIntent).not.toHaveProperty("nextStep");

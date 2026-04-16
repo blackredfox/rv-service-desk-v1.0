@@ -453,7 +453,33 @@ export async function POST(req: Request) {
     : null;
 
   const modeResolution = pendingFinalReportCommand;
-  if (existingReportInContext && precomputedLaborOverride.isLaborOverrideRequest) {
+  // When a final report already exists AND the technician sends a narrow
+  // line-item edit (e.g. "исправь - <item>: 0.3 ч"), prefer the REPORT
+  // REVISION path over the broad LABOR TOTAL OVERRIDE path. This prevents
+  // the post-final "If you want the report now... / START FINAL REPORT"
+  // restart loop observed in Case-58 when the labor-total regex falsely
+  // captures a per-line labor correction.
+  const postFinalLineEdit =
+    existingReportInContext &&
+    reportRevisionIntent.matched &&
+    (reportRevisionIntent.isLineEdit ?? false);
+
+  if (postFinalLineEdit) {
+    reportPromptConstraint = [
+      buildReportTypePromptConstraint(requestedReportKind),
+      buildReportRevisionPromptConstraint(message),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (currentMode !== "final_report") {
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (post-final line-item revision)`);
+    } else {
+      console.log(`[Chat API v2] Mode held as final_report (post-final line-item revision)`);
+    }
+  } else if (existingReportInContext && precomputedLaborOverride.isLaborOverrideRequest) {
     currentMode = "final_report";
     console.log(`[Chat API v2] Mode held in-memory as final_report (existing report labor override)`);
   } else if (existingReportInContext && (reportRevisionIntent.matched || approvedFinalReportIntent.matched)) {
@@ -1010,8 +1036,14 @@ export async function POST(req: Request) {
       : null;
 
   const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
-  const isLaborOverrideRequest = laborOverride.isLaborOverrideRequest;
-  const requestedLaborHours = laborOverride.requestedLaborHours;
+  // Post-final line-item revisions are NOT labor-total overrides — they must
+  // flow through the primary completion path with the REPORT REVISION prompt
+  // so the LLM patches the existing report line-by-line instead of rewriting
+  // the Estimated Labor section to a single-item total.
+  const isLaborOverrideRequest = postFinalLineEdit
+    ? false
+    : laborOverride.isLaborOverrideRequest;
+  const requestedLaborHours = postFinalLineEdit ? null : laborOverride.requestedLaborHours;
   const requestedLaborHoursText =
     requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
 
