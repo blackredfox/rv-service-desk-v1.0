@@ -281,6 +281,22 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
   }
 }
 
+/**
+ * Build a deterministic response when the technician requests a final report
+ * but diagnostics are still in progress (isolation not complete).
+ * Remains in diagnostic mode and directs the technician to continue.
+ */
+function buildDiagnosticsNotReadyResponse(language: Language): string {
+  switch (language) {
+    case "RU":
+      return "Диагностика ещё не завершена. Давайте продолжим с текущего шага, прежде чем формировать отчёт.";
+    case "ES":
+      return "El diagnóstico aún no está completo. Continuemos con el paso actual antes de generar el informe.";
+    default:
+      return "Diagnostics are not yet complete. Let\u2019s continue with the current step before generating the report.";
+  }
+}
+
 function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete" | "terminalState"> | null | undefined): boolean {
   return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
@@ -456,7 +472,13 @@ export async function POST(req: Request) {
         await storage.updateCase(ensuredCase.id, { mode: currentMode });
         console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (report request routed by readiness)`);
       }
+    } else if (Boolean(currentContextSnapshot.activeProcedureId) && !runtimeReportReady) {
+      // Active diagnostic procedure with isolation not complete.
+      // Do NOT fall to repair-summary questionnaire — defer to post-context-engine
+      // where the context engine may resolve readiness.
+      console.log(`[Chat API v2] Report request deferred — active procedure, isolation not complete`);
     } else if (shouldAskForMissingReportFieldsEarly) {
+      // No active procedure or isolation already complete — ask for missing fields
       reportRoutingResponse = buildRepairSummaryClarificationResponse({
         language: outputPolicy.effective,
         missingFields: [...missingReportFields],
@@ -766,7 +788,7 @@ export async function POST(req: Request) {
       const stepQuestion = getActiveStepQuestion(ensuredCase.id, currentActiveStep);
       if (isStepAnswered(routingMessage, stepQuestion)) {
         // Technician's message answers the step — mark it complete
-        registryMarkStepCompleted(ensuredCase.id, currentActiveStep);
+        registryMarkStepCompleted(ensuredCase.id, currentActiveStep, routingMessage);
         markContextStepCompleted(ensuredCase.id, currentActiveStep);
         console.log(`[Chat API v2] Step ${currentActiveStep} answered (contextual match, hardening backup)`);
 
@@ -899,6 +921,21 @@ export async function POST(req: Request) {
       clarificationInstruction,
     ].filter(Boolean).join("\n\n");
 
+    // ── ANTI-INVITATION DIRECTIVE ───────────────────────────────────────
+    // When isolation is NOT complete, explicitly prohibit the LLM from
+    // inviting or suggesting final report generation.
+    if (!engineResult.context.isolationComplete && engineResult.context.terminalState?.phase === "normal") {
+      const antiInvitationDirective = [
+        "PROHIBITION (MANDATORY):",
+        "- Isolation is NOT complete. Diagnostics are still in progress.",
+        "- Do NOT suggest or mention generating a final report.",
+        "- Do NOT suggest or mention START FINAL REPORT.",
+        "- Do NOT say the technician can request a report.",
+        "- Continue with the active diagnostic step only.",
+      ].join("\n");
+      contextEngineDirectives = [contextEngineDirectives, antiInvitationDirective].filter(Boolean).join("\n\n");
+    }
+
     const shouldSuppressProcedureContext =
       engineResult.context.isolationComplete ||
       engineResult.context.terminalState?.phase !== "normal";
@@ -921,11 +958,10 @@ export async function POST(req: Request) {
       });
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
     } else if (hasBoundedReportRequest && currentMode === "diagnostic") {
-      reportRoutingResponse = buildRepairSummaryClarificationResponse({
-        language: outputPolicy.effective,
-        missingFields: [...missingReportFields],
-      });
-      console.log(`[Chat API v2] Report request still missing data after context processing: ${missingReportFields.join(", ")}`);
+      // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
+      // Stay in diagnostic mode and continue from the correct legal state.
+      reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);
+      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved`);
     }
   }
 

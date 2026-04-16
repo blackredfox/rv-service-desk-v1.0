@@ -438,7 +438,7 @@ export function processMessage(
         // Technician answered the current step — mark it complete
         const completedStepId = context.activeStepId;
         context.completedSteps.add(completedStepId);
-        registryMarkStepCompleted(caseId, completedStepId); // Sync to registry
+        registryMarkStepCompleted(caseId, completedStepId, message); // Sync to registry with message for subtype detection
         notices.push(`Step ${completedStepId} marked as COMPLETED`);
 
         // ── P1.5: Branch trigger check ─────────────────────────────

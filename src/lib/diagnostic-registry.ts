@@ -52,6 +52,8 @@ type DiagnosticEntry = {
   decisionPath: Array<{ stepId: string; branchId: string | null; reason: string; timestamp: string }>;
   /** P1.5: Branches that are locked out */
   lockedOutBranches: Set<string>;
+  /** Subtype exclusions: subtypeGate values to skip (e.g. "combo" when gas-only) */
+  subtypeExclusions: Set<string>;
 };
 
 const registry = new Map<string, DiagnosticEntry>();
@@ -74,10 +76,54 @@ function ensureEntry(caseId: string): DiagnosticEntry {
       activeBranchId: null,
       decisionPath: [],
       lockedOutBranches: new Set(),
+      // Subtype exclusions
+      subtypeExclusions: new Set(),
     };
     registry.set(caseId, entry);
   }
   return entry;
+}
+
+// ── Subtype exclusion detection ──────────────────────────────────────
+
+/**
+ * Detect subtype exclusions from technician's response to a type-identification step.
+ * For example, if the technician says "gas only" or "not combo" at wh_1,
+ * "combo" is excluded from future steps.
+ */
+const GAS_ONLY_EXCLUSION_PATTERNS = [
+  /(?:gas|lp|propane)\s*only/i,
+  /(?:только\s*)?(?:газ|lp|пропан)(?:\s*только)?/i,
+  /not?\s*combo/i,
+  /не\s*комби/i,
+  /no\s*(?:es\s*)?combo/i,
+  // Explicit gas/LP without mention of electric or combo
+  /^(?:gas|lp|propane)$/i,
+  /^(?:газ|пропан)$/i,
+];
+
+const COMBO_EXCLUSION_PATTERNS = [
+  /(?:electric\s*only|only\s*electric)/i,
+  /(?:только\s*)?электрич/i,
+];
+
+export function detectSubtypeExclusions(stepId: string, message: string): string[] {
+  // Only check for subtype at wh_1 (system type identification step)
+  if (stepId !== "wh_1") return [];
+
+  const exclusions: string[] = [];
+
+  // Gas-only → exclude combo steps
+  if (GAS_ONLY_EXCLUSION_PATTERNS.some(p => p.test(message))) {
+    exclusions.push("combo");
+  }
+
+  // Electric-only → could exclude gas steps in the future
+  if (COMBO_EXCLUSION_PATTERNS.some(p => p.test(message))) {
+    // For now, no specific exclusions needed for electric-only
+  }
+
+  return exclusions;
 }
 
 // ── Answered detection ──────────────────────────────────────────────
@@ -367,6 +413,7 @@ export function buildRegistryContext(
       entry.unableStepIds,
       entry.activeBranchId,
       entry.lockedOutBranches,
+      entry.subtypeExclusions,
     )?.id;
 
     return buildProcedureContext(
@@ -456,11 +503,21 @@ export function clearRegistry(caseId: string): void {
 /**
  * Mark a step as completed in the registry.
  * Called by context-engine when technician answers a step.
+ * Also detects subtype exclusions from the response if available.
  */
-export function markStepCompleted(caseId: string, stepId: string): void {
+export function markStepCompleted(caseId: string, stepId: string, technicianMessage?: string): void {
   const entry = ensureEntry(caseId);
   entry.completedStepIds.add(stepId);
   entry.askedStepIds.add(stepId); // Also mark as asked to prevent re-asking
+
+  // Detect subtype exclusions from the technician's response
+  if (technicianMessage) {
+    const exclusions = detectSubtypeExclusions(stepId, technicianMessage);
+    for (const exclusion of exclusions) {
+      entry.subtypeExclusions.add(exclusion);
+      console.log(`[DiagnosticRegistry] Subtype exclusion added: "${exclusion}" (from step ${stepId})`);
+    }
+  }
 }
 
 /**
@@ -474,20 +531,21 @@ export function markStepUnable(caseId: string, stepId: string): void {
 
 /**
  * Get the next available step ID for this case.
- * Uses branch-aware resolution (P1.5).
+ * Uses branch-aware resolution (P1.5) with subtype gating.
  * Returns null if all steps complete or no procedure.
  */
 export function getNextStepId(caseId: string): string | null {
   const entry = registry.get(caseId);
   if (!entry?.procedure) return null;
   
-  // Use branch-aware step resolution
+  // Use branch-aware step resolution with subtype exclusions
   const step = getNextStepBranchAware(
     entry.procedure,
     entry.completedStepIds,
     entry.unableStepIds,
     entry.activeBranchId,
     entry.lockedOutBranches,
+    entry.subtypeExclusions,
   );
   return step?.id ?? null;
 }
