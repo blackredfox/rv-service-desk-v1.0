@@ -1,11 +1,34 @@
 # RV Service Desk
 ## REPO_STATE_TRUTH_2026-03-18.md
 
-**Version:** 1.0  
-**Status:** Current-State Audit Memo  
-**Purpose:** Reconcile project documents with current observed repository/application reality before further architecture work.
+**Version:** 1.1  
+**Status:** Historical / Dated Current-State Audit Memo (descriptive only)  
+**Purpose:** Reconcile project documents with the repository/application reality observed on 2026-03-18.
 
-**Last updated:** 2026-03-18
+**Last updated:** 2026-03-18  
+**Reclassified:** descriptive-only memo (truth-hierarchy cleanup)
+
+> ### Status note
+>
+> This memo is a **dated, descriptive current-state audit** from 2026-03-18.
+> It is **not** a contract document and **not** active product, architecture,
+> or benchmark truth.
+>
+> For active behavioral, product, architecture, and benchmark truth, use:
+>
+> - `docs/CUSTOMER_BEHAVIOR_SPEC.md` (canonical behavioral mirror, highest behavioral authority)
+> - `PROJECT_MEMORY.md` (active product memory)
+> - `ARCHITECTURE_RULES.md` and active ADRs (implementation invariants)
+> - `RV_SWE_BENCHMARK_v1.md` (behavioral validation law)
+> - `README.md`, `ROADMAP.md` for current external/planning narrative
+>
+> Where this memo refers to documents using older `_UPDATED` filenames
+> (e.g. `PROJECT_MEMORY_1_UPDATED.md`, `ROADMAP_UPDATED.md`,
+> `README_UPDATED.md`), those names are **historical**. The active docs
+> are now the un-suffixed filenames listed above.
+>
+> The historical observations below are preserved as repo-state history,
+> not as currently authoritative statements.
 
 ---
 
@@ -59,10 +82,16 @@ It should be preserved as history, not overwritten.
 `ADR-002-ROUTE-DECOMPOSITION.md` is now the active architecture decision record for safe route decomposition.
 
 ### 3.3 Project memory / roadmap / benchmark
-The following are now active contract documents:
-- `PROJECT_MEMORY_1_UPDATED.md`
-- `ROADMAP_UPDATED.md`
-- `README_UPDATED.md`
+At the time of this 2026-03-18 audit, the contract documents being
+treated as active were referenced under their then-current `_UPDATED`
+filenames.
+
+The active contract documents are now (post-cleanup):
+- `PROJECT_MEMORY.md` (was: `PROJECT_MEMORY_1_UPDATED.md`)
+- `ROADMAP.md` (was: `ROADMAP_UPDATED.md`)
+- `README.md` (was: `README_UPDATED.md`)
+- `ARCHITECTURE_RULES.md`
+- `docs/CUSTOMER_BEHAVIOR_SPEC.md` (canonical behavioral mirror)
 - `RV_SWE_BENCHMARK_v1.md`
 
 ---
@@ -142,24 +171,35 @@ These are newer than the baseline snapshot and must be treated as active truth.
 
 ## 6) What Is Authoritative Now
 
+> Note (post-cleanup): the document references in this section have been
+> updated to point at the active filenames. The hierarchy itself is
+> defined by `SOURCE_OF_TRUTH_RULES.md`; this memo only describes the
+> current-state mapping.
+
 For current work, the following order of truth applies:
 
-### 6.1 Product / behavior truth
-`PROJECT_MEMORY_1_UPDATED.md`
+### 6.1 Behavioral truth (canonical)
+`docs/CUSTOMER_BEHAVIOR_SPEC.md`
 
-### 6.2 Planning truth
-`ROADMAP_UPDATED.md`
+### 6.2 Product / behavior truth
+`PROJECT_MEMORY.md`
 
-### 6.3 External-facing product description
-`README_UPDATED.md`
+### 6.3 Planning truth
+`ROADMAP.md`
 
-### 6.4 Evaluation truth
+### 6.4 External-facing product description
+`README.md`
+
+### 6.5 Architecture truth
+`ARCHITECTURE_RULES.md` and active ADRs
+
+### 6.6 Evaluation truth
 `RV_SWE_BENCHMARK_v1.md`
 
-### 6.5 Route decomposition architecture truth
+### 6.7 Route decomposition architecture truth
 `ADR-002-ROUTE-DECOMPOSITION.md`
 
-### 6.6 Historical snapshot only
+### 6.8 Historical snapshot only
 `BASELINE_BEHAVIOR_2026-03-16.md`
 
 Important:

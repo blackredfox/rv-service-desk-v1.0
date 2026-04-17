@@ -1,8 +1,53 @@
 # ADR: Branch-Aware Step Resolution (P1.5)
 
 **Date:** 2026-01-XX  
-**Status:** Implemented  
+**Status:** Historical / Superseded — implementation memo, NOT current architecture authority  
 **Task:** P1.5 — Branch-Aware Step Resolution
+
+---
+
+> ## ⚠️ Status warning (truth-hierarchy cleanup)
+>
+> This document is preserved as a **historical implementation memo** describing
+> early branch-aware step-resolution work. It is **not** the current
+> architecture authority for diagnostic flow, branch authority, or
+> registry/route ownership of branch state.
+>
+> Current authoritative doctrine:
+>
+> - Behavioral authority: `docs/CUSTOMER_BEHAVIOR_SPEC.md`
+> - Product memory: `PROJECT_MEMORY.md`
+> - Architecture invariants: `ARCHITECTURE_RULES.md` (see Rule A1, B1, B3, G1b)
+> - Single-authority doctrine: **the Context Engine is the single runtime
+>   authority for diagnostic flow, including branch selection, branch
+>   switching, branch entry/exit, and step resolution.**
+>
+> Specifically, the following parts of this memo MUST NOT be read as
+> current active architecture:
+>
+> - any implication that the **registry** owns branch authority,
+>   branch entry/exit, or mutual-exclusivity decisions,
+> - any implication that **`route.ts`** owns branch synchronization,
+>   branch advancement, or "sync branch state to context engine",
+> - any implication that calling helpers such as `processResponseForBranch`
+>   from a route handler is the canonical architectural pattern.
+>
+> Per `ARCHITECTURE_RULES.md` Rule G1b, no helper module, registry call,
+> or route handler may shadow, replicate, or override Context Engine
+> decisions about step selection, branch switching, completion,
+> isolation, terminal state, or readiness.
+>
+> The behavioral and architectural intent expressed by this memo (one
+> active branch at a time, mutually exclusive branches, no parallel
+> branches, semantic stability of step IDs) remains directionally valid,
+> but the **ownership** described here is historical. Any future work in
+> this area MUST be designed against current `ARCHITECTURE_RULES.md` and
+> the customer behavior spec, not against the route/registry-centric
+> model described below.
+>
+> Use this file as implementation history and as a record of the original
+> P1.5 decision. Do not use it as a current authority on where branch
+> logic lives.
 
 ---
 

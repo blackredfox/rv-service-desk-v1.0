@@ -29,27 +29,61 @@ This document defines the **only allowed source-of-truth hierarchy**.
 
 # 2) Enforced Source of Truth Hierarchy
 
-## L1 — Product Truth (Highest Authority)
+## L1 — Customer Behavior Mirror (Behavioral Authority)
+**File:**
+- `docs/CUSTOMER_BEHAVIOR_SPEC.md`
+
+Defines:
+- the canonical, customer-approved behavioral algorithm
+  (engineering-normalized internal mirror)
+- diagnostic-flow doctrine (one question at a time, causal procedure flow,
+  no questionnaire-first unresolved fallback)
+- isolation / cause gating doctrine
+- manufacturer-priority behavior
+- output-surface distinction
+  (`authorization_ready`, `portal_cause`, `shop_final_report`)
+- prohibited premature outputs
+- approved transition classes
+  (explicit commands, server-approved natural-language aliases,
+  server-owned legality-gated CTAs)
+- single-authority doctrine (Context Engine is the sole runtime
+  diagnostic-flow authority)
+
+**Rule:**
+If any internal product, architecture, or supporting document conflicts
+with the customer behavior spec, the customer behavior spec wins and the
+conflicting document MUST be reconciled to it.
+
+This is the highest behavioral authority in the repository.
+
+---
+
+## L2 — Product Memory (Active Product Truth)
 **File:**
 - `PROJECT_MEMORY.md`
 
 Defines:
-- product behavior
+- product behavior (aligned to L1)
 - diagnostic contract
 - mode system
 - language rules
 - terminal / completion logic
 - safety constraints
+- non-goals / hard product boundaries
 
 **Rule:**
-If any document conflicts with PROJECT_MEMORY → PROJECT_MEMORY wins.
+- Must remain aligned to L1.
+- Where L2 and L1 diverge, L1 wins and L2 must be reconciled.
+- Within its scope, L2 remains the active product memory and the
+  technical-boundary document for engineering work.
+- L2 may not redefine behavioral truth that L1 owns.
 
 ---
 
-## L2 — Architecture Rules (Implementation Law)
+## L3 — Architecture Rules (Implementation Law)
 **Files:**
 - `ARCHITECTURE_RULES.md`
-- ADR documents (e.g. `ADR-002-ROUTE-DECOMPOSITION.md`)
+- active ADR documents (e.g. `ADR-002-ROUTE-DECOMPOSITION.md`)
 
 Defines:
 - system invariants
@@ -58,12 +92,15 @@ Defines:
 - allowed vs forbidden patterns
 
 **Rule:**
-Must comply with L1.
-Cannot redefine product behavior.
+- Must comply with L1 and L2.
+- Cannot redefine product behavior.
+- Cannot override the customer behavior spec.
+- Architecture truth is authoritative for *how* the system is built,
+  not for *what behavior* the system must produce.
 
 ---
 
-## L3 — Behavioral Truth (Validation Law)
+## L4 — Behavioral Validation Law (Benchmark)
 **File:**
 - `RV_SWE_BENCHMARK_v1.md`
 
@@ -74,28 +111,35 @@ Defines:
 - real failure references
 
 **Rule:**
-- Overrides subjective interpretation
-- If system passes docs but fails benchmark → system is wrong
+- Overrides subjective interpretation.
+- If system passes docs but fails benchmark → system is wrong.
+- Benchmark is the validation law that protects L1 / L2 contracts.
+- Benchmark cannot be overridden by architecture preference or
+  by descriptive repo-state memos.
 
 ---
 
-## L4 — Current Runtime Truth (Observed State)
+## L5 — Current Runtime Truth (Observed State, Descriptive Only)
 **File:**
 - `REPO_STATE_TRUTH_YYYY-MM-DD.md`
 
 Defines:
-- what is actually implemented
+- what is actually implemented at a given point in time
 - known gaps vs architecture
 - current limitations
 
 **Rule:**
-- Descriptive, not prescriptive
-- Cannot override L1–L3
-- Must be used to avoid refactoring against false assumptions
+- Descriptive, not prescriptive.
+- Cannot override L1–L4.
+- A repo-state memo can describe the current observed state of the
+  codebase, but it cannot redefine product, architecture, or
+  benchmark truth.
+- Must be used to avoid refactoring against false assumptions, not
+  to justify violating contract truth.
 
 ---
 
-## L5 — Historical Truth (Archive Only)
+## L6 — Historical Truth (Archive Only)
 **Files:**
 - `BASELINE_BEHAVIOR_*.md`
 - older PROJECT_MEMORY versions
@@ -163,8 +207,14 @@ ADR documents:
 - define HOW to implement
 - not WHAT the system does
 
-If ADR conflicts with PROJECT_MEMORY:
-→ ADR must be updated
+If ADR conflicts with PROJECT_MEMORY (L2) or with the customer
+behavior spec (L1):
+→ ADR must be updated.
+
+ADRs cannot redefine behavioral doctrine. If a previously accepted ADR
+now reads as if it owns flow authority, branch authority, or
+report-readiness authority, it must be reclassified as historical /
+superseded rather than left readable as current architecture truth.
 
 ---
 
@@ -172,11 +222,14 @@ If ADR conflicts with PROJECT_MEMORY:
 
 The repository must satisfy:
 
+- Exactly ONE active customer behavior mirror (`docs/CUSTOMER_BEHAVIOR_SPEC.md`)
 - Exactly ONE `PROJECT_MEMORY.md`
 - Exactly ONE active benchmark spec
-- ADRs aligned with current architecture intent
-- A current `REPO_STATE_TRUTH` document
+- ADRs aligned with current architecture intent and reconciled to L1
+- A current `REPO_STATE_TRUTH` document, clearly marked as descriptive
 - No active duplicate truth sources
+- No supporting doc that implies route handlers, registry helpers, or
+  prompt logic own diagnostic flow / branch / readiness authority
 
 ---
 
@@ -184,9 +237,16 @@ The repository must satisfy:
 
 ## Required now:
 
-### 1. Product Memory
-- KEEP: `PROJECT_MEMORY.md`
-- REMOVE or ARCHIVE: `PROJECT_MEMORY_1_UPDATED.md`
+### 1. Behavioral mirror
+- KEEP: `docs/CUSTOMER_BEHAVIOR_SPEC.md` as L1.
+- Any document that contradicts it must be reconciled or reclassified.
+
+### 2. Product Memory
+- KEEP: `PROJECT_MEMORY.md` as L2 (active product memory).
+- Any prior `_UPDATED` variants (e.g. `PROJECT_MEMORY_1_UPDATED.md`,
+  `ROADMAP_UPDATED.md`, `README_UPDATED.md`) are **not** the current
+  active docs. Supporting documents must reference the active filenames
+  (`PROJECT_MEMORY.md`, `ROADMAP.md`, `README.md`) instead.
 
 ---
 
@@ -217,12 +277,13 @@ Any PR affecting architecture or behavior must verify:
 - [ ] No hidden authority added
 
 ### Alignment
-- [ ] Matches PROJECT_MEMORY (L1)
-- [ ] Respects ARCHITECTURE_RULES (L2)
-- [ ] Does not break BENCHMARK (L3)
+- [ ] Matches the customer behavior spec (L1)
+- [ ] Matches PROJECT_MEMORY (L2)
+- [ ] Respects ARCHITECTURE_RULES (L3)
+- [ ] Does not break BENCHMARK (L4)
 
 ### Reality awareness
-- [ ] Considers current gaps from REPO_STATE_TRUTH (L4)
+- [ ] Considers current gaps from REPO_STATE_TRUTH (L5) as descriptive only
 
 ---
 
