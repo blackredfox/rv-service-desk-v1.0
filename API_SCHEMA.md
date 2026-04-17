@@ -50,275 +50,55 @@ All errors return:
     "details": "any"
   }
 }
-```
+# RV Service Desk
+## API_SCHEMA.md
 
-Status codes:
-- 400: validation / bad request
-- 401: auth required
-- 413: payload too large
-- 429: rate limit
-- 500: server error
+**Version:** 1.3  
+**Scope:** MVP API schema for a web-based RV Service Desk (case-based chat, session-only artifacts, explicit mode commands, language enforcement).
 
----
+**Canonical behavior source:** the customer-approved behavioral algorithm, normalized in `docs/CUSTOMER_BEHAVIOR_SPEC.md`. If schema wording and customer behavior doctrine diverge, the customer behavior doctrine wins and the schema must be reconciled.
 
-## 2) Data Models
+**Conceptual output-surface distinction is part of the API model:**
+- `authorization_ready`
+- `portal_cause`
+- `shop_final_report`
 
-### 2.1 Case
+These surfaces must remain distinct in both documentation and runtime. Their legality is runtime-owned and depends on readiness; it is not derived from model wording.
 
-```json
-{
-  "caseId": "string",
-  "title": "string",
-  "inputLanguage": "en" | "ru" | "es",
-  "languageSource": "AUTO" | "MANUAL",
-  "createdAt": "2026-02-03T23:12:00Z",
-  "updatedAt": "2026-02-03T23:45:00Z"
-}
-```
-
-### 2.2 Message
-
-```json
-{
-  "messageId": "string",
-  "caseId": "string",
-  "role": "technician" | "agent",
-  "language": "en" | "ru" | "es",
-  "content": "string",
-  "timestamp": "2026-02-03T23:13:00Z"
-}
-```
-
-### 2.3 Mode
-
-```json
-{
-  "mode": "diagnostic" | "authorization" | "final_report"
-}
-```
-
-**Rule:** mode changes only via a server-owned approved trigger path.
-
-### 2.4 Session Artifacts (session-only)
-Artifacts are never stored; they only exist inside one request.
-
-```json
-{
-  "images": [
-    {
-      "mimeType": "image/jpeg",
-      "base64": "...",
-      "filename": "photo1.jpg"
-    }
-  ],
-  "files": [
-    {
-      "mimeType": "application/pdf",
-      "base64": "...",
-      "filename": "form.pdf"
-    }
-  ]
-}
-```
+**Principles:**
+- Text-first MVP.
+- Images/audio/files are **session-only** (never stored).
+- Mode transitions are **server-owned explicit trigger paths** (explicit commands, approved aliases, or future server-owned legality-gated CTA events; never meaning-only inference).
+- Server validates output format (English-first + translation block; gating rules).
+- Persistence is text-only (cases + messages + final outputs).
 
 ---
 
-## 3) Cases API (MVP)
+## 1) Conventions
 
-### 3.1 Create Case
-`POST /api/cases`
+### 1.1 Base URL
+- Local: `http://localhost:3000`
+- All endpoints are prefixed with `/api`.
 
-Request:
-```json
-{ "title": "string (optional)" }
-```
+### 1.2 Content Types
+- Requests: `application/json` unless specified
+- Responses: `application/json`
 
-Response (201):
+### 1.3 Identifiers
+- `caseId`: `string` (uuid preferred)
+- `messageId`: `string` (uuid preferred)
+
+### 1.4 Time
+- `createdAt`, `timestamp`: ISO 8601 UTC strings
+
+### 1.5 Errors
+All errors return:
+
 ```json
 {
-  "case": {
-    "caseId": "string",
-    "title": "New Case",
-    "inputLanguage": "en",
-    "languageSource": "AUTO",
-    "createdAt": "...",
-    "updatedAt": "..."
+  "error": {
+    "code": "string",
+    "message": "string",
+    "details": "any"
   }
 }
-```
-
-### 3.2 List Cases
-`GET /api/cases`
-
-Response (200):
-```json
-{ "cases": [ { "caseId": "string", "title": "string", "createdAt": "...", "updatedAt": "..." } ] }
-```
-
-### 3.3 Rename Case
-`PATCH /api/cases/{caseId}`
-
-Request:
-```json
-{ "title": "string" }
-```
-
-Response (200):
-```json
-{ "case": { "caseId": "string", "title": "string", "createdAt": "...", "updatedAt": "..." } }
-```
-
-### 3.4 Delete Case
-`DELETE /api/cases/{caseId}`
-
-Response (204): empty body
-
----
-
-## 4) Chat API (Core)
-
-### 4.1 Send Message / Get Next Agent Message
-`POST /api/chat`
-
-Purpose:
-- append technician message
-- run AI orchestration
-- validate output rules (mode, language blocks, gating)
-- return agent response + current state
-
-Behavioral notes:
-- Authorization-ready output, Portal-Cause output, and Shop Final Report are distinct response surfaces (`authorization_ready`, `portal_cause`, `shop_final_report`). They must not be collapsed.
-- Final surface legality depends on readiness. A final surface is emitted only after the relevant runtime gate is satisfied.
-- If isolation is not complete, the response must remain diagnostic and continue diagnostics.
-- Unresolved diagnostics must not be converted into questionnaire-first report-field collection. Questionnaire-first "confirm complaint / what was found / what repair was performed" is not the default unresolved path; it is valid only when the case is already in a legally appropriate near-final / report-edit state.
-
-Request:
-```json
-{
-  "caseId": "string",
-  "clientContext": {
-    "uiLanguage": "en" | "ru" | "es",
-    "timezone": "America/New_York"
-  },
-  "messages": [
-    {
-      "role": "technician",
-      "language": "en",
-      "content": "string",
-      "timestamp": "..."
-    }
-  ],
-  "sessionArtifacts": {
-    "images": [],
-    "files": []
-  }
-}
-```
-
-Response (200):
-```json
-{
-  "agentMessage": {
-    "role": "agent",
-    "language": "en",
-    "content": "string",
-    "timestamp": "..."
-  },
-  "state": {
-    "mode": "diagnostic" | "authorization" | "final_report",
-    "inputLanguage": "en" | "ru" | "es"
-  }
-}
-```
-
-Mode transition rules (server-side):
-- Approved trigger paths only (explicit commands and approved aliases after bounded normalization).
-- Final Report aliases:
-  - START FINAL REPORT
-  - FINAL REPORT
-  - GENERATE FINAL REPORT
-  - REPORT
-  - GIVE ME THE REPORT
-  - RU: ВЫДАЙ РЕПОРТ, РЕПОРТ, ФИНАЛЬНЫЙ РЕПОРТ, СДЕЛАЙ РЕПОРТ
-  - ES: REPORTE FINAL, GENERAR REPORTE, REPORTE
-- Authorization aliases:
-  - START AUTHORIZATION REQUEST
-  - AUTHORIZATION REQUEST
-  - REQUEST AUTHORIZATION
-  - PRE-AUTHORIZATION
-  - RU: ЗАПРОС АВТОРИЗАЦИИ, АВТОРИЗАЦИЯ, ПРЕАВТОРИЗАЦИЯ
-  - ES: SOLICITAR AUTORIZACIÓN, AUTORIZACIÓN, PREAUTORIZACIÓN
-- Otherwise keep current mode.
-- A future `START FINAL REPORT` button/CTA is acceptable API direction only as a server-owned, legality-gated UX trigger that resolves to the same approved transition class. CTA metadata in API responses is permitted, but mode/transition authority must remain runtime-owned and legality-gated; it must not be inferred from LLM wording alone.
-
-Hard boundaries:
-- server must never infer mode transitions from meaning
-- server must validate English-first + translation block when in final outputs
-- server must enforce diagnostic gates for complex systems
-- when a manufacturer-specific approved diagnostic procedure is available for the identified unit, it has priority over a generic procedure
-- if manufacturer data is incomplete or unavailable, diagnostics continue with the approved standard procedure rather than blocking
-
----
-
-### 4.2 Get Case Messages (if backend persists)
-`GET /api/cases/{caseId}/messages`
-
-Response (200):
-```json
-{
-  "messages": [
-    {
-      "messageId": "string",
-      "role": "technician" | "agent",
-      "language": "en" | "ru" | "es",
-      "content": "string",
-      "timestamp": "..."
-    }
-  ],
-  "state": { "mode": "diagnostic" | "authorization" | "final_report" }
-}
-```
-
----
-
-## 5) Speech-to-Text API (Optional MVP)
-
-### 5.1 Transcribe Audio
-`POST /api/stt/transcribe`
-
-Request: `multipart/form-data`
-- field `audio`: wav/m4a/mp3
-- field `languageHint` (optional): `en|ru|es`
-
-Response (200):
-```json
-{ "text": "string", "detectedLanguage": "en" | "ru" | "es" }
-```
-
-Boundary: audio is not stored.
-
----
-
-## 6) Health
-
-### 6.1 Health Check
-`GET /api/health`
-
-Response (200):
-```json
-{ "status": "ok", "version": "1.1" }
-```
-
----
-
-## 7) Rate Limiting (Recommended)
-- Limit by IP in MVP
-- Example: 60 requests/minute per IP
-- On limit exceeded: HTTP 429
-
----
-
-## 8) Security & Privacy Boundaries
-- No storing images/files/audio
-- Avoid PII in logs
-- Do not expose OpenAI/Stripe secrets to clients
