@@ -1,9 +1,9 @@
 # RV Service Desk
 ## ARCHITECTURE_RULES.md
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Status:** Enforced engineering rules (PR review gate)  
-**Last updated:** 2026-04-16
+**Last updated:** 2026-04-17
 
 ---
 
@@ -112,6 +112,8 @@ Server must **not**:
 - “repair” step logic via heuristics
 - allow uncontrolled semantic mode switching from vague meaning
 - default unresolved diagnostics into questionnaire-first report collection
+- treat questionnaire-first "confirm complaint / what was found / what repair was performed" as the unresolved-diagnostics fallback; this collection path is legal only when the case is already in a legally appropriate near-final / report-edit state
+- continue diagnostics in any way that contradicts the customer behavior spec's continue-diagnostics doctrine
 
 ---
 
@@ -141,7 +143,10 @@ A future `START FINAL REPORT` or authorization CTA/button is acceptable only if:
 - the control is server-owned,
 - legality/readiness gates are already satisfied server-side,
 - the CTA resolves to the same approved transition class as an explicit command/alias,
-- the client does not gain independent mode authority.
+- the client does not gain independent mode authority,
+- the CTA is not derived from LLM wording / model output alone.
+
+The final-output CTA/button must be server-owned and legality-gated. It must not be inferred from model wording, prompt phrasing, or client-side heuristics.
 
 ## Rule M1a — Natural report / authorization aliases are controlled, not open-ended
 
@@ -216,7 +221,19 @@ Gate satisfaction conditions are Context Engine-owned.
 If isolation is not complete:
 - continue diagnostics,
 - state that isolation is not complete when relevant,
-- do not switch the user into questionnaire-first report collection as a fallback.
+- do not switch the user into questionnaire-first report collection as a fallback,
+- do not ask "confirm complaint / what was found / what repair was performed" as a default unresolved path; this questionnaire-first collection is legal only when the case is already in a legally appropriate near-final / report-edit state,
+- align with the customer behavior spec: when the customer algorithm says continue diagnostics, the system continues diagnostics.
+
+## Rule G1b — Single authority preservation
+
+Diagnostic flow authority must remain singular. No hidden second brain in route handlers, extracted boundary modules, helpers, or prompt layer may override, shadow, or replicate the Context Engine's decisions about:
+- step selection,
+- branch switching,
+- completion,
+- isolation,
+- terminal state,
+- readiness / gate satisfaction.
 
 ---
 
