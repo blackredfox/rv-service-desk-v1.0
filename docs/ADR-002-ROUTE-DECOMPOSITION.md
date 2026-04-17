@@ -419,9 +419,11 @@ Until then, route decomposition is considered:
 
 ## Related Documents
 
-- `PROJECT_MEMORY_1_UPDATED.md`
-- `ROADMAP_UPDATED.md`
-- `README_UPDATED.md`
+- `docs/CUSTOMER_BEHAVIOR_SPEC.md` (canonical behavioral mirror)
+- `PROJECT_MEMORY.md`
+- `ROADMAP.md`
+- `README.md`
+- `ARCHITECTURE_RULES.md`
 - `RV_SWE_BENCHMARK_v1.md`
 - `route.ts-decomposition-plan.md`
 - current working plan / baseline verification notes

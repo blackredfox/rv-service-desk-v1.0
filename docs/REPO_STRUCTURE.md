@@ -188,7 +188,16 @@ Modes include:
 * authorization
 * final_report
 
-Mode transitions occur only through explicit technician commands.
+Mode transitions are server-owned. Approved trigger paths are:
+
+* explicit technician commands,
+* server-approved natural-language aliases (deterministic, allow-listed),
+* server-owned, legality-gated CTA/button controls that resolve to the
+  same approved transition class.
+
+LLM wording and client-side heuristics MUST NOT trigger mode transitions
+on their own. See `docs/CUSTOMER_BEHAVIOR_SPEC.md` and
+`ARCHITECTURE_RULES.md` for the authoritative doctrine.
 
 ---
 

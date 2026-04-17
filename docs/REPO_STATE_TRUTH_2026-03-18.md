@@ -1,11 +1,35 @@
 # RV Service Desk
 ## REPO_STATE_TRUTH_2026-03-18.md
 
-**Version:** 1.0  
-**Status:** Current-State Audit Memo  
-**Purpose:** Reconcile project documents with current observed repository/application reality before further architecture work.
+**Version:** 1.2  
+**Status:** Historical / Dated Current-State Audit Memo (descriptive only)  
+**Purpose:** Reconcile project documents with the repository/application reality observed on 2026-03-18.
 
-**Last updated:** 2026-03-18
+**Last updated:** 2026-03-18  
+**Reclassified:** descriptive-only memo (truth-hierarchy cleanup)
+
+> ### Status note
+>
+> This memo is a **dated, descriptive current-state audit** from 2026-03-18.
+> It is **not** a contract document and **not** active product, architecture,
+> or benchmark truth.
+>
+> For active truth, use:
+>
+> - `docs/CUSTOMER_BEHAVIOR_SPEC.md` (behavioral authority)
+> - `PROJECT_MEMORY.md` (active product memory)
+> - `ARCHITECTURE_RULES.md` and active ADRs (implementation invariants)
+> - `RV_SWE_BENCHMARK_v1.md` (behavioral validation law)
+> - `SOURCE_OF_TRUTH_RULES.md` (truth hierarchy / conflict resolution)
+> - `README.md`, `ROADMAP.md` for current external/planning narrative
+>
+> Where this memo refers to documents using older `_UPDATED` filenames
+> (e.g. `PROJECT_MEMORY_1_UPDATED.md`, `ROADMAP_UPDATED.md`,
+> `README_UPDATED.md`), those names are **historical**. The active docs
+> are now the un-suffixed filenames listed above.
+>
+> The historical observations below are preserved as repo-state history,
+> not as currently authoritative statements.
 
 ---
 
@@ -23,7 +47,7 @@ These sources are not fully aligned.
 This memo does **not** replace the historical baseline.
 It exists to:
 - identify the mismatches,
-- establish the current working truth,
+- establish the current working truth at that date,
 - prevent refactoring against stale assumptions.
 
 ---
@@ -38,7 +62,11 @@ This is a **repo-state truth / architecture-audit memo**, not:
 
 Its purpose is narrow:
 
-> say what is currently true, what is stale, and what must be treated as authoritative going forward.
+> say what was currently true on 2026-03-18, what was stale at that time,
+> and how to avoid refactoring against false assumptions.
+
+This memo does **not** define the active repository truth hierarchy.
+That hierarchy is defined by `SOURCE_OF_TRUTH_RULES.md`.
 
 ---
 
@@ -59,11 +87,20 @@ It should be preserved as history, not overwritten.
 `ADR-002-ROUTE-DECOMPOSITION.md` is now the active architecture decision record for safe route decomposition.
 
 ### 3.3 Project memory / roadmap / benchmark
-The following are now active contract documents:
-- `PROJECT_MEMORY_1_UPDATED.md`
-- `ROADMAP_UPDATED.md`
-- `README_UPDATED.md`
+At the time of this 2026-03-18 audit, the contract documents being
+treated as active were referenced under their then-current `_UPDATED`
+filenames.
+
+The active contract/supporting documents are now (post-cleanup):
+- `docs/CUSTOMER_BEHAVIOR_SPEC.md`
+- `PROJECT_MEMORY.md`
+- `ARCHITECTURE_RULES.md`
 - `RV_SWE_BENCHMARK_v1.md`
+- `ROADMAP.md`
+- `README.md`
+
+This section is informational only.  
+It does **not** define precedence. Precedence lives in `SOURCE_OF_TRUTH_RULES.md`.
 
 ---
 
@@ -96,8 +133,8 @@ Therefore:
 - route decomposition is **not complete**,
 - and any document claiming the boundary target is already achieved is stale.
 
-### 4.3 Current architecture truth
-The current architecture truth is:
+### 4.3 Current architecture truth observed at that time
+The current architecture reality observed on 2026-03-18 was:
 
 - **Context Engine is the single flow authority**
 - `route.ts` is still oversized
@@ -108,6 +145,9 @@ The current architecture truth is:
 - signal-aware branch semantics are recognized as needed architecture evolution
 - benchmark-first validation is now part of the active plan
 
+This list is descriptive of the observed state and planning interpretation at that time.
+It is not a substitute for active contract truth.
+
 ---
 
 ## 5) Document Alignment Findings
@@ -117,17 +157,17 @@ The current architecture truth is:
 
 ### Finding B — Prior ADR wording was too optimistic
 Earlier ADR wording implied that route decomposition was already implemented.
-That is no longer acceptable as the active truth statement.
+That was no longer acceptable as the active truth statement.
 
-The updated ADR-002 corrects this.
+The updated ADR-002 corrected this.
 
 ### Finding C — route.ts still exceeds target role
-The route file still acts as more than a transport/controller boundary.
+The route file still acted as more than a transport/controller boundary.
 
-This is the central current-state truth relevant to future refactor work.
+This was the central current-state truth relevant to future refactor work.
 
-### Finding D — Benchmark and behavioral contracts now define more of the system than baseline did
-As of 2026-03-18, system truth now explicitly includes:
+### Finding D — Benchmark and behavioral contracts defined more of the system than baseline did
+As of 2026-03-18, system truth already explicitly included:
 - signal override,
 - branch priority,
 - report suggestion without auto-switch,
@@ -136,68 +176,75 @@ As of 2026-03-18, system truth now explicitly includes:
 - language consistency as a critical contract,
 - state/memory-loss failures as benchmarked defects.
 
-These are newer than the baseline snapshot and must be treated as active truth.
+These were newer than the baseline snapshot and had to be treated as active contract direction at that time.
 
 ---
 
-## 6) What Is Authoritative Now
+## 6) Active contract documents referenced by this memo
 
-For current work, the following order of truth applies:
+> This section is a reference map only.
+> It does **not** define hierarchy or precedence.
+> The enforced order of truth lives in `SOURCE_OF_TRUTH_RULES.md`.
 
-### 6.1 Product / behavior truth
-`PROJECT_MEMORY_1_UPDATED.md`
+For current work, the active documents referenced by this memo are:
 
-### 6.2 Planning truth
-`ROADMAP_UPDATED.md`
+### Behavioral authority
+`docs/CUSTOMER_BEHAVIOR_SPEC.md`
 
-### 6.3 External-facing product description
-`README_UPDATED.md`
+### Product memory
+`PROJECT_MEMORY.md`
 
-### 6.4 Evaluation truth
+### Architecture invariants
+`ARCHITECTURE_RULES.md` and active ADRs
+
+### Behavioral validation law
 `RV_SWE_BENCHMARK_v1.md`
 
-### 6.5 Route decomposition architecture truth
-`ADR-002-ROUTE-DECOMPOSITION.md`
+### Planning narrative
+`ROADMAP.md`
 
-### 6.6 Historical snapshot only
+### External-facing product description
+`README.md`
+
+### Historical snapshot only
 `BASELINE_BEHAVIOR_2026-03-16.md`
 
 Important:
-The baseline remains useful for comparison, but it is **not** the active truth source for current architecture decisions.
+The baseline remains useful for comparison, but it is **not** an active truth source for current architecture decisions.
 
 ---
 
-## 7) Route.ts Truth Statement (Current)
+## 7) Route.ts Truth Statement (Current at that time)
 
-Current truth statement for `route.ts`:
+Current truth statement for `route.ts` on 2026-03-18:
 
-- It is still a mixed boundary/orchestration file.
-- It is not yet a thin controller.
-- It still includes too much application orchestration.
-- This is acceptable only temporarily.
-- Future decomposition must preserve single-flow authority.
-- No extraction may introduce hidden diagnostic logic outside Context Engine.
+- It was still a mixed boundary/orchestration file.
+- It was not yet a thin controller.
+- It still included too much application orchestration.
+- This was acceptable only temporarily.
+- Future decomposition had to preserve single-flow authority.
+- No extraction could introduce hidden diagnostic logic outside Context Engine.
 
-This statement supersedes any informal assumption that route decomposition is already done.
+This statement superseded any informal assumption that route decomposition was already done.
 
 ---
 
 ## 8) Truth Statement on Decomposition
 
-Safe decomposition is currently:
+Safe decomposition was, at that time:
 
 > **planned, partially prepared, not complete**
 
-That means:
-- decomposition may proceed,
+That meant:
+- decomposition could proceed,
 - but only after contract alignment and benchmark alignment,
 - and only under the updated ADR-002 constraints.
 
-This document explicitly rejects the interpretation:
+This document explicitly rejected the interpretation:
 
 > “helpers were extracted, therefore route decomposition is complete.”
 
-That interpretation is false for current planning purposes.
+That interpretation was false for planning purposes.
 
 ---
 
@@ -245,7 +292,8 @@ Use this document when:
 Do **not** use this document as:
 - a benchmark,
 - a release note,
-- a substitute for baseline history.
+- a substitute for baseline history,
+- a replacement for `SOURCE_OF_TRUTH_RULES.md`.
 
 ---
 
@@ -270,18 +318,19 @@ The project currently has a legitimate distinction between:
 
 - **historical baseline truth**
 - and
-- **current working architecture truth**
+- **current working architecture truth observed at a given date**
 
 The correct action is:
 - preserve the baseline,
-- use updated ADR + current contract docs for active decisions,
-- use this memo as the reconciliation layer.
+- use active contract docs for active decisions,
+- use this memo as a reconciliation layer for the dated 2026-03-18 state,
+- and use `SOURCE_OF_TRUTH_RULES.md` for truth precedence.
 
-Current active conclusion:
+Current active conclusion of this historical memo:
 
-> `route.ts` is not yet boundary-only.  
-> Safe decomposition remains planned work.  
-> Single-flow authority must remain in Context Engine.  
+> `route.ts` was not yet boundary-only.  
+> Safe decomposition remained planned work.  
+> Single-flow authority had to remain in Context Engine.  
 > Historical baseline must not be mistaken for current architecture truth.
 
 ---

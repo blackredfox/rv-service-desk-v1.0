@@ -65,9 +65,17 @@ Modes include:
 - authorization
 - final_report
 
-Mode transitions occur only through explicit commands or approved natural-language aliases.
+Mode transitions are server-owned. Approved trigger paths are:
+- explicit technician commands,
+- server-approved natural-language aliases (deterministic, allow-listed),
+- server-owned, legality-gated CTA/button controls that resolve to the
+  same approved transition class.
 
-The server must not perform uncontrolled semantic switching.
+The server must not perform uncontrolled semantic switching, must not
+infer mode transitions from LLM wording, and must not default
+unresolved diagnostics into a questionnaire-first report-collection
+flow. See `docs/CUSTOMER_BEHAVIOR_SPEC.md` and `ARCHITECTURE_RULES.md`
+for the authoritative doctrine.
 
 ---
 
@@ -169,6 +177,13 @@ The response is stored in:
 - message history
 
 The chat UI displays the assistant response.
+
+Output surfaces (`authorization_ready`, `portal_cause`, `shop_final_report`)
+remain distinct and are never collapsed into a single generic "report"
+behavior. Final output on any surface is legal only after the relevant
+readiness gate is satisfied server-side; readiness is never inferred
+from LLM wording. See `docs/CUSTOMER_BEHAVIOR_SPEC.md` for the
+authoritative output-surface doctrine.
 
 ---
 

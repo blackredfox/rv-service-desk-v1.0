@@ -338,7 +338,17 @@ forbiddenBeforeIsolation: [
 1. These outputs are blocked at the **Context Engine** level
 2. LLM prompts include explicit prohibition
 3. If LLM violates, output is rejected and regenerated
-4. Only explicit technician command can override (e.g., "START FINAL REPORT")
+4. The block may only be released through a server-owned, legality-gated
+   transition. Approved trigger paths include:
+   - explicit technician commands (e.g., `START FINAL REPORT`),
+   - server-approved natural-language aliases that deterministically
+     normalize to an approved trigger class,
+   - server-owned, legality-gated CTA/button controls that resolve to
+     the same approved transition class.
+   In all cases the relevant readiness/legality gate must be satisfied
+   server-side. LLM wording or client-side heuristics MUST NOT release
+   the block on their own. See `docs/CUSTOMER_BEHAVIOR_SPEC.md` and
+   `ARCHITECTURE_RULES.md` (Rules M1, M1a, M1b).
 
 ---
 

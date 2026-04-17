@@ -2,7 +2,48 @@
 
 **Date:** 2026-01-XX  
 **Task:** P1 — Engine Execution Authority  
-**Status:** COMPLETE
+**Status:** Historical / Superseded — implementation memo, NOT current architecture authority
+
+---
+
+> ## ⚠️ Status warning (truth-hierarchy cleanup)
+>
+> This document is preserved as a **historical implementation memo** for
+> the original P1 "engine execution authority" pass. It is **not** the
+> current architecture law for engine execution authority, validation
+> ownership, fallback ownership, or runtime enforcement structure.
+>
+> Current authoritative doctrine:
+>
+> - Behavioral authority: `docs/CUSTOMER_BEHAVIOR_SPEC.md`
+> - Product memory: `PROJECT_MEMORY.md`
+> - Architecture invariants: `ARCHITECTURE_RULES.md`
+>   (Rules A1, B1, B2, B3, G1, G1a, G1b, M1, M1b, O0, O3, P1)
+> - Single authority: **the Context Engine is the only authority for
+>   diagnostic flow.** Validation, fallback, and CTA legality are
+>   server-owned per current architecture rules; they do not migrate
+>   diagnostic-flow authority away from the Context Engine.
+>
+> Specifically, the file/line references, code snippets, and "before /
+> after" pipelines in this memo describe a snapshot of the runtime at
+> the time of the original fix. They MUST NOT be read as:
+>
+> - the current authoritative description of `route.ts` responsibilities,
+> - the current authoritative description of where loop recovery,
+>   compliance validation, contextual completion, or authoritative
+>   fallback logic lives,
+> - a pattern requiring route handlers, helpers, or registry modules to
+>   own diagnostic step authority.
+>
+> The behavioral intent of this memo — that the Context Engine's
+> `activeStepId` is authoritative and that the LLM may not silently
+> ignore or substitute steps — remains aligned with current doctrine.
+> The **ownership and runtime layout** description below is historical.
+>
+> For any new work that touches engine execution, validation, or
+> fallback ownership, design against the current `ARCHITECTURE_RULES.md`
+> and the customer behavior spec, not against the route-centric layout
+> described in this file.
 
 ---
 
