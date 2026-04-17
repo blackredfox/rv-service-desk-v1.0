@@ -1,7 +1,7 @@
 # SOURCE_OF_TRUTH_RULES.md
 
 ## RV Service Desk
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** ENFORCED (PR review required)  
 **Purpose:** Eliminate ambiguity in project truth sources and prevent architectural drift.
 
@@ -10,6 +10,7 @@
 # 1) Why This Exists
 
 The project accumulated multiple overlapping “truth sources”:
+- customer-behavior mirror,
 - product memory,
 - ADRs,
 - runtime descriptions,
@@ -172,9 +173,9 @@ If duplication exists:
 No document may silently act as truth.
 
 Every document must clearly be:
-- authoritative (L1–L3)
-- descriptive (L4)
-- or historical (L5)
+- authoritative (`L1–L4`)
+- descriptive (`L5`)
+- or historical (`L6`)
 
 ---
 
@@ -183,11 +184,11 @@ Runtime code (e.g. `route.ts`) is:
 
 > implementation, not authority
 
-If code conflicts with L1–L3:
+If code conflicts with L1–L4:
 → code is wrong, not the contract
 
 Exception:
-- must be documented in L4 (REPO_STATE_TRUTH)
+- current implementation gaps or contradictions must be documented in L5 (`REPO_STATE_TRUTH_YYYY-MM-DD.md`)
 
 ---
 
@@ -248,16 +249,12 @@ The repository must satisfy:
   active docs. Supporting documents must reference the active filenames
   (`PROJECT_MEMORY.md`, `ROADMAP.md`, `README.md`) instead.
 
----
-
-### 2. Baseline
+### 3. Baseline
 - KEEP as historical
 - CLEARLY mark as:
   > ARCHIVED — NOT CURRENT TRUTH
 
----
-
-### 3. Runtime / README docs
+### 4. Runtime / README docs
 Must be one of:
 
 - updated to match current reality  
