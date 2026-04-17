@@ -1,9 +1,11 @@
 # RV Service Desk
 ## ROADMAP
 
-**Version:** 1.3  
-**Last updated:** 2026-04-06  
+**Version:** 1.4  
+**Last updated:** 2026-04-17  
 **Status:** Active Execution Plan
+
+**Canonical behavioral reference:** `docs/CUSTOMER_BEHAVIOR_SPEC.md`. Roadmap priorities must align to that spec.
 
 ---
 
@@ -513,6 +515,34 @@ Web version:
 4. Implement stronger step-guidance locate/identify behavior
 5. Add dirty-input normalization
 6. Only then continue major route.ts decomposition
+
+---
+
+# 7. Next-Priority Regression Targets (Customer-Fidelity Alignment)
+
+These are the regression targets queued directly behind the current customer-fidelity alignment pass. They are doctrine-driven and must be represented in the benchmark before the corresponding runtime fixes land.
+
+### 7.1 False final-output invitation before isolation / readiness
+- Reject any system behavior that invites the technician to start a final report, authorization, or portal-cause output before the relevant readiness gate is satisfied.
+- Covers both explicit invitations and implicit "it looks like we can write the report" drift.
+
+### 7.2 Subtype gating fidelity
+- Ensure procedure selection honors equipment subtype.
+- Example: a non-combo unit must not trigger combo-only diagnostic steps.
+- Regression cases must cover equipment-subtype mismatch against procedure selection.
+
+### 7.3 Eliminate questionnaire-first unresolved report flow
+- Unresolved diagnostics must never fall back into "confirm complaint / what was found / what repair was performed" collection as the default path.
+- This collection mode is legal only in a legally appropriate near-final / report-edit state.
+- Regression cases must prove continued diagnostics instead of questionnaire-first collection.
+
+### 7.4 Server-owned, legality-gated final-report CTA / button
+- A future `START FINAL REPORT` CTA/button is allowed only if server-owned and legality-gated.
+- Regression cases must prove:
+  - the CTA is not emitted when gates are unsatisfied,
+  - the CTA is not inferred from LLM wording alone,
+  - the CTA resolves to the same approved transition class as an explicit command/alias,
+  - the client does not gain independent mode authority.
 
 ---
 

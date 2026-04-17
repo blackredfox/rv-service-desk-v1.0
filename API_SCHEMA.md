@@ -1,10 +1,17 @@
 # RV Service Desk
 ## API_SCHEMA.md
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Scope:** MVP API schema for a web-based RV Service Desk (case-based chat, session-only artifacts, explicit mode commands, language enforcement).
 
 **Canonical behavior source:** the customer-approved behavioral algorithm, normalized in `docs/CUSTOMER_BEHAVIOR_SPEC.md`. If schema wording and customer behavior doctrine diverge, the customer behavior doctrine wins and the schema must be reconciled.
+
+**Conceptual output-surface distinction is part of the API model:**
+- `authorization_ready`
+- `portal_cause`
+- `shop_final_report`
+
+These surfaces must remain distinct in both documentation and runtime. Their legality is runtime-owned and depends on readiness; it is not derived from model wording.
 
 **Principles:**
 - Text-first MVP.
@@ -180,9 +187,10 @@ Purpose:
 - return agent response + current state
 
 Behavioral notes:
-- Authorization-ready output, Portal-Cause output, and Shop Final Report are distinct response surfaces.
+- Authorization-ready output, Portal-Cause output, and Shop Final Report are distinct response surfaces (`authorization_ready`, `portal_cause`, `shop_final_report`). They must not be collapsed.
+- Final surface legality depends on readiness. A final surface is emitted only after the relevant runtime gate is satisfied.
 - If isolation is not complete, the response must remain diagnostic and continue diagnostics.
-- Unresolved diagnostics must not be converted into questionnaire-first report collection.
+- Unresolved diagnostics must not be converted into questionnaire-first report-field collection. Questionnaire-first "confirm complaint / what was found / what repair was performed" is not the default unresolved path; it is valid only when the case is already in a legally appropriate near-final / report-edit state.
 
 Request:
 ```json
@@ -241,7 +249,7 @@ Mode transition rules (server-side):
   - RU: ЗАПРОС АВТОРИЗАЦИИ, АВТОРИЗАЦИЯ, ПРЕАВТОРИЗАЦИЯ
   - ES: SOLICITAR AUTORIZACIÓN, AUTORIZACIÓN, PREAUTORIZACIÓN
 - Otherwise keep current mode.
-- A future `START FINAL REPORT` button/CTA is acceptable only as a server-owned, legality-gated UX trigger that resolves to the same approved transition class.
+- A future `START FINAL REPORT` button/CTA is acceptable API direction only as a server-owned, legality-gated UX trigger that resolves to the same approved transition class. CTA metadata in API responses is permitted, but mode/transition authority must remain runtime-owned and legality-gated; it must not be inferred from LLM wording alone.
 
 Hard boundaries:
 - server must never infer mode transitions from meaning

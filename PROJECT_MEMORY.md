@@ -1,11 +1,13 @@
 # RV Service Desk
 ## PROJECT_MEMORY.md
 
-**Version:** 1.4  
+**Version:** 1.5  
 **Status:** Official Project Memory (Product + Technical)  
 **Purpose:** Single source of truth to restore project context, architectural decisions, technical boundaries, and non-goals.
 
-**Last updated:** 2026-04-16
+**Last updated:** 2026-04-17
+
+**Canonical behavioral reference:** the customer-approved behavioral algorithm, normalized in `docs/CUSTOMER_BEHAVIOR_SPEC.md`. The customer prompt is the **practical behavioral algorithm reference** for diagnostic flow. Where this document and the customer behavior spec diverge, the customer behavior spec wins and this document must be reconciled to it.
 
 ---
 
@@ -286,8 +288,11 @@ C) technician explicitly requests preliminary authorization based on partial iso
 ### 9.3 Diagnostic Completeness Gate (critical)
 When in Guided Diagnostics or Diagnostic Form behavior:
 - MUST NOT generate Portal-Cause unless A/B/C is met.
+- MUST NOT recommend replacement or estimate labor unless the relevant gate is satisfied.
 - If not met: continue diagnostics and state isolation is not complete.
 - Do **not** default unresolved diagnostics into questionnaire-first report collection.
+- Questionnaire-first "confirm complaint / what was found / what repair was performed" collection is NOT the default unresolved path. It is allowed only when the case is already in a legally appropriate near-final / report-edit state.
+- Final output on any surface (authorization_ready / portal_cause / shop_final_report) is legal ONLY after the relevant readiness gate is satisfied.
 
 ### 9.4 Post-repair guardrail (critical)
 If a previously authorized repair did NOT restore operation:
@@ -510,11 +515,20 @@ Post-completion questioning is a contract breach when:
 ## 11) Prompt Architecture & Version Truth
 
 ### 11.1 Customer prompt (source of truth)
-The customer-approved prompt is the canonical behavioral algorithm.
+The customer-approved prompt is the canonical behavioral algorithm and the **practical behavioral reference** for diagnostic flow.
 
 `docs/CUSTOMER_BEHAVIOR_SPEC.md` is the normalized internal documentation mirror for that algorithm.
 
 If any internal product/runtime document conflicts with the customer behavior spec, the customer behavior spec wins and the internal docs must be reconciled to it.
+
+Doctrine consequences that must remain visible across internal docs:
+- equipment identification first,
+- manufacturer-consistent diagnostic path when manufacturer/model is known,
+- one diagnostic question at a time,
+- continue diagnostics when isolation is incomplete (do not substitute with questionnaire-first report collection),
+- do not generate Cause, recommend replacement, or estimate labor before the allowed gate,
+- final output must follow the legal output surface only after readiness is satisfied,
+- `START FINAL REPORT` text command may remain a current trigger; a future server-owned, legality-gated CTA/button for final report launch is acceptable product direction only if it is not inferred from LLM wording alone.
 
 ### 11.2 System prompt (production)
 Production system prompt is a structured normalization of the customer behavior contract.

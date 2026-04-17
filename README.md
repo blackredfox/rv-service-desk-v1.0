@@ -4,6 +4,8 @@
 
 RV Service Desk is an AI-powered assistant designed to help RV technicians perform structured diagnostics and generate approval-safe documentation for warranty, insurance, and customer-pay repairs.
 
+> Behavioral reference: the customer-approved behavioral algorithm, mirrored internally in `docs/CUSTOMER_BEHAVIOR_SPEC.md`. Product behavior below aligns to that spec.
+
 ---
 
 # 1. What This Product Is (And Is Not)
@@ -135,7 +137,10 @@ Instead, it:
 
 If isolation is not complete:
 - diagnostics continue,
-- the system does NOT fall back into questionnaire-first report collection.
+- the system does NOT fall back into questionnaire-first report collection,
+- questionnaire-first "confirm complaint / what was found / what repair was performed" is not the default unresolved path; it is allowed only when the case is already in a legally appropriate near-final / report-edit state.
+
+Final output (authorization-ready, portal cause, or shop final report) is only emitted after the relevant readiness gate is satisfied. A future server-owned, legality-gated final-report CTA/button is acceptable product direction, but it must not be inferred from model wording alone.
 
 ---
 
