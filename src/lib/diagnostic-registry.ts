@@ -107,6 +107,42 @@ const GAS_ONLY_EXCLUSION_PATTERNS = [
 ];
 
 /**
+ * Fuel-mention patterns used for implicit subtype identification on wh_1.
+ * Matches a standalone gas/LP/propane mention within a larger identification
+ * message (e.g. "Suburban SW10GE, gas" or "gas water heater, Atwood").
+ *
+ * These are ONLY consulted on wh_1 identification and ONLY as a supplement
+ * to the authoritative combo / combination / electric-only signal gates.
+ */
+const IMPLICIT_GAS_MENTION_PATTERNS = [
+  /\b(?:gas|lp|propane)\b/i,
+  /газ/i,
+  /пропан/i,
+  /\bgas(?:olina|\s*natural|-natural)?\b/i,
+];
+
+/**
+ * Combo / combination / both / electric signals that MUST suppress an
+ * implicit gas-only inference on wh_1. If the technician mentions any
+ * of these, we cannot assume the unit is gas-only.
+ */
+const COMBO_OR_ELECTRIC_MENTION_PATTERNS = [
+  /\bcombo\b/i,
+  /\bcombination\b/i,
+  /\bboth\b/i,
+  /\belectric\b/i,
+  /\belement\b/i,
+  /комби/i,
+  /комбо/i,
+  /комбинир/i,
+  /электр/i,
+  /\bтэн\b/i,
+  /combinad/i,
+  /eléctric/i,
+  /electric/i,
+];
+
+/**
  * Explicit non-combo assertions — fire on ANY step, not just wh_1.
  * Covers English, Russian (Cyrillic "комби/комбо/COMBO" forms including mixed-script),
  * and Spanish. Authoritative: technician is explicitly ruling combo out.
@@ -136,6 +172,26 @@ export function detectSubtypeExclusions(stepId: string, message: string): string
   // Broad subtype inference — only on wh_1 (type identification)
   if (stepId === "wh_1") {
     if (GAS_ONLY_EXCLUSION_PATTERNS.some((p) => p.test(message))) {
+      if (!exclusions.includes("combo")) exclusions.push("combo");
+    }
+
+    // Implicit gas-only identification on wh_1.
+    //
+    // If the technician's wh_1 answer mentions gas/LP/propane (e.g.
+    // "Suburban SW10GE, gas" or "Atwood gas water heater") WITHOUT any
+    // combo / combination / both / electric signal, the unit is
+    // identified as gas-only for subtype-gating purposes. This prevents
+    // combo-only steps (currently wh_11) from leaking into a gas-only
+    // unit's diagnostic path.
+    //
+    // The authoritative Context Engine step state is unchanged —
+    // this only supplies the registry with the subtype exclusion that
+    // step-resolution already consumes.
+    const mentionsGas = IMPLICIT_GAS_MENTION_PATTERNS.some((p) => p.test(message));
+    const mentionsComboOrElectric = COMBO_OR_ELECTRIC_MENTION_PATTERNS.some((p) =>
+      p.test(message),
+    );
+    if (mentionsGas && !mentionsComboOrElectric) {
       if (!exclusions.includes("combo")) exclusions.push("combo");
     }
 

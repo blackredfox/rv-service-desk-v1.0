@@ -60,25 +60,6 @@ vi.mock("@/lib/context-engine", () => ({
   DEFAULT_CONFIG: {},
 }));
 
-const FINAL_REPORT_TEXT = `Complaint: Bedroom slide wall leak.
-Diagnostic Procedure: Reviewed technician repair summary and verified completed corrective action.
-Verified Condition: Vertical trim was re-secured and water leak path was sealed.
-Recommended Corrective Action: Document completed repair and warranty claim details.
-Estimated Labor: Repair summary review and report preparation - 0.5 hr. Total labor: 0.5 hr.
-Required Parts: Screws and sealant as used.`;
-
-const FINAL_REPORT_TEXT_RU = `${FINAL_REPORT_TEXT}
-
---- TRANSLATION ---
-
-Жалоба: течь воды в стенке слайда спальни. Диагностика выполнена по сводке техника. Состояние после ремонта подтверждено.`;
-
-const FINAL_REPORT_TEXT_ES = `${FINAL_REPORT_TEXT}
-
---- TRANSLATION ---
-
-Queja: filtración de agua en la pared del slide del dormitorio. El diagnóstico se revisó con base en el resumen del técnico. La condición reparada quedó verificada.`;
-
 describe("Dirty-input report routing", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -140,14 +121,27 @@ describe("Dirty-input report routing", () => {
     });
   });
 
-  it("generates a report immediately for EN complaint + findings + repair summary at the beginning", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
-      }),
-    });
-
+  // Doctrine update (runtime customer-fidelity regression fix):
+  //
+  // The previous tests here asserted that a first-message "complaint +
+  // findings + corrective-action + write-report" shape must immediately
+  // transition the case into final_report and emit a generated report.
+  //
+  // That behavior relied on `repairSummaryIntent.readyForReportRouting`
+  // (a wording-based heuristic) to unlock final-report availability
+  // before the Context Engine confirmed isolation / terminal readiness.
+  // Per CUSTOMER_BEHAVIOR_SPEC §5–§6 and ROADMAP §7.1 / §7.4, final-output
+  // legality is runtime-owned and MUST NOT be inferred from message
+  // wording alone (LLM or technician). The gate is the Context Engine's
+  // isolationComplete / terminal phase — nothing else.
+  //
+  // The replacement tests below assert the doctrine-aligned outcome
+  // for exactly the same inputs:
+  //   - NO mode transition to final_report,
+  //   - NO LLM fetch for report generation,
+  //   - system remains in diagnostic mode,
+  //   - diagnostics-not-ready deterministic response is emitted.
+  it("does NOT transition to final_report for EN complaint + findings + repair summary at the beginning (runtime readiness not satisfied)", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "Complaint: bedroom slide outside left side wall black metal vertical piece not attached and water leaking into the RV.",
@@ -164,16 +158,21 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockInitializeCase).not.toHaveBeenCalled();
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
-    expect(streamText).toContain("Complaint:");
-    expect(streamText).not.toContain("converter");
+    // No wording-inferred mode transition.
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith(
+      "case_dirty_1",
+      { mode: "final_report" },
+    );
+    // No LLM call for final-report generation.
+    expect(mockFetch).not.toHaveBeenCalled();
+    // Emits the diagnostic stream envelope, not the final_report mode event.
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
+    // Deterministic diagnostics-not-ready response (EN).
+    expect(streamText).toContain("Diagnostics are not yet complete");
   });
 
-  it("generates a report immediately for RU natural report intent when enough data already exists", async () => {
+  it("does NOT transition to final_report for RU natural report intent before runtime readiness", async () => {
     mockStorage.ensureCase.mockResolvedValueOnce({
       id: "case_dirty_1",
       title: "Dirty Input Case",
@@ -183,12 +182,6 @@ describe("Dirty-input report routing", () => {
       mode: "diagnostic",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT_RU } }],
-      }),
     });
 
     const { POST } = await import("@/app/api/chat/route");
@@ -207,15 +200,18 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockInitializeCase).not.toHaveBeenCalled();
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
-    expect(streamText).not.toContain("START FINAL REPORT");
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith(
+      "case_dirty_1",
+      { mode: "final_report" },
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
+    // Deterministic diagnostics-not-ready response (RU).
+    expect(streamText).toContain("Диагностика ещё не завершена");
   });
 
-  it("generates a report immediately for ES natural report intent when enough data already exists", async () => {
+  it("does NOT transition to final_report for ES natural report intent before runtime readiness", async () => {
     mockStorage.ensureCase.mockResolvedValueOnce({
       id: "case_dirty_1",
       title: "Dirty Input Case",
@@ -225,12 +221,6 @@ describe("Dirty-input report routing", () => {
       mode: "diagnostic",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT_ES } }],
-      }),
     });
 
     const { POST } = await import("@/app/api/chat/route");
@@ -249,21 +239,18 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockInitializeCase).not.toHaveBeenCalled();
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith(
+      "case_dirty_1",
+      { mode: "final_report" },
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
+    // Deterministic diagnostics-not-ready response (ES).
+    expect(streamText).toContain("El diagnóstico aún no está completo");
   });
 
-  it("handles mixed-language typo-heavy report requests when intent is still clear", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT_RU } }],
-      }),
-    });
-
+  it("does NOT transition to final_report for mixed-language typo-heavy report request before runtime readiness", async () => {
     const { POST } = await import("@/app/api/chat/route");
     const message = [
       "bedrom slied ouside left wall blak metal vertical peice not atached, water leeking into rv.",
@@ -280,11 +267,13 @@ describe("Dirty-input report routing", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_dirty_1", { mode: "final_report" });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockInitializeCase).not.toHaveBeenCalled();
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith(
+      "case_dirty_1",
+      { mode: "final_report" },
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
   });
 
   it("does not ask the technician to re-author complaint/findings/repair when dirty input summary is incomplete", async () => {
