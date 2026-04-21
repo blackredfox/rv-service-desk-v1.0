@@ -430,7 +430,21 @@ export async function POST(req: Request) {
   const requestedReportKind = reportRevisionIntent.reportKind ?? approvedFinalReportIntent.reportKind;
   const requestedOutputSurface =
     reportRevisionIntent.requestedSurface ?? approvedFinalReportIntent.requestedSurface;
-  const readyForImmediateReport = runtimeReportReady || repairSummaryIntent.readyForReportRouting;
+  // Final-output availability is RUNTIME-OWNED and gated on the Context Engine's
+  // isolation / terminal state. It MUST NOT be inferred from technician-wording
+  // heuristics (complaint + findings + corrective-action regex signals). Allowing
+  // wording-based readiness here would create a hidden second flow authority
+  // outside the Context Engine, violate ARCHITECTURE_RULES A1 / G1b, and permit
+  // the report surface to open before the doctrine-required readiness gate is
+  // satisfied. See CUSTOMER_BEHAVIOR_SPEC §6 and ROADMAP §7.1 / §7.4.
+  //
+  // `repairSummaryIntent` is retained as an assessment object for observability
+  // and for tests, but it is NOT consulted as a final-output gate.
+  const readyForImmediateReport = runtimeReportReady;
+  // Explicit non-use marker for repairSummaryIntent — kept available for
+  // observability (and for existing unit tests that import the assessor),
+  // but deliberately NOT consulted in the readiness gate above.
+  void repairSummaryIntent;
   // NOTE: We never ask the technician to author complaint/findings/performed
   // repair as the default path. When a report request arrives, either the
   // assistant assembles the draft from the transcript (ready case), or we

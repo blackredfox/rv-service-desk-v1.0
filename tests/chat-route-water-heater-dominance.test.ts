@@ -277,12 +277,22 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
   });
 
-  it("overrides unfinished wh_5a branch flow for typo-heavy RU repair summary + natural warranty-report request", async () => {
+  it("does NOT override unfinished wh_5a branch flow for typo-heavy RU repair summary + natural warranty-report request (runtime readiness not satisfied)", async () => {
+    // Doctrine update (runtime customer-fidelity regression fix):
+    // A natural warranty-report request combined with a technician-worded
+    // repair summary MUST NOT override the Context Engine's state and
+    // collapse an unfinished branch flow into final_report. Only the
+    // Context Engine's restoration / terminal detection is allowed to
+    // unlock final-output availability (see CUSTOMER_BEHAVIOR_SPEC §5–§6,
+    // ARCHITECTURE_RULES A1 / G1b, ROADMAP §7.1 / §7.4).
+    //
+    // The typo-heavy message here ("поменял предохранитель") deliberately
+    // does NOT match the engine's restoration patterns, so the engine
+    // correctly stays on wh_5a. The route must respect that — defer the
+    // report request and continue diagnostics.
     const caseId = "route_wh5_report_ru_typo";
     await advanceToWh5(caseId);
     await postChat(caseId, "нет");
-
-    fetchMock.mockImplementationOnce(async () => buildMockFetchResponse("Complaint: Heater inoperative.\nDiagnostic Procedure: Verified failed fuse and completed repair summary.\nVerified Condition: Water heater operates normally after fuse replacement.\nRecommended Corrective Action: Replace the failed fuse and verify normal operation.\nEstimated Labor: Fuse replacement and functional test - 0.4 hr. Total labor: 0.4 hr.\nRequired Parts: Fuse."));
 
     const reportTurn = await postChat(
       caseId,
@@ -291,13 +301,23 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     const { getOrCreateContext } = await import("@/lib/context-engine");
 
-    expect(storageMocks.updateCase).toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    expect(reportTurn.fetchTriggered).toBe(true);
-    expect(reportTurn.streamText).toContain('"type":"mode","mode":"final_report"');
-    expect(reportTurn.streamText).toContain("Complaint:");
-    expect(reportTurn.streamText).not.toContain("wh_5b");
-    expect(reportTurn.streamText).not.toContain("wh_5c");
-    expect(getOrCreateContext(caseId).activeStepId).toBe("wh_5a");
+    // No wording-inferred mode transition.
+    expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
+    // No LLM call for report generation.
+    expect(reportTurn.fetchTriggered).toBe(false);
+    // Case remains in diagnostic mode for SSE envelope.
+    expect(reportTurn.streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(reportTurn.streamText).not.toContain('"type":"mode","mode":"final_report"');
+    // Deterministic RU diagnostics-not-ready deferral — NOT a questionnaire.
+    expect(reportTurn.streamText).toContain("Диагностика ещё не завершена");
+    // Context Engine retains authority — the branch is still active.
+    // The specific next step within the branch (e.g. wh_5a → wh_5b) is
+    // owned by the engine; what matters for doctrine is that we remain
+    // inside the no_12v_supply branch and did NOT collapse the case.
+    const ctxAfter = getOrCreateContext(caseId);
+    expect(ctxAfter.activeStepId).toMatch(/^wh_5[a-z]?$/);
+    expect(ctxAfter.isolationComplete).toBe(false);
+    expect(ctxAfter.terminalState?.phase).toBe("normal");
   });
 
   it("overrides unfinished wh_5a branch flow for EN repair summary + natural warranty-report request", async () => {

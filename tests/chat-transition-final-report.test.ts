@@ -334,17 +334,19 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     expect(streamText).toContain("Diagnostics are not yet complete");
   });
 
-  it("uses the report path mid-flow when history + current repair summary make the case ready", async () => {
+  it("does NOT use the report path mid-flow when history + current repair summary are only wording-inferred (runtime readiness not satisfied)", async () => {
+    // Doctrine update (runtime customer-fidelity regression fix):
+    // A mid-flow report request combined with complaint/findings/repair
+    // wording in history and the current message MUST NOT unlock the
+    // final_report path unless the Context Engine has confirmed readiness
+    // (isolationComplete / terminal). Prior behavior used the
+    // repairSummaryIntent heuristic to transition mode based on wording
+    // alone — that is a hidden second flow authority and is now rejected.
+    // See CUSTOMER_BEHAVIOR_SPEC §5–§6 and ROADMAP §7.1 / §7.4.
     mockStorage.listMessagesForContext.mockResolvedValueOnce([
       { role: "user", content: "Complaint: Water pump not operating per spec." },
       { role: "user", content: "Findings: direct 12V was present and the fuse was blown." },
     ]);
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: FINAL_REPORT_TEXT } }],
-      }),
-    });
 
     const { POST } = await import("@/app/api/chat/route");
 
@@ -359,9 +361,15 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
 
     const streamText = await response.text();
 
-    expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
-    expect(mockProcessContextMessage).not.toHaveBeenCalled();
-    expect(streamText).toContain('"type":"mode","mode":"final_report"');
+    // No wording-inferred mode transition to final_report.
+    expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
+    // No LLM call for final-report generation.
+    expect(mockFetch).not.toHaveBeenCalled();
+    // Case remains in diagnostic mode for the SSE envelope.
+    expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
+    expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
+    // Deterministic diagnostics-not-ready deferral (EN session).
+    expect(streamText).toContain("Diagnostics are not yet complete");
   });
 });
 
