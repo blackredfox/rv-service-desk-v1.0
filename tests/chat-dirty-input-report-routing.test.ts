@@ -163,12 +163,13 @@ describe("Dirty-input report routing", () => {
       "case_dirty_1",
       { mode: "final_report" },
     );
-    // No LLM call for final-report generation.
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): bounded LLM is now called with the report-not-ready
+    // directive; the server-owned readiness gate still blocks the mode.
+    expect(mockFetch).toHaveBeenCalled();
     // Emits the diagnostic stream envelope, not the final_report mode event.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready response (EN).
+    // Deterministic diagnostics-not-ready response (EN) via fallback.
     expect(streamText).toContain("Diagnostics are not yet complete");
   });
 
@@ -204,10 +205,11 @@ describe("Dirty-input report routing", () => {
       "case_dirty_1",
       { mode: "final_report" },
     );
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): bounded LLM call under report-not-ready directive.
+    expect(mockFetch).toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready response (RU).
+    // Deterministic diagnostics-not-ready response (RU) via fallback.
     expect(streamText).toContain("Диагностика ещё не завершена");
   });
 
@@ -243,10 +245,11 @@ describe("Dirty-input report routing", () => {
       "case_dirty_1",
       { mode: "final_report" },
     );
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): bounded LLM call under report-not-ready directive.
+    expect(mockFetch).toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready response (ES).
+    // Deterministic diagnostics-not-ready response (ES) via fallback.
     expect(streamText).toContain("El diagnóstico aún no está completo");
   });
 
@@ -271,7 +274,8 @@ describe("Dirty-input report routing", () => {
       "case_dirty_1",
       { mode: "final_report" },
     );
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): bounded LLM call under report-not-ready directive.
+    expect(mockFetch).toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
   });

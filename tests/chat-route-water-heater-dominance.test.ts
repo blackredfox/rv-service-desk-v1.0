@@ -229,7 +229,13 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.activeStepId).toBeNull();
     expect(context.isolationComplete).toBe(true);
     expect(context.terminalState.phase).toBe("terminal");
-    expect(completionTurn.fetchTriggered).toBe(false);
+    // PR1 (agent-freedom): the offer_completion turn no longer bypasses the LLM.
+    // The bounded LLM authors the reply under the Context Engine's completion
+    // directive; only on validation failure does the transcript-grounded
+    // authoritative offer text kick in. Either way the legality properties below
+    // must hold — START FINAL REPORT invitation present, no cross-step/cross-
+    // system drift, and no status-terminal "Isolation not completed" prose.
+    expect(completionTurn.fetchTriggered).toBe(true);
     expect(completionTurn.streamText).toContain("START FINAL REPORT");
     expect(completionTurn.streamText).toContain("сделать отчёт");
     expect(completionTurn.streamText).not.toContain("wh_5b");
@@ -253,7 +259,10 @@ describe("/api/chat water-heater runtime dominance", () => {
     expect(context.activeStepId).toBeNull();
     expect(context.isolationComplete).toBe(true);
     expect(context.terminalState.phase).toBe("terminal");
-    expect(completionTurn.fetchTriggered).toBe(false);
+    // PR1 (agent-freedom): see note above — LLM is called for the completion
+    // offer turn under a bounded directive; legality + fact-integrity must
+    // survive either way. Fuse-case fallback prose preserves the finding.
+    expect(completionTurn.fetchTriggered).toBe(true);
     expect(completionTurn.streamText).toContain("START FINAL REPORT");
     expect(completionTurn.streamText).toContain("сделать отчёт");
     expect(completionTurn.streamText).not.toContain("wh_5b");
@@ -303,12 +312,15 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     // No wording-inferred mode transition.
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // No LLM call for report generation.
-    expect(reportTurn.fetchTriggered).toBe(false);
+    // PR1 (agent-freedom): under the new server-bounded contract the LLM is
+    // called with a bounded "report-not-ready" directive; on validation
+    // failure the transcript-grounded diagnostics-not-ready fallback is
+    // used. No wording-inferred mode transition, no LLM-authored report.
+    expect(reportTurn.fetchTriggered).toBe(true);
     // Case remains in diagnostic mode for SSE envelope.
     expect(reportTurn.streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(reportTurn.streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic RU diagnostics-not-ready deferral — NOT a questionnaire.
+    // Deterministic RU diagnostics-not-ready deferral (fallback path) — NOT a questionnaire.
     expect(reportTurn.streamText).toContain("Диагностика ещё не завершена");
     // Context Engine retains authority — the branch is still active.
     // The specific next step within the branch (e.g. wh_5a → wh_5b) is
@@ -349,12 +361,17 @@ describe("/api/chat water-heater runtime dominance", () => {
       "¿Prepara el warranty report? Cambié el fusible.",
     );
 
-    expect(reportTurn.fetchTriggered).toBe(false);
+    // PR1 (agent-freedom): LLM is now called with the bounded report-not-ready
+    // directive. On validation failure the ES diagnostics-not-ready fallback
+    // text is emitted. Mode legality and no cross-step drift in assistant
+    // tokens must still hold.
+    expect(reportTurn.fetchTriggered).toBe(true);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    // Fallback text (or valid ES LLM reply) must include the "not complete" wording.
     expect(reportTurn.streamText).toContain("no est");
-    expect(reportTurn.streamText).not.toContain("wh_5b");
-    expect(reportTurn.streamText).not.toContain("wh_5c");
+    // No assistant token should advance to a different step.
+    expect(reportTurn.streamText).not.toMatch(/"type":"token","token":"[^"]*wh_5b/);
+    expect(reportTurn.streamText).not.toMatch(/"type":"token","token":"[^"]*wh_5c/);
   });
 
   it("blocks bare natural report request during active diagnostic flow — diagnostics not ready", async () => {
@@ -364,12 +381,13 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     const reportTurn = await postChat(caseId, "Generate warranty report");
 
-    expect(reportTurn.fetchTriggered).toBe(false);
+    // PR1 (agent-freedom): LLM called with report-not-ready directive; on
+    // validation failure the EN diagnostics-not-ready fallback text is used.
+    expect(reportTurn.fetchTriggered).toBe(true);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
     expect(reportTurn.streamText).toContain("not yet complete");
-    expect(reportTurn.streamText).not.toContain("wh_5b");
-    expect(reportTurn.streamText).not.toContain("wh_5c");
+    expect(reportTurn.streamText).not.toMatch(/"type":"token","token":"[^"]*wh_5b/);
+    expect(reportTurn.streamText).not.toMatch(/"type":"token","token":"[^"]*wh_5c/);
   });
 
   it("transitions to final_report for natural-language English report commands", async () => {

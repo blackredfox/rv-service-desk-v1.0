@@ -52,8 +52,10 @@ import {
 } from "@/lib/fact-pack";
 import type { Language } from "@/lib/lang";
 import {
+  buildReportNotReadyDirective,
   buildStepGuidanceResponse,
   getStepGuidanceContinuation,
+  type DiagnosticFallbackHint,
 } from "@/lib/chat/output-policy";
 import { executeStepGuidanceCompletion } from "@/lib/chat/openai-execution-service";
 import {
@@ -177,65 +179,6 @@ function buildStepGuidanceClarificationSystemPrompt(args: {
     .join("\n");
 }
 
-function buildAuthoritativeCompletionOffer(args: {
-  language: Language;
-  isolationFinding?: string | null;
-  facts?: FinalReportAuthorityFacts | null;
-}): string {
-  const evidence = [
-    args.isolationFinding,
-    args.facts?.verifiedCondition,
-    args.facts?.correctiveAction,
-    args.facts?.requiredParts,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const isFuseRepair = /предохранител|fuse/i.test(evidence);
-
-  switch (args.language) {
-    case "RU":
-      return isFuseRepair
-        ? [
-            "Принято.",
-            "Причина подтверждена: неисправный предохранитель в цепи питания водонагревателя.",
-            "Ремонт подтверждён: предохранитель заменён, водонагреватель работает штатно.",
-            "Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.",
-          ].join("\n")
-        : [
-            "Принято.",
-            args.isolationFinding ?? "Восстановление после ремонта подтверждено.",
-            "Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.",
-          ].join("\n");
-    case "ES":
-      return isFuseRepair
-        ? [
-            "Entendido.",
-            "Causa confirmada: fusible defectuoso en el circuito de alimentación del calentador de agua.",
-            "Reparación confirmada: se reemplazó el fusible y el calentador funciona normalmente.",
-            "Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.",
-          ].join("\n")
-        : [
-            "Entendido.",
-            args.isolationFinding ?? "La restauración después de la reparación fue confirmada.",
-            "Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.",
-          ].join("\n");
-    default:
-      return isFuseRepair
-        ? [
-            "Noted.",
-            "Root cause confirmed: failed fuse in the water-heater power path.",
-            "Repair confirmed: the fuse was replaced and the water heater is operating normally.",
-            "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
-          ].join("\n")
-        : [
-            "Noted.",
-            args.isolationFinding ?? "Repair completion and restored operation have been confirmed.",
-            "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
-          ].join("\n");
-  }
-}
-
 function buildTranscriptDerivedDraftConstraint(): string {
   return [
     "REPORT ASSEMBLY (MANDATORY):",
@@ -288,22 +231,6 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
       return "Para elegir el procedimiento correcto del AC, confirma qué tipo de unidad es: ¿AC de techo, AC del tablero/cabina, AC de techo con bomba de calor u otro tipo?";
     default:
       return "Before I choose the correct AC procedure, confirm what type of unit it is: roof AC, dash/cab AC, roof AC with heat pump, or another type?";
-  }
-}
-
-/**
- * Build a deterministic response when the technician requests a final report
- * but diagnostics are still in progress (isolation not complete).
- * Remains in diagnostic mode and directs the technician to continue.
- */
-function buildDiagnosticsNotReadyResponse(language: Language): string {
-  switch (language) {
-    case "RU":
-      return "Диагностика ещё не завершена. Давайте продолжим с текущего шага, прежде чем формировать отчёт.";
-    case "ES":
-      return "El diagnóstico aún no está completo. Continuemos con el paso actual antes de generar el informe.";
-    default:
-      return "Diagnostics are not yet complete. Let\u2019s continue with the current step before generating the report.";
   }
 }
 
@@ -401,8 +328,14 @@ export async function POST(req: Request) {
     message,
   );
 
-  let reportRoutingResponse: string | null = null;
+  const reportRoutingResponse: string | null = null;
   let reportPromptConstraint = "";
+  // PR1 (agent-freedom): hint carried to executePrimaryChatCompletion so
+  // the validation-failure fallback picks the transcript-grounded text for
+  // this specific diagnostic turn type instead of the generic status-terminal
+  // step fallback. Production boundary stays server-owned; authorship of
+  // the ordinary turn is delegated to the bounded LLM.
+  let diagnosticFallbackHint: DiagnosticFallbackHint | undefined;
   const runtimeReportReady = isFinalReportReady(currentContextSnapshot);
 
   const pendingFinalReportCommand =
@@ -1011,9 +944,16 @@ export async function POST(req: Request) {
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
     } else if (hasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
-      // Stay in diagnostic mode and continue from the correct legal state.
-      reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);
-      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved`);
+      // PR1 (agent-freedom): stop authoring the deterministic one-liner here.
+      // Instead inject a bounded directive; the LLM authors the decline +
+      // redirect within the directive's legality. The deterministic text is
+      // kept only as the validation-failure fallback downstream.
+      const notReadyDirective = buildReportNotReadyDirective();
+      contextEngineDirectives = [contextEngineDirectives, notReadyDirective]
+        .filter(Boolean)
+        .join("\n\n");
+      diagnosticFallbackHint = { kind: "report_not_ready" };
+      console.log(`[Chat API v2] Report request deferred via directive — diagnostics unresolved`);
     }
   }
 
@@ -1038,16 +978,24 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("\n\n");
 
-  const authoritativeDiagnosticCompletionResponse =
+  // PR1 (agent-freedom): the offer_completion turn no longer bypasses the
+  // LLM. The Context Engine's completionDirective (injected above into
+  // contextEngineDirectives) already enforces the legal shape of this turn
+  // (acknowledge + root cause + report invitation, no final-report headers,
+  // no advancement). We let the bounded LLM author the reply and validate
+  // the output. Only on validation failure after retry does the transcript-
+  // grounded authoritative text kick in via the primary fallback.
+  if (
     currentMode === "diagnostic" &&
     engineResult?.context.isolationComplete &&
     engineResult?.responseInstructions.action === "offer_completion"
-      ? buildAuthoritativeCompletionOffer({
-          language: outputPolicy.effective,
-          isolationFinding: engineResult.context.isolationFinding,
-          facts: deriveFinalReportAuthorityFacts(history, engineResult.context),
-        })
-      : null;
+  ) {
+    diagnosticFallbackHint = {
+      kind: "completion_offer",
+      isolationFinding: engineResult.context.isolationFinding,
+      facts: deriveFinalReportAuthorityFacts(history, engineResult.context),
+    };
+  }
 
   const laborOverride = computeLaborOverrideRequest(currentMode, history, message);
   // Post-final line-item revisions are NOT labor-total overrides — they must
@@ -1207,32 +1155,14 @@ export async function POST(req: Request) {
           return;
         }
 
-        if (authoritativeDiagnosticCompletionResponse) {
-          emitToken(authoritativeDiagnosticCompletionResponse);
-          full = authoritativeDiagnosticCompletionResponse;
+        // PR1 (agent-freedom): the previous server-scripted bypass for
+        // isolation-complete completion offers has been removed. The
+        // bounded LLM authors this turn under the Context Engine's
+        // completionDirective. `diagnosticFallbackHint` is threaded to
+        // executePrimaryChatCompletion so the validation-failure fallback
+        // uses the transcript-grounded authoritative offer text instead
+        // of the generic status-terminal step fallback.
 
-          if (!aborted && full.trim()) {
-            await appendAssistantChatMessage({
-              caseId: ensuredCase.id,
-              content: full,
-              language: outputPolicy.effective,
-              userId: user?.id,
-            });
-          }
-
-          if (currentMode === "diagnostic" && engineResult) {
-            finalizeDiagnosticPersistence({
-              caseId: ensuredCase.id,
-              mode: currentMode,
-              engineResult,
-              responseText: full,
-            });
-          }
-
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
-          controller.close();
-          return;
-        }
 
         // ── LABOR OVERRIDE PATH ─────────────────────────────────────
         if (
@@ -1295,6 +1225,7 @@ export async function POST(req: Request) {
           activeStepMetadata: activeStepMetadata as ChatActiveStepMetadata | null,
           activeStepId: engineResult?.context.activeStepId ?? undefined,
           finalReportAuthorityFacts,
+          diagnosticFallbackHint,
           model: getModelForMode(currentMode),
           requestStartedAt,
         });

@@ -329,8 +329,11 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     const streamText = await response.text();
 
     expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
-    expect(mockFetch).not.toHaveBeenCalled();
-    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
+    // PR1 (agent-freedom): LLM called under the report-not-ready directive;
+    // server-owned readiness gate still blocks the questionnaire-first
+    // fallback and holds the mode in diagnostic.
+    expect(mockFetch).toHaveBeenCalled();
+    // Diagnostics-not-ready fallback text must appear (EN).
     expect(streamText).toContain("Diagnostics are not yet complete");
   });
 
@@ -363,12 +366,12 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
 
     // No wording-inferred mode transition to final_report.
     expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
-    // No LLM call for final-report generation.
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): bounded LLM call under report-not-ready directive.
+    expect(mockFetch).toHaveBeenCalled();
     // Case remains in diagnostic mode for the SSE envelope.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready deferral (EN session).
+    // Deterministic diagnostics-not-ready deferral (EN session) via fallback.
     expect(streamText).toContain("Diagnostics are not yet complete");
   });
 });

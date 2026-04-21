@@ -10,12 +10,15 @@ import {
 } from "@/lib/mode-validators";
 import {
   applyDiagnosticModeValidationGuard,
+  buildAuthoritativeCompletionOffer,
   buildAuthoritativeStepFallback,
   buildDiagnosticDriftCorrectionInstruction,
+  buildDiagnosticsNotReadyResponse,
   buildFinalReportFallback,
   buildPortalCauseFallback,
   extractPrimaryReportBlock,
   isDiagnosticDriftViolation,
+  type DiagnosticFallbackHint,
 } from "@/lib/chat/output-policy";
 import { hasCanonicalTotalLaborLine } from "@/lib/chat/labor-override";
 import { buildLaborOverrideCorrectionInstruction } from "@/lib/chat/final-report-service";
@@ -175,6 +178,14 @@ export function buildPrimaryCorrectionInstruction(args: {
 
 /**
  * Build the safe fallback for primary response validation failures.
+ *
+ * PR1 (agent-freedom): when a `diagnosticFallbackHint` is present, the
+ * diagnostic-surface fallback switches from the generic status-terminal
+ * step fallback (Guided Diagnostics / Progress / Step wh_X) to the
+ * transcript-grounded text for the specific turn type — completion
+ * offer or report-not-ready redirect. This preserves the
+ * "grounded reply survives" property on the failure path while still
+ * keeping legality enforcement intact.
  */
 export function buildPrimaryFallbackResponse(args: {
   validation: ValidationResult;
@@ -186,7 +197,22 @@ export function buildPrimaryFallbackResponse(args: {
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
   finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
+  diagnosticFallbackHint?: DiagnosticFallbackHint;
 }): string {
+  if (args.outputSurface === "diagnostic" && args.diagnosticFallbackHint) {
+    if (args.diagnosticFallbackHint.kind === "completion_offer") {
+      return buildAuthoritativeCompletionOffer({
+        language: args.outputLanguage,
+        isolationFinding: args.diagnosticFallbackHint.isolationFinding,
+        facts:
+          args.diagnosticFallbackHint.facts ?? args.finalReportAuthorityFacts ?? null,
+      });
+    }
+    if (args.diagnosticFallbackHint.kind === "report_not_ready") {
+      return buildDiagnosticsNotReadyResponse(args.outputLanguage);
+    }
+  }
+
   const hasDriftOrStepViolation =
     isDiagnosticDriftViolation(args.validation.violations) ||
     args.validation.violations.some((violation) =>

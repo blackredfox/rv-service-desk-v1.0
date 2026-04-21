@@ -7,6 +7,7 @@
 
 import { detectLanguage, type LanguagePolicy, type Language } from "@/lib/lang";
 import type { CaseMode } from "@/lib/prompt-composer";
+import type { FinalReportAuthorityFacts } from "@/lib/fact-pack";
 
 // Translation separator (must match mode-validators / output-validator)
 export const TRANSLATION_SEPARATOR = "--- TRANSLATION ---";
@@ -337,4 +338,148 @@ export function buildAuthoritativeStepFallback(
   ];
   
   return lines.join("\n");
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────
+ * PR1 (agent-freedom): Diagnostic-turn fallbacks moved out of route.ts.
+ *
+ * These builders used to run as UNCONDITIONAL server bypasses in
+ * src/app/api/chat/route.ts, flattening any LLM-authored diagnostic
+ * turn into server-scripted status-terminal prose. In PR1 they are
+ * demoted to validation-failure fallbacks only. The Context Engine
+ * is still the single flow authority; these helpers only produce
+ * the deterministic transcript-grounded text used when the LLM
+ * output fails mode / step / language validation after retry.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * Transcript-grounded completion-offer fallback.
+ *
+ * Used ONLY when the bounded LLM completion-offer turn fails validation
+ * after retry. Produces a short 3-line acknowledgment + restored-state
+ * sentence + concise report invitation in the session language. Fuse-
+ * case repair wording is preserved so a blown-fuse transcript never
+ * drifts into generic "repair" wording on the fallback path.
+ */
+export function buildAuthoritativeCompletionOffer(args: {
+  language: Language;
+  isolationFinding?: string | null;
+  facts?: FinalReportAuthorityFacts | null;
+}): string {
+  const evidence = [
+    args.isolationFinding,
+    args.facts?.verifiedCondition,
+    args.facts?.correctiveAction,
+    args.facts?.requiredParts,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const isFuseRepair = /предохранител|fuse/i.test(evidence);
+
+  switch (args.language) {
+    case "RU":
+      return isFuseRepair
+        ? [
+            "Принято.",
+            "Причина подтверждена: неисправный предохранитель в цепи питания водонагревателя.",
+            "Ремонт подтверждён: предохранитель заменён, водонагреватель работает штатно.",
+            "Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.",
+          ].join("\n")
+        : [
+            "Принято.",
+            args.isolationFinding ?? "Восстановление после ремонта подтверждено.",
+            "Если хотите отчёт сейчас, попросите меня сделать отчёт или отправьте START FINAL REPORT.",
+          ].join("\n");
+    case "ES":
+      return isFuseRepair
+        ? [
+            "Entendido.",
+            "Causa confirmada: fusible defectuoso en el circuito de alimentación del calentador de agua.",
+            "Reparación confirmada: se reemplazó el fusible y el calentador funciona normalmente.",
+            "Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.",
+          ].join("\n")
+        : [
+            "Entendido.",
+            args.isolationFinding ?? "La restauración después de la reparación fue confirmada.",
+            "Si quieres el informe ahora, pídeme que lo prepare o envía START FINAL REPORT.",
+          ].join("\n");
+    default:
+      return isFuseRepair
+        ? [
+            "Noted.",
+            "Root cause confirmed: failed fuse in the water-heater power path.",
+            "Repair confirmed: the fuse was replaced and the water heater is operating normally.",
+            "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
+          ].join("\n")
+        : [
+            "Noted.",
+            args.isolationFinding ?? "Repair completion and restored operation have been confirmed.",
+            "If you want the report now, ask me to write the report, or send START FINAL REPORT.",
+          ].join("\n");
+  }
+}
+
+/**
+ * Transcript-grounded "diagnostics not ready" fallback.
+ *
+ * Used ONLY when a bounded LLM reply to a report request during
+ * unresolved diagnostics fails validation after retry. Stays in the
+ * diagnostic surface: no report headers, no questionnaire, no
+ * START FINAL REPORT wording — just a deterministic redirect back
+ * to the active step.
+ */
+export function buildDiagnosticsNotReadyResponse(language: Language): string {
+  switch (language) {
+    case "RU":
+      return "Диагностика ещё не завершена. Давайте продолжим с текущего шага, прежде чем формировать отчёт.";
+    case "ES":
+      return "El diagnóstico aún no está completo. Continuemos con el paso actual antes de generar el informe.";
+    default:
+      return "Diagnostics are not yet complete. Let\u2019s continue with the current step before generating the report.";
+  }
+}
+
+/**
+ * Diagnostic-turn fallback intent carried from route.ts into the
+ * primary response pipeline. When the LLM output fails validation
+ * after retry, the fallback layer picks the matching grounded text
+ * instead of the generic status-terminal step fallback.
+ *
+ *   - "completion_offer":  isolation confirmed, LLM was asked to
+ *                          acknowledge + state root cause + invite report.
+ *   - "report_not_ready":  report requested while isolation unresolved,
+ *                          LLM was asked to decline + redirect to step.
+ */
+export type DiagnosticFallbackHint =
+  | { kind: "completion_offer"; isolationFinding?: string | null; facts?: FinalReportAuthorityFacts | null }
+  | { kind: "report_not_ready" };
+
+/**
+ * Directive injected into the Context Engine directive block when the
+ * technician requests a report but isolation is not complete. Keeps the
+ * LLM in diagnostic mode, prevents questionnaire-first fallback, and
+ * does not introduce a second flow authority — legality (mode stays
+ * diagnostic, active step unchanged) remains owned by the server.
+ */
+export function buildReportNotReadyDirective(): string {
+  return [
+    "── REPORT REQUEST DEFERRED ──",
+    "The technician asked for a report, but diagnostic isolation is NOT complete.",
+    "The Context Engine is still on an active diagnostic step.",
+    "",
+    "MANDATORY RESPONSE (this turn only):",
+    "1. Briefly acknowledge the report request in one line, in the session language.",
+    "2. Say diagnostics are not yet complete, in natural technician-facing phrasing.",
+    "3. Redirect back to the current active diagnostic step with one concise question or short instruction.",
+    "",
+    "CRITICAL RULES:",
+    "- Do NOT output any final-report section headers (Complaint / Diagnostic Procedure / Verified Condition / Recommended Corrective Action / Estimated Labor / Required Parts).",
+    "- Do NOT mention START FINAL REPORT.",
+    "- Do NOT ask questionnaire-style questions about complaint / findings / performed repair.",
+    "- Do NOT switch the active system or object.",
+    "- Remain in diagnostic mode.",
+  ].join("\n");
 }

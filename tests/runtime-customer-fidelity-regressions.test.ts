@@ -193,17 +193,21 @@ describe("Regression 7.1 — No false final-output invitation before readiness",
       "case_regression",
       { mode: "final_report" },
     );
-    // No LLM call for final-report generation.
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): the bounded LLM is now called with the
+    // report-not-ready directive; on validation failure the transcript-
+    // grounded diagnostics-not-ready fallback text is emitted. The
+    // readiness gate (Context Engine state) still blocks final_report
+    // mode and any CTA-equivalent surface availability.
+    expect(mockFetch).toHaveBeenCalled();
     // SSE mode envelope stays diagnostic.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready continuation (EN).
+    // Deterministic diagnostics-not-ready continuation (EN) on fallback path.
     expect(streamText).toContain("Diagnostics are not yet complete");
-    // Explicit anti-invitation: no final-report suggestion or CTA text.
-    expect(streamText).not.toContain("START FINAL REPORT");
-    expect(streamText).not.toContain("write the report");
-    expect(streamText).not.toContain("generate the report");
+    // Explicit anti-invitation: no final-report CTA text in assistant tokens.
+    expect(streamText).not.toMatch(/"type":"token","token":"[^"]*START FINAL REPORT/);
+    expect(streamText).not.toMatch(/"type":"token","token":"[^"]*write the report/);
+    expect(streamText).not.toMatch(/"type":"token","token":"[^"]*generate the report/);
     // No output-surface events for final-report surfaces.
     expect(streamText).not.toContain('"surface":"shop_final_report"');
     expect(streamText).not.toContain('"surface":"portal_cause"');
@@ -225,7 +229,9 @@ describe("Regression 7.1 — No false final-output invitation before readiness",
       "case_regression",
       { mode: "final_report" },
     );
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): LLM is now called with the report-not-ready
+    // directive; the server-owned readiness gate still blocks the mode.
+    expect(mockFetch).toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).toContain("Diagnostics are not yet complete");
   });
@@ -346,7 +352,9 @@ describe("Regression 7.4 — Server-owned, legality-gated final-report CTA bound
       "case_regression",
       { mode: "final_report" },
     );
-    expect(mockFetch).not.toHaveBeenCalled();
+    // PR1 (agent-freedom): LLM is called with the report-not-ready directive;
+    // wording-inferred readiness is still blocked by the server-owned gate.
+    expect(mockFetch).toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
   });
 

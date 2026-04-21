@@ -12,6 +12,7 @@ import {
 import {
   buildFinalReportFallback,
   enforceLanguagePolicy,
+  type DiagnosticFallbackHint,
 } from "@/lib/chat/output-policy";
 import {
   buildLaborOverridePlan,
@@ -201,6 +202,7 @@ export async function executePrimaryChatCompletion(args: {
   activeStepMetadata: ActiveStepMetadata;
   activeStepId?: string;
   finalReportAuthorityFacts?: FinalReportAuthorityFacts | null;
+  diagnosticFallbackHint?: DiagnosticFallbackHint;
   model: string;
   requestStartedAt: number;
 }): Promise<PrimaryChatExecutionResult> {
@@ -232,6 +234,41 @@ export async function executePrimaryChatCompletion(args: {
   });
 
   if (result.error) {
+    // PR1 (agent-freedom): for hint-driven diagnostic turns (completion
+    // offer, report-not-ready), emit the transcript-grounded fallback on
+    // upstream failure instead of surfacing a raw upstream error. This
+    // keeps the runtime boundary deterministic without re-introducing the
+    // old unconditional server bypass on the happy path.
+    if (args.outputSurface === "diagnostic" && args.diagnosticFallbackHint) {
+      logFlow("safe_fallback_used", {
+        caseId: args.caseId,
+        mode: args.mode,
+        path: "primary_first",
+        reason: "upstream_error_hint_fallback",
+      });
+
+      const fallbackResponse = buildPrimaryFallbackResponse({
+        validation: { valid: false, violations: [] },
+        mode: args.mode,
+        outputSurface: args.outputSurface,
+        outputLanguage: args.outputLanguage,
+        langPolicy: args.langPolicy,
+        translationLanguage: args.translationLanguage,
+        activeStepMetadata: args.activeStepMetadata,
+        activeStepId: args.activeStepId,
+        finalReportAuthorityFacts: args.finalReportAuthorityFacts,
+        diagnosticFallbackHint: args.diagnosticFallbackHint,
+      });
+
+      args.emitToken(fallbackResponse);
+
+      return {
+        response: fallbackResponse,
+        validation: { valid: false, violations: [] },
+        emittedValidationFallback: true,
+      };
+    }
+
     return {
       response: "",
       validation: { valid: false, violations: [] },
@@ -361,6 +398,7 @@ export async function executePrimaryChatCompletion(args: {
         activeStepMetadata: args.activeStepMetadata,
         activeStepId: args.activeStepId,
         finalReportAuthorityFacts: args.finalReportAuthorityFacts,
+        diagnosticFallbackHint: args.diagnosticFallbackHint,
       });
 
       args.emitToken(fallbackResponse);
