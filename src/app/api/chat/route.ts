@@ -60,6 +60,7 @@ import {
   detectReportRevisionIntent,
   type ReportKind,
 } from "@/lib/chat/report-intent";
+import { buildSurfaceAwareReportDeferralResponse } from "@/lib/chat/report-deferral-response";
 
 // ── Extracted Chat Modules ─────────────────────────────────────────
 import {
@@ -292,21 +293,10 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
 }
 
 /**
- * Build a deterministic response when the technician requests a final report
- * but diagnostics are still in progress (isolation not complete).
- * Remains in diagnostic mode and directs the technician to continue.
+ * Runtime readiness gate for final-report transition.
+ * True only when the Context Engine has recorded isolationComplete OR a
+ * terminal-phase terminal state. Engine-owned, not wording-inferred.
  */
-function buildDiagnosticsNotReadyResponse(language: Language): string {
-  switch (language) {
-    case "RU":
-      return "Диагностика ещё не завершена. Давайте продолжим с текущего шага, прежде чем формировать отчёт.";
-    case "ES":
-      return "El diagnóstico aún no está completo. Continuemos con el paso actual antes de generar el informe.";
-    default:
-      return "Diagnostics are not yet complete. Let\u2019s continue with the current step before generating the report.";
-  }
-}
-
 function isFinalReportReady(context: Pick<DiagnosticContext, "isolationComplete" | "terminalState"> | null | undefined): boolean {
   return Boolean(context?.isolationComplete || context?.terminalState?.phase === "terminal");
 }
@@ -998,7 +988,34 @@ export async function POST(req: Request) {
     } else if (hasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
       // Stay in diagnostic mode and continue from the correct legal state.
-      reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);
+      //
+      // Surface-aware deferral (report-ready surface recognition):
+      // acknowledge the requested documentation surface explicitly and
+      // quote the Context-Engine-authoritative next step verbatim. This
+      // replaces the previous generic "diagnostics are not yet complete"
+      // one-liner that produced repetitive dead-end behavior when the
+      // technician was already trying to document a result.
+      //
+      // Legality invariants preserved:
+      //   - stays in diagnostic mode (no gate unlocked by wording)
+      //   - asks NO report-field questionnaire (no complaint / findings
+      //     / repair / labor collection)
+      //   - quotes only engine/registry-owned step text (no invented
+      //     facts, no claimed transcript evidence)
+      //   - degenerates safely to a generic continuation when no active
+      //     step is known
+      const deferralStepMetadata = getActiveStepMetadata(
+        ensuredCase.id,
+        engineResult.context.activeStepId ?? null,
+        outputPolicy.effective,
+      );
+      reportRoutingResponse = buildSurfaceAwareReportDeferralResponse({
+        language: outputPolicy.effective,
+        requestedSurface: requestedOutputSurface,
+        requestedReportKind: requestedReportKind,
+        activeStepQuestion: deferralStepMetadata?.question ?? null,
+        activeProcedureDisplayName: deferralStepMetadata?.procedureName ?? null,
+      });
       console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved`);
     }
   }

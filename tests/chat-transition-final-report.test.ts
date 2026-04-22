@@ -317,7 +317,7 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     expect(mockStorage.updateCase).toHaveBeenCalledWith("case_123", { mode: "final_report" });
   });
 
-  it("blocks report request when diagnostics are not ready (no questionnaire fallback)", async () => {
+  it("blocks report request when diagnostics are not ready (surface-aware deferral, no questionnaire fallback)", async () => {
     const { POST } = await import("@/app/api/chat/route");
 
     const response = await POST(new Request("http://localhost/api/chat", {
@@ -328,10 +328,23 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
 
     const streamText = await response.text();
 
+    // Doctrine: the runtime gate is Context-Engine-owned and must not
+    // transition mode on a wording-inferred report request when the
+    // engine reports diagnostics are incomplete. No LLM report draft.
     expect(mockStorage.updateCase).not.toHaveBeenCalledWith("case_123", { mode: "final_report" });
     expect(mockFetch).not.toHaveBeenCalled();
-    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
-    expect(streamText).toContain("Diagnostics are not yet complete");
+
+    // Surface-aware deferral: acknowledges the requested documentation
+    // surface explicitly and states that diagnostics are not yet complete.
+    expect(streamText).toContain("diagnostics are not yet complete");
+    expect(streamText).toMatch(/(?:final report|warranty report|retail report)/i);
+
+    // Questionnaire-first fallback is still forbidden — no report-field
+    // questionnaire prompts of any kind.
+    expect(streamText).not.toContain("what was the complaint");
+    expect(streamText).not.toContain("what did you find");
+    expect(streamText).not.toContain("what repair you");
+    expect(streamText).not.toContain("missing report details");
   });
 
   it("uses the report path mid-flow when history + current repair summary make the case ready", async () => {
