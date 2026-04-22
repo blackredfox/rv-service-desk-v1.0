@@ -82,6 +82,15 @@ const FAULT_PATTERNS: RegExp[] = [
   /\b(?:board|motor|relay|valve|pump|module|capacitor|compressor|controller|component|igniter|electrode|wire|connector)\b.{0,80}\b(?:burnt?|burned?|melted?|shorted?|blown?|seized|dead|failed)\b/i,
   // English: state word first then component (e.g. "burnt relay board")
   /\b(?:burnt?|burned?|melted?|shorted?|blown?|seized|dead|failed)\b.{0,60}\b(?:board|motor|relay|valve|pump|module|capacitor|compressor|controller|component|igniter|electrode|wire|connector)\b/i,
+  // English: sensor / switch-class component + fault state word (narrow).
+  // Added to close the recognition gap for common real-tech phrases like
+  // "flame sensor is bad", "thermocouple failed", "switch is defective".
+  // Broader state words (bad|defective|faulty) are admitted ONLY when
+  // paired with this narrow component list, mirroring the precedent
+  // already set above for the `fuse` component. The state word alone
+  // is NOT enough to match — a sensor/switch-class noun must be present.
+  /\b(?:flame\s+sensor|sensor|thermocouple|thermistor|switch)\b.{0,40}\b(?:blown|failed|faulty|bad|defective|broken|dead)\b/i,
+  /\b(?:blown|failed|faulty|bad|defective|broken|dead)\b\s+(?:flame\s+sensor|sensor|thermocouple|thermistor|switch)\b/i,
   // English: short circuit / open circuit in wiring
   /\b(?:short\s+circuit|open\s+circuit|wiring\s+fault|wiring\s+break|broken\s+wire|severed\s+wire)\b/i,
   // English: power+ground confirmed but component not responding
@@ -107,8 +116,15 @@ const FAULT_PATTERNS: RegExp[] = [
   /(?:плата|мотор|двигатель|реле|клапан|насос|модуль|конденсатор|компрессор|контроллер).{0,60}(?:сгорел|оплавился|вздулся|перегорел|подгорел|расплавился|заклинил)/i,
   // Russian (simpler fallback for start-of-message): "сгорел мотор"
   /^(?:сгорел|оплавился|вздулся|перегорел|подгорел)\s+(?:плата|мотор|двигатель|реле|клапан|насос|модуль|конденсатор)/i,
+  // Russian: sensor / switch-class component + fault state (narrow).
+  // Mirrors the English sensor/switch-class gap-closure above.
+  /(?:датчик(?:\s+пламени)?|термопара|термистор|переключатель|выключатель).{0,60}(?:неисправ[а-яё]+|сломан[а-яё]*|плох[а-яё]+|дефектн[а-яё]+|сгорел[а-яё]*|перегорел[а-яё]*)/i,
+  /(?:неисправ[а-яё]+|сломан[а-яё]*|плох[а-яё]+|дефектн[а-яё]+|сгорел[а-яё]*|перегорел[а-яё]*)\s+(?:датчик(?:\s+пламени)?|термопара|термистор|переключатель|выключатель)/i,
   // Spanish: quemado/fundido + component
   /\b(?:quemado|fundido|dañado|cortocircuito)\b.{0,60}\b(?:placa|motor|relé|válvula|bomba|módulo|condensador)\b/i,
+  // Spanish: sensor / switch-class component + fault state (narrow).
+  /\b(?:sensor(?:\s+de\s+llama)?|termopar|termistor|interruptor)\b.{0,40}\b(?:malo|defectuoso|dañado|roto|quemado|fundido|fallado|fallido)\b/i,
+  /\b(?:malo|defectuoso|dañado|roto|quemado|fundido|fallado|fallido)\b\s+(?:sensor(?:\s+de\s+llama)?|termopar|termistor|interruptor)\b/i,
 ];
 
 // Used ONLY in fault_candidate phase — simpler patterns for restoration confirmation
