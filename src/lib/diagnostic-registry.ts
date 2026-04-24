@@ -612,6 +612,33 @@ export function scanMessageForSubtypeAssertions(caseId: string, message: string)
 }
 
 /**
+ * Add subtype exclusions that originate from an already-adjudicated LLM
+ * runtime signal. The caller (the narrow sidecar consumer) is responsible
+ * for mapping the adjudicated subtype string to canonical exclusion
+ * values — this helper is a pure server-owned setter that the sidecar
+ * layer cannot use to bypass registry semantics. Returns the exclusions
+ * that were newly added on this call.
+ */
+export function addSubtypeExclusionsFromSignal(
+  caseId: string,
+  exclusions: string[],
+): string[] {
+  const entry = registry.get(caseId);
+  if (!entry) return [];
+  const added: string[] = [];
+  for (const exclusion of exclusions) {
+    if (!entry.subtypeExclusions.has(exclusion)) {
+      entry.subtypeExclusions.add(exclusion);
+      added.push(exclusion);
+      console.log(
+        `[DiagnosticRegistry] Subtype exclusion added (runtime-signal consumer): "${exclusion}"`,
+      );
+    }
+  }
+  return added;
+}
+
+/**
  * Mark a step as completed in the registry.
  * Called by context-engine when technician answers a step.
  * Also detects subtype exclusions from the response if available.

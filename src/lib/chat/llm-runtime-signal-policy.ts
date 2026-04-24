@@ -250,9 +250,9 @@ export function adjudicateSubtypeLock(
   // Standard subtype synonyms so adjudication does not require exact wording.
   const subtypeLower = proposal.subtype.toLowerCase();
   const synonyms: Record<string, string[]> = {
-    "gas-only": ["gas only", "gas-only", "lp only", "lp-only", "propane only", "not combo", "no electric"],
-    "lp-only": ["lp only", "lp-only", "propane only", "gas only", "not combo"],
-    "non-combo": ["not combo", "non-combo", "gas only", "lp only", "propane only"],
+    "gas-only": ["gas only", "gas-only", "lp only", "lp-only", "propane only", "not combo", "not a combo", "no electric"],
+    "lp-only": ["lp only", "lp-only", "propane only", "gas only", "not combo", "not a combo"],
+    "non-combo": ["not combo", "non-combo", "not a combo", "not a combo unit", "isn't combo", "isn't a combo", "is not combo", "is not a combo", "gas only", "lp only", "propane only"],
     "combo": ["combo"],
     "mechanical-ignition": ["mechanical ignition", "manual ignition", "pilot"],
     "electronic-ignition": ["electronic ignition", "dsi"],

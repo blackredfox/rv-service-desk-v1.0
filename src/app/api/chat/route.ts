@@ -100,6 +100,8 @@ import {
   buildAdjudicationDebug,
   mayOpenReportSurface,
   produceRuntimeSignalProposal,
+  consumeAdjudicatedDiagnosticSignals,
+  buildConsumerDebug,
   type AdjudicatedSignals,
   type AdjudicationServerState,
 } from "@/lib/chat";
@@ -801,6 +803,36 @@ export async function POST(req: Request) {
     // Save the active step ID BEFORE context engine processes the message.
     // Used by STEP COMPLETION HARDENING to determine if the engine already advanced the step.
     const stepIdBeforeProcessing = getOrCreateContext(ensuredCase.id)?.activeStepId ?? null;
+
+    // ── CONSUME ADJUDICATED DIAGNOSTIC SIGNALS ───────────────────────
+    // Server-owned consumption of accepted subtype-lock / step-issue
+    // signals from the already-merged sidecar adjudication layer.
+    //
+    // AUTHORITY BOUNDARY:
+    //   - Only signals with verdict `accepted: true` are consumed.
+    //   - Consumption uses existing server-owned registry primitives
+    //     (`addSubtypeExclusionsFromSignal`, `forceStepComplete`).
+    //   - Context Engine is NOT mutated directly here. Subsequent step
+    //     selection still flows through `getNextStepBranchAware`, which
+    //     reads the updated subtype-exclusion set from the registry.
+    //   - Consumer fails closed if the flag is OFF, no signals exist,
+    //     or no active procedure is bound to the case.
+    if (sidecarSignals) {
+      const consumerResult = consumeAdjudicatedDiagnosticSignals({
+        caseId: ensuredCase.id,
+        signals: sidecarSignals,
+        activeStepId: stepIdBeforeProcessing,
+      });
+      if (
+        consumerResult.subtypeExclusionsAdded.length > 0 ||
+        consumerResult.stepIssueActions.length > 0
+      ) {
+        console.log(
+          `[Chat API v2] Diagnostic runtime signals consumed:`,
+          buildConsumerDebug(consumerResult),
+        );
+      }
+    }
 
     engineResult = processContextMessage(ensuredCase.id, routingMessage, DEFAULT_CONFIG);
 

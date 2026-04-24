@@ -191,3 +191,14 @@ export {
   type ProduceRuntimeSignalProposalInput,
   type ProduceRuntimeSignalProposalResult,
 } from "./llm-runtime-signal-producer";
+
+// Diagnostic signal consumer — narrow server-owned consumption of
+// already-adjudicated subtype-lock / step-issue signals inside diagnostic
+// step selection. Never mutates Context Engine state directly.
+export {
+  consumeAdjudicatedDiagnosticSignals,
+  mapSubtypeLockToRegistryExclusions,
+  buildConsumerDebug,
+  type DiagnosticSignalConsumerInput,
+  type DiagnosticSignalConsumerResult,
+} from "./diagnostic-signal-consumer";
