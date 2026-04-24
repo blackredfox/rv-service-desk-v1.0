@@ -137,3 +137,48 @@ export {
 
 // Logging
 export { logTiming, logFlow } from "./logging";
+
+// LLM Runtime Signals (feature-flagged advisory layer — sidecar is advisory only)
+export {
+  parseSidecarProposal,
+  normalizeSidecarProposal,
+  extractSidecarJson,
+  type LlmRuntimeSignalProposal,
+  type ObjectHypothesisProposal,
+  type SubtypeLockProposal,
+  type SurfaceRequestProposal,
+  type ReportReadyCandidateProposal,
+  type StepIssueSignalProposal,
+  type EvidenceSummaryProposal,
+  type RequestedSurface,
+  type StepIssue,
+} from "./llm-runtime-signal-schema";
+
+export {
+  adjudicateProposal,
+  adjudicateObjectHypothesis,
+  adjudicateSubtypeLock,
+  adjudicateSurfaceRequest,
+  adjudicateReportReadiness,
+  adjudicateStepIssue,
+  adjudicateEvidenceSummary,
+  isGroundedIn,
+  isGroundedInSentence,
+  mayOpenReportSurface,
+  mayEnforceSubtypeLock,
+  REJECT,
+  type AdjudicationInput,
+  type AdjudicationServerState,
+  type AdjudicatedSignals,
+} from "./llm-runtime-signal-policy";
+
+export {
+  tryAdjudicateRuntimeSignals,
+  isLlmRuntimeSignalsEnabled,
+  isSidecarClientInputAllowed,
+  buildAdjudicationDebug,
+  LLM_RUNTIME_SIGNALS_FLAG_ENV,
+  LLM_RUNTIME_SIGNALS_DEV_CLIENT_INPUT_ENV,
+  type AdjudicateRuntimeSignalsInput,
+  type AdjudicateRuntimeSignalsResult,
+} from "./llm-runtime-signals";

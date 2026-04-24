@@ -93,6 +93,14 @@ import {
   classifyStepGuidanceIntent,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
+  // LLM Runtime Signals (advisory sidecar)
+  tryAdjudicateRuntimeSignals,
+  isLlmRuntimeSignalsEnabled,
+  isSidecarClientInputAllowed,
+  buildAdjudicationDebug,
+  mayOpenReportSurface,
+  type AdjudicatedSignals,
+  type AdjudicationServerState,
 } from "@/lib/chat";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
@@ -418,6 +426,69 @@ export async function POST(req: Request) {
     hasEmbeddedExplicitFinalReportCommand ||
     (pendingFinalReportCommand.changed && pendingFinalReportCommand.nextMode === "final_report");
 
+  // ── LLM RUNTIME SIGNALS (advisory sidecar, feature-flagged) ────────
+  //
+  // Authority contract:
+  //   - The LLM sidecar proposes; the server adjudicates; Context Engine
+  //     remains the single diagnostic-flow authority.
+  //   - The sidecar cannot switch modes, mark diagnostics complete,
+  //     select next steps, or generate final output. It is advisory only.
+  //   - When the feature flag is OFF (default), adjudication is skipped
+  //     and runtime behavior is unchanged.
+  let sidecarSignals: AdjudicatedSignals | null = null;
+  let sidecarServerState: AdjudicationServerState | null = null;
+  if (isLlmRuntimeSignalsEnabled()) {
+    // SECURITY: The `__sidecarProposal` body field is a test/dev-only channel
+    // for deterministic adjudication exercises. In production it is silently
+    // ignored even when the feature flag is ON. Real sidecar input must come
+    // from server-side LLM execution in a future PR — never from the HTTP
+    // body of a user-controlled request. See `isSidecarClientInputAllowed`.
+    const rawProposal =
+      isSidecarClientInputAllowed() && typeof body?.__sidecarProposal === "string"
+        ? body.__sidecarProposal
+        : "";
+    if (rawProposal) {
+      const technicianMessages = historyBeforeAppend
+        .filter((msg) => msg.role === "user")
+        .map((msg) => msg.content)
+        .concat(routingMessage);
+      sidecarServerState = {
+        caseMode: currentMode,
+        isolationComplete: Boolean(currentContextSnapshot.isolationComplete),
+        terminalPhase: currentContextSnapshot.terminalState?.phase ?? "normal",
+        activeStepId: currentContextSnapshot.activeStepId ?? null,
+        hasActiveProcedure: Boolean(currentContextSnapshot.activeProcedureId),
+      };
+      const adjudication = tryAdjudicateRuntimeSignals({
+        rawProposal,
+        latestUserMessage: routingMessage,
+        technicianMessages,
+        serverState: sidecarServerState,
+      });
+      if (adjudication) {
+        sidecarSignals = adjudication.signals;
+        console.log(
+          `[Chat API v2] LLM runtime signals adjudicated:`,
+          buildAdjudicationDebug(adjudication),
+        );
+      } else {
+        console.log(`[Chat API v2] LLM runtime signals: fail-closed (no usable proposal)`);
+      }
+    }
+  }
+
+  // Advisory: allow the sidecar to RECOGNIZE a natural-language report request
+  // that the regex-based intent detector missed. The server still owns every
+  // subsequent gate (readiness, legality, subtype incompatibility, etc.).
+  const sidecarRecognizesReportRequest = Boolean(
+    sidecarSignals?.surfaceRequest.accepted &&
+      (sidecarSignals.surfaceRequest.requestedSurface === "shop_final_report" ||
+        sidecarSignals.surfaceRequest.requestedSurface === "warranty_report" ||
+        sidecarSignals.surfaceRequest.requestedSurface === "portal_cause"),
+  );
+  const effectiveHasBoundedReportRequest =
+    hasBoundedReportRequest || sidecarRecognizesReportRequest;
+
   const repairSummaryIntent = assessRepairSummaryIntent({
     message: routingMessage,
     hasReportRequest: hasBoundedReportRequest,
@@ -440,7 +511,19 @@ export async function POST(req: Request) {
   //
   // `repairSummaryIntent` is retained as an assessment object for observability
   // and for tests, but it is NOT consulted as a final-output gate.
-  const readyForImmediateReport = runtimeReportReady;
+  //
+  // LLM RUNTIME SIGNALS (advisory): when the feature flag is ON and the sidecar
+  // report-readiness proposal is accepted, server may open the report surface
+  // even if Context Engine isolation hasn't been explicitly flipped — but only
+  // under `mayOpenReportSurface` rules which still respect the active-procedure
+  // isolation-not-complete boundary. This does NOT give the LLM state authority.
+  const sidecarPermitsReportSurface = Boolean(
+    sidecarSignals &&
+      sidecarServerState &&
+      mayOpenReportSurface(sidecarSignals, sidecarServerState).allowed,
+  );
+  const readyForImmediateReport =
+    runtimeReportReady || sidecarPermitsReportSurface;
   // Explicit non-use marker for repairSummaryIntent — kept available for
   // observability (and for existing unit tests that import the assessor),
   // but deliberately NOT consulted in the readiness gate above.
@@ -456,7 +539,7 @@ export async function POST(req: Request) {
     )?.content ?? null;
   const needsAcSubtypeClarification =
     currentMode === "diagnostic" &&
-    !hasBoundedReportRequest &&
+    !effectiveHasBoundedReportRequest &&
     !currentContextSnapshot.activeProcedureId &&
     detectSystem(routingMessage) === null &&
     isBroadAcFamilyMessage(routingMessage) &&
@@ -509,7 +592,7 @@ export async function POST(req: Request) {
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
       console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (existing report revision)`);
     }
-  } else if (hasBoundedReportRequest) {
+  } else if (effectiveHasBoundedReportRequest) {
     if (readyForImmediateReport) {
       reportPromptConstraint = [
         buildReportTypePromptConstraint(requestedReportKind),
@@ -995,7 +1078,7 @@ export async function POST(req: Request) {
           outputPolicy.effective,
         );
 
-    if (hasBoundedReportRequest && currentMode === "diagnostic" && isFinalReportReady(engineResult.context)) {
+    if (effectiveHasBoundedReportRequest && currentMode === "diagnostic" && isFinalReportReady(engineResult.context)) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
       reportPromptConstraint = [
@@ -1009,7 +1092,7 @@ export async function POST(req: Request) {
         requestedSurface: requestedOutputSurface,
       });
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
-    } else if (hasBoundedReportRequest && currentMode === "diagnostic") {
+    } else if (effectiveHasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
       // Stay in diagnostic mode and continue from the correct legal state.
       reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);

@@ -27,6 +27,14 @@ export type ChatBodyV2 = {
   languageMode?: LanguageMode;
   dialogueLanguage?: Language;
   attachments?: Attachment[];
+  /**
+   * Optional LLM runtime-signal sidecar proposal.
+   *
+   * Advisory-only. The server always adjudicates this against the transcript
+   * and its own state before using it. It is ignored unless the
+   * `ENABLE_LLM_RUNTIME_SIGNALS` feature flag is enabled.
+   */
+  __sidecarProposal?: string;
 };
 
 export type PreparedAttachmentBundle = {
