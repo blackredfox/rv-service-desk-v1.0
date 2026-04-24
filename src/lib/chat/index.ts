@@ -182,3 +182,12 @@ export {
   type AdjudicateRuntimeSignalsInput,
   type AdjudicateRuntimeSignalsResult,
 } from "./llm-runtime-signals";
+
+// Server-side sidecar producer (internal, non-streaming). The raw output of
+// this producer is NEVER forwarded to the client SSE stream; it is only
+// fed into `tryAdjudicateRuntimeSignals` for server-side consumption.
+export {
+  produceRuntimeSignalProposal,
+  type ProduceRuntimeSignalProposalInput,
+  type ProduceRuntimeSignalProposalResult,
+} from "./llm-runtime-signal-producer";
