@@ -99,6 +99,7 @@ import {
   isSidecarClientInputAllowed,
   buildAdjudicationDebug,
   mayOpenReportSurface,
+  produceRuntimeSignalProposal,
   type AdjudicatedSignals,
   type AdjudicationServerState,
 } from "@/lib/chat";
@@ -435,18 +436,66 @@ export async function POST(req: Request) {
   //     select next steps, or generate final output. It is advisory only.
   //   - When the feature flag is OFF (default), adjudication is skipped
   //     and runtime behavior is unchanged.
+  //
+  // Producer path (this PR):
+  //   - When the flag is ON and no test/dev client proposal is available,
+  //     the server runs an internal, non-streaming LLM call via
+  //     `produceRuntimeSignalProposal` to obtain a JSON proposal. That call
+  //     has NO `onToken` callback — its output never reaches the user's
+  //     SSE stream. On any error/timeout it returns "" and the route
+  //     continues exactly as if no proposal existed.
   let sidecarSignals: AdjudicatedSignals | null = null;
   let sidecarServerState: AdjudicationServerState | null = null;
   if (isLlmRuntimeSignalsEnabled()) {
     // SECURITY: The `__sidecarProposal` body field is a test/dev-only channel
     // for deterministic adjudication exercises. In production it is silently
-    // ignored even when the feature flag is ON. Real sidecar input must come
-    // from server-side LLM execution in a future PR — never from the HTTP
-    // body of a user-controlled request. See `isSidecarClientInputAllowed`.
-    const rawProposal =
-      isSidecarClientInputAllowed() && typeof body?.__sidecarProposal === "string"
-        ? body.__sidecarProposal
-        : "";
+    // ignored even when the feature flag is ON. Production proposals are
+    // obtained via the server-side producer below. See
+    // `isSidecarClientInputAllowed`.
+    let rawProposal = "";
+    let sidecarSource: "client_test_input" | "server_producer" | "none" = "none";
+    if (
+      isSidecarClientInputAllowed() &&
+      typeof body?.__sidecarProposal === "string" &&
+      body.__sidecarProposal.length > 0
+    ) {
+      rawProposal = body.__sidecarProposal;
+      sidecarSource = "client_test_input";
+    } else {
+      // Server-side producer path. Runs a bounded, non-streaming LLM call
+      // whose output is NEVER emitted to the client SSE stream.
+      try {
+        const technicianMessagesForProducer = historyBeforeAppend
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .concat(routingMessage);
+        const producerResult = await produceRuntimeSignalProposal({
+          apiKey,
+          mode: currentMode,
+          model: getModelForMode(currentMode),
+          latestUserMessage: routingMessage,
+          technicianMessages: technicianMessagesForProducer,
+          upstreamSignal: req.signal,
+        });
+        if (producerResult.rawProposal) {
+          rawProposal = producerResult.rawProposal;
+          sidecarSource = "server_producer";
+        } else if (producerResult.error) {
+          console.log(
+            `[Chat API v2] LLM runtime signals producer fail-closed: ${producerResult.error}`,
+          );
+        }
+      } catch (e) {
+        // Defensive: producer already fails closed, but wrap in case an
+        // unexpected exception occurs. The user-facing path must never be
+        // affected by sidecar failures.
+        console.log(
+          `[Chat API v2] LLM runtime signals producer threw, ignored:`,
+          e instanceof Error ? e.message : "unknown",
+        );
+      }
+    }
+
     if (rawProposal) {
       const technicianMessages = historyBeforeAppend
         .filter((msg) => msg.role === "user")
@@ -468,11 +517,13 @@ export async function POST(req: Request) {
       if (adjudication) {
         sidecarSignals = adjudication.signals;
         console.log(
-          `[Chat API v2] LLM runtime signals adjudicated:`,
+          `[Chat API v2] LLM runtime signals adjudicated (source=${sidecarSource}):`,
           buildAdjudicationDebug(adjudication),
         );
       } else {
-        console.log(`[Chat API v2] LLM runtime signals: fail-closed (no usable proposal)`);
+        console.log(
+          `[Chat API v2] LLM runtime signals: fail-closed (no usable proposal; source=${sidecarSource})`,
+        );
       }
     }
   }
