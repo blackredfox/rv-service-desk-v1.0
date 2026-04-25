@@ -198,8 +198,18 @@ describe("Regression 7.1 — No false final-output invitation before readiness",
     // SSE mode envelope stays diagnostic.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready continuation (EN).
-    expect(streamText).toContain("Diagnostics are not yet complete");
+    // Specific report-gate response (Blocker 2): dynamic EN wording.
+    // Either Tier 2 ("Got it — complaint, inspection findings…") when
+    // complaint/findings/repair are wording-inferred, Tier 3 ("Got the
+    // report request …") when only the request is present, or — only
+    // when Context Engine has no active step to point at — Tier 4
+    // fallback ("not yet complete"). NEVER a questionnaire.
+    expect(streamText).toMatch(
+      /Got it — complaint, inspection findings|Got the report request|not yet complete/,
+    );
+    // Anti-questionnaire guard: must NOT ask the technician to re-author
+    // complaint/findings/repair fields (ARCHITECTURE_RULE A1).
+    expect(streamText).not.toContain("the original complaint");
     // Explicit anti-invitation: no final-report suggestion or CTA text.
     expect(streamText).not.toContain("START FINAL REPORT");
     expect(streamText).not.toContain("write the report");

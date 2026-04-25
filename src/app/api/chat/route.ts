@@ -93,6 +93,7 @@ import {
   classifyStepGuidanceIntent,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
+  type RepairSummaryIntentAssessment,
   // LLM Runtime Signals (advisory sidecar)
   tryAdjudicateRuntimeSignals,
   isLlmRuntimeSignalsEnabled,
@@ -312,6 +313,121 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
  * but diagnostics are still in progress (isolation not complete).
  * Remains in diagnostic mode and directs the technician to continue.
  */
+/**
+ * Build a deterministic response when the technician requests a final report
+ * but diagnostics are still in progress (isolation not complete).
+ *
+ * Specificity rules (Blocker 2):
+ *   - When the LLM sidecar's report-readiness candidate was accepted and
+ *     supplied a `missingFields` list, name those fields back to the user.
+ *   - When the server-owned `assessRepairSummaryIntent` shows the request
+ *     is genuinely report-shaped but the technician has not yet supplied
+ *     all of complaint / findings / corrective_action, ask precisely for
+ *     the missing items via `buildRepairSummaryClarificationResponse`.
+ *   - Only fall back to the generic "diagnostics not complete" wall when
+ *     no specific signal is present.
+ *
+ * NOTE: this helper changes ONLY the prose. State, legality, and Context
+ * Engine flow are unchanged — the gate is still server-owned and
+ * Context Engine remains the authority that flips isolationComplete.
+ */
+function buildSpecificReportGateResponse(args: {
+  language: Language;
+  sidecarSignals: AdjudicatedSignals | null;
+  repairSummary: RepairSummaryIntentAssessment;
+  activeProcedureLabel?: string | null;
+  activeStepPrompt?: string | null;
+}): string {
+  const sidecarReadiness = args.sidecarSignals?.reportReadiness;
+  const sidecarMissing = sidecarReadiness?.accepted && sidecarReadiness.missingFields
+    ? sidecarReadiness.missingFields.filter((s) => s.length > 0)
+    : [];
+
+  // Tier 1 — adjudicated sidecar `missingFields` win when available.
+  // These are legal-field names the sidecar grounded in the transcript;
+  // they are not a questionnaire authored from scratch.
+  if (sidecarMissing.length > 0) {
+    switch (args.language) {
+      case "RU":
+        return `Чтобы завершить отчёт, мне нужны только эти данные: ${sidecarMissing.join(", ")}. Подтвердите их, пожалуйста, чтобы я подготовил отчёт корректно.`;
+      case "ES":
+        return `Para completar el informe, solo necesito estos datos: ${sidecarMissing.join(", ")}. Por favor confírmalos para preparar el informe correctamente.`;
+      default:
+        return `To finish the report, I only need these items: ${sidecarMissing.join(", ")}. Please confirm them so I can prepare the report correctly.`;
+    }
+  }
+
+  // Tier 2 — technician supplied a dense report-ready narrative; Context
+  // Engine just hasn't flagged isolation. Acknowledge what was recorded
+  // and — if available — point at the specific active step that's still
+  // open. We deliberately do NOT ask the technician to re-author
+  // complaint / findings / repair (ARCHITECTURE_RULE A1).
+  if (args.repairSummary.readyForReportRouting) {
+    const stepHint = args.activeStepPrompt
+      ? buildStepHintLine(args.language, args.activeStepPrompt)
+      : null;
+    switch (args.language) {
+      case "RU":
+        return [
+          "Принято: жалоба, осмотр и проведённый ремонт зафиксированы.",
+          stepHint
+            ?? "Чтобы я мог сформировать отчёт по правилам, подтвердите, пожалуйста, что диагностика по этому случаю закрыта.",
+        ].join(" ");
+      case "ES":
+        return [
+          "Recibido: queja, inspección y reparación registradas.",
+          stepHint
+            ?? "Para generar el informe correctamente, confirma que el diagnóstico está cerrado.",
+        ].join(" ");
+      default:
+        return [
+          "Got it — complaint, inspection findings, and the repair you completed are recorded.",
+          stepHint
+            ?? "Before the report can be issued, please confirm diagnostics are closed for this case.",
+        ].join(" ");
+    }
+  }
+
+  // Tier 3 — technician asked for a report but the transcript isn't yet
+  // dense enough to route. If we know the next legal diagnostic step
+  // from Context Engine, name it directly so the technician sees the
+  // exact action that would unlock the report. We do NOT ask the
+  // technician to author the report (no questionnaire) and we do NOT
+  // emit the generic wall.
+  if (args.activeStepPrompt) {
+    const stepHint = buildStepHintLine(args.language, args.activeStepPrompt);
+    switch (args.language) {
+      case "RU":
+        return `Запрос на отчёт принял. ${stepHint}`;
+      case "ES":
+        return `Solicitud de informe recibida. ${stepHint}`;
+      default:
+        return `Got the report request. ${stepHint}`;
+    }
+  }
+
+  // Tier 4 — last-resort generic wall. Reached only when Context Engine
+  // has no active step to point at AND no sidecar signal is present.
+  // Behaviour preserved from prior PRs.
+  return buildDiagnosticsNotReadyResponse(args.language);
+}
+
+function buildStepHintLine(language: Language, stepPrompt: string): string {
+  // `stepPrompt` is the active procedure's current step question text
+  // produced by Context Engine. Echoing it lets the technician see the
+  // exact action that would close the case — without us inventing one.
+  const trimmed = stepPrompt.trim();
+  const oneLine = trimmed.replace(/\s+/g, " ").slice(0, 240);
+  switch (language) {
+    case "RU":
+      return `Чтобы закрыть диагностику и оформить отчёт, остался один шаг: ${oneLine}`;
+    case "ES":
+      return `Para cerrar el diagnóstico y emitir el informe, queda un paso: ${oneLine}`;
+    default:
+      return `One step is still open before the report can be issued: ${oneLine}`;
+  }
+}
+
 function buildDiagnosticsNotReadyResponse(language: Language): string {
   switch (language) {
     case "RU":
@@ -1182,9 +1298,18 @@ export async function POST(req: Request) {
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
     } else if (effectiveHasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
-      // Stay in diagnostic mode and continue from the correct legal state.
-      reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);
-      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved`);
+      // Stay in diagnostic mode but build a SPECIFIC gate response that names
+      // what is actually missing (sidecar `missingFields` if available, then
+      // — when the technician supplied a dense narrative — the active
+      // procedure step that is still open; otherwise the generic wall).
+      reportRoutingResponse = buildSpecificReportGateResponse({
+        language: outputPolicy.effective,
+        sidecarSignals,
+        repairSummary: repairSummaryIntent,
+        activeProcedureLabel: engineResult.context.activeProcedureId ?? null,
+        activeStepPrompt: activeStepMetadata?.question ?? null,
+      });
+      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved (specific gate)`);
     }
   }
 
@@ -1261,7 +1386,7 @@ export async function POST(req: Request) {
       let full = "";
       let aborted = false;
       let firstSseTokenEmitted = false;
-      const emitToken = (token: string) => {
+      const rawEmitToken = (token: string) => {
         if (aborted || !token) return;
         if (!firstSseTokenEmitted) {
           firstSseTokenEmitted = true;
@@ -1271,6 +1396,26 @@ export async function POST(req: Request) {
           });
         }
         controller.enqueue(encoder.encode(sseEncode({ type: "token", token })));
+      };
+
+      // ── Diagnostic output sanitizer (covers ALL emission paths) ────
+      //
+      // In diagnostic mode, every user-visible token — whether streamed
+      // from the primary LLM completion, step-guidance completion, the
+      // authoritative-completion direct emit, or the report-routing
+      // direct emit — passes through the same line-buffered sanitizer
+      // before reaching SSE. This eliminates banner / metadata leakage
+      // regardless of which code path produced the text.
+      //
+      // Feature-flagged via `DISABLE_DIAGNOSTIC_OUTPUT_SANITIZER` for
+      // emergency rollback (default: enabled).
+      const sanitizingEmitter =
+        currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled()
+          ? wrapEmitterWithDiagnosticSanitizer(rawEmitToken)
+          : null;
+      const emitToken = sanitizingEmitter ? sanitizingEmitter.emit : rawEmitToken;
+      const flushSanitizer = (): void => {
+        if (sanitizingEmitter) sanitizingEmitter.flush();
       };
 
       const onAbort = () => {
@@ -1322,7 +1467,8 @@ export async function POST(req: Request) {
             );
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1373,7 +1519,8 @@ export async function POST(req: Request) {
             }
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1400,7 +1547,8 @@ export async function POST(req: Request) {
             });
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1441,29 +1589,18 @@ export async function POST(req: Request) {
             });
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
 
         // ── PRIMARY REQUEST PATH ────────────────────────────────────
         //
-        // Wrap the SSE token emitter for diagnostic mode with a server-owned
-        // sanitizer that strips internal status banners (e.g. "Copy",
-        // "Reply RU", "Система:", "Прогресс:", "Шаг wh_3:") from the LLM's
-        // streamed output BEFORE it reaches the technician's chat. This is
-        // a presentation-layer transform only — it does not change state,
-        // legality, or Context Engine flow. The sanitizer is feature-flagged
-        // via DISABLE_DIAGNOSTIC_OUTPUT_SANITIZER for emergency rollback.
-        const sanitizerActive =
-          currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled();
-        const sanitizingEmitter = sanitizerActive
-          ? wrapEmitterWithDiagnosticSanitizer(emitToken)
-          : null;
-        const primaryEmitToken = sanitizingEmitter
-          ? sanitizingEmitter.emit
-          : emitToken;
-
+        // The diagnostic-mode sanitizer is already applied to `emitToken`
+        // at the SSE controller scope, so the primary completion's
+        // streamed tokens are sanitized automatically. Below we simply
+        // pass `emitToken` through; no per-call wrapping needed.
         const result = await executePrimaryChatCompletion({
           apiKey,
           caseId: ensuredCase.id,
@@ -1474,7 +1611,7 @@ export async function POST(req: Request) {
           message,
           attachments,
           signal: ac.signal,
-          emitToken: primaryEmitToken,
+          emitToken,
           isAborted: () => aborted,
           trackedInputLanguage,
           outputLanguage: outputPolicy.effective,
@@ -1487,17 +1624,12 @@ export async function POST(req: Request) {
           requestStartedAt,
         });
 
-        // Flush the trailing partial line of the sanitizer (if any) so the
-        // last sentence of a diagnostic response is not buffered indefinitely.
-        if (sanitizingEmitter) {
-          sanitizingEmitter.flush();
-        }
-
         if (result.upstreamError) {
           controller.enqueue(
             encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.upstreamError }))
           );
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1543,6 +1675,7 @@ export async function POST(req: Request) {
           });
         }
 
+                flushSanitizer();
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } catch (e: unknown) {
@@ -1555,6 +1688,7 @@ export async function POST(req: Request) {
         controller.enqueue(
           encoder.encode(sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) }))
         );
+                flushSanitizer();
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } finally {

@@ -48,6 +48,13 @@ const FINDING_PATTERNS = [
   /(?:нет|без)\s+(?:силикон|герметик)/iu,
   /solo\s+\d+\s+tornillos?/iu,
   /sin\s+(?:silicona|sellador)/iu,
+  // Broader technician phrasing ("checked X", "проверил X", "revisé X")
+  // — required so dense report-ready narratives (Cases 82–84) are
+  // recognised as having findings even when the technician does not
+  // type the literal words "found" / "inspection".
+  /(?:checked|inspected|verified|tested|measured)\s+\S+/i,
+  /(?:проверил(?:а)?|осмотрел(?:а)?|измерил(?:а)?|протестировал(?:а)?)\s+\S+/iu,
+  /(?:revis[eé]|inspeccion[eé]|verifiqu[eé]|med[ií]|prob[eé])\s+\S+/iu,
 ];
 
 const CORRECTIVE_ACTION_PATTERNS = [
@@ -62,6 +69,13 @@ const CORRECTIVE_ACTION_PATTERNS = [
   /appl(?:y|ied)\s+(?:silicone|sealant)/i,
   /(?:добавил|установил|закрепил|прикрутил|нан[её]с)/iu,
   /(?:agregu[eé]|instal[eé]|asegur[eé]|apliqu[eé]|sell[eé])/iu,
+  // Broader corrective-action phrasing ("replaced the pump", "заменил
+  // насос") — required so dense reports about non-fuse/breaker parts
+  // are recognised. Past-tense only; future-intent forms like
+  // "надо менять" / "need to replace" are intentionally NOT matched.
+  /(?:replaced|changed|swapped|installed|removed)\s+(?:the\s+|a\s+)?[a-zа-яё][a-zа-яё\s-]{1,40}/iu,
+  /(?:заменил(?:а)?|поменял(?:а)?|снял(?:а)?|поставил(?:а)?)\s+\S+/iu,
+  /(?:reemplaz[eé]|cambi[eé]|instal[eé]|quit[eé])\s+\S+/iu,
 ];
 
 function dedupeMissingFields(fields: RepairSummaryMissingField[]): RepairSummaryMissingField[] {
