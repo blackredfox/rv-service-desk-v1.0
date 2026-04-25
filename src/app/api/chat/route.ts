@@ -93,6 +93,7 @@ import {
   classifyStepGuidanceIntent,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
+  assessTranscriptRepairStatus,
   type RepairSummaryIntentAssessment,
   // LLM Runtime Signals (advisory sidecar)
   tryAdjudicateRuntimeSignals,
@@ -255,8 +256,11 @@ function buildAuthoritativeCompletionOffer(args: {
   }
 }
 
-function buildTranscriptDerivedDraftConstraint(): string {
-  return [
+function buildTranscriptDerivedDraftConstraint(opts?: {
+  repairPerformed?: boolean;
+  restorationConfirmed?: boolean;
+}): string {
+  const lines: string[] = [
     "REPORT ASSEMBLY (MANDATORY):",
     "- Assemble the final report draft yourself from the case transcript and technician-verified facts.",
     "- Propose each section (Complaint, Diagnostic Procedure, Verified Condition, Recommended Corrective Action, Estimated Labor with breakdown lines, Required Parts) using what the technician has already reported in-conversation.",
@@ -264,7 +268,35 @@ function buildTranscriptDerivedDraftConstraint(): string {
     "- Do NOT ask questionnaire-style questions before generating the draft.",
     "- The technician will review and correct the draft if needed; proposing items is your job.",
     "- If a specific item is truly not inferable from the transcript, use a conservative shop-style placeholder rather than asking a question.",
-  ].join("\n");
+  ];
+
+  // Case-89 — TRUTH / NO-INVENTION rules.
+  // When the transcript does NOT establish that the repair was actually
+  // completed, the assistant must NOT invent post-repair restoration
+  // claims. The Recommended Corrective Action section may still
+  // RECOMMEND the future repair using imperative / future wording.
+  if (opts && opts.repairPerformed === false) {
+    lines.push(
+      "",
+      "TRUTH / NO-INVENTION (MANDATORY):",
+      "- The technician has NOT stated that the repair / replacement was performed. Do not assume or imply it was.",
+      "- Do NOT claim the part was replaced, swapped, installed, fixed, or that any repair was completed.",
+      "- The Verified Condition section must describe the diagnostic finding only (e.g. \"Water pump failed direct-power test; replacement required\"). It must NOT contain the words \"after replacement\", \"restored\", \"repair completed\", \"post-repair\", \"system is operating\", or any equivalent post-repair claim.",
+      "- The Recommended Corrective Action section may RECOMMEND a future repair using imperative / future wording (e.g. \"Replace the water pump and verify operation after installation\"). It must NOT state the repair has already been done.",
+      "- The Estimated Labor section must NOT include a line for post-repair operational verification when no repair has been performed. Only include diagnostic / replacement-task lines that are consistent with the technician's labor figure.",
+    );
+  }
+
+  if (opts && opts.restorationConfirmed === false) {
+    lines.push(
+      "",
+      "RESTORATION (MANDATORY):",
+      "- The technician has NOT confirmed that the system is operational after repair.",
+      "- Do NOT state or imply \"system is operating\", \"verified after repair\", \"post-repair operational check passed\", \"работает после ремонта\", \"funciona después de la reparación\", or any equivalent wording.",
+    );
+  }
+
+  return lines.join("\n");
 }
 
 function buildReportTypePromptConstraint(reportKind?: ReportKind): string {
@@ -769,9 +801,15 @@ export async function POST(req: Request) {
     }
   } else if (effectiveHasBoundedReportRequest) {
     if (readyForImmediateReport) {
+      const transcriptRepairStatusEarly = assessTranscriptRepairStatus(
+        historyBeforeAppend
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .concat(routingMessage),
+      );
       reportPromptConstraint = [
         buildReportTypePromptConstraint(requestedReportKind),
-        buildTranscriptDerivedDraftConstraint(),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusEarly),
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -1286,9 +1324,12 @@ export async function POST(req: Request) {
     if (effectiveHasBoundedReportRequest && currentMode === "diagnostic" && isFinalReportReady(engineResult.context)) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      const transcriptRepairStatusPostCtx = assessTranscriptRepairStatus(
+        history.filter((msg) => msg.role === "user").map((msg) => msg.content),
+      );
       reportPromptConstraint = [
         buildReportTypePromptConstraint(requestedReportKind),
-        buildTranscriptDerivedDraftConstraint(),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusPostCtx),
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -1734,4 +1775,5 @@ export const __test__ = {
   shouldTreatAsFinalReportForOverride,
   applyDiagnosticModeValidationGuard,
   computeLaborOverrideRequest,
+  buildTranscriptDerivedDraftConstraint,
 };

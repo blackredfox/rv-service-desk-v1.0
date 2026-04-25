@@ -84,9 +84,11 @@ export {
 
 export {
   assessRepairSummaryIntent,
+  assessTranscriptRepairStatus,
   buildRepairSummaryClarificationResponse,
   type RepairSummaryIntentAssessment,
   type RepairSummaryMissingField,
+  type TranscriptRepairStatus,
 } from "./repair-summary-intent";
 
 export {
