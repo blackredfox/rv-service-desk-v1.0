@@ -208,11 +208,27 @@ export function detectSubtypeExclusions(stepId: string, message: string): string
 
 const ALREADY_ANSWERED_PATTERNS = [
   /already\s+(?:checked|tested|verified|answered|told|said|mentioned|confirmed|reported|measured|looked)/i,
-  /i\s+(?:already|just)\s+(?:checked|tested|verified|told|said|mentioned|confirmed|reported|measured)/i,
+  /i\s+(?:already|just)\s+(?:checked|tested|verified|told|said|mentioned|confirmed|reported|measured|answered)/i,
   /(?:told|said|mentioned)\s+(?:you|that)\s+(?:already|before|earlier)/i,
-  /как\s+(?:я\s+)?(?:уже\s+)?(?:сказал|говорил|проверил|упомянул)/i,
-  /уже\s+(?:проверил|проверено|сказал|ответил|делал|смотрел)/i,
-  /ya\s+(?:lo\s+)?(?:revisé|verifiqué|dije|mencioné|comprobé)/i,
+  /как\s+(?:я\s+)?(?:уже\s+)?(?:сказал|говорил|проверил|упомянул|ответил)/i,
+  /уже\s+(?:проверил|проверено|сказал|ответил|делал|смотрел|сообщил|говорил)/i,
+  /я\s+уже\s+(?:сказал|ответил|проверил|говорил)/i,
+  /ya\s+(?:lo\s+)?(?:revisé|verifiqué|dije|mencioné|comprobé|respondí)/i,
+
+  // Technician pushback / "you're not listening" / "irrelevant question"
+  // — the technician is signalling that the active step has been answered
+  // or that the question is not on point. Treat as an already-answered
+  // signal so the legality re-evaluation path runs.
+  /(?:ты|вы)\s+меня\s+не\s+слыш/iu,
+  /не\s+слыш(?:ишь|ите)\s+(?:что|меня)/iu,
+  /вопрос\s+не\s+по\s+существу/iu,
+  /не\s+по\s+существу/iu,
+  /не\s+пон(?:ял|яла)\s+вопроса/iu,
+  /you(?:'re|\s+are)\s+not\s+listening/i,
+  /you\s+(?:keep\s+asking|already\s+asked)/i,
+  /(?:not|isn'?t)\s+(?:relevant|the\s+point)/i,
+  /irrelevant\s+question/i,
+  /no\s+(?:está|es)\s+(?:relevante|el\s+punto)/i,
 ];
 
 export function detectAlreadyAnswered(message: string): boolean {

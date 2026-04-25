@@ -106,6 +106,11 @@ import {
   type AdjudicationServerState,
 } from "@/lib/chat";
 
+import {
+  isDiagnosticOutputSanitizerEnabled,
+  wrapEmitterWithDiagnosticSanitizer,
+} from "@/lib/chat/diagnostic-output-sanitizer";
+
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
 
@@ -1442,6 +1447,23 @@ export async function POST(req: Request) {
         }
 
         // ── PRIMARY REQUEST PATH ────────────────────────────────────
+        //
+        // Wrap the SSE token emitter for diagnostic mode with a server-owned
+        // sanitizer that strips internal status banners (e.g. "Copy",
+        // "Reply RU", "Система:", "Прогресс:", "Шаг wh_3:") from the LLM's
+        // streamed output BEFORE it reaches the technician's chat. This is
+        // a presentation-layer transform only — it does not change state,
+        // legality, or Context Engine flow. The sanitizer is feature-flagged
+        // via DISABLE_DIAGNOSTIC_OUTPUT_SANITIZER for emergency rollback.
+        const sanitizerActive =
+          currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled();
+        const sanitizingEmitter = sanitizerActive
+          ? wrapEmitterWithDiagnosticSanitizer(emitToken)
+          : null;
+        const primaryEmitToken = sanitizingEmitter
+          ? sanitizingEmitter.emit
+          : emitToken;
+
         const result = await executePrimaryChatCompletion({
           apiKey,
           caseId: ensuredCase.id,
@@ -1452,7 +1474,7 @@ export async function POST(req: Request) {
           message,
           attachments,
           signal: ac.signal,
-          emitToken,
+          emitToken: primaryEmitToken,
           isAborted: () => aborted,
           trackedInputLanguage,
           outputLanguage: outputPolicy.effective,
@@ -1464,6 +1486,12 @@ export async function POST(req: Request) {
           model: getModelForMode(currentMode),
           requestStartedAt,
         });
+
+        // Flush the trailing partial line of the sanitizer (if any) so the
+        // last sentence of a diagnostic response is not buffered indefinitely.
+        if (sanitizingEmitter) {
+          sanitizingEmitter.flush();
+        }
 
         if (result.upstreamError) {
           controller.enqueue(
