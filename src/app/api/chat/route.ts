@@ -113,7 +113,13 @@ import {
   wrapEmitterWithDiagnosticSanitizer,
 } from "@/lib/chat/diagnostic-output-sanitizer";
 
-import { buildStepHintLine as _buildStepHintLine } from "@/lib/chat/report-gate-language";
+import { buildStepHintLine as _buildStepHintLine, filterServerAuthoredFragments } from "@/lib/chat/report-gate-language";
+
+import {
+  buildPostInvitationGateResponse,
+  isStartFinalReportInvariantViolated,
+  type GovernanceHistoryMessage,
+} from "@/lib/chat/response-governance-policy";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
@@ -371,15 +377,24 @@ function buildSpecificReportGateResponse(args: {
   repairSummary: RepairSummaryIntentAssessment;
   activeProcedureLabel?: string | null;
   activeStepPrompt?: string | null;
+  history?: GovernanceHistoryMessage[] | null;
 }): string {
   const sidecarReadiness = args.sidecarSignals?.reportReadiness;
-  const sidecarMissing = sidecarReadiness?.accepted && sidecarReadiness.missingFields
+  const sidecarMissingRaw = sidecarReadiness?.accepted && sidecarReadiness.missingFields
     ? sidecarReadiness.missingFields.filter((s) => s.length > 0)
     : [];
 
   // Tier 1 — adjudicated sidecar `missingFields` win when available.
   // These are legal-field names the sidecar grounded in the transcript;
   // they are not a questionnaire authored from scratch.
+  //
+  // Language-fidelity invariant: when the reply language is RU/ES,
+  // sidecar-supplied field names that are dominantly the wrong script
+  // (e.g. raw English fragments leaked from a registry-only English
+  // procedure) MUST NOT be echoed verbatim. Filter them out before
+  // composing the response. If filtering eliminates ALL fragments,
+  // fall through to Tier 2/3/4.
+  const sidecarMissing = filterServerAuthoredFragments(sidecarMissingRaw, args.language);
   if (sidecarMissing.length > 0) {
     switch (args.language) {
       case "RU":
@@ -443,9 +458,19 @@ function buildSpecificReportGateResponse(args: {
     }
   }
 
+  // ── START-FINAL-REPORT INVARIANT ───────────────────────────────────
+  // If the assistant's prior turn explicitly invited the technician to
+  // send `START FINAL REPORT` AND we'd otherwise reach the legacy
+  // generic wall, emit a ChatGPT-style post-invitation acknowledgement
+  // instead. The technician SHOULD NOT see "Diagnostics not complete..."
+  // immediately after we just invited the action.
+  if (isStartFinalReportInvariantViolated(args.history ?? null, /* runtimeReportReady */ false)) {
+    return buildPostInvitationGateResponse(args.language);
+  }
+
   // Tier 4 — last-resort generic wall. Reached only when Context Engine
-  // has no active step to point at AND no sidecar signal is present.
-  // Behaviour preserved from prior PRs.
+  // has no active step to point at AND no sidecar signal is present
+  // AND no recent invitation. Behaviour preserved from prior PRs.
   return buildDiagnosticsNotReadyResponse(args.language);
 }
 
@@ -1350,6 +1375,7 @@ export async function POST(req: Request) {
         repairSummary: repairSummaryIntent,
         activeProcedureLabel: engineResult.context.activeProcedureId ?? null,
         activeStepPrompt: activeStepMetadata?.question ?? null,
+        history: historyBeforeAppend,
       });
       console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved (specific gate)`);
     }
