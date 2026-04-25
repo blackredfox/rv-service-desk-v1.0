@@ -194,8 +194,25 @@ const GENERIC_REPLACEMENT_PATTERNS = [
 ];
 
 const RESTORED_OPERATION_PATTERNS = [
-  /(?:works?|working|operational|functional|back\s+up|resolved)/i,
-  /(?:работает|заработал|функционирует|проблема\s+устранена|неисправность\s+устранена)/i,
+  // English — strict positive-context only. Bare "working" / "operational"
+  // must NEVER match a negation context (e.g. "the pump is not working");
+  // a clear post-repair / restoration cue is required.
+  /\b(?:resolved|back\s+up\s+and\s+running)\b/i,
+  /\b(?:problem|issue)\s+(?:is\s+)?(?:fixed|resolved|solved)\b/i,
+  /\bnow\s+(?:works|working|operational)\b/i,
+  /\b(?:works?|working|operational|operating|running)\s+(?:now|again|properly|correctly|after\s+(?:repair|replacement|fix))\b/i,
+  /\bafter\s+(?:the\s+)?(?:repair|replacement|fix|swap)\b[^.\n]{0,80}\b(?:works?|operational|running|operating|fixed)\b/i,
+  /\b(?:replaced|swapped|installed|fixed)\s+\S+[^.\n]{0,80}\b(?:now\s+)?(?:works?|operational|running|operating)\b/i,
+  // Russian — bare "работает" is too ambiguous (matches "не работает"); a
+  // positive cue word is required.
+  /(?:теперь|снова|штатно|нормально)\s+работает/iu,
+  /работает\s+(?:нормально|штатно|снова|без\s+проблем|корректно)/iu,
+  /\bзаработал(?:а|и)?\b/iu,
+  /(?:проблема|неисправность)\s+устранена/iu,
+  /(?:после\s+(?:замен|ремонт|почин|восстанов)\S*)[^.\n]{0,80}(?:работает|функционирует|запустился|включается)/iu,
+  // Spanish — same approach.
+  /\bfunciona\s+(?:correctamente|bien|de\s+nuevo|ahora)/iu,
+  /(?:después\s+de\s+|tras\s+)(?:el\s+)?(?:reemplaz|repar|cambi)\S*[^.\n]{0,80}(?:funciona|opera)/iu,
 ];
 
 function cleanAuthorityText(text?: string | null): string | undefined {
@@ -271,6 +288,14 @@ export function deriveFinalReportAuthorityFacts(
     ? `Technician confirmed restored operation after repair. ${cleanedRestore ?? "System operational after repair."}`
     : cleanAuthorityText(context.isolationFinding) ?? cleanedFault;
 
+  // Case-89 truth-integrity guard: when the technician has NOT confirmed
+  // a corrective action AND has NOT confirmed restoration, the authority
+  // summary must NOT push the LLM toward a "repaired/restored" framing.
+  const hasNoRepairEvidence = !cleanedRepair && !cleanedRestore && !hasRestoredOperation;
+  const closingLine = hasNoRepairEvidence
+    ? "- No corrective action has been performed yet — the report must describe the diagnostic isolation only and may RECOMMEND a future corrective action; it must not claim the repair was done."
+    : "- Earlier pre-repair observations must not override this restored final state.";
+
   return {
     complaint,
     diagnosticProcedure:
@@ -285,7 +310,7 @@ export function deriveFinalReportAuthorityFacts(
       cleanedFault ? `- Root cause / fault: ${cleanedFault}` : undefined,
       cleanedRepair ? `- Corrective action performed: ${cleanedRepair}` : undefined,
       verifiedCondition ? `- Final verified condition: ${verifiedCondition}` : undefined,
-      "- Earlier pre-repair observations must not override this restored final state.",
+      closingLine,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -297,9 +322,20 @@ export function buildFinalReportAuthorityConstraint(
 ): string {
   if (!facts?.authoritySummary) return "";
 
+  // When the authority summary already encodes a no-repair-performed
+  // closing line (Case-89 direct-power isolation), use a closing
+  // sentence that does NOT push the LLM toward "repaired/restored".
+  const hasNoRepairClosing = facts.authoritySummary.includes(
+    "No corrective action has been performed yet",
+  );
+
+  const trailingLine = hasNoRepairClosing
+    ? "For the FINAL REPORT, the Verified Condition must reflect ONLY the diagnostic isolation. The Recommended Corrective Action may RECOMMEND a future repair using future / imperative wording. It MUST NOT state, imply, or invent that the repair was performed or that the system is operational after repair."
+    : "For the FINAL REPORT, the Verified Condition and Recommended Corrective Action must reflect this repaired/restored latest state, not an earlier pre-repair snapshot.";
+
   return [
     "AUTHORITATIVE FINAL STATE (LATEST TECHNICIAN-VERIFIED — USE THIS AS SOURCE OF TRUTH):",
     facts.authoritySummary,
-    "For the FINAL REPORT, the Verified Condition and Recommended Corrective Action must reflect this repaired/restored latest state, not an earlier pre-repair snapshot.",
+    trailingLine,
   ].join("\n\n");
 }

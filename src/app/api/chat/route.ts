@@ -93,6 +93,8 @@ import {
   classifyStepGuidanceIntent,
   normalizeRoutingInput,
   assessRepairSummaryIntent,
+  assessTranscriptRepairStatus,
+  type RepairSummaryIntentAssessment,
   // LLM Runtime Signals (advisory sidecar)
   tryAdjudicateRuntimeSignals,
   isLlmRuntimeSignalsEnabled,
@@ -100,9 +102,18 @@ import {
   buildAdjudicationDebug,
   mayOpenReportSurface,
   produceRuntimeSignalProposal,
+  consumeAdjudicatedDiagnosticSignals,
+  buildConsumerDebug,
   type AdjudicatedSignals,
   type AdjudicationServerState,
 } from "@/lib/chat";
+
+import {
+  isDiagnosticOutputSanitizerEnabled,
+  wrapEmitterWithDiagnosticSanitizer,
+} from "@/lib/chat/diagnostic-output-sanitizer";
+
+import { buildStepHintLine as _buildStepHintLine } from "@/lib/chat/report-gate-language";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
@@ -245,8 +256,11 @@ function buildAuthoritativeCompletionOffer(args: {
   }
 }
 
-function buildTranscriptDerivedDraftConstraint(): string {
-  return [
+function buildTranscriptDerivedDraftConstraint(opts?: {
+  repairPerformed?: boolean;
+  restorationConfirmed?: boolean;
+}): string {
+  const lines: string[] = [
     "REPORT ASSEMBLY (MANDATORY):",
     "- Assemble the final report draft yourself from the case transcript and technician-verified facts.",
     "- Propose each section (Complaint, Diagnostic Procedure, Verified Condition, Recommended Corrective Action, Estimated Labor with breakdown lines, Required Parts) using what the technician has already reported in-conversation.",
@@ -254,7 +268,35 @@ function buildTranscriptDerivedDraftConstraint(): string {
     "- Do NOT ask questionnaire-style questions before generating the draft.",
     "- The technician will review and correct the draft if needed; proposing items is your job.",
     "- If a specific item is truly not inferable from the transcript, use a conservative shop-style placeholder rather than asking a question.",
-  ].join("\n");
+  ];
+
+  // Case-89 — TRUTH / NO-INVENTION rules.
+  // When the transcript does NOT establish that the repair was actually
+  // completed, the assistant must NOT invent post-repair restoration
+  // claims. The Recommended Corrective Action section may still
+  // RECOMMEND the future repair using imperative / future wording.
+  if (opts && opts.repairPerformed === false) {
+    lines.push(
+      "",
+      "TRUTH / NO-INVENTION (MANDATORY):",
+      "- The technician has NOT stated that the repair / replacement was performed. Do not assume or imply it was.",
+      "- Do NOT claim the part was replaced, swapped, installed, fixed, or that any repair was completed.",
+      "- The Verified Condition section must describe the diagnostic finding only (e.g. \"Water pump failed direct-power test; replacement required\"). It must NOT contain the words \"after replacement\", \"restored\", \"repair completed\", \"post-repair\", \"system is operating\", or any equivalent post-repair claim.",
+      "- The Recommended Corrective Action section may RECOMMEND a future repair using imperative / future wording (e.g. \"Replace the water pump and verify operation after installation\"). It must NOT state the repair has already been done.",
+      "- The Estimated Labor section must NOT include a line for post-repair operational verification when no repair has been performed. Only include diagnostic / replacement-task lines that are consistent with the technician's labor figure.",
+    );
+  }
+
+  if (opts && opts.restorationConfirmed === false) {
+    lines.push(
+      "",
+      "RESTORATION (MANDATORY):",
+      "- The technician has NOT confirmed that the system is operational after repair.",
+      "- Do NOT state or imply \"system is operating\", \"verified after repair\", \"post-repair operational check passed\", \"работает после ремонта\", \"funciona después de la reparación\", or any equivalent wording.",
+    );
+  }
+
+  return lines.join("\n");
 }
 
 function buildReportTypePromptConstraint(reportKind?: ReportKind): string {
@@ -305,6 +347,120 @@ function buildAcSubtypeClarificationResponse(language: Language): string {
  * but diagnostics are still in progress (isolation not complete).
  * Remains in diagnostic mode and directs the technician to continue.
  */
+/**
+ * Build a deterministic response when the technician requests a final report
+ * but diagnostics are still in progress (isolation not complete).
+ *
+ * Specificity rules (Blocker 2):
+ *   - When the LLM sidecar's report-readiness candidate was accepted and
+ *     supplied a `missingFields` list, name those fields back to the user.
+ *   - When the server-owned `assessRepairSummaryIntent` shows the request
+ *     is genuinely report-shaped but the technician has not yet supplied
+ *     all of complaint / findings / corrective_action, ask precisely for
+ *     the missing items via `buildRepairSummaryClarificationResponse`.
+ *   - Only fall back to the generic "diagnostics not complete" wall when
+ *     no specific signal is present.
+ *
+ * NOTE: this helper changes ONLY the prose. State, legality, and Context
+ * Engine flow are unchanged — the gate is still server-owned and
+ * Context Engine remains the authority that flips isolationComplete.
+ */
+function buildSpecificReportGateResponse(args: {
+  language: Language;
+  sidecarSignals: AdjudicatedSignals | null;
+  repairSummary: RepairSummaryIntentAssessment;
+  activeProcedureLabel?: string | null;
+  activeStepPrompt?: string | null;
+}): string {
+  const sidecarReadiness = args.sidecarSignals?.reportReadiness;
+  const sidecarMissing = sidecarReadiness?.accepted && sidecarReadiness.missingFields
+    ? sidecarReadiness.missingFields.filter((s) => s.length > 0)
+    : [];
+
+  // Tier 1 — adjudicated sidecar `missingFields` win when available.
+  // These are legal-field names the sidecar grounded in the transcript;
+  // they are not a questionnaire authored from scratch.
+  if (sidecarMissing.length > 0) {
+    switch (args.language) {
+      case "RU":
+        return `Чтобы завершить отчёт, мне нужны только эти данные: ${sidecarMissing.join(", ")}. Подтвердите их, пожалуйста, чтобы я подготовил отчёт корректно.`;
+      case "ES":
+        return `Para completar el informe, solo necesito estos datos: ${sidecarMissing.join(", ")}. Por favor confírmalos para preparar el informe correctamente.`;
+      default:
+        return `To finish the report, I only need these items: ${sidecarMissing.join(", ")}. Please confirm them so I can prepare the report correctly.`;
+    }
+  }
+
+  // Tier 2 — technician supplied a dense report-ready narrative; Context
+  // Engine just hasn't flagged isolation. Acknowledge what was recorded
+  // and — if available — point at the specific active step that's still
+  // open. We deliberately do NOT ask the technician to re-author
+  // complaint / findings / repair (ARCHITECTURE_RULE A1).
+  if (args.repairSummary.readyForReportRouting) {
+    const stepHint = args.activeStepPrompt
+      ? buildStepHintLine(args.language, args.activeStepPrompt)
+      : null;
+    switch (args.language) {
+      case "RU":
+        return [
+          "Понял — отчёт нужен. Жалоба, осмотр и выполненный ремонт уже зафиксированы.",
+          "Я подготовлю отчёт, как только будет закрыто следующее подтверждение:",
+          stepHint
+            ?? "подтвердите, пожалуйста, что диагностика по этому случаю закрыта.",
+        ].join(" ");
+      case "ES":
+        return [
+          "Entendido — quieres el informe. La queja, la inspección y la reparación ya están registradas.",
+          "Prepararé el informe en cuanto se cierre la siguiente confirmación:",
+          stepHint
+            ?? "confirma que el diagnóstico de este caso está cerrado.",
+        ].join(" ");
+      default:
+        return [
+          "Understood — you want the report. Complaint, inspection findings, and the repair you completed are already recorded.",
+          "I can prepare it as soon as this specific confirmation is closed:",
+          stepHint
+            ?? "please confirm diagnostics are closed for this case.",
+        ].join(" ");
+    }
+  }
+
+  // Tier 3 — technician asked for a report but the transcript isn't yet
+  // dense enough to route. If we know the next legal diagnostic step
+  // from Context Engine, name it directly so the technician sees the
+  // exact action that would unlock the report. We do NOT ask the
+  // technician to author the report (no questionnaire) and we do NOT
+  // emit the generic wall.
+  if (args.activeStepPrompt) {
+    const stepHint = buildStepHintLine(args.language, args.activeStepPrompt);
+    switch (args.language) {
+      case "RU":
+        return `Понял — отчёт нужен. Прежде чем я его подготовлю, ${stepHint.charAt(0).toLowerCase()}${stepHint.slice(1)}`;
+      case "ES":
+        return `Entendido — quieres el informe. Antes de prepararlo, ${stepHint.charAt(0).toLowerCase()}${stepHint.slice(1)}`;
+      default:
+        return `Understood — you want the report. Before I can prepare it, ${stepHint.charAt(0).toLowerCase()}${stepHint.slice(1)}`;
+    }
+  }
+
+  // Tier 4 — last-resort generic wall. Reached only when Context Engine
+  // has no active step to point at AND no sidecar signal is present.
+  // Behaviour preserved from prior PRs.
+  return buildDiagnosticsNotReadyResponse(args.language);
+}
+
+/**
+ * Heuristic — does `text` look like it belongs to `language`?
+ *
+ * Re-exported from `@/lib/chat/report-gate-language` so route-level
+ * code can stay backwards-compatible. See that module for the full
+ * contract.
+ */
+
+function buildStepHintLine(language: Language, stepPrompt: string): string {
+  return _buildStepHintLine(language, stepPrompt);
+}
+
 function buildDiagnosticsNotReadyResponse(language: Language): string {
   switch (language) {
     case "RU":
@@ -645,9 +801,15 @@ export async function POST(req: Request) {
     }
   } else if (effectiveHasBoundedReportRequest) {
     if (readyForImmediateReport) {
+      const transcriptRepairStatusEarly = assessTranscriptRepairStatus(
+        historyBeforeAppend
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .concat(routingMessage),
+      );
       reportPromptConstraint = [
         buildReportTypePromptConstraint(requestedReportKind),
-        buildTranscriptDerivedDraftConstraint(),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusEarly),
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -801,6 +963,36 @@ export async function POST(req: Request) {
     // Save the active step ID BEFORE context engine processes the message.
     // Used by STEP COMPLETION HARDENING to determine if the engine already advanced the step.
     const stepIdBeforeProcessing = getOrCreateContext(ensuredCase.id)?.activeStepId ?? null;
+
+    // ── CONSUME ADJUDICATED DIAGNOSTIC SIGNALS ───────────────────────
+    // Server-owned consumption of accepted subtype-lock / step-issue
+    // signals from the already-merged sidecar adjudication layer.
+    //
+    // AUTHORITY BOUNDARY:
+    //   - Only signals with verdict `accepted: true` are consumed.
+    //   - Consumption uses existing server-owned registry primitives
+    //     (`addSubtypeExclusionsFromSignal`, `forceStepComplete`).
+    //   - Context Engine is NOT mutated directly here. Subsequent step
+    //     selection still flows through `getNextStepBranchAware`, which
+    //     reads the updated subtype-exclusion set from the registry.
+    //   - Consumer fails closed if the flag is OFF, no signals exist,
+    //     or no active procedure is bound to the case.
+    if (sidecarSignals) {
+      const consumerResult = consumeAdjudicatedDiagnosticSignals({
+        caseId: ensuredCase.id,
+        signals: sidecarSignals,
+        activeStepId: stepIdBeforeProcessing,
+      });
+      if (
+        consumerResult.subtypeExclusionsAdded.length > 0 ||
+        consumerResult.stepIssueActions.length > 0
+      ) {
+        console.log(
+          `[Chat API v2] Diagnostic runtime signals consumed:`,
+          buildConsumerDebug(consumerResult),
+        );
+      }
+    }
 
     engineResult = processContextMessage(ensuredCase.id, routingMessage, DEFAULT_CONFIG);
 
@@ -1132,9 +1324,12 @@ export async function POST(req: Request) {
     if (effectiveHasBoundedReportRequest && currentMode === "diagnostic" && isFinalReportReady(engineResult.context)) {
       currentMode = "final_report";
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      const transcriptRepairStatusPostCtx = assessTranscriptRepairStatus(
+        history.filter((msg) => msg.role === "user").map((msg) => msg.content),
+      );
       reportPromptConstraint = [
         buildReportTypePromptConstraint(requestedReportKind),
-        buildTranscriptDerivedDraftConstraint(),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusPostCtx),
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -1145,9 +1340,18 @@ export async function POST(req: Request) {
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
     } else if (effectiveHasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
-      // Stay in diagnostic mode and continue from the correct legal state.
-      reportRoutingResponse = buildDiagnosticsNotReadyResponse(outputPolicy.effective);
-      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved`);
+      // Stay in diagnostic mode but build a SPECIFIC gate response that names
+      // what is actually missing (sidecar `missingFields` if available, then
+      // — when the technician supplied a dense narrative — the active
+      // procedure step that is still open; otherwise the generic wall).
+      reportRoutingResponse = buildSpecificReportGateResponse({
+        language: outputPolicy.effective,
+        sidecarSignals,
+        repairSummary: repairSummaryIntent,
+        activeProcedureLabel: engineResult.context.activeProcedureId ?? null,
+        activeStepPrompt: activeStepMetadata?.question ?? null,
+      });
+      console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved (specific gate)`);
     }
   }
 
@@ -1188,10 +1392,20 @@ export async function POST(req: Request) {
   // flow through the primary completion path with the REPORT REVISION prompt
   // so the LLM patches the existing report line-by-line instead of rewriting
   // the Estimated Labor section to a single-item total.
-  const isLaborOverrideRequest = postFinalLineEdit
+  //
+  // First-turn fresh transitions to `final_report` (e.g. Case-88 — water-pump
+  // direct-power isolation + warranty-report request in a single message) are
+  // also NOT labor-total overrides: there is no prior report whose labor we
+  // could possibly be overriding. The labor figure ("0.5 h labor") is part
+  // of the transcript-derived facts the LLM must use when assembling the
+  // initial draft, not a directive to overwrite an existing total. Gate on
+  // `existingReportInContext`, computed pre-transition from history.
+  const isLaborOverrideRequest = postFinalLineEdit || !existingReportInContext
     ? false
     : laborOverride.isLaborOverrideRequest;
-  const requestedLaborHours = postFinalLineEdit ? null : laborOverride.requestedLaborHours;
+  const requestedLaborHours = postFinalLineEdit || !existingReportInContext
+    ? null
+    : laborOverride.requestedLaborHours;
   const requestedLaborHoursText =
     requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
 
@@ -1224,7 +1438,7 @@ export async function POST(req: Request) {
       let full = "";
       let aborted = false;
       let firstSseTokenEmitted = false;
-      const emitToken = (token: string) => {
+      const rawEmitToken = (token: string) => {
         if (aborted || !token) return;
         if (!firstSseTokenEmitted) {
           firstSseTokenEmitted = true;
@@ -1234,6 +1448,28 @@ export async function POST(req: Request) {
           });
         }
         controller.enqueue(encoder.encode(sseEncode({ type: "token", token })));
+      };
+
+      // ── Diagnostic output sanitizer (covers ALL emission paths) ────
+      //
+      // In diagnostic mode, every user-visible token — whether streamed
+      // from the primary LLM completion, step-guidance completion, the
+      // authoritative-completion direct emit, or the report-routing
+      // direct emit — passes through the same line-buffered sanitizer
+      // before reaching SSE. This eliminates banner / metadata leakage
+      // regardless of which code path produced the text.
+      //
+      // Feature-flagged via `DISABLE_DIAGNOSTIC_OUTPUT_SANITIZER` for
+      // emergency rollback (default: enabled).
+      const sanitizingEmitter =
+        currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled()
+          ? wrapEmitterWithDiagnosticSanitizer(rawEmitToken, {
+              replyLanguage: outputPolicy.effective,
+            })
+          : null;
+      const emitToken = sanitizingEmitter ? sanitizingEmitter.emit : rawEmitToken;
+      const flushSanitizer = (): void => {
+        if (sanitizingEmitter) sanitizingEmitter.flush();
       };
 
       const onAbort = () => {
@@ -1285,7 +1521,8 @@ export async function POST(req: Request) {
             );
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1336,7 +1573,8 @@ export async function POST(req: Request) {
             }
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1363,7 +1601,8 @@ export async function POST(req: Request) {
             });
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1404,12 +1643,18 @@ export async function POST(req: Request) {
             });
           }
 
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
 
         // ── PRIMARY REQUEST PATH ────────────────────────────────────
+        //
+        // The diagnostic-mode sanitizer is already applied to `emitToken`
+        // at the SSE controller scope, so the primary completion's
+        // streamed tokens are sanitized automatically. Below we simply
+        // pass `emitToken` through; no per-call wrapping needed.
         const result = await executePrimaryChatCompletion({
           apiKey,
           caseId: ensuredCase.id,
@@ -1437,7 +1682,8 @@ export async function POST(req: Request) {
           controller.enqueue(
             encoder.encode(sseEncode({ type: "error", code: "UPSTREAM_ERROR", message: result.upstreamError }))
           );
-          controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
+                  flushSanitizer();
+        controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
           controller.close();
           return;
         }
@@ -1483,6 +1729,7 @@ export async function POST(req: Request) {
           });
         }
 
+                flushSanitizer();
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } catch (e: unknown) {
@@ -1495,6 +1742,7 @@ export async function POST(req: Request) {
         controller.enqueue(
           encoder.encode(sseEncode({ type: "error", code: "INTERNAL_ERROR", message: msg.slice(0, 300) }))
         );
+                flushSanitizer();
         controller.enqueue(encoder.encode(sseEncode({ type: "done" })));
         controller.close();
       } finally {
@@ -1527,4 +1775,5 @@ export const __test__ = {
   shouldTreatAsFinalReportForOverride,
   applyDiagnosticModeValidationGuard,
   computeLaborOverrideRequest,
+  buildTranscriptDerivedDraftConstraint,
 };

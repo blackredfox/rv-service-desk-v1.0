@@ -308,8 +308,16 @@ describe("/api/chat water-heater runtime dominance", () => {
     // Case remains in diagnostic mode for SSE envelope.
     expect(reportTurn.streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(reportTurn.streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic RU diagnostics-not-ready deferral — NOT a questionnaire.
-    expect(reportTurn.streamText).toContain("Диагностика ещё не завершена");
+    // Specific report-gate response (Blocker 2): dynamic wording referencing
+    // the active diagnostic step instead of the legacy generic wall.
+    // We assert stable RU markers for either Tier 2 (acknowledgment) or
+    // Tier 3 (request-received) of buildSpecificReportGateResponse, plus
+    // the "one step remaining" hint that points at the active step.
+    expect(reportTurn.streamText).toMatch(/Понял — отчёт нужен\.|Диагностика ещё не завершена/);
+    expect(reportTurn.streamText).toContain("остался один шаг");
+    // Anti-questionnaire guard: must NOT ask the technician to re-author
+    // complaint/findings/repair (ARCHITECTURE_RULE A1).
+    expect(reportTurn.streamText).not.toContain("исходную жалобу");
     // Context Engine retains authority — the branch is still active.
     // The specific next step within the branch (e.g. wh_5a → wh_5b) is
     // owned by the engine; what matters for doctrine is that we remain
@@ -351,8 +359,19 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
-    expect(reportTurn.streamText).toContain("no est");
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic ES
+    // wording. Either Tier 2 ("Entendido — quieres el informe. La queja,
+    // la inspección …"), Tier 3 ("Entendido — quieres el informe. Antes
+    // de prepararlo, …"), or Tier 4 fallback ("aún no está completo").
+    expect(reportTurn.streamText).toMatch(
+      /Entendido — quieres el informe\.|aún no está completo/,
+    );
+    expect(reportTurn.streamText).toMatch(
+      /queda un paso|confirma que el diagnóstico|paso actual antes de generar|Antes de prepararlo/,
+    );
+    // Anti-questionnaire guard: must NOT ask the technician to re-author
+    // complaint/findings/repair fields.
+    expect(reportTurn.streamText).not.toContain("la queja original");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });
@@ -366,8 +385,20 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // With the fix: diagnostics-not-ready response instead of repair-summary questionnaire
-    expect(reportTurn.streamText).toContain("not yet complete");
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic EN
+    // wording. Either Tier 2 ("Understood — you want the report.
+    // Complaint, inspection findings…"), Tier 3 ("Understood — you want
+    // the report. Before I can prepare it, …"), or Tier 4 fallback
+    // ("not yet complete").
+    expect(reportTurn.streamText).toMatch(
+      /Understood — you want the report\.|not yet complete/,
+    );
+    expect(reportTurn.streamText).toMatch(
+      /One step is still open before the report can be issued|please confirm diagnostics are closed|continue with the current step before generating|Before I can prepare it/,
+    );
+    // Anti-questionnaire guard: must NOT ask the technician to re-author
+    // complaint/findings/repair fields.
+    expect(reportTurn.streamText).not.toContain("the original complaint");
     expect(reportTurn.streamText).not.toContain("wh_5b");
     expect(reportTurn.streamText).not.toContain("wh_5c");
   });

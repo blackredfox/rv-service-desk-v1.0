@@ -168,8 +168,16 @@ describe("Dirty-input report routing", () => {
     // Emits the diagnostic stream envelope, not the final_report mode event.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready response (EN).
-    expect(streamText).toContain("Diagnostics are not yet complete");
+    // Specific report-gate response (Blocker 2 + Case-86 ChatGPT-like
+    // acknowledgment): dynamic EN wording. Either Tier 2 ("Understood —
+    // you want the report. Complaint, inspection findings, …"), Tier 3
+    // ("Understood — you want the report. Before I can prepare it, …"),
+    // or Tier 4 fallback ("not yet complete").
+    expect(streamText).toMatch(
+      /Understood — you want the report\.|not yet complete/,
+    );
+    // Anti-questionnaire guard.
+    expect(streamText).not.toContain("the original complaint");
   });
 
   it("does NOT transition to final_report for RU natural report intent before runtime readiness", async () => {
@@ -207,8 +215,15 @@ describe("Dirty-input report routing", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready response (RU).
-    expect(streamText).toContain("Диагностика ещё не завершена");
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic RU
+    // wording. Either Tier 2 ("Понял — отчёт нужен. Жалоба, осмотр …"),
+    // Tier 3 ("Понял — отчёт нужен. Прежде чем я его подготовлю, …"),
+    // or Tier 4 fallback ("Диагностика ещё не завершена").
+    expect(streamText).toMatch(
+      /Понял — отчёт нужен\.|Диагностика ещё не завершена/,
+    );
+    // Anti-questionnaire guard.
+    expect(streamText).not.toContain("исходную жалобу");
   });
 
   it("does NOT transition to final_report for ES natural report intent before runtime readiness", async () => {
@@ -246,8 +261,16 @@ describe("Dirty-input report routing", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Deterministic diagnostics-not-ready response (ES).
-    expect(streamText).toContain("El diagnóstico aún no está completo");
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic ES
+    // wording. Either Tier 2 ("Entendido — quieres el informe. La queja,
+    // la inspección …"), Tier 3 ("Entendido — quieres el informe.
+    // Antes de prepararlo, …"), or Tier 4 fallback ("aún no está
+    // completo").
+    expect(streamText).toMatch(
+      /Entendido — quieres el informe\.|aún no está completo/,
+    );
+    // Anti-questionnaire guard.
+    expect(streamText).not.toContain("la queja original");
   });
 
   it("does NOT transition to final_report for mixed-language typo-heavy report request before runtime readiness", async () => {
