@@ -78,6 +78,16 @@ const DROP_LINE_PATTERNS: RegExp[] = [
   /^\s*PASO\s+ACTUAL\s*:.*$/i,
   /^\s*Pregunta\s+EXACTAMENTE\s*:.*$/i,
   /^\s*TODOS\s+LOS\s+PASOS\s+COMPLETADOS\.?\s*$/i,
+
+  // Procedure-name header banner observed in Case-88, e.g.:
+  //   "Water Pump — Пошаговая диагностика"
+  //   "Water Heater — Step-by-step diagnostics"
+  //   "Bomba de agua — Diagnóstico paso a paso"
+  // The LLM rephrases the internal procedure-context banner into a
+  // human-readable header. Drop the whole line in any reply language.
+  /^\s*\S[^\n]*?\s*[—–\-]\s*Пошаговая\s+диагностика\.?\s*$/iu,
+  /^\s*\S[^\n]*?\s*[—–\-]\s*Step[-\s]*by[-\s]*step\s+diagnostic(?:s)?\.?\s*$/i,
+  /^\s*\S[^\n]*?\s*[—–\-]\s*Diagn[óo]stico\s+paso\s+a\s+paso\.?\s*$/iu,
 ];
 
 // ── Strip-leading-prefix patterns ──────────────────────────────────────
@@ -112,19 +122,35 @@ const STRIP_INLINE_PATTERNS: RegExp[] = [
 
 /**
  * Sanitize a single complete line of LLM output.
+ *
+ * @param line raw output line (no trailing newline)
+ * @param options optional behaviour switches:
+ *   - `replyLanguage`: when "RU" or "ES", a step-prefix line whose
+ *     residual content is dominantly the wrong script (e.g. an English
+ *     active-step prompt leaked into a RU response — Case-88) is dropped
+ *     entirely instead of emitting the raw foreign-language text.
+ *
  * Returns:
  *   - `null` if the line should be dropped entirely
  *   - the (possibly modified) line otherwise
  */
-export function sanitizeLine(line: string): string | null {
+export function sanitizeLine(
+  line: string,
+  options?: { replyLanguage?: "RU" | "EN" | "ES" },
+): string | null {
   // Drop empty lines that arise from cleaning above (let the caller
   // collapse repeated blank lines).
   for (const pat of DROP_LINE_PATTERNS) {
     if (pat.test(line)) return null;
   }
   let out = line;
+  let prefixWasStripped = false;
   for (const pat of STRIP_PREFIX_PATTERNS) {
-    out = out.replace(pat, "");
+    const replaced = out.replace(pat, "");
+    if (replaced !== out) {
+      prefixWasStripped = true;
+      out = replaced;
+    }
   }
   // Strip inline metadata fragments mid-line (Case 86 leakage).
   for (const pat of STRIP_INLINE_PATTERNS) {
@@ -133,7 +159,48 @@ export function sanitizeLine(line: string): string | null {
   // Collapse runs of whitespace introduced by the inline strips and
   // trim any leading punctuation/whitespace left behind.
   out = out.replace(/\s{2,}/g, " ").replace(/^[\s.,;:·•|/—–-]+/, "");
+
+  // Case-88 — Language-fidelity drop:
+  // If a step-prefix was stripped (i.e. this line was originally
+  // "Шаг wp_2: Measure voltage..." or similar) and the technician's
+  // reply language is RU / ES, the residual must be in the same
+  // script. Otherwise the registry's English step text is leaking
+  // into a non-English reply. Drop the line rather than echo it.
+  if (
+    prefixWasStripped &&
+    options?.replyLanguage &&
+    options.replyLanguage !== "EN" &&
+    !looksLikeReplyLanguage(out, options.replyLanguage)
+  ) {
+    return null;
+  }
+
   return out;
+}
+
+/**
+ * Conservative dominance check used by `sanitizeLine` to decide whether
+ * the residual of a step-prefix line is still in the technician's reply
+ * language. Mirrors the behaviour of `looksLikeLanguage` in
+ * `report-gate-language.ts` but is duplicated here intentionally so the
+ * sanitizer has zero coupling to the report-gate module.
+ */
+function looksLikeReplyLanguage(
+  text: string,
+  language: "RU" | "ES",
+): boolean {
+  const letters = text.match(/[A-Za-z\u00C0-\u024F\u0400-\u04FF]/g) ?? [];
+  if (letters.length === 0) return true; // numeric / punctuation only
+  const cyr = letters.filter((c) => /[\u0400-\u04FF]/.test(c)).length;
+  const lat = letters.length - cyr;
+  if (language === "RU") {
+    return cyr >= Math.max(3, Math.floor(letters.length * 0.5));
+  }
+  // ES — Latin script expected. Reject if Cyrillic dominates and require
+  // a Spanish-specific marker (otherwise Latin text is likely English,
+  // which we must NOT echo into ES prose either).
+  if (cyr > lat) return false;
+  return /[áéíóúñ¿¡]|(?:^|\s)(?:el|la|los|las|que|del|para|de|con|sin|cómo|qué|cuál|hay|verifica|comprueba|mide|inspecciona)\b/i.test(text);
 }
 
 export type SanitizingEmitter = {
@@ -152,9 +219,15 @@ export type SanitizingEmitter = {
  *
  * IMPORTANT: callers MUST invoke `flush()` exactly once after the upstream
  * stream has finished, so the final unterminated buffer can be evaluated.
+ *
+ * Optional `options.replyLanguage`: when "RU" or "ES", lines with stripped
+ * step-id prefixes whose residual is dominantly the wrong script are
+ * dropped (Case-88 — registry-only English active-step text MUST NOT leak
+ * into a non-English technician-facing reply).
  */
 export function wrapEmitterWithDiagnosticSanitizer(
   emitToken: (text: string) => void,
+  options?: { replyLanguage?: "RU" | "EN" | "ES" },
 ): SanitizingEmitter {
   let pending = "";
   // Track whether the previous emitted character was a newline so we can
@@ -162,7 +235,7 @@ export function wrapEmitterWithDiagnosticSanitizer(
   let lastEmittedWasNewline = true;
 
   function commitLine(line: string, withNewline: boolean): void {
-    const sanitized = sanitizeLine(line);
+    const sanitized = sanitizeLine(line, options);
     if (sanitized === null) {
       // Whole line dropped — collapse adjacent newlines.
       return;

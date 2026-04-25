@@ -1351,10 +1351,20 @@ export async function POST(req: Request) {
   // flow through the primary completion path with the REPORT REVISION prompt
   // so the LLM patches the existing report line-by-line instead of rewriting
   // the Estimated Labor section to a single-item total.
-  const isLaborOverrideRequest = postFinalLineEdit
+  //
+  // First-turn fresh transitions to `final_report` (e.g. Case-88 — water-pump
+  // direct-power isolation + warranty-report request in a single message) are
+  // also NOT labor-total overrides: there is no prior report whose labor we
+  // could possibly be overriding. The labor figure ("0.5 h labor") is part
+  // of the transcript-derived facts the LLM must use when assembling the
+  // initial draft, not a directive to overwrite an existing total. Gate on
+  // `existingReportInContext`, computed pre-transition from history.
+  const isLaborOverrideRequest = postFinalLineEdit || !existingReportInContext
     ? false
     : laborOverride.isLaborOverrideRequest;
-  const requestedLaborHours = postFinalLineEdit ? null : laborOverride.requestedLaborHours;
+  const requestedLaborHours = postFinalLineEdit || !existingReportInContext
+    ? null
+    : laborOverride.requestedLaborHours;
   const requestedLaborHoursText =
     requestedLaborHours !== null ? formatLaborHours(requestedLaborHours) : null;
 
@@ -1412,7 +1422,9 @@ export async function POST(req: Request) {
       // emergency rollback (default: enabled).
       const sanitizingEmitter =
         currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled()
-          ? wrapEmitterWithDiagnosticSanitizer(rawEmitToken)
+          ? wrapEmitterWithDiagnosticSanitizer(rawEmitToken, {
+              replyLanguage: outputPolicy.effective,
+            })
           : null;
       const emitToken = sanitizingEmitter ? sanitizingEmitter.emit : rawEmitToken;
       const flushSanitizer = (): void => {

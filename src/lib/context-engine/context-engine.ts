@@ -149,6 +149,81 @@ const NEGATIVE_RESTORATION: RegExp[] = [
   /^(?:нет|no|nope|nah)$/i,
 ];
 
+// ── Case-88: Water-pump direct-power terminal evidence ──────────────
+//
+// In RV pump diagnostics, applying battery voltage directly to the pump
+// terminals is itself the definitive isolation procedure: if 12V is
+// confirmed at the pump and the pump still does not run when powered
+// directly, the motor is mechanically/electrically failed and must be
+// replaced. There is no further diagnostic step that can change this
+// conclusion — restoration confirmation is not applicable in a
+// pre-replacement warranty workflow.
+//
+// These patterns are NARROW on purpose:
+//   - they require BOTH a "direct-power-applied" cue AND a
+//     "pump-not-running" cue to co-occur in the technician's message;
+//   - they only fire when the active procedure is `water_pump`;
+//   - they bypass MIN_STEPS_FOR_COMPLETION because the direct-power
+//     test is itself the diagnostic conclusion (no prior steps are a
+//     prerequisite for it to be authoritative).
+//
+// Authority contract is preserved:
+//   - Server (Context Engine) owns isolation. The LLM never sets it.
+//   - The synthesized finding is grounded in the technician's own
+//     transcript wording ("12V applied directly, pump does not run").
+//
+const DIRECT_POWER_APPLIED_PATTERNS: RegExp[] = [
+  // English: "applied 12V directly to the pump", "powered the motor
+  // directly with 12V", "ran 12V straight to the pump", etc.
+  /(?:applied|connected|hooked(?:\s*up)?|powered|wired|jumper(?:ed)?|ran|put)\s+(?:\S+\s+){0,4}\b12\s*(?:v|volts?|vdc)\b\s+(?:\S+\s+){0,4}\b(?:direct(?:ly)?|straight)\b/i,
+  /\b(?:direct(?:ly)?|straight)\b\s+(?:\S+\s+){0,4}\b12\s*(?:v|volts?|vdc)\b\s+(?:\S+\s+){0,4}(?:to|at|on)\s+(?:the\s+)?(?:pump|motor)/i,
+  // Russian: "подключил/подал/подсоединил/запитал 12 в(олт) напрямую"
+  // The unit alternates `в`, `вольт(а|ов)`, and the colloquial typo `волт`
+  // (without soft sign), all of which appear in real technician transcripts.
+  // NOTE: JS `\b` is ASCII-only — it does NOT recognize a Cyrillic letter
+  // as a word boundary. We use an explicit non-letter lookahead instead.
+  /(?:подал|подключил|подсоединил|подвёл|подвел|запитал|пустил|подача)\s+(?:\S+\s+){0,4}12\s*(?:в|вольт(?:а|ов)?|волт(?:а|ов)?|v|volts?|vdc)(?=[\s.,;:!?]|$)\s+(?:\S+\s+){0,4}(?:напрямую|непосредственно|прямо)/iu,
+  // Russian: "напрямую к насосу 12 в" (reverse word order)
+  /(?:напрямую|непосредственно|прямо)\s+(?:\S+\s+){0,4}12\s*(?:в|вольт(?:а|ов)?|волт(?:а|ов)?|v|volts?|vdc)(?=[\s.,;:!?]|$)\s+(?:\S+\s+){0,4}(?:к\s+насосу|на\s+насос|к\s+помпе|на\s+помпу|насос|помп(?:у|е))/iu,
+  // Russian: "12 в напрямую к насосу" (no leading verb — the verb appeared
+  // earlier in the same message but the locality window is too tight)
+  /\b12\s*(?:в|вольт(?:а|ов)?|волт(?:а|ов)?|v|volts?|vdc)(?=[\s.,;:!?]|$)\s+(?:\S+\s+){0,3}(?:напрямую|непосредственно|прямо)\s+(?:\S+\s+){0,3}(?:к\s+насосу|на\s+насос|к\s+помпе|на\s+помпу)/iu,
+  // Spanish: "apliqué 12V directamente a la bomba", "alimenté el motor con 12V directo"
+  /(?:apliqu[eé]|conect[eé]|aliment[eé]|puse|cabl[eé])\s+(?:\S+\s+){0,4}\b12\s*(?:v|voltios?)\b\s+(?:\S+\s+){0,4}(?:direct(?:o|amente))/iu,
+  /(?:direct(?:o|amente))\s+(?:\S+\s+){0,4}\b12\s*(?:v|voltios?)\b\s+(?:\S+\s+){0,4}(?:a\s+la\s+bomba|al\s+motor)/iu,
+];
+
+const PUMP_NO_RUN_PATTERNS: RegExp[] = [
+  // English: "pump does not run", "motor is dead", "pump won't start", etc.
+  /\b(?:pump|motor)\b[^.\n]{0,80}\b(?:not\s+(?:run(?:ning)?|operating|working)|won'?t\s+(?:run|start|operate)|does(?:n'?| no)t\s+(?:run|start|operate|work)|dead|no\s+response|nothing)\b/i,
+  /\b(?:dead|failed|inoperative|bad)\b\s+(?:pump|motor)/i,
+  // Russian: "насос не работает", "насос не рабочий", "помпа мертвая", "насос не запускается"
+  /(?:насос|помпа)[^.\n]{0,80}(?:не\s+(?:работает|запускается|включается|крутит(?:ся)?|вращается|реагирует)|не\s+рабоч(?:ий|ая)|неисправ\S*|мертв\S*|сдох\S*)/iu,
+  /(?:не\s+рабоч(?:ий|ая)|мертв\S*|неисправ\S*)\s+(?:насос|помпа)/iu,
+  // Spanish: "la bomba no funciona", "el motor está muerto"
+  /\b(?:bomba|motor)\b[^.\n]{0,80}(?:no\s+(?:funciona|arranca|gira|opera|trabaja)|no\s+responde|muert[ao])/iu,
+];
+
+/**
+ * Detect Case-88-style water-pump terminal evidence:
+ *   "12V applied directly to the pump AND pump does not run"
+ *
+ * Returns the synthesized isolation finding text, or `null` when no
+ * direct-power isolation evidence is present in the message. Caller
+ * is responsible for checking `activeProcedureId === "water_pump"`.
+ */
+export function detectWaterPumpDirectPowerIsolation(
+  message: string,
+): string | null {
+  const hasDirectPower = DIRECT_POWER_APPLIED_PATTERNS.some((p) => p.test(message));
+  if (!hasDirectPower) return null;
+  const hasNoRun = PUMP_NO_RUN_PATTERNS.some((p) => p.test(message));
+  if (!hasNoRun) return null;
+  return "Water pump failed direct-power test — 12V applied directly to the pump, pump does not run; replacement required.";
+}
+
+
+
 type TerminalStateUpdate = {
   changed: boolean;
   previousPhase: TerminalPhase;
@@ -561,6 +636,43 @@ export function processMessage(
       // Just entered fault_candidate — stop step progression, await restoration
       context.activeStepId = null;
       notices.push(`Strong fault identified: ${context.terminalState.faultIdentified!.text} — awaiting restoration confirmation`);
+      stateChanged = true;
+    }
+  }
+
+  // ── Case-88 — Water-pump direct-power isolation (server-owned) ─────
+  // When the active procedure is `water_pump` AND the technician's
+  // message provides direct-power terminal evidence (12V applied
+  // directly + pump does not run), treat isolation as complete.
+  // This is a domain-specific definitive isolation that does not
+  // require subsequent restoration confirmation — replacement is the
+  // only remaining action, and the technician may be requesting a
+  // pre-replacement warranty report.
+  //
+  // Doctrine preserved:
+  //   - Server still owns isolation. The LLM never sets it.
+  //   - This bypasses MIN_STEPS_FOR_COMPLETION on purpose: the direct-
+  //     power test IS itself the diagnostic conclusion for a pump.
+  //   - It runs only when the registry-bound active procedure is
+  //     `water_pump`, so unrelated systems are unaffected.
+  if (
+    !context.isolationComplete &&
+    context.activeProcedureId === "water_pump"
+  ) {
+    const directPowerFinding = detectWaterPumpDirectPowerIsolation(message);
+    if (directPowerFinding) {
+      context.isolationComplete = true;
+      context.isolationFinding = directPowerFinding;
+      // Record fault for downstream observability without flipping
+      // terminalState.phase to terminal (no restoration was confirmed).
+      if (!context.terminalState.faultIdentified) {
+        context.terminalState.faultIdentified = {
+          text: directPowerFinding,
+          detectedAt: new Date().toISOString(),
+        };
+      }
+      context.activeStepId = null;
+      notices.push(`Water-pump direct-power isolation: ${directPowerFinding}`);
       stateChanged = true;
     }
   }
