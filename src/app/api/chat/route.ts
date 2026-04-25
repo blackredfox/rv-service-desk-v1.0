@@ -1579,7 +1579,7 @@ export async function POST(req: Request) {
       // Feature-flagged via `DISABLE_DIAGNOSTIC_OUTPUT_SANITIZER` for
       // emergency rollback (default: enabled).
       const sanitizingEmitter =
-        currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled()
+        isDiagnosticOutputSanitizerEnabled()
           ? wrapEmitterWithDiagnosticSanitizer(rawEmitToken, {
               replyLanguage: outputPolicy.effective,
             })

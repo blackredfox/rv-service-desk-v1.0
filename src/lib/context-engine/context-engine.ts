@@ -263,12 +263,15 @@ const GENERIC_COMPONENT_FAILURE_PATTERNS: RegExp[] = [
   /\b\S+\s+(?:does(?:n'?| no)t|won'?t|doesn'?t)\s+(?:work|operate|run|start)\b/i,
   /\b(?:bad|dead|failed|inoperative|broken|defective)\s+\S+/i,
   // Russian: "X не работает", "X неисправен", "X мёртв"
-  /\b\S+\s+не\s+работает\b/iu,
-  /\b\S+\s+(?:неисправ\S*|мертв\S*|сдох\S*)/iu,
-  /\b(?:неисправ\S*|мертв\S*)\s+\S+/iu,
+  // NOTE: JS `\b` is ASCII-only and does not recognize a Cyrillic
+  // letter as a word boundary, so trailing `\b` after a Cyrillic verb
+  // never fires. Use an explicit non-letter lookahead instead.
+  /(?:^|\s)\S+\s+не\s+работает(?=[\s.,;:!?]|$)/iu,
+  /(?:^|\s)\S+\s+(?:неисправ\S*|мертв\S*|сдох\S*)(?=[\s.,;:!?]|$)/iu,
+  /(?:^|\s)(?:неисправ\S*|мертв\S*)\s+\S+/iu,
   // Spanish: "X no funciona", "X está dañado"
-  /\b\S+\s+no\s+funciona\b/iu,
-  /\b\S+\s+est[aá]\s+(?:dañad|roto|muert)/iu,
+  /(?:^|\s)\S+\s+no\s+funciona(?=[\s.,;:!?]|$)/iu,
+  /(?:^|\s)\S+\s+est[aá]\s+(?:dañad|roto|muert)/iu,
 ];
 
 const FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX: RegExp[] = [
