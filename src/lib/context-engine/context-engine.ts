@@ -222,6 +222,90 @@ export function detectWaterPumpDirectPowerIsolation(
   return "Water pump failed direct-power test — 12V applied directly to the pump, pump does not run; replacement required.";
 }
 
+// ── Generalized component-isolation detector (Cases 101–103) ────────
+//
+// Generalizes the Case-88 water-pump direct-power isolation pattern
+// across ANY active procedure. Fires when the technician's message
+// includes ALL THREE of:
+//
+//   - past-tense diagnostic verification: "проверил X" / "checked X" /
+//     "revisé X" (the technician inspected something and is
+//     reporting the result);
+//   - component-level failure assertion: "X не работает" / "X bad" /
+//     "no funciona" / "доxлый";
+//   - future-replacement intent: "надо менять" / "requires replacement"
+//     (the technician concluded the part needs to be replaced — but
+//     has NOT yet replaced it. This is the pre-replacement warranty
+//     workflow that Case-88 first solved for water_pump.).
+//
+// Returns the synthesized isolation finding text, or `null` when the
+// pattern doesn't fully match. Caller is responsible for checking
+// that an active procedure is bound — the ALL-THREE requirement
+// keeps this conservative enough to trigger only on dense
+// component-isolation messages.
+//
+// Authority contract:
+//   - Server (Context Engine) owns the isolation flip. The LLM
+//     never sets it.
+//   - The synthesized finding is grounded in the technician's own
+//     transcript wording (the matched component name + replacement
+//     intent are echoed back into the finding text).
+//
+const GENERIC_DIAGNOSTIC_VERIFICATION_PATTERNS: RegExp[] = [
+  /\b(?:checked|inspected|verified|tested|measured)\s+\S+/i,
+  /(?:проверил(?:а)?|осмотрел(?:а)?|измерил(?:а)?|протестировал(?:а)?)\s+\S+/iu,
+  /(?:revis[eé]|inspeccion[eé]|verifiqu[eé]|med[ií]|prob[eé])\s+\S+/iu,
+];
+
+const GENERIC_COMPONENT_FAILURE_PATTERNS: RegExp[] = [
+  // English: "X is bad", "X does not work", "X failed", "X is dead"
+  /\b\S+\s+(?:is|are)\s+(?:bad|dead|failed|inoperative|broken|defective)\b/i,
+  /\b\S+\s+(?:does(?:n'?| no)t|won'?t|doesn'?t)\s+(?:work|operate|run|start)\b/i,
+  /\b(?:bad|dead|failed|inoperative|broken|defective)\s+\S+/i,
+  // Russian: "X не работает", "X неисправен", "X мёртв"
+  /\b\S+\s+не\s+работает\b/iu,
+  /\b\S+\s+(?:неисправ\S*|мертв\S*|сдох\S*)/iu,
+  /\b(?:неисправ\S*|мертв\S*)\s+\S+/iu,
+  // Spanish: "X no funciona", "X está dañado"
+  /\b\S+\s+no\s+funciona\b/iu,
+  /\b\S+\s+est[aá]\s+(?:dañad|roto|muert)/iu,
+];
+
+const FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX: RegExp[] = [
+  /\b(?:needs?|requires?|will\s+(?:need|require)|going\s+to|gonna|to\s+be)\s+(?:replaced|replacement|swapped|fixed|repaired)\b/i,
+  /\b(?:replacement|repair)\s+(?:is\s+)?(?:required|needed|necessary)\b/i,
+  /(?:требует(?:ся)?|нужн[аоы]?|надо|необходим\S*)\s+(?:замен\S*|поменя\S*|менять|ремонт\S*)/iu,
+  /(?:requiere|necesita|hay\s+que)\s+(?:reemplaz\S*|cambi\S*|repar\S*)/iu,
+];
+
+/**
+ * Detect generic component-isolation evidence (any equipment).
+ * Returns the synthesized isolation finding text, or `null`.
+ *
+ * @param message — current technician message
+ * @param activeProcedureLabel — used to compose a domain-aware
+ *   isolation finding string (e.g. "water_heater" → "Water heater
+ *   component-level isolation: ...").
+ */
+export function detectGenericComponentIsolation(
+  message: string,
+  activeProcedureLabel: string | null,
+): string | null {
+  if (!activeProcedureLabel) return null;
+  const hasVerification = GENERIC_DIAGNOSTIC_VERIFICATION_PATTERNS.some((p) =>
+    p.test(message),
+  );
+  if (!hasVerification) return null;
+  const hasFailure = GENERIC_COMPONENT_FAILURE_PATTERNS.some((p) => p.test(message));
+  if (!hasFailure) return null;
+  const hasFutureRepair = FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX.some((p) =>
+    p.test(message),
+  );
+  if (!hasFutureRepair) return null;
+  const display = activeProcedureLabel.replace(/_/g, " ");
+  return `${display.charAt(0).toUpperCase() + display.slice(1)} component-level isolation: technician verified the component and confirmed it is failed; replacement required.`;
+}
+
 
 
 type TerminalStateUpdate = {
@@ -673,6 +757,38 @@ export function processMessage(
       }
       context.activeStepId = null;
       notices.push(`Water-pump direct-power isolation: ${directPowerFinding}`);
+      stateChanged = true;
+    }
+  }
+
+  // Cases 101–103 generalization: generic component-level isolation.
+  // Fires for ANY active procedure (e.g. water_heater gas-valve
+  // solenoid, dimmer switch, inverter) when the technician's message
+  // contains BOTH a past-tense diagnostic verification AND a
+  // component-failure assertion AND a future-replacement intent.
+  // This preserves the Case-88 design pattern (server-owned
+  // isolation flip on dense component evidence) without case-by-case
+  // hacks and without giving the LLM state authority.
+  if (
+    !context.isolationComplete &&
+    context.activeProcedureId &&
+    context.activeProcedureId !== "water_pump"
+  ) {
+    const genericFinding = detectGenericComponentIsolation(
+      message,
+      context.activeProcedureId,
+    );
+    if (genericFinding) {
+      context.isolationComplete = true;
+      context.isolationFinding = genericFinding;
+      if (!context.terminalState.faultIdentified) {
+        context.terminalState.faultIdentified = {
+          text: genericFinding,
+          detectedAt: new Date().toISOString(),
+        };
+      }
+      context.activeStepId = null;
+      notices.push(`Generic component-level isolation: ${genericFinding}`);
       stateChanged = true;
     }
   }

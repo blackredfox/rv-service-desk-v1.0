@@ -94,6 +94,7 @@ import {
   normalizeRoutingInput,
   assessRepairSummaryIntent,
   assessTranscriptRepairStatus,
+  hasStructuredReportHeaders,
   type RepairSummaryIntentAssessment,
   // LLM Runtime Signals (advisory sidecar)
   tryAdjudicateRuntimeSignals,
@@ -118,6 +119,7 @@ import { buildStepHintLine as _buildStepHintLine, filterServerAuthoredFragments 
 import {
   buildPostInvitationGateResponse,
   isStartFinalReportInvariantViolated,
+  wasFinalReportInvitedRecently,
   type GovernanceHistoryMessage,
 } from "@/lib/chat/response-governance-policy";
 
@@ -1393,6 +1395,65 @@ export async function POST(req: Request) {
         requestedSurface: requestedOutputSurface,
       });
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
+    } else if (
+      effectiveHasBoundedReportRequest &&
+      currentMode === "diagnostic" &&
+      !engineResult.context.activeProcedureId &&
+      hasStructuredReportHeaders(message)
+    ) {
+      // Cases 100/103 generalization — non-procedure dense report.
+      // The technician copy/pasted a structured shop-style narrative
+      // (Complaint / Inspection / Conclusion / Parts / Labor) AND
+      // explicitly asked for a report. There is no Context-Engine
+      // isolation to gate on (no procedure for this equipment), so
+      // we transition to `final_report` and let the LLM build a
+      // transcript-derived draft. Truth integrity is preserved by
+      // the existing `assessTranscriptRepairStatus` constraint —
+      // recommended-only / completed-mixed scenarios are handled.
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      const transcriptRepairStatusStructured = assessTranscriptRepairStatus(
+        history.filter((msg) => msg.role === "user").map((msg) => msg.content),
+      );
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusStructured),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      currentOutputSurface = resolveOutputSurface({
+        mode: currentMode,
+        requestedSurface: requestedOutputSurface,
+      });
+      console.log("[Chat API v2] Mode transition: diagnostic → final_report (structured report headers + explicit report intent, no active procedure)");
+    } else if (
+      effectiveHasBoundedReportRequest &&
+      currentMode === "diagnostic" &&
+      hasEmbeddedExplicitFinalReportCommand &&
+      wasFinalReportInvitedRecently(historyBeforeAppend)
+    ) {
+      // START-FINAL-REPORT INVARIANT (Cases 100/101 follow-up).
+      // The assistant's previous turn explicitly invited the technician
+      // to send `START FINAL REPORT`. The technician complied. The
+      // route MUST honour that invitation and produce report/draft —
+      // not a gate response. Truth integrity is still enforced by the
+      // existing `assessTranscriptRepairStatus` constraint.
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      const transcriptRepairStatusInv = assessTranscriptRepairStatus(
+        history.filter((msg) => msg.role === "user").map((msg) => msg.content),
+      );
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusInv),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      currentOutputSurface = resolveOutputSurface({
+        mode: currentMode,
+        requestedSurface: requestedOutputSurface,
+      });
+      console.log("[Chat API v2] Mode transition: diagnostic → final_report (START FINAL REPORT honoured after assistant invitation)");
     } else if (effectiveHasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
       // Stay in diagnostic mode but build a SPECIFIC gate response that names

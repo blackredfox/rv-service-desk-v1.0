@@ -86,6 +86,7 @@ export {
   assessRepairSummaryIntent,
   assessTranscriptRepairStatus,
   buildRepairSummaryClarificationResponse,
+  hasStructuredReportHeadersExported as hasStructuredReportHeaders,
   type RepairSummaryIntentAssessment,
   type RepairSummaryMissingField,
   type TranscriptRepairStatus,
