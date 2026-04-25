@@ -313,7 +313,7 @@ describe("/api/chat water-heater runtime dominance", () => {
     // We assert stable RU markers for either Tier 2 (acknowledgment) or
     // Tier 3 (request-received) of buildSpecificReportGateResponse, plus
     // the "one step remaining" hint that points at the active step.
-    expect(reportTurn.streamText).toMatch(/Принято: жалоба|Запрос на отчёт принял|Диагностика ещё не завершена/);
+    expect(reportTurn.streamText).toMatch(/Понял — отчёт нужен\.|Диагностика ещё не завершена/);
     expect(reportTurn.streamText).toContain("остался один шаг");
     // Anti-questionnaire guard: must NOT ask the technician to re-author
     // complaint/findings/repair (ARCHITECTURE_RULE A1).
@@ -359,15 +359,15 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // Specific report-gate response (Blocker 2): dynamic ES wording. Either
-    // Tier 2 ("Recibido: …") or Tier 3 ("Solicitud de informe recibida …")
-    // with the active-step hint, or — only when no step is available —
-    // Tier 4 fallback ("aún no está completo").
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic ES
+    // wording. Either Tier 2 ("Entendido — quieres el informe. La queja,
+    // la inspección …"), Tier 3 ("Entendido — quieres el informe. Antes
+    // de prepararlo, …"), or Tier 4 fallback ("aún no está completo").
     expect(reportTurn.streamText).toMatch(
-      /Recibido: queja|Solicitud de informe recibida|aún no está completo/,
+      /Entendido — quieres el informe\.|aún no está completo/,
     );
     expect(reportTurn.streamText).toMatch(
-      /queda un paso|confirma que el diagnóstico está cerrado|paso actual antes de generar/,
+      /queda un paso|confirma que el diagnóstico|paso actual antes de generar|Antes de prepararlo/,
     );
     // Anti-questionnaire guard: must NOT ask the technician to re-author
     // complaint/findings/repair fields.
@@ -385,15 +385,16 @@ describe("/api/chat water-heater runtime dominance", () => {
 
     expect(reportTurn.fetchTriggered).toBe(false);
     expect(storageMocks.updateCase).not.toHaveBeenCalledWith(caseId, { mode: "final_report" });
-    // Specific report-gate response (Blocker 2): dynamic EN wording. Either
-    // Tier 2 ("Got it — complaint, inspection findings…"), Tier 3 ("Got the
-    // report request …") with the active-step hint, or — only when no step
-    // is available — Tier 4 fallback ("not yet complete").
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic EN
+    // wording. Either Tier 2 ("Understood — you want the report.
+    // Complaint, inspection findings…"), Tier 3 ("Understood — you want
+    // the report. Before I can prepare it, …"), or Tier 4 fallback
+    // ("not yet complete").
     expect(reportTurn.streamText).toMatch(
-      /Got it — complaint, inspection findings|Got the report request|not yet complete/,
+      /Understood — you want the report\.|not yet complete/,
     );
     expect(reportTurn.streamText).toMatch(
-      /One step is still open before the report can be issued|please confirm diagnostics are closed|continue with the current step before generating/,
+      /One step is still open before the report can be issued|please confirm diagnostics are closed|continue with the current step before generating|Before I can prepare it/,
     );
     // Anti-questionnaire guard: must NOT ask the technician to re-author
     // complaint/findings/repair fields.

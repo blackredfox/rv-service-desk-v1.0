@@ -112,6 +112,8 @@ import {
   wrapEmitterWithDiagnosticSanitizer,
 } from "@/lib/chat/diagnostic-output-sanitizer";
 
+import { buildStepHintLine as _buildStepHintLine } from "@/lib/chat/report-gate-language";
+
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
 
@@ -369,21 +371,24 @@ function buildSpecificReportGateResponse(args: {
     switch (args.language) {
       case "RU":
         return [
-          "Принято: жалоба, осмотр и проведённый ремонт зафиксированы.",
+          "Понял — отчёт нужен. Жалоба, осмотр и выполненный ремонт уже зафиксированы.",
+          "Я подготовлю отчёт, как только будет закрыто следующее подтверждение:",
           stepHint
-            ?? "Чтобы я мог сформировать отчёт по правилам, подтвердите, пожалуйста, что диагностика по этому случаю закрыта.",
+            ?? "подтвердите, пожалуйста, что диагностика по этому случаю закрыта.",
         ].join(" ");
       case "ES":
         return [
-          "Recibido: queja, inspección y reparación registradas.",
+          "Entendido — quieres el informe. La queja, la inspección y la reparación ya están registradas.",
+          "Prepararé el informe en cuanto se cierre la siguiente confirmación:",
           stepHint
-            ?? "Para generar el informe correctamente, confirma que el diagnóstico está cerrado.",
+            ?? "confirma que el diagnóstico de este caso está cerrado.",
         ].join(" ");
       default:
         return [
-          "Got it — complaint, inspection findings, and the repair you completed are recorded.",
+          "Understood — you want the report. Complaint, inspection findings, and the repair you completed are already recorded.",
+          "I can prepare it as soon as this specific confirmation is closed:",
           stepHint
-            ?? "Before the report can be issued, please confirm diagnostics are closed for this case.",
+            ?? "please confirm diagnostics are closed for this case.",
         ].join(" ");
     }
   }
@@ -398,11 +403,11 @@ function buildSpecificReportGateResponse(args: {
     const stepHint = buildStepHintLine(args.language, args.activeStepPrompt);
     switch (args.language) {
       case "RU":
-        return `Запрос на отчёт принял. ${stepHint}`;
+        return `Понял — отчёт нужен. Прежде чем я его подготовлю, ${stepHint.charAt(0).toLowerCase()}${stepHint.slice(1)}`;
       case "ES":
-        return `Solicitud de informe recibida. ${stepHint}`;
+        return `Entendido — quieres el informe. Antes de prepararlo, ${stepHint.charAt(0).toLowerCase()}${stepHint.slice(1)}`;
       default:
-        return `Got the report request. ${stepHint}`;
+        return `Understood — you want the report. Before I can prepare it, ${stepHint.charAt(0).toLowerCase()}${stepHint.slice(1)}`;
     }
   }
 
@@ -412,20 +417,16 @@ function buildSpecificReportGateResponse(args: {
   return buildDiagnosticsNotReadyResponse(args.language);
 }
 
+/**
+ * Heuristic — does `text` look like it belongs to `language`?
+ *
+ * Re-exported from `@/lib/chat/report-gate-language` so route-level
+ * code can stay backwards-compatible. See that module for the full
+ * contract.
+ */
+
 function buildStepHintLine(language: Language, stepPrompt: string): string {
-  // `stepPrompt` is the active procedure's current step question text
-  // produced by Context Engine. Echoing it lets the technician see the
-  // exact action that would close the case — without us inventing one.
-  const trimmed = stepPrompt.trim();
-  const oneLine = trimmed.replace(/\s+/g, " ").slice(0, 240);
-  switch (language) {
-    case "RU":
-      return `Чтобы закрыть диагностику и оформить отчёт, остался один шаг: ${oneLine}`;
-    case "ES":
-      return `Para cerrar el diagnóstico y emitir el informe, queda un paso: ${oneLine}`;
-    default:
-      return `One step is still open before the report can be issued: ${oneLine}`;
-  }
+  return _buildStepHintLine(language, stepPrompt);
 }
 
 function buildDiagnosticsNotReadyResponse(language: Language): string {

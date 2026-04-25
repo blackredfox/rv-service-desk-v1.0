@@ -168,11 +168,13 @@ describe("Dirty-input report routing", () => {
     // Emits the diagnostic stream envelope, not the final_report mode event.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Specific report-gate response (Blocker 2): dynamic EN wording.
-    // Either Tier 2 ("Got it — complaint, inspection findings…"), Tier 3
-    // ("Got the report request …"), or Tier 4 fallback ("not yet complete").
+    // Specific report-gate response (Blocker 2 + Case-86 ChatGPT-like
+    // acknowledgment): dynamic EN wording. Either Tier 2 ("Understood —
+    // you want the report. Complaint, inspection findings, …"), Tier 3
+    // ("Understood — you want the report. Before I can prepare it, …"),
+    // or Tier 4 fallback ("not yet complete").
     expect(streamText).toMatch(
-      /Got it — complaint, inspection findings|Got the report request|not yet complete/,
+      /Understood — you want the report\.|not yet complete/,
     );
     // Anti-questionnaire guard.
     expect(streamText).not.toContain("the original complaint");
@@ -213,11 +215,12 @@ describe("Dirty-input report routing", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Specific report-gate response (Blocker 2): dynamic RU wording.
-    // Either Tier 2 ("Принято: жалоба …"), Tier 3 ("Запрос на отчёт принял …"),
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic RU
+    // wording. Either Tier 2 ("Понял — отчёт нужен. Жалоба, осмотр …"),
+    // Tier 3 ("Понял — отчёт нужен. Прежде чем я его подготовлю, …"),
     // or Tier 4 fallback ("Диагностика ещё не завершена").
     expect(streamText).toMatch(
-      /Принято: жалоба|Запрос на отчёт принял|Диагностика ещё не завершена/,
+      /Понял — отчёт нужен\.|Диагностика ещё не завершена/,
     );
     // Anti-questionnaire guard.
     expect(streamText).not.toContain("исходную жалобу");
@@ -258,14 +261,13 @@ describe("Dirty-input report routing", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Specific report-gate response (Blocker 2): dynamic ES wording.
-    // Either Tier 2 ("Recibido: queja, inspección…") when complaint/
-    // findings/repair are recorded, Tier 3 ("Solicitud de informe
-    // recibida …") when only the request is present, or — only when
-    // Context Engine has no active step — Tier 4 fallback ("aún no
-    // está completo"). NEVER a questionnaire.
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic ES
+    // wording. Either Tier 2 ("Entendido — quieres el informe. La queja,
+    // la inspección …"), Tier 3 ("Entendido — quieres el informe.
+    // Antes de prepararlo, …"), or Tier 4 fallback ("aún no está
+    // completo").
     expect(streamText).toMatch(
-      /Recibido: queja|Solicitud de informe recibida|aún no está completo/,
+      /Entendido — quieres el informe\.|aún no está completo/,
     );
     // Anti-questionnaire guard.
     expect(streamText).not.toContain("la queja original");

@@ -42,24 +42,31 @@ export function isDiagnosticOutputSanitizerEnabled(): boolean {
 //
 // These patterns intentionally match the whole line (with optional
 // surrounding whitespace). They cover the actual banners observed in
-// production transcripts.
+// production transcripts (Cases 78–86).
+//
+// Separator class for "Detected RU · Reply RU"-style banners — broadened
+// to cover middle-dot, bullet, hyphen-minus, en-dash, em-dash, pipe, and
+// slash variants observed in Case 86.
+const SEP = "[·•∙\u00B7\\-\\u2010\\u2011\\u2012\\u2013\\u2014\\u2015|/]";
+
 const DROP_LINE_PATTERNS: RegExp[] = [
   // Language/control banners
   /^\s*Copy\s*$/i,
   /^\s*Reply\s+(?:RU|EN|ES)\s*$/i,
-  /^\s*Detected\s+(?:RU|EN|ES)(?:\s*[·•-]\s*Reply\s+(?:RU|EN|ES))?\s*$/i,
+  new RegExp(`^\\s*Detected\\s+(?:RU|EN|ES)(?:\\s*${SEP}\\s*Reply\\s+(?:RU|EN|ES))?\\s*$`, "i"),
   /^\s*(?:RU|EN|ES)\s*[—–-]\s*(?:RU|EN|ES)\s*$/i,
   /^\s*(?:Output\s+)?Policy\s*:.*$/i,
 
-  // Russian internal status banner observed in Case-81
-  /^\s*(?:Система|Классификация|Режим|Статус|Прогресс|Первый\s+шаг)\s*:.*$/iu,
+  // Russian internal status banner observed in Cases 81/86
+  // `Состояние` (state) added per Case-86 manual acceptance feedback.
+  /^\s*(?:Система|Классификация|Режим|Состояние|Статус|Прогресс|Первый\s+шаг)\s*:.*$/iu,
   /^\s*АКТИВНАЯ\s+ДИАГНОСТИЧЕСКАЯ\s+ПРОЦЕДУРА\s*:.*$/iu,
   /^\s*ТЕКУЩИЙ\s+ШАГ\s*:.*$/iu,
   /^\s*Задай\s+ТОЧНО\s*:.*$/iu,
   /^\s*ВСЕ\s+ШАГИ\s+ЗАВЕРШЕНЫ\.?\s*$/iu,
 
   // English equivalents (system prompt label leakage)
-  /^\s*(?:System|Classification|Mode|Status|Progress|First\s+step)\s*:\s+.{0,400}$/i,
+  /^\s*(?:System|Classification|Mode|State|Status|Progress|First\s+step)\s*:\s+.{0,400}$/i,
   /^\s*ACTIVE\s+DIAGNOSTIC\s+PROCEDURE\s*:.*$/i,
   /^\s*CURRENT\s+STEP\s*:.*$/i,
   /^\s*Ask\s+EXACTLY\s*:.*$/i,
@@ -84,6 +91,25 @@ const STRIP_PREFIX_PATTERNS: RegExp[] = [
   /^\s*Paso\s+\S+\s*:\s*/i,
 ];
 
+// ── Strip-inline patterns ──────────────────────────────────────────────
+//
+// These patterns remove inline metadata fragments that appear MID-line
+// (i.e., not at the very start), e.g. when the LLM concatenates a
+// banner and a sentence into one line. Examples observed in Case 86:
+//   "Принято. Шаг wh_3: Работают ли..."  →  "Принято. Работают ли..."
+//   "Detected RU · Reply RU. Continue..."  →  ". Continue..."  (then trimmed)
+//
+// IMPORTANT: JavaScript `\b` is ASCII-only — it does NOT respect
+// Cyrillic word boundaries. We use a lookbehind for "start of line OR
+// whitespace OR sentence-terminator punctuation" so the inline strip
+// works for "Принято. Шаг wh_3:" as well as English/ES.
+const STRIP_INLINE_PATTERNS: RegExp[] = [
+  /(?<=^|[\s.,;:])Шаг\s+\S+\s*:\s*/giu,
+  /(?<=^|[\s.,;:])Step\s+\S+\s*:\s*/gi,
+  /(?<=^|[\s.,;:])Paso\s+\S+\s*:\s*/gi,
+  new RegExp(`(?<=^|[\\s.,;:])Detected\\s+(?:RU|EN|ES)(?:\\s*${SEP}\\s*Reply\\s+(?:RU|EN|ES))?\\s*\\.?\\s*`, "gi"),
+];
+
 /**
  * Sanitize a single complete line of LLM output.
  * Returns:
@@ -100,6 +126,13 @@ export function sanitizeLine(line: string): string | null {
   for (const pat of STRIP_PREFIX_PATTERNS) {
     out = out.replace(pat, "");
   }
+  // Strip inline metadata fragments mid-line (Case 86 leakage).
+  for (const pat of STRIP_INLINE_PATTERNS) {
+    out = out.replace(pat, "");
+  }
+  // Collapse runs of whitespace introduced by the inline strips and
+  // trim any leading punctuation/whitespace left behind.
+  out = out.replace(/\s{2,}/g, " ").replace(/^[\s.,;:·•|/—–-]+/, "");
   return out;
 }
 

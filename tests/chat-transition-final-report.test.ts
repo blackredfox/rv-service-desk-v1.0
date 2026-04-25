@@ -368,11 +368,12 @@ describe("Explicit-only mode transitions (no auto-transition)", () => {
     // Case remains in diagnostic mode for the SSE envelope.
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
     expect(streamText).not.toContain('"type":"mode","mode":"final_report"');
-    // Specific report-gate response (Blocker 2): dynamic EN wording —
-    // Tier 2 acknowledgment when complaint/findings/repair are recorded,
-    // or Tier 4 fallback when no step is available. NEVER a questionnaire.
+    // Specific report-gate response (Blocker 2 + Case-86): dynamic EN
+    // wording — Tier 2 acknowledgment when complaint/findings/repair
+    // are recorded, or Tier 4 fallback when no step is available.
+    // NEVER a questionnaire.
     expect(streamText).toMatch(
-      /Got it — complaint, inspection findings|Got the report request|not yet complete/,
+      /Understood — you want the report\.|not yet complete/,
     );
     // Anti-questionnaire guard.
     expect(streamText).not.toContain("the original complaint");
