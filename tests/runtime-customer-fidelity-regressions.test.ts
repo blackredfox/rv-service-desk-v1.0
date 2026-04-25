@@ -238,7 +238,14 @@ describe("Regression 7.1 — No false final-output invitation before readiness",
     );
     expect(mockFetch).not.toHaveBeenCalled();
     expect(streamText).toContain('"type":"mode","mode":"diagnostic"');
-    expect(streamText).toContain("Diagnostics are not yet complete");
+    // Cases 95–99 fix: when an active procedure exists, the route now
+    // emits a procedure-aware acknowledgement (Tier 3.5) instead of
+    // the legacy generic wall. EITHER response is acceptable —
+    // the underlying invariant (no questionnaire, stay in diagnostic
+    // mode, deterministic deferral) is preserved.
+    expect(streamText).toMatch(
+      /Diagnostics are not yet complete|final isolation confirmation|Share the final check result|Got it — I received START FINAL REPORT/i,
+    );
   });
 });
 
@@ -264,8 +271,12 @@ describe("Regression 7.3 — Unresolved diagnostics never fall into questionnair
     expect(streamText).not.toContain("what you found");
     expect(streamText).not.toContain("what repair you completed");
     expect(streamText).not.toContain("missing report details");
-    // Diagnostics-not-ready deferral (EN).
-    expect(streamText).toContain("Diagnostics are not yet complete");
+    // Cases 95–99 fix: Tier 3.5 procedure-aware acknowledgement OR
+    // legacy Tier 4 wall — both are acceptable as long as the
+    // questionnaire-prompt path is NEVER taken.
+    expect(streamText).toMatch(
+      /Diagnostics are not yet complete|final isolation confirmation|Share the final check result|Got it — I received START FINAL REPORT/i,
+    );
   });
 
   it("natural RU alias in an unresolved RU session does NOT produce any questionnaire prompt", async () => {
@@ -302,8 +313,12 @@ describe("Regression 7.3 — Unresolved diagnostics never fall into questionnair
       "case_regression",
       { mode: "final_report" },
     );
-    // Deterministic RU diagnostics-not-ready deferral.
-    expect(streamText).toContain("Диагностика ещё не завершена");
+    // Cases 95–99 fix: Tier 3.5 procedure-aware acknowledgement OR
+    // legacy Tier 4 wall (RU). The invariant: stay in diagnostic
+    // mode, no questionnaire, deterministic deferral wording.
+    expect(streamText).toMatch(
+      /Диагностика ещё не завершена|подтверждения изоляции неисправности|итоговым результатом|Понял — вы прислали START FINAL REPORT/u,
+    );
   });
 });
 

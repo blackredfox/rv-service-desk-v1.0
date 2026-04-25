@@ -76,7 +76,12 @@ describe("OpenAI Execution Service", () => {
     expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
     expect(emitted.some((token) => token.includes("Repairing output"))).toBe(true);
     expect(result.emittedValidationFallback).toBe(true);
-    expect(result.response).toContain("Step wp_2");
+    // Metadata leak ban (Cases 95–99): fallback no longer emits the
+    // `Step <id>:` prefix or procedure-banner. It just reuses the
+    // localized step question with a neutral intro line.
+    expect(result.response).not.toMatch(/Step\s+wp_2/);
+    expect(result.response).not.toMatch(/—\s*Guided Diagnostics/i);
+    expect(result.response).toMatch(/answer|continue/i);
   });
 
   it("returns a valid labor override response without introducing flow logic", async () => {

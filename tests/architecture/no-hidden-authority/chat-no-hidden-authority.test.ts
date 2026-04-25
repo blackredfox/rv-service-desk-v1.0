@@ -89,9 +89,13 @@ describe("No Hidden Authority — Route Decomposition", () => {
       activeStepId: "wh_9",
     });
 
-    expect(fallback).toContain("Step wh_3");
+    // Metadata leak ban (Cases 95–99): the user-visible fallback no
+    // longer leaks `Step <id>:` / procedure-banner labels. The
+    // authoritative step QUESTION is still rendered (it is the
+    // server-selected, not LLM-chosen, prompt).
     expect(fallback).toContain("Is 12V present at the water heater control input?");
-    expect(fallback).not.toContain("Step wh_9");
+    expect(fallback).not.toMatch(/Step\s+wh_3/);
+    expect(fallback).not.toMatch(/Step\s+wh_9/);
   });
 
   it("route remains the boundary that invokes Context Engine directly", () => {

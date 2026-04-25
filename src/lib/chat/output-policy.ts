@@ -291,6 +291,23 @@ export function buildDiagnosticDriftFallback(activeStepId?: string): string {
 /**
  * Build an authoritative step fallback that includes the exact step question.
  * Used when LLM fails to render the correct step after retry.
+ *
+ * IMPORTANT (Case-95–99 generalization): this fallback is one of the
+ * actual user-visible runtime paths, NOT just an internal scratch
+ * value. Therefore it MUST NOT emit any internal metadata / status /
+ * progress / step-id label that the technician-facing prose layer
+ * forbids:
+ *
+ *   - `<Procedure> — Пошаговая диагностика` / `Step-by-step
+ *     diagnostics` / `Diagnóstico paso a paso`
+ *   - `Прогресс: …` / `Progress: …` / `Progreso: …`
+ *   - `Шаг wh_2:` / `Step wh_2:` / `Paso wh_2:`
+ *
+ * The previous version of this function emitted exactly that banner
+ * shape and was the actual chokepoint behind manual Cases-95/97/99.
+ * It now emits ONLY the localized step question, prefixed with a
+ * neutral "I need one confirmation" sentence so the technician still
+ * gets context without the internal metadata.
  */
 export function buildAuthoritativeStepFallback(
   stepMetadata: { id: string; question: string; procedureName: string; progress: { completed: number; total: number } } | null,
@@ -300,41 +317,31 @@ export function buildAuthoritativeStepFallback(
   const labels =
     language === "RU"
       ? {
-          guidedDiagnostics: "Пошаговая диагностика",
-          progress: "Прогресс",
-          stepsCompleted: "шагов завершено",
-          step: "Шаг",
+          intro: "Чтобы продолжить диагностику, ответьте, пожалуйста, на текущий вопрос:",
           genericQuestion: "Каков фактический результат по этому активному диагностическому шагу?",
+          unknown: "Уточните, пожалуйста, последний результат — и я продолжу.",
         }
       : language === "ES"
       ? {
-          guidedDiagnostics: "Diagnóstico guiado",
-          progress: "Progreso",
-          stepsCompleted: "pasos completados",
-          step: "Paso",
+          intro: "Para continuar el diagnóstico, responde, por favor, la pregunta actual:",
           genericQuestion: "¿Cuál es el resultado observado para este paso de diagnóstico activo?",
+          unknown: "Comparte el último resultado y continuamos.",
         }
       : {
-          guidedDiagnostics: "Guided Diagnostics",
-          progress: "Progress",
-          stepsCompleted: "steps completed",
-          step: "Step",
+          intro: "To continue the diagnosis, please answer the current question:",
           genericQuestion: "What is the observed result for this active diagnostic step?",
+          unknown: "Share the latest result and I'll continue.",
         };
 
   if (!stepMetadata) {
-    // No metadata available — use generic fallback
-    const stepLabel = fallbackStepId ? ` (${fallbackStepId})` : "";
-    return `${labels.guidedDiagnostics}${stepLabel}: ${labels.genericQuestion}`;
+    // No metadata available — use a neutral, language-correct prompt.
+    // Do NOT include the internal step id even when `fallbackStepId`
+    // is present; that's metadata too.
+    return labels.unknown;
   }
-  
-  // Build authoritative response with exact step question
-  const lines = [
-    `${stepMetadata.procedureName} — ${labels.guidedDiagnostics}`,
-    `${labels.progress}: ${stepMetadata.progress.completed}/${stepMetadata.progress.total} ${labels.stepsCompleted}`,
-    ``,
-    `${labels.step} ${stepMetadata.id}: ${stepMetadata.question}`,
-  ];
-  
-  return lines.join("\n");
+
+  // Emit ONLY the step question. The procedure name, progress numbers,
+  // and `Шаг <id>:` prefix are internal metadata — not shown to the
+  // technician. The intro line provides neutral context.
+  return `${labels.intro} ${stepMetadata.question}`;
 }

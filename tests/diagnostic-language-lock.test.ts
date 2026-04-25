@@ -80,10 +80,12 @@ describe("Diagnostic language lock regression", () => {
       activeStepId: "wh_2",
     });
 
-    expect(fallback).toContain("Водонагреватель (газовый/комбинированный) — Пошаговая диагностика");
-    expect(fallback).toContain("Прогресс: 1/24 шагов завершено");
-    expect(fallback).toContain("Шаг wh_2:");
     expect(fallback).toContain("Какой уровень в LP-баке");
+    // Metadata leak ban (Cases 95–99): the user-visible fallback must
+    // NOT contain procedure-banner / progress / step-id labels.
+    expect(fallback).not.toContain("— Пошаговая диагностика");
+    expect(fallback).not.toMatch(/Прогресс\s*:/);
+    expect(fallback).not.toMatch(/Шаг\s+wh_2/);
     expect(fallback).not.toMatch(/\b(Guided Diagnostics|Progress|Step)\b/);
   });
 

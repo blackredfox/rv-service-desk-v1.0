@@ -458,6 +458,35 @@ function buildSpecificReportGateResponse(args: {
     }
   }
 
+  // Tier 3.5 — active procedure exists but no specific active step
+  // (e.g. all steps complete + isolation not yet flipped, or
+  // intermediate state). Emit a procedure-aware acknowledgement
+  // instead of the generic wall. Cases 95–99 manual feedback: the
+  // technician must NOT see "Diagnostics not complete" when the
+  // procedure is mid-flight and the report request was acknowledged.
+  if (args.activeProcedureLabel) {
+    switch (args.language) {
+      case "RU":
+        return [
+          "Понял — отчёт нужен.",
+          "Чтобы оформить отчёт, мне не хватает только подтверждения изоляции неисправности по текущему случаю.",
+          "Поделитесь, пожалуйста, итоговым результатом проверки — и я подготовлю отчёт.",
+        ].join(" ");
+      case "ES":
+        return [
+          "Entendido — quieres el informe.",
+          "Para prepararlo solo me falta la confirmación final de aislamiento de la falla.",
+          "Comparte el resultado final y preparo el informe.",
+        ].join(" ");
+      default:
+        return [
+          "Understood — you want the report.",
+          "To prepare it I just need the final isolation confirmation for this case.",
+          "Share the final check result and I'll generate the report.",
+        ].join(" ");
+    }
+  }
+
   // ── START-FINAL-REPORT INVARIANT ───────────────────────────────────
   // If the assistant's prior turn explicitly invited the technician to
   // send `START FINAL REPORT` AND we'd otherwise reach the legacy
@@ -469,8 +498,9 @@ function buildSpecificReportGateResponse(args: {
   }
 
   // Tier 4 — last-resort generic wall. Reached only when Context Engine
-  // has no active step to point at AND no sidecar signal is present
-  // AND no recent invitation. Behaviour preserved from prior PRs.
+  // has no active procedure / no active step to point at AND no
+  // sidecar signal is present AND no recent invitation. Behaviour
+  // preserved from prior PRs.
   return buildDiagnosticsNotReadyResponse(args.language);
 }
 
@@ -1802,4 +1832,5 @@ export const __test__ = {
   applyDiagnosticModeValidationGuard,
   computeLaborOverrideRequest,
   buildTranscriptDerivedDraftConstraint,
+  buildSpecificReportGateResponse,
 };

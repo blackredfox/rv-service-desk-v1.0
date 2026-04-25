@@ -57,23 +57,31 @@ const DROP_LINE_PATTERNS: RegExp[] = [
   /^\s*(?:RU|EN|ES)\s*[—–-]\s*(?:RU|EN|ES)\s*$/i,
   /^\s*(?:Output\s+)?Policy\s*:.*$/i,
 
-  // Russian internal status banner observed in Cases 81/86
+  // Russian internal status banner observed in Cases 81/86/95–99.
   // `Состояние` (state) added per Case-86 manual acceptance feedback.
-  /^\s*(?:Система|Классификация|Режим|Состояние|Статус|Прогресс|Первый\s+шаг)\s*:.*$/iu,
+  // `Первый\s+(?:[\wа-яё]+\s+)?шаг` covers `Первый шаг` AND
+  // `Первый действительный шаг` / `Первый необходимый шаг` (Case-97).
+  /^\s*(?:Система|Классификация|Режим|Состояние|Статус|Прогресс)\s*:.*$/iu,
+  /^\s*Первый(?:\s+[\wа-яё]+){0,2}\s+шаг\s*:.*$/iu,
   /^\s*АКТИВНАЯ\s+ДИАГНОСТИЧЕСКАЯ\s+ПРОЦЕДУРА\s*:.*$/iu,
   /^\s*ТЕКУЩИЙ\s+ШАГ\s*:.*$/iu,
   /^\s*Задай\s+ТОЧНО\s*:.*$/iu,
   /^\s*ВСЕ\s+ШАГИ\s+ЗАВЕРШЕНЫ\.?\s*$/iu,
 
   // English equivalents (system prompt label leakage)
-  /^\s*(?:System|Classification|Mode|State|Status|Progress|First\s+step)\s*:\s+.{0,400}$/i,
+  /^\s*(?:System|Classification|Mode|State|Status|Progress)\s*:\s+.{0,400}$/i,
+  /^\s*First(?:\s+\S+){0,2}\s+step\s*:.*$/i,
   /^\s*ACTIVE\s+DIAGNOSTIC\s+PROCEDURE\s*:.*$/i,
   /^\s*CURRENT\s+STEP\s*:.*$/i,
   /^\s*Ask\s+EXACTLY\s*:.*$/i,
   /^\s*ALL\s+STEPS\s+COMPLETE\.?\s*$/i,
 
   // Spanish equivalents
-  /^\s*(?:Sistema|Clasificación|Modo|Estado|Progreso|Primer\s+paso)\s*:.*$/i,
+  /^\s*(?:Sistema|Clasificación|Modo|Estado|Progreso)\s*:.*$/i,
+  // Spanish places adjectives AFTER the noun, so we accept up to 2
+  // words AFTER `paso` (e.g. `Primer paso necesario:` / `Primero paso
+  // adecuado:`) in addition to the canonical `Primer paso:`.
+  /^\s*Primer(?:o)?\s+paso(?:\s+\S+){0,2}\s*:.*$/i,
   /^\s*PROCEDIMIENTO\s+DE\s+DIAGN[ÓO]STICO\s+ACTIVO\s*:.*$/i,
   /^\s*PASO\s+ACTUAL\s*:.*$/i,
   /^\s*Pregunta\s+EXACTAMENTE\s*:.*$/i,
