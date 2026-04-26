@@ -111,6 +111,7 @@ import {
 
 import {
   isDiagnosticOutputSanitizerEnabled,
+  sanitizeText as sanitizeDiagnosticText,
   wrapEmitterWithDiagnosticSanitizer,
 } from "@/lib/chat/diagnostic-output-sanitizer";
 
@@ -1589,6 +1590,27 @@ export async function POST(req: Request) {
         if (sanitizingEmitter) sanitizingEmitter.flush();
       };
 
+      // ── Persisted-message sanitizer ────────────────────────────────
+      //
+      // `full` (the assistant snapshot saved via
+      // `appendAssistantChatMessage`) bypasses the streaming SSE
+      // emitter and was therefore re-exposing the banner leaks on
+      // case reload (Case-107 first-turn metadata leak — even though
+      // the live stream was clean, the persisted record still
+      // contained `Система:` / `Классификация:` / `Шаг wh_*:` / etc.).
+      //
+      // In diagnostic mode we run the same line-drop / prefix-strip /
+      // inline-strip rules on `full` before persistence. Final-report
+      // mode skips this transform — final reports legitimately
+      // contain section headers that look superficially banner-like
+      // (e.g. "Estimated Labor:") and must not be dropped.
+      const sanitizeForPersistence = (text: string): string => {
+        if (currentMode !== "diagnostic") return text;
+        return sanitizeDiagnosticText(text, {
+          replyLanguage: outputPolicy.effective,
+        });
+      };
+
       const onAbort = () => {
         aborted = true;
         try { ac.abort(); } catch { /* ignore */ }
@@ -1620,7 +1642,7 @@ export async function POST(req: Request) {
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              content: full,
+              content: sanitizeForPersistence(full),
               language: outputPolicy.effective,
               userId: user?.id,
             });
@@ -1667,7 +1689,7 @@ export async function POST(req: Request) {
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              content: full,
+              content: sanitizeForPersistence(full),
               language: outputPolicy.effective,
               userId: user?.id,
             });
@@ -1703,7 +1725,7 @@ export async function POST(req: Request) {
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              content: full,
+              content: sanitizeForPersistence(full),
               language: outputPolicy.effective,
               userId: user?.id,
             });
@@ -1840,7 +1862,7 @@ export async function POST(req: Request) {
         if (!aborted && full.trim()) {
           await appendAssistantChatMessage({
             caseId: ensuredCase.id,
-            content: full,
+            content: sanitizeForPersistence(full),
             language: outputPolicy.effective,
             userId: user?.id,
           });

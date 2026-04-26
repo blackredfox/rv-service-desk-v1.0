@@ -66,6 +66,19 @@ const RESTORATION_PATTERNS: RegExp[] = [
   // Russian: explicit resolution phrasing after repair
   /(?:заменил|восстановил|починил|устранил).{0,120}(?:теперь\s+)?(?:водонагреватель|система|оборудование)?.{0,40}(?:работает|работает\s*нормально|функционирует|заработал).{0,40}(?:проблема\s+устранена|неисправность\s+устранена|исправен)/i,
   /(?:проблема\s+устранена|неисправность\s+устранена).{0,80}(?:работает|заработал|функционирует)|(?:работает|заработал|функционирует).{0,80}(?:проблема\s+устранена|неисправность\s+устранена)/i,
+  // Russian (Case 108/109): "заменил X. (теперь) Y исправен / в порядке"
+  // — fault repaired and equipment now reported operational without
+  // explicitly using the verb "работает". Common technician phrasing
+  // for fuse replacement in water-heater diagnostics.
+  /(?:заменил|восстановил|починил|устранил|отремонтировал)[\s\S]{0,150}(?:теперь\s+)?(?:водонагреватель|система|оборудование|устройство|прибор)?[\s\S]{0,40}(?:исправен|исправно|в\s+порядке|готов(?:а|о)?\s+к\s+работе)/iu,
+  // Russian: explicit "проблема устранена" / "неисправность устранена" anywhere
+  // in the message after a repair-context cue elsewhere in the same message.
+  /(?:заменил|восстановил|починил|устранил|отремонтировал|поменял)[\s\S]{0,200}(?:проблема\s+устранена|неисправность\s+устранена|неполадка\s+устранена)/iu,
+  /(?:проблема\s+устранена|неисправность\s+устранена|неполадка\s+устранена)[\s\S]{0,200}(?:заменил|восстановил|починил|устранил|отремонтировал|поменял)/iu,
+  // Russian (Case 109): standalone "восстановился / восстановилось / восстановилась"
+  // — used by technicians as confirmation that the previously reported
+  // condition (12V, питание, работа) is now restored after the repair.
+  /(?:^|[\s.,!?;:])(?:восстановил(?:ся|ась|ось|ис[ьъ])|восстановлен[аоы]?)(?=[\s.,!?;:]|$)/iu,
   // Russian: "[unk repair] проводку + работает" — wiring-specific restoration
   /(?:заменил|восстановил|отремонтировал|починил)\s+проводку.{0,80}(?:работает|заработал|функционирует)/i,
   // Russian: loose "работает" after a temporal/causal sequence
@@ -99,6 +112,12 @@ const FAULT_PATTERNS: RegExp[] = [
   /короткое\s+замыкание/i,
   /(?:неисправен|перегорел|сгорел)\s+предохранитель/i,
   /предохранитель.{0,40}(?:неисправен|перегорел|сгорел)/i,
+  // Russian (Case 108): "предохранитель не работал / не работает" —
+  // technicians often phrase fuse failure colloquially without the
+  // formal diagnostic verbs above. Pair the component noun with a
+  // failure-of-function clause to keep this conservative.
+  /предохранитель[^.\n]{0,40}не\s+работ(?:ал|ает|ала)/iu,
+  /не\s+работ(?:ал|ает|ала)[^.\n]{0,40}предохранитель/iu,
   // Russian: "обрыв проводки/провода/цепи" (wiring/circuit break)
   /обрыв\s+(?:проводки|провода|цепи|питания)/i,
   // Russian: "разрыв проводки/провода" (wiring break)

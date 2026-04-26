@@ -36,26 +36,81 @@ export type GovernanceHistoryMessage = {
 };
 
 /**
- * Did the most-recent assistant turn invite the technician to send
- * `START FINAL REPORT`? Walks backwards to the FIRST encountered
- * assistant message (intermediate user messages are ignored).
+ * Heuristic — does the assistant message look like a generated/finalized
+ * final-report draft? Used by `wasFinalReportInvitedRecently` to decide
+ * whether an earlier invitation has been "consumed".
  *
- * The invitation is detected from any of:
- *   - the literal phrase `START FINAL REPORT` (assistant prompts the
- *     technician to send it back);
- *   - the localized "Send START FINAL REPORT" / "отправьте START FINAL
- *     REPORT" / "envía START FINAL REPORT" / "envíe START FINAL REPORT"
- *     hints emitted by `buildAuthoritativeCompletionOffer` and the
- *     Context-Engine completion-instruction constraint.
+ * Section-header presence is the dominant cue. We require at least
+ * three of the canonical final-report headers to co-occur in the same
+ * message. The trilingual list mirrors the validators that check
+ * `FINAL_REPORT_FORMAT` in the response-validation service.
+ */
+function looksLikeFinalReportDraft(content: string): boolean {
+  const headerHits = [
+    /(?:^|\n)\s*Complaint\s*:/i,
+    /(?:^|\n)\s*Diagnostic\s+Procedure\s*:/i,
+    /(?:^|\n)\s*Verified\s+Condition\s*:/i,
+    /(?:^|\n)\s*Recommended\s+Corrective\s+Action\s*:/i,
+    /(?:^|\n)\s*Estimated\s+Labor\s*:/i,
+    /(?:^|\n)\s*Required\s+Parts\s*:/i,
+    /(?:^|\n)\s*Жалоба\s*:/iu,
+    /(?:^|\n)\s*Диагностическая\s+процедура\s*:/iu,
+    /(?:^|\n)\s*Подтверждённое\s+состояние\s*:/iu,
+    /(?:^|\n)\s*Рекомендуемые\s+действия\s*:/iu,
+    /(?:^|\n)\s*Оценка\s+трудозатрат\s*:/iu,
+    /(?:^|\n)\s*Требуемые\s+запчасти\s*:/iu,
+    /(?:^|\n)\s*Queja\s*:/i,
+    /(?:^|\n)\s*Procedimiento\s+de\s+diagn[óo]stico\s*:/i,
+    /(?:^|\n)\s*Condici[óo]n\s+verificada\s*:/i,
+    /(?:^|\n)\s*Acci[óo]n\s+correctiva\s+recomendada\s*:/i,
+  ];
+  let count = 0;
+  for (const re of headerHits) {
+    if (re.test(content)) count += 1;
+    if (count >= 3) return true;
+  }
+  return false;
+}
+
+/**
+ * Did a recent assistant turn invite the technician to send
+ * `START FINAL REPORT`? Walks backwards through history and returns
+ * `true` as soon as it finds an assistant message containing the
+ * literal phrase. Walking stops early when an assistant message that
+ * looks like a generated final-report draft is encountered (the
+ * invitation has been consumed by the report being produced).
+ *
+ * Why walk past one non-matching assistant message?
+ *   When the technician sends `START FINAL REPORT` and the route
+ *   emits the legacy "isolation confirmation" gate response (which
+ *   does NOT itself contain the literal `START FINAL REPORT`), the
+ *   invitation is still pending — the user asked, the system did
+ *   not satisfy. On the technician's next attempt, the most-recent
+ *   assistant message no longer contains `START FINAL REPORT`,
+ *   but earlier turns do. Returning `false` because of one
+ *   intermediate gate response would loop the user. (Case 107/110.)
+ *
+ * Authority preserved:
+ *   - Server still owns the report gate. This helper only changes
+ *     PROSE selection (legacy generic wall vs. acknowledgement) and
+ *     mode-transition eligibility when paired with an explicit
+ *     `START FINAL REPORT` user message.
  */
 export function wasFinalReportInvitedRecently(
   history: GovernanceHistoryMessage[] | null | undefined,
 ): boolean {
   if (!history || history.length === 0) return false;
+  // Walk backwards. The invitation is "live" if we encounter it before
+  // a generated final-report draft. We bound the walk to the most
+  // recent 8 assistant turns to keep this conservative and deterministic.
+  let assistantsSeen = 0;
   for (let i = history.length - 1; i >= 0; i--) {
     const msg = history[i];
     if (msg.role !== "assistant") continue;
-    return /\bSTART\s+FINAL\s+REPORT\b/i.test(msg.content);
+    if (looksLikeFinalReportDraft(msg.content)) return false;
+    if (/\bSTART\s+FINAL\s+REPORT\b/i.test(msg.content)) return true;
+    assistantsSeen += 1;
+    if (assistantsSeen >= 8) break;
   }
   return false;
 }

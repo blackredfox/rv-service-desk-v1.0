@@ -78,7 +78,7 @@ describe("Systemic — START FINAL REPORT invariant", () => {
     ).toBe(true);
   });
 
-  it("returns false when the latest assistant turn does NOT invite it", () => {
+  it("returns false when no assistant turn has ever invited START FINAL REPORT", () => {
     expect(
       wasFinalReportInvitedRecently([
         { role: "assistant", content: "Continue with the next diagnostic step." },
@@ -86,13 +86,45 @@ describe("Systemic — START FINAL REPORT invariant", () => {
     ).toBe(false);
   });
 
-  it("only considers the most-recent assistant turn (not earlier ones)", () => {
-    // Earlier invitation, but the latest assistant turn does NOT invite.
+  it("treats an earlier invitation as still PENDING when the latest assistant turn is an intermediate gate (Case 107/110)", () => {
+    // Cases 107/110 — the assistant invited START FINAL REPORT, the
+    // technician complied, the route emitted the legacy isolation
+    // gate response (which does NOT itself contain the literal
+    // phrase). On the technician's next attempt the most-recent
+    // assistant turn does not invite, but the invitation is still
+    // unsatisfied. The helper MUST return true so the route honours
+    // the invitation instead of looping.
     expect(
       wasFinalReportInvitedRecently([
         { role: "assistant", content: "Send START FINAL REPORT when ready." },
-        { role: "user", content: "wait, one more check" },
-        { role: "assistant", content: "OK, what was the voltage reading?" },
+        { role: "user", content: "START FINAL REPORT" },
+        {
+          role: "assistant",
+          content:
+            "Понял — отчёт нужен. Чтобы оформить отчёт, мне не хватает только подтверждения изоляции неисправности по текущему случаю.",
+        },
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns false once a generated final-report draft has consumed the invitation", () => {
+    // Once the assistant has actually emitted a final-report draft
+    // (Complaint / Diagnostic Procedure / Verified Condition / etc.),
+    // the prior invitation has been satisfied — subsequent technician
+    // turns must NOT be treated as still-pending invitations.
+    expect(
+      wasFinalReportInvitedRecently([
+        { role: "assistant", content: "Send START FINAL REPORT when ready." },
+        { role: "user", content: "START FINAL REPORT" },
+        {
+          role: "assistant",
+          content: [
+            "Complaint: Water heater not heating.",
+            "Diagnostic Procedure: Verified gas, voltage, fuse.",
+            "Verified Condition: Fuse failed; replaced.",
+            "Recommended Corrective Action: Confirm restoration after restart.",
+          ].join("\n"),
+        },
       ]),
     ).toBe(false);
   });

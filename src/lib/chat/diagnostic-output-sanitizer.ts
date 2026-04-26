@@ -219,6 +219,37 @@ export type SanitizingEmitter = {
 };
 
 /**
+ * Sanitize a complete text string using the same line-buffered logic as
+ * `wrapEmitterWithDiagnosticSanitizer`. Used to clean text that bypasses
+ * the streaming SSE emitter — e.g., the persisted assistant message
+ * (`full`) saved via `appendAssistantChatMessage`. The streamed SSE
+ * tokens go through the wrapper, but the persisted snapshot does NOT,
+ * so reloading the case re-exposed banner leaks even when the live
+ * stream had been clean.
+ *
+ * Returns the sanitized text (empty string if everything was dropped).
+ * If the sanitizer feature flag is off, returns the input unchanged.
+ */
+export function sanitizeText(
+  text: string,
+  options?: { replyLanguage?: "RU" | "EN" | "ES" },
+): string {
+  if (!isDiagnosticOutputSanitizerEnabled()) return text;
+  if (!text) return text;
+  let out = "";
+  const wrapper = wrapEmitterWithDiagnosticSanitizer((chunk) => {
+    out += chunk;
+  }, options);
+  wrapper.emit(text);
+  wrapper.flush();
+  // Collapse any runs of >2 blank lines that the sanitizer's line drops
+  // may have left behind (the streaming wrapper already collapses
+  // adjacent newlines emitted by it, but back-to-back drops can still
+  // leave double blanks in the accumulated output).
+  return out.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
  * Wrap a downstream `emitToken(text)` callback with a stateful, line-buffered
  * sanitizer. Streaming-safe: tokens may arrive partial and are buffered until
  * a newline is observed. The wrapper preserves token-level streaming by
