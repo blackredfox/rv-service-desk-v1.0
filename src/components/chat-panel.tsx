@@ -141,28 +141,39 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  const attachmentValidationError = useMemo(() => {
+    if (photoAttachments.length > MAX_IMAGES) {
+      return `Maximum ${MAX_IMAGES} photos allowed per message.`;
+    }
+
+    if (calculateTotalBytes(photoAttachments) > MAX_TOTAL_BYTES) {
+      return "Total attachment size exceeds 5MB limit. Please remove some photos.";
+    }
+
+    return null;
+  }, [photoAttachments]);
+
+  const hasText = input.trim().length > 0;
+  const hasAttachments = photoAttachments.length > 0;
   const canSend = useMemo(
-    () => input.trim().length > 0 && !loading && !disabled,
-    [input, loading, disabled]
+    () => (hasText || hasAttachments) && !loading && !disabled && !attachmentValidationError,
+    [hasText, hasAttachments, loading, disabled, attachmentValidationError]
   );
 
   const isTyping = streaming && messages.length > 0;
 
   async function send() {
     const text = input.trim();
-    if (!text) return;
+    const hasCurrentAttachments = photoAttachments.length > 0;
+    if (!text && !hasCurrentAttachments) return;
 
     // Validate attachments before sending
-    if (photoAttachments.length > MAX_IMAGES) {
-      setError(`Maximum ${MAX_IMAGES} photos allowed per message.`);
+    if (attachmentValidationError) {
+      setError(attachmentValidationError);
       return;
     }
-    
-    const totalBytes = calculateTotalBytes(photoAttachments);
-    if (totalBytes > MAX_TOTAL_BYTES) {
-      setError(`Total attachment size exceeds 5MB limit. Please remove some photos.`);
-      return;
-    }
+
+    const messageToSend = text || "Photo attached.";
 
     setInput("");
     setError(null);
@@ -186,7 +197,7 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
         id: localId,
         caseId: caseId ?? "pending",
         role: "user",
-        content: text,
+        content: messageToSend,
         createdAt: now,
       } as ChatMessage,
       {
@@ -209,7 +220,7 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
         attachments?: Array<{ type: "image"; dataUrl: string }>;
       } = {
         caseId: caseId ?? undefined,
-        message: text,
+        message: messageToSend,
         languageMode,
         // Keep this for compatibility if route.ts reads inputLanguage.
         inputLanguage: languageMode,
@@ -452,7 +463,7 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
         </div>
       </div>
 
-      <div className="border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
+      <div className="safe-area-bottom border-t border-zinc-200 bg-white/70 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/50">
         <div className="mx-auto max-w-2xl">
           {/* Photo preview grid */}
           {photoAttachments.length > 0 && (
@@ -465,7 +476,16 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
             </div>
           )}
 
-          <div className="flex items-end gap-3">
+          {attachmentValidationError ? (
+            <div
+              className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+              data-testid="attachment-validation-error"
+            >
+              {attachmentValidationError}
+            </div>
+          ) : null}
+
+          <div className="flex min-w-0 items-end gap-2 sm:gap-3">
             {/* Photo attach button */}
             <div className="relative">
               <PhotoAttachButton
@@ -492,7 +512,7 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
               placeholder={disabled ? "Accept Terms to begin" : "Message"}
               rows={2}
               disabled={Boolean(disabled)}
-              className="max-h-40 flex-1 resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
+              className="max-h-40 min-w-0 flex-1 resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -505,14 +525,20 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
               data-testid="chat-send-button"
               disabled={!canSend}
               onClick={() => void send()}
-              className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
+              className="h-10 shrink-0 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-white"
             >
               Send
             </button>
           </div>
 
-          <div className="mt-2 flex items-center justify-between">
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+          {hasAttachments && !hasText ? (
+            <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400" data-testid="attachment-only-send-note">
+              Send is enabled for photo-only messages. A short note is included for chat compatibility.
+            </div>
+          ) : null}
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400" data-testid="composer-keyboard-hint">
               Enter to send. Shift+Enter for newline.
             </div>
 

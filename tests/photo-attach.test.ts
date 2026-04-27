@@ -1,6 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { createElement } from "react";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { PhotoAttachment } from "@/components/photo-attach";
-import { MAX_IMAGES, MAX_TOTAL_BYTES, calculateTotalBytes } from "@/components/photo-attach";
+import { MAX_IMAGES, MAX_TOTAL_BYTES, PhotoAttachButton, calculateTotalBytes } from "@/components/photo-attach";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("Photo Attachment Component", () => {
   // Helper to create mock attachment
@@ -195,6 +201,46 @@ describe("Photo Attachment Component", () => {
 
       const canAddAll = newFiles.length <= remainingSlots;
       expect(canAddAll).toBe(false);
+    });
+  });
+
+  describe("Mobile source selection", () => {
+    it("splits camera capture from library selection", () => {
+      window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+
+      render(createElement(PhotoAttachButton, {
+        attachments: [],
+        onAttach: vi.fn(),
+        onRemove: vi.fn(),
+      }));
+
+      const cameraInput = screen.getByTestId("photo-camera-input");
+      const libraryInput = screen.getByTestId("photo-library-input");
+      const desktopInput = screen.getByTestId("photo-desktop-input");
+
+      expect(cameraInput.getAttribute("capture")).toBe("environment");
+      expect(cameraInput.getAttribute("accept")).toBe("image/*");
+      expect(libraryInput.hasAttribute("capture")).toBe(false);
+      expect(libraryInput.getAttribute("accept")).toBe("image/*,.heic,.heif");
+      expect(libraryInput.hasAttribute("multiple")).toBe(true);
+      expect(desktopInput.hasAttribute("capture")).toBe(false);
+    });
+
+    it("opens a mobile-safe source menu on coarse/mobile screens", () => {
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+
+      render(createElement(PhotoAttachButton, {
+        attachments: [],
+        onAttach: vi.fn(),
+        onRemove: vi.fn(),
+      }));
+
+      fireEvent.click(screen.getByTestId("photo-attach-button"));
+
+      expect(screen.getByTestId("photo-source-menu")).toBeTruthy();
+      expect(screen.getByTestId("photo-source-camera-button").textContent).toContain("Take photo");
+      expect(screen.getByTestId("photo-source-library-button").textContent).toContain("Choose from library");
+      expect(screen.getByTestId("photo-source-cancel-button").textContent).toContain("Cancel");
     });
   });
 });
