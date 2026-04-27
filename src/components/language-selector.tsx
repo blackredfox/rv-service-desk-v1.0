@@ -10,12 +10,24 @@ type Props = {
 export function LanguageSelector({ value, onChange }: Props) {
   return (
     <div data-testid="language-selector" className="flex items-center gap-2">
-      <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Input language</label>
+      <label
+        htmlFor="language-selector-select"
+        className="text-xs font-medium text-zinc-600 dark:text-zinc-300"
+      >
+        Input language
+      </label>
       <select
+        id="language-selector-select"
         data-testid="language-selector-select"
         value={value}
         onChange={(e) => onChange(e.target.value as LanguageMode)}
-        className="h-9 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-900 shadow-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:ring-zinc-700"
+        className="
+          h-10 rounded-xl border border-zinc-200 bg-white px-3 pr-8
+          text-sm text-zinc-900 shadow-sm outline-none
+          focus:ring-2 focus:ring-zinc-300
+          dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:focus:ring-zinc-700
+          transition-colors
+        "
       >
         <option value="AUTO">Auto</option>
         <option value="EN">EN</option>
