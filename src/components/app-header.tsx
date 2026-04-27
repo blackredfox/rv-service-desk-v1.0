@@ -154,7 +154,7 @@ export function AppHeader({
         className="
           sticky top-0 z-40
           flex h-20 items-center justify-between
-          border-b border-zinc-800 bg-zinc-900 px-3
+          border-b border-zinc-800 bg-zinc-950 px-3
           md:px-4
         "
       >
@@ -168,9 +168,11 @@ export function AppHeader({
               data-testid="sidebar-toggle-btn"
               aria-label={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
               className="
-                flex h-9 w-9 items-center justify-center
-                rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white
+                flex h-10 w-10 items-center justify-center
+                rounded-xl border border-zinc-800 bg-zinc-900
+                text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800 hover:text-white
                 transition-colors
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6B00]/60
               "
             >
               {sidebarCollapsed ? (
@@ -185,25 +187,28 @@ export function AppHeader({
             </button>
           )}
 
-          {/* Logo - official brand image */}
-          <img
-            src="/logo.jpg"
-            alt="RV Service Desk"
-            className="h-14 w-auto"
-          />
+          {/* Logo - balanced container (kept proportional to h-20 header) */}
+          <div className="flex h-12 items-center justify-center">
+            <img
+              src="/logo.jpg"
+              alt="RV Service Desk"
+              className="h-12 w-auto rounded-md object-contain"
+            />
+          </div>
 
-          {/* New Case CTA - PRIMARY BUTTON (orange) */}
+          {/* New Case CTA - PRIMARY BUTTON (orange), aligned to header control height */}
           <button
             type="button"
             onClick={onNewCase}
             data-testid="header-new-case-btn"
             className="
-              ml-2 flex items-center gap-1.5
-              rounded-lg bg-[#FF6B00] px-3 py-1.5
+              ml-2 flex h-10 items-center gap-1.5
+              rounded-xl bg-[#FF6B00] px-3
               text-xs font-bold text-white
-              hover:bg-orange-600
+              hover:bg-[#FF7A1A]
               transition-colors
-              md:ml-4 md:px-4 md:py-2 md:text-sm
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6B00]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950
+              md:ml-4 md:px-4 md:text-sm
             "
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,19 +218,21 @@ export function AppHeader({
           </button>
         </div>
 
-        {/* Right section: Controls */}
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* User email - cyan, slightly larger */}
+        {/* Right section: Controls — unified h-10 / rounded-xl design language */}
+        <div className="flex items-center gap-2">
+          {/* Username — cyan accent, aligned with controls */}
           <div className="relative" ref={userMenuRef}>
             <button
               type="button"
               data-testid="user-menu-button"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="
-                flex items-center gap-1.5
-                rounded-lg px-2 py-1.5
-                text-sm font-medium text-[#00CED1] hover:bg-zinc-800
+                flex h-10 items-center gap-1.5
+                rounded-xl border border-transparent px-3
+                text-sm font-medium text-[#00CED1]
+                hover:border-[#00CED1]/30 hover:bg-zinc-900
                 transition-colors
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00CED1]/60
               "
               aria-haspopup="menu"
               aria-expanded={userMenuOpen}
@@ -330,26 +337,32 @@ export function AppHeader({
             )}
           </div>
 
-          {/* Language selector - integrated, orange */}
-          <div className="flex items-center rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50">
-            <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-[#FF6B00]">
-              Lang
-            </span>
+          {/* Language selector — secondary outlined control, subtle orange accent */}
+          <div
+            className="
+              flex h-10 items-center
+              rounded-xl border border-[#FF6B00]/30 bg-zinc-900
+              hover:border-[#FF6B00]/60
+              focus-within:border-[#FF6B00]/80 focus-within:ring-2 focus-within:ring-[#FF6B00]/40
+              transition-colors
+            "
+          >
             <select
               data-testid="language-selector"
               value={languageMode}
               onChange={(e) => onLanguageChange(e.target.value as LanguageMode)}
+              aria-label="Input language"
               className="
-                h-8 bg-transparent pr-6 pl-1
-                text-xs font-bold text-[#FF6B00]
+                h-10 bg-transparent pl-3 pr-7
+                text-xs font-bold text-white
                 outline-none cursor-pointer
                 appearance-none
               "
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23FF6B00'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
                 backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 4px center",
-                backgroundSize: "16px",
+                backgroundPosition: "right 8px center",
+                backgroundSize: "14px",
               }}
             >
               {(["AUTO", "EN", "ES", "RU"] as LanguageMode[]).map((mode) => (
@@ -360,17 +373,18 @@ export function AppHeader({
             </select>
           </div>
 
-          {/* Theme toggle - white */}
+          {/* Theme toggle — square control, matches design system */}
           <button
             type="button"
             onClick={toggleTheme}
             data-testid="theme-toggle"
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             className="
-              flex h-8 items-center rounded-lg px-2
-              bg-white/10 border border-white/30
-              text-white hover:bg-white/20
+              flex h-10 w-10 items-center justify-center
+              rounded-xl border border-zinc-800 bg-zinc-900
+              text-zinc-300 hover:border-zinc-700 hover:bg-zinc-800 hover:text-white
               transition-colors
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/60
             "
           >
             {isDark ? (
@@ -384,17 +398,19 @@ export function AppHeader({
             )}
           </button>
 
-          {/* Support ? button - in header, far right */}
+          {/* Support / Help — square control with cyan accent */}
           <button
             type="button"
             onClick={() => setSupportOpen(true)}
             data-testid="support-button"
             aria-label="Get support"
             className="
-              flex h-8 w-8 items-center justify-center
-              rounded-lg bg-[#00CED1] text-zinc-900
-              hover:bg-cyan-400
-              transition-colors font-bold
+              flex h-10 w-10 items-center justify-center
+              rounded-xl border border-[#00CED1]/40 bg-[#00CED1]/10
+              text-[#00CED1] font-bold text-base
+              hover:border-[#00CED1]/70 hover:bg-[#00CED1]/20
+              transition-colors
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00CED1]/60
             "
           >
             ?

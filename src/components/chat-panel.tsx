@@ -42,6 +42,9 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
   const [photoAttachments, setPhotoAttachments] = useState<PhotoAttachment[]>([]);
   const [reportCopied, setReportCopied] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  // Language metadata is no longer rendered in the UI, but we keep the setter
+  // to preserve the SSE `language` event flow and avoid touching backend behavior.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [turnLanguageByMessageId, setTurnLanguageByMessageId] = useState<Record<string, TurnLanguageBadge>>({});
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -419,23 +422,12 @@ export function ChatPanel({ caseId, draftToken, languageMode, onCaseId, disabled
                 ) : null}
               </div>
 
-              {(() => {
-                if (m.role !== "assistant") return null;
-                const turnLanguage = turnLanguageByMessageId[m.id];
-                const replyLanguage = turnLanguage?.outputEffective ?? m.language;
-                if (!turnLanguage && !replyLanguage) return null;
-
-                return (
-                  <div
-                    data-testid={`chat-language-badge-${m.id}`}
-                    className="mb-2 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  >
-                    {turnLanguage
-                      ? `Detected ${turnLanguage.inputDetected} · Reply ${turnLanguage.outputEffective}`
-                      : `Reply ${replyLanguage}`}
-                  </div>
-                );
-              })()}
+              {/*
+                Language metadata is intentionally hidden from the UI.
+                The internal `turnLanguageByMessageId` state and SSE `language`
+                events are preserved for backend/governance behavior; only the
+                visible badge ("Detected RU · Reply RU", etc.) is removed.
+              */}
 
               <div className="whitespace-pre-wrap">{m.content}</div>
             </div>
