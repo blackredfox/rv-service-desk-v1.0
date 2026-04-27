@@ -93,6 +93,17 @@ export {
 } from "./repair-summary-intent";
 
 export {
+  assessInspectionReportIntent,
+  buildInspectionReportPromptConstraint,
+  type InspectionReportIntentAssessment,
+} from "./inspection-report-intent";
+
+export {
+  detectServiceGuidanceIntent,
+  buildServiceGuidanceResponse,
+} from "./service-guidance-intent";
+
+export {
   classifyStepGuidanceIntent,
   type StepGuidanceIntentCategory,
 } from "./step-guidance-intent";

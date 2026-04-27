@@ -44,6 +44,7 @@ import {
   type DiagnosticContext,
   DEFAULT_CONFIG,
 } from "@/lib/context-engine";
+import { detectGenericComponentReplacementReadiness } from "@/lib/context-engine/context-engine";
 import {
   buildFactLockConstraint,
   buildFinalReportAuthorityConstraint,
@@ -95,6 +96,10 @@ import {
   assessRepairSummaryIntent,
   assessTranscriptRepairStatus,
   hasStructuredReportHeaders,
+  assessInspectionReportIntent,
+  buildInspectionReportPromptConstraint,
+  detectServiceGuidanceIntent,
+  buildServiceGuidanceResponse,
   type RepairSummaryIntentAssessment,
   // LLM Runtime Signals (advisory sidecar)
   tryAdjudicateRuntimeSignals,
@@ -337,6 +342,18 @@ function buildReportRevisionPromptConstraint(message: string): string {
     "- Do NOT ask follow-up questions.",
     "- Do NOT send START FINAL REPORT.",
     `Technician revision request: ${message.trim()}`,
+  ].join("\n");
+}
+
+function buildComponentReplacementReportPromptConstraint(finding: string): string {
+  return [
+    "COMPONENT REPLACEMENT REPORT ROUTE (MANDATORY):",
+    `Server-recognized field evidence: ${finding}`,
+    "- Treat technician-provided component/mechanical evidence as report-ready evidence; do NOT continue a generic fuse/switch/ground checklist.",
+    "- Build a report/draft only from transcript-grounded facts.",
+    "- If access constraints are stated, include them as constraints; do NOT invent voltage values or measurements not provided.",
+    "- Recommended Corrective Action may say to order/replace the failed component and verify operation after installation.",
+    "- Do NOT claim the replacement was already performed unless the technician explicitly said it was completed.",
   ].join("\n");
 }
 
@@ -754,12 +771,28 @@ export async function POST(req: Request) {
   const effectiveHasBoundedReportRequest =
     hasBoundedReportRequest || sidecarRecognizesReportRequest;
 
+  const priorUserMessages = historyBeforeAppend
+    .filter((msg) => msg.role === "user")
+    .map((msg) => msg.content);
+  const technicianMessagesIncludingCurrent = priorUserMessages.concat(routingMessage);
+
+  const inspectionReportIntent = assessInspectionReportIntent({
+    message: routingMessage,
+    priorUserMessages,
+    hasCurrentReportRequest: effectiveHasBoundedReportRequest,
+  });
+
+  const componentReplacementFinding = effectiveHasBoundedReportRequest
+    ? detectGenericComponentReplacementReadiness(
+        technicianMessagesIncludingCurrent,
+        currentContextSnapshot.activeProcedureId ?? null,
+      )
+    : null;
+
   const repairSummaryIntent = assessRepairSummaryIntent({
     message: routingMessage,
     hasReportRequest: hasBoundedReportRequest,
-    priorUserMessages: historyBeforeAppend
-      .filter((msg) => msg.role === "user")
-      .map((msg) => msg.content),
+    priorUserMessages,
     hasActiveDiagnosticContext: Boolean(currentContextSnapshot.activeProcedureId),
   });
   const hasPriorUserEvidence = historyBeforeAppend.some((msg) => msg.role === "user");
@@ -810,9 +843,16 @@ export async function POST(req: Request) {
     isBroadAcFamilyMessage(routingMessage) &&
     !hasSpecificRoofAcEvidence(routingMessage) &&
     !storedRoofAcEvidenceMessage;
-  const directDiagnosticResponse = needsAcSubtypeClarification
-    ? buildAcSubtypeClarificationResponse(outputPolicy.effective)
-    : null;
+  const serviceGuidanceResponse =
+    currentMode === "diagnostic" &&
+    !effectiveHasBoundedReportRequest &&
+    detectServiceGuidanceIntent(routingMessage)
+      ? buildServiceGuidanceResponse(outputPolicy.effective)
+      : null;
+  const directDiagnosticResponse = serviceGuidanceResponse
+    ?? (needsAcSubtypeClarification
+      ? buildAcSubtypeClarificationResponse(outputPolicy.effective)
+      : null);
 
   const modeResolution = pendingFinalReportCommand;
   // When a final report already exists AND the technician sends a narrow
@@ -857,13 +897,44 @@ export async function POST(req: Request) {
       await storage.updateCase(ensuredCase.id, { mode: currentMode });
       console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (existing report revision)`);
     }
-  } else if (effectiveHasBoundedReportRequest) {
-    if (readyForImmediateReport) {
+  } else if (effectiveHasBoundedReportRequest || inspectionReportIntent.readyForReportRouting) {
+    if (inspectionReportIntent.readyForReportRouting) {
+      const transcriptRepairStatusInspection = assessTranscriptRepairStatus(
+        technicianMessagesIncludingCurrent,
+      );
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildInspectionReportPromptConstraint(),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusInspection),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      if (currentMode !== "final_report") {
+        currentMode = "final_report";
+        await storage.updateCase(ensuredCase.id, { mode: currentMode });
+        console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (inspection report route)`);
+      }
+    } else if (componentReplacementFinding) {
+      const transcriptRepairStatusComponent = assessTranscriptRepairStatus(
+        technicianMessagesIncludingCurrent,
+      );
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildComponentReplacementReportPromptConstraint(componentReplacementFinding),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusComponent),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      if (currentMode !== "final_report") {
+        currentMode = "final_report";
+        await storage.updateCase(ensuredCase.id, { mode: currentMode });
+        console.log(`[Chat API v2] Mode transition: ${storedMode} → final_report (component replacement evidence route)`);
+      }
+    } else if (readyForImmediateReport) {
       const transcriptRepairStatusEarly = assessTranscriptRepairStatus(
-        historyBeforeAppend
-          .filter((msg) => msg.role === "user")
-          .map((msg) => msg.content)
-          .concat(routingMessage),
+        technicianMessagesIncludingCurrent,
       );
       reportPromptConstraint = [
         buildReportTypePromptConstraint(requestedReportKind),

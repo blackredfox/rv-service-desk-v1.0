@@ -35,9 +35,13 @@ const RETAIL_TRIGGER = "(?:retail|customer[\\s-]*pay|рознич\\S*)";
 
 const APPROVED_FINAL_REPORT_PATTERNS = [
   new RegExp(`(?:write|generate|prepare|make|create)\\s+(?:the\\s+)?(?:(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|service|repair)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:write|generate|prepare|make|create)\\s+(?:the\\s+)?(?:inspection|visual\\s+inspection|customer)\\s+${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:need|want)\\s+(?:a\\s+)?(?:(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|service|repair)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:inspection|visual\\s+inspection|customer)\\s+${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:напиши|сделай|сформируй|подготовь|сгенерируй)\\s+(?:(?:финальн(?:ый|ого)|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|сервисн(?:ый|ого)|ремонтн(?:ый|ого))\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`(?:напиши|сделай|сформируй|подготовь|сгенерируй)\\s+(?:(?:клиентск\\S*|инспекционн\\S*)\\s+)?${REPORT_TRIGGER_NOUN}[^\\n]{0,100}(?:инспекц|осмотр|перечислен\\S+\\s+проблем)`, "iu"),
   new RegExp(`(?:нужен|нужно|хочу)\\s+(?:(?:финальн\\S*|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|сервисн\\S*|ремонтн\\S*)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
+  new RegExp(`${REPORT_TRIGGER_NOUN}[^\\n]{0,100}(?:итог|результат)[^\\n]{0,100}(?:инспекц|осмотр)`, "iu"),
   new RegExp(`(?:haz|genera|prepara|escribe|crea)\\s+(?:el\\s+)?(?:(?:${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|final|de\\s+servicio|de\\s+reparaci[oó]n)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:quiero|necesito)\\s+(?:un\\s+)?(?:(?:${WARRANTY_TRIGGER}|${RETAIL_TRIGGER}|final|de\\s+servicio|de\\s+reparaci[oó]n)\\s+)?${REPORT_TRIGGER_NOUN}(?:$|[.!?;:,\\n\\s])`, "iu"),
   new RegExp(`(?:haz|genera|prepara|escribe|crea)\\s+(?:el\\s+)?(?:reporte|informe|report)\\s+(?:final|${WARRANTY_TRIGGER}|${RETAIL_TRIGGER})(?:$|[.!?;:,\\n\\s])`, "iu"),

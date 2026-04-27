@@ -274,6 +274,12 @@ const GENERIC_DIAGNOSTIC_VERIFICATION_PATTERNS: RegExp[] = [
   /\b(?:checked|inspected|verified|tested|measured)\s+\S+/i,
   /(?:проверил(?:а)?|осмотрел(?:а)?|измерил(?:а)?|протестировал(?:а)?)\s+\S+/iu,
   /(?:revis[eé]|inspeccion[eé]|verifiqu[eé]|med[ií]|prob[eé])\s+\S+/iu,
+  /\bpower\s+(?:is\s+)?(?:present|available|good)\b/i,
+  /(?:питани\S*|power)\s+(?:есть|присутствует|имеется)/iu,
+  /\b(?:switch|control)\s+(?:works?|function(?:s|ing)?|ok|good)\b/i,
+  /(?:switch|control|выключател\S*|кнопк\S*|управлен\S*)[^.\n]{0,50}(?:работает|исправн|всё\s+работает|все\s+работает)/iu,
+  /(?:cannot|can't|can\s+not)\s+measure\s+without\s+remov(?:ing|al)/i,
+  /не\s+могу\s+измерить[^.\n]{0,80}(?:без\s+снятия|без\s+демонтажа)/iu,
 ];
 
 const GENERIC_COMPONENT_FAILURE_PATTERNS: RegExp[] = [
@@ -293,11 +299,30 @@ const GENERIC_COMPONENT_FAILURE_PATTERNS: RegExp[] = [
   /(?:^|\s)\S+\s+est[aá]\s+(?:dañad|roto|muert)/iu,
 ];
 
+const GENERIC_MECHANICAL_FAILURE_PATTERNS: RegExp[] = [
+  /\bbroken\s+(?:pin|bracket|linkage|shaft|gear)\b/i,
+  /\b(?:pin|bracket|linkage|shaft|gear)\s+(?:is\s+)?broken\b/i,
+  /(?:сломан\S*|обломан\S*)\s+(?:штифт|палец|кронштейн|тяга|вал|шестерн\S*)/iu,
+  /(?:штифт|палец|кронштейн|тяга|вал|шестерн\S*)\s+(?:сломан\S*|обломан\S*)/iu,
+  /\b(?:motor|actuator|cover|component)\b[^.\n]{0,80}\b(?:hums?|buzz(?:es|ing)?)\b[^.\n]{0,80}\b(?:does\s+not|doesn'?t|won'?t|no)\s+(?:move|extend|retract|open)\b/i,
+  /(?:гудит|гудение)[^.\n]{0,80}(?:не\s+двигается|нет\s+движения|не\s+выдвигается|не\s+открывается)/iu,
+  /(?:не\s+двигается|нет\s+движения|не\s+выдвигается|не\s+открывается)[^.\n]{0,80}(?:гудит|гудение)/iu,
+];
+
 const FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX: RegExp[] = [
   /\b(?:needs?|requires?|will\s+(?:need|require)|going\s+to|gonna|to\s+be)\s+(?:replaced|replacement|swapped|fixed|repaired)\b/i,
   /\b(?:replacement|repair)\s+(?:is\s+)?(?:required|needed|necessary)\b/i,
+  /\b(?:part|component|actuator|motor|solenoid|valve)\s+must\s+be\s+(?:ordered\s+and\s+)?(?:replaced|changed|swapped)\b/i,
+  /\b(?:order|ordered|ordering)\s+(?:the\s+)?(?:part|component|actuator|motor|solenoid|valve)\b/i,
   /(?:требует(?:ся)?|нужн[аоы]?|надо|необходим\S*)\s+(?:замен\S*|поменя\S*|менять|ремонт\S*)/iu,
+  /(?:надо|нужно|необходимо)\s+заказать\s+запчаст\S*[^.\n]{0,80}(?:замен\S*|поменя\S*|менять)/iu,
+  /(?:нужно|надо)\s+менять\s+(?:актуатор|привод|мотор|соленоид|клапан|компонент|детал\S*)/iu,
   /(?:requiere|necesita|hay\s+que)\s+(?:reemplaz\S*|cambi\S*|repar\S*)/iu,
+];
+
+const COMPONENT_IDENTIFIER_PATTERNS: RegExp[] = [
+  /\b(?:component|part|actuator|linear\s+actuator|motor|solenoid|valve|switch|control|pin|bracket|linkage|gear|pump)\b/i,
+  /(?:актуатор|привод|мотор|соленоид|клапан|выключател|кнопк|управлен|штифт|палец|кронштейн|тяга|шестерн|детал|узел|запчаст)/iu,
 ];
 
 /**
@@ -318,14 +343,42 @@ export function detectGenericComponentIsolation(
     p.test(message),
   );
   if (!hasVerification) return null;
-  const hasFailure = GENERIC_COMPONENT_FAILURE_PATTERNS.some((p) => p.test(message));
+  const hasFailure =
+    GENERIC_COMPONENT_FAILURE_PATTERNS.some((p) => p.test(message)) ||
+    GENERIC_MECHANICAL_FAILURE_PATTERNS.some((p) => p.test(message));
   if (!hasFailure) return null;
-  const hasFutureRepair = FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX.some((p) =>
+  const hasMechanicalTerminalEvidence = GENERIC_MECHANICAL_FAILURE_PATTERNS.some((p) => p.test(message));
+  const hasFutureRepair = hasMechanicalTerminalEvidence || FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX.some((p) =>
     p.test(message),
   );
   if (!hasFutureRepair) return null;
   const display = activeProcedureLabel.replace(/_/g, " ");
   return `${display.charAt(0).toUpperCase() + display.slice(1)} component-level isolation: technician verified the component and confirmed it is failed; replacement required.`;
+}
+
+export function detectGenericComponentReplacementReadiness(
+  technicianMessages: string[],
+  activeProcedureLabel: string | null,
+): string | null {
+  const transcript = technicianMessages.filter(Boolean).join("\n");
+  if (!transcript.trim()) return null;
+
+  const hasComponentIdentifier = COMPONENT_IDENTIFIER_PATTERNS.some((p) => p.test(transcript));
+  if (!hasComponentIdentifier) return null;
+
+  const hasVerification = GENERIC_DIAGNOSTIC_VERIFICATION_PATTERNS.some((p) => p.test(transcript));
+  const hasFailure =
+    GENERIC_COMPONENT_FAILURE_PATTERNS.some((p) => p.test(transcript)) ||
+    GENERIC_MECHANICAL_FAILURE_PATTERNS.some((p) => p.test(transcript));
+  const hasReplacementIntent = FUTURE_REPLACEMENT_INTENT_PATTERNS_CTX.some((p) => p.test(transcript));
+  const hasMechanicalTerminalEvidence = GENERIC_MECHANICAL_FAILURE_PATTERNS.some((p) => p.test(transcript));
+
+  if (!hasVerification || !hasFailure || (!hasReplacementIntent && !hasMechanicalTerminalEvidence)) {
+    return null;
+  }
+
+  const display = (activeProcedureLabel ?? "component").replace(/_/g, " ");
+  return `${display.charAt(0).toUpperCase() + display.slice(1)} component-level evidence: technician reported component failure / mechanical evidence and replacement is required.`;
 }
 
 

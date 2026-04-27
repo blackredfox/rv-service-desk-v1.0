@@ -45,6 +45,8 @@ export {
   
   // Message processing
   processMessage,
+  detectGenericComponentIsolation,
+  detectGenericComponentReplacementReadiness,
   
   // Step management
   markStepCompleted,
