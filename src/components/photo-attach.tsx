@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { analytics } from "@/lib/client-analytics";
 
 export type PhotoAttachment = {
@@ -25,6 +25,11 @@ export const JPEG_QUALITY = 0.75;
 export const MAX_TOTAL_BYTES = 5_000_000; // 5MB total
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file before compression
+
+function shouldShowMobileSourceMenu(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
+}
 
 /**
  * Resize and compress image to meet payload limits
@@ -82,8 +87,11 @@ export function calculateTotalBytes(attachments: PhotoAttachment[]): number {
   return attachments.reduce((sum, a) => sum + a.sizeBytes, 0);
 }
 
-export function PhotoAttachButton({ attachments, onAttach, onRemove, disabled, caseId }: Props) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
+export function PhotoAttachButton({ attachments, onAttach, disabled, caseId }: Props) {
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const desktopInputRef = useRef<HTMLInputElement | null>(null);
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
 
   const currentTotalBytes = calculateTotalBytes(attachments);
   const canAddMore = attachments.length < MAX_IMAGES && currentTotalBytes < MAX_TOTAL_BYTES;
@@ -94,7 +102,7 @@ export function PhotoAttachButton({ attachments, onAttach, onRemove, disabled, c
       if (files.length === 0) return;
 
       // Reset input so same files can be selected again
-      if (inputRef.current) inputRef.current.value = "";
+      e.target.value = "";
 
       // Check if adding these files would exceed limit
       const remainingSlots = MAX_IMAGES - attachments.length;
@@ -139,30 +147,74 @@ export function PhotoAttachButton({ attachments, onAttach, onRemove, disabled, c
     [attachments.length, currentTotalBytes, onAttach, caseId]
   );
 
+  const handleAttachClick = useCallback(() => {
+    if (disabled || !canAddMore) return;
+
+    if (shouldShowMobileSourceMenu()) {
+      setSourceMenuOpen(true);
+      return;
+    }
+
+    desktopInputRef.current?.click();
+  }, [disabled, canAddMore]);
+
+  const openCamera = useCallback(() => {
+    setSourceMenuOpen(false);
+    cameraInputRef.current?.click();
+  }, []);
+
+  const openLibrary = useCallback(() => {
+    setSourceMenuOpen(false);
+    libraryInputRef.current?.click();
+  }, []);
+
   return (
     <div className="flex flex-col gap-2">
       <input
-        ref={inputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
+        onChange={handleFileChange}
+        disabled={disabled || !canAddMore}
+        className="hidden"
+        data-testid="photo-camera-input"
+        aria-label="Take photo"
+      />
+
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*,.heic,.heif"
         multiple
         onChange={handleFileChange}
         disabled={disabled || !canAddMore}
         className="hidden"
-        data-testid="photo-input"
+        data-testid="photo-library-input"
+        aria-label="Choose photos from library"
+      />
+
+      <input
+        ref={desktopInputRef}
+        type="file"
+        accept="image/*,.heic,.heif"
+        multiple
+        onChange={handleFileChange}
+        disabled={disabled || !canAddMore}
+        className="hidden"
+        data-testid="photo-desktop-input"
         aria-label="Attach photos"
       />
 
       {/* Attach button */}
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={handleAttachClick}
         disabled={disabled || !canAddMore}
         aria-label={canAddMore ? "Attach photos" : `Maximum ${MAX_IMAGES} photos reached`}
         title={canAddMore ? "Attach photos (up to 10)" : `Maximum ${MAX_IMAGES} photos reached`}
         data-testid="photo-attach-button"
-        className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900"
+        className="relative flex h-10 w-10 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900"
       >
         <CameraIcon />
         {attachments.length > 0 && (
@@ -171,6 +223,49 @@ export function PhotoAttachButton({ attachments, onAttach, onRemove, disabled, c
           </span>
         )}
       </button>
+
+      {sourceMenuOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/30 p-3"
+          data-testid="photo-source-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose photo source"
+          onClick={() => setSourceMenuOpen(false)}
+        >
+          <div
+            className="safe-area-bottom w-full rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              data-testid="photo-source-camera-button"
+              onClick={openCamera}
+              className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-900"
+            >
+              <span>Take photo</span>
+              <CameraIcon />
+            </button>
+            <button
+              type="button"
+              data-testid="photo-source-library-button"
+              onClick={openLibrary}
+              className="mt-1 flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-900"
+            >
+              <span>Choose from library</span>
+              <PhotoIcon />
+            </button>
+            <button
+              type="button"
+              data-testid="photo-source-cancel-button"
+              onClick={() => setSourceMenuOpen(false)}
+              className="mt-2 flex w-full items-center justify-center rounded-xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -193,18 +288,18 @@ export function PhotoPreviewGrid({
   const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
 
   return (
-    <div className="space-y-2" data-testid="photo-preview-grid">
-      <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-        <span>{attachments.length}/{MAX_IMAGES} photos</span>
-        <span>{totalMB} MB / 5 MB</span>
+    <div className="max-w-full space-y-2 overflow-hidden" data-testid="photo-preview-grid">
+      <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <span className="shrink-0" data-testid="photo-preview-count">{attachments.length}/{MAX_IMAGES} photos</span>
+        <span className="truncate" data-testid="photo-preview-size">{totalMB} MB / 5 MB</span>
       </div>
       
-      <div className="flex flex-wrap gap-2">
+      <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
         {attachments.map((attachment) => (
           <div
             key={attachment.id}
             data-testid={`photo-preview-${attachment.id}`}
-            className="group relative"
+            className="group relative shrink-0"
           >
             <img
               src={attachment.dataUrl}
@@ -217,7 +312,7 @@ export function PhotoPreviewGrid({
               disabled={disabled}
               aria-label={`Remove ${attachment.fileName}`}
               data-testid={`photo-remove-${attachment.id}`}
-              className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-0 transition-opacity hover:bg-zinc-700 group-hover:opacity-100 disabled:cursor-not-allowed dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-100 transition-opacity hover:bg-zinc-700 disabled:cursor-not-allowed sm:opacity-0 sm:group-hover:opacity-100 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-300"
             >
               <XIcon />
             </button>
@@ -265,6 +360,26 @@ function XIcon() {
     >
       <line x1="18" x2="6" y1="6" y2="18" />
       <line x1="6" x2="18" y1="6" y2="18" />
+    </svg>
+  );
+}
+
+function PhotoIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
     </svg>
   );
 }

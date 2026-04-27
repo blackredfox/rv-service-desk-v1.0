@@ -594,13 +594,24 @@ export default function Home() {
         </main>
       </div>
 
+      <div className="safe-area-bottom shrink-0 border-t border-zinc-200 bg-white/80 px-4 py-2 text-right backdrop-blur md:hidden dark:border-zinc-800 dark:bg-zinc-950/70">
+        <button
+          type="button"
+          onClick={() => setShowTermsModal(true)}
+          data-testid="terms-privacy-mobile-btn"
+          className="rounded px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-[#FF6B00] transition-colors hover:text-orange-400 hover:underline"
+        >
+          Terms &amp; Privacy
+        </button>
+      </div>
+
       {/* Terms & Privacy link - bottom-right, orange/red color */}
       <button
         type="button"
         onClick={() => setShowTermsModal(true)}
         data-testid="terms-privacy-btn"
         className="
-          fixed bottom-4 right-4 z-30
+          fixed bottom-4 right-4 z-30 hidden md:block
           px-2 py-1 rounded
           text-[11px] font-bold uppercase tracking-wide
           text-[#FF6B00] hover:text-orange-400 hover:underline
