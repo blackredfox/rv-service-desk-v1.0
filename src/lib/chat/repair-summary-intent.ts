@@ -33,7 +33,39 @@ const COMPLAINT_PATTERNS = [
   /(?:filtraci[oó]n\s+de\s+agua|entra\s+agua)/iu,
   /(?:протечк|утечк).*вод/iu,
   /(?:не\s+закрепл|болтаетс)/iu,
+  // Cases 100/103 generalization: generic "X not working" / "X не работает"
+  // / "X no funciona" patterns. Used to recognize complaints across ANY
+  // equipment (dimmer / inverter / fridge / etc.), not just water heater.
+  // `\S+` matches at least one non-space token before/after so that bare
+  // sentence fragments don't false-positive.
+  /(?:^|\b)(?:не\s+работает|не\s+включается|не\s+запускается)\s+\S/iu,
+  /\S\s+(?:не\s+работает|не\s+включается|не\s+запускается)(?:$|\b)/iu,
+  /\b(?:not\s+working|won'?t\s+(?:work|start|turn\s+on)|doesn'?t\s+work)\b/i,
+  /\bno\s+funciona\b/iu,
 ];
+
+// Cases 100/103 — Structured shop-style report headers.
+// When the technician copies/pastes a partially-structured shop report
+// into chat (Complaint / Inspection / Conclusion / Parts / Labor),
+// that's a strong, language-agnostic report-ready signal. Three or more
+// distinct headers in the same message qualifies.
+const STRUCTURED_REPORT_HEADER_PATTERNS: readonly RegExp[] = [
+  /(?:^|\n)\s*Complaint\b/i,
+  /(?:^|\n)\s*Inspection(?:\s+performed)?\b/i,
+  /(?:^|\n)\s*Conclusion\b/i,
+  /(?:^|\n)\s*(?:Parts(?:\s+required)?|Required\s+parts)\b/i,
+  /(?:^|\n)\s*Labor\b/i,
+  /(?:^|\n)\s*(?:Жалоба|Осмотр|Заключение|Запчасти|Работа)\b/iu,
+  /(?:^|\n)\s*(?:Queja|Inspecci[oó]n|Conclusi[oó]n|Piezas|Trabajo)\b/iu,
+];
+
+function hasStructuredReportHeaders(message: string): boolean {
+  const matchCount = STRUCTURED_REPORT_HEADER_PATTERNS.reduce(
+    (n, p) => (p.test(message) ? n + 1 : n),
+    0,
+  );
+  return matchCount >= 3;
+}
 
 const FINDING_PATTERNS = [
   /(?:finding|findings|found|inspection)\s*[:\-]/i,
@@ -80,6 +112,19 @@ const CORRECTIVE_ACTION_PATTERNS = [
 
 function dedupeMissingFields(fields: RepairSummaryMissingField[]): RepairSummaryMissingField[] {
   return Array.from(new Set(fields));
+}
+
+/**
+ * Cases 100/103 generalization — does the message contain ≥3 structured
+ * shop-report headers (Complaint / Inspection / Conclusion / Parts /
+ * Labor in EN, RU, or ES)? When true, the technician has supplied a
+ * pre-structured shop-style narrative and is implicitly asking for a
+ * report draft built from it. The route uses this to BYPASS the
+ * normal Context-Engine isolation-readiness gate for non-procedure
+ * equipment (e.g. dimmer switch).
+ */
+export function hasStructuredReportHeadersExported(message: string): boolean {
+  return hasStructuredReportHeaders(message);
 }
 
 // ── Case-89: Transcript-derived repair-status assessment ────────────

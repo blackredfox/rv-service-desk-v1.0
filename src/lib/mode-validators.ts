@@ -752,6 +752,27 @@ export function isStepAnswered(
   
   const text = responseText.trim().toLowerCase();
   
+  // Russian/Spanish "all clean / nothing wrong / no problem" answers — short
+  // affirmative-no-problem phrases that semantically answer inspection
+  // questions like "any blockage/corrosion/damage visible?" (Case 110 —
+  // wh_10 burner-tube inspection answered with "все чисто" / "all clean"
+  // would otherwise loop because none of the rules below recognized it).
+  if (
+    /^(?:все\s+чисто|всё\s+чисто|все\s+норм(?:ально)?|всё\s+норм(?:ально)?|всё\s+ок|все\s+ок|всё\s+в\s+порядке|все\s+в\s+порядке|без\s+(?:проблем|повреждений|засор(?:а|ов)?|следов))$/iu.test(text)
+  ) {
+    return true;
+  }
+  if (
+    /^(?:all\s+clean|all\s+clear|all\s+good|nothing\s+(?:visible|wrong|found)|no\s+(?:issues?|problems?|damage|debris|blockage))$/i.test(text)
+  ) {
+    return true;
+  }
+  if (
+    /^(?:todo\s+limpio|todo\s+(?:bien|ok)|sin\s+(?:problemas?|da[ñn]os?|obstrucci[óo]n))$/i.test(text)
+  ) {
+    return true;
+  }
+  
   // Very short responses are likely answers to a yes/no or value question
   if (text.length <= 20) {
     // Common affirmative/negative patterns

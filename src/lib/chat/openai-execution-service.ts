@@ -104,7 +104,15 @@ export async function executeStepGuidanceCompletion(args: {
   logValidation(validation, { caseId: args.caseId, mode: "diagnostic" });
 
   if ((result.error || !validation.valid) && !args.isAborted()) {
-    args.emitToken("\n\n[System] Repairing clarification...\n\n");
+    // Validator/retry status is server-side only — never emit a
+    // visible "[System] Repairing..." token to the technician chat.
+    // Frontend progress should be driven by SSE control events, not
+    // by injected message content (Blocker 1).
+    logFlow("retry_triggered", {
+      caseId: args.caseId,
+      mode: "diagnostic",
+      path: "step_guidance_retry",
+    });
 
     const correctionInstruction = [
       buildCorrectionInstruction(
@@ -276,7 +284,10 @@ export async function executePrimaryChatCompletion(args: {
       violations: validation.violations.length,
     });
 
-    args.emitToken("\n\n[System] Repairing output...\n\n");
+    // Validator/retry status is server-side only — do NOT emit a
+    // visible "[System] Repairing..." token to the technician chat
+    // (Blocker 1). The retry's own tokens follow on the same SSE
+    // stream; the frontend needs no chat-message marker.
 
     const correctionInstruction = buildPrimaryCorrectionInstruction({
       validation,
@@ -478,7 +489,9 @@ export async function executeLaborOverrideCompletion(args: {
           validation.laborValidation.violations.length,
       });
 
-      args.emitToken("\n\n[System] Repairing output...\n\n");
+      // Validator/retry status is server-side only — do NOT emit a
+      // visible "[System] Repairing..." token to the technician chat
+      // (Blocker 1).
 
       const correctionInstruction = buildLaborOverrideRetryInstruction({
         modeViolations: validation.modeValidation.violations,

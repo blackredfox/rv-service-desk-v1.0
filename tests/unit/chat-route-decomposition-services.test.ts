@@ -283,9 +283,11 @@ describe("Chat Route Decomposition Services", () => {
       activeStepId: "wp_9",
     });
 
-    expect(fallback).toContain("Step wp_2");
+    // Metadata leak ban (Cases 95–99): `Step <id>:` and procedure
+    // banner are now forbidden in user-visible fallback text.
+    expect(fallback).not.toMatch(/Step\s+wp_2/);
+    expect(fallback).not.toMatch(/Step\s+wp_9/);
     expect(fallback).toContain("What voltage do you measure at the water pump input?");
-    expect(fallback).not.toContain("Step wp_9");
   });
 
   it("validates labor override outputs and builds retry instructions", () => {

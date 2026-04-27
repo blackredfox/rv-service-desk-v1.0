@@ -347,7 +347,9 @@ describe("/api/chat STEP_GUIDANCE runtime enforcement", () => {
     const context = getOrCreateContext(caseId);
 
     expect(turn.fetchTriggered).toBe(true);
-    expect(turn.streamText).toContain("[System] Repairing clarification...");
+    // Validator/retry status is server-side only (Blocker 1).
+    expect(turn.streamText).not.toContain("[System] Repairing clarification");
+    expect(turn.streamText).not.toContain("[System] Repairing");
     expect(turn.streamText).toContain("Current step:");
     expect(turn.streamText).toContain("We are still on this step. After you perform that check, tell me exactly what you found.");
     expect(context.activeStepId).toBe("wh_5");

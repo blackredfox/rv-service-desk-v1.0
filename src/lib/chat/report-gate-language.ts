@@ -35,6 +35,26 @@ export function looksLikeLanguage(text: string, language: Language): boolean {
 }
 
 /**
+ * Filter an arbitrary list of server-authored text fragments
+ * (e.g. sidecar `missingFields`, registry-derived labels) so only
+ * fragments that match the technician's reply language survive.
+ *
+ * Architecture invariant: when the reply language is RU or ES,
+ * raw English / wrong-script fragments must NEVER reach the
+ * technician-facing response. Used by `buildSpecificReportGateResponse`
+ * to keep Tier-1 sidecar wording language-consistent.
+ */
+export function filterServerAuthoredFragments(
+  fragments: string[],
+  language: Language,
+): string[] {
+  return fragments
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0)
+    .filter((f) => looksLikeLanguage(f, language));
+}
+
+/**
  * Build the "one step still open" hint that follows the report-gate
  * acknowledgment. Echoes the active-step prompt verbatim when it is
  * already in the technician's reply language; otherwise returns a

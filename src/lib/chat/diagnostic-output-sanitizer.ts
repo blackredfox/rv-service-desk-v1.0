@@ -50,6 +50,38 @@ export function isDiagnosticOutputSanitizerEnabled(): boolean {
 const SEP = "[·•∙\u00B7\\-\\u2010\\u2011\\u2012\\u2013\\u2014\\u2015|/]";
 
 const DROP_LINE_PATTERNS: RegExp[] = [
+  // ── Universal — drop in ALL modes (diagnostic AND final_report) ────
+  //
+  // These patterns target prompt-leakage that is never legitimate
+  // user-facing text in any case mode:
+  //
+  //   - "Active surface: <value>" / localised translations — the
+  //     OUTPUT SURFACE (MANDATORY) header from prompt-composer.ts
+  //     was being copied verbatim into final-report bodies, then
+  //     auto-translated into the chat language ("Активная
+  //     поверхность: shop_final_report" leaked into RU translations).
+  //
+  //   - "OUTPUT SURFACE (MANDATORY):" preamble — the system-prompt
+  //     fragment header itself, also occasionally echoed.
+  //
+  //   - "[System] Repairing output..." / "[System] Repairing
+  //     clarification..." — validator-retry markers historically
+  //     emitted as visible tokens by openai-execution-service. The
+  //     emit calls are removed at the source; this rule is a
+  //     defense-in-depth catch.
+  //
+  // These patterns deliberately match in ANY mode and ANY language —
+  // there is no case in which a technician should ever see them.
+  /^\s*(?:Active|Output)\s+surface\s*:.*$/i,
+  /^\s*Активная\s+(?:поверхность|выходная\s+поверхность)\s*:.*$/iu,
+  /^\s*Superficie\s+(?:activa|de\s+salida)\s*:.*$/i,
+  /^\s*OUTPUT\s+SURFACE(?:\s*\([^)]*\))?\s*:?\s*$/i,
+  /^\s*ВЫХОДНАЯ\s+ПОВЕРХНОСТЬ(?:\s*\([^)]*\))?\s*:?\s*$/iu,
+  /^\s*SUPERFICIE\s+DE\s+SALIDA(?:\s*\([^)]*\))?\s*:?\s*$/i,
+  /^\s*\[System\]\s*Repairing\s+(?:output|clarification|response)[\s.]*$/i,
+  /^\s*\[Система\]\s*Восстановл\S*\s*(?:вывод|ответ|уточн)[\s.а-яё]*$/iu,
+
+  // ── Diagnostic / runtime banners ───────────────────────────────────
   // Language/control banners
   /^\s*Copy\s*$/i,
   /^\s*Reply\s+(?:RU|EN|ES)\s*$/i,
@@ -57,23 +89,31 @@ const DROP_LINE_PATTERNS: RegExp[] = [
   /^\s*(?:RU|EN|ES)\s*[—–-]\s*(?:RU|EN|ES)\s*$/i,
   /^\s*(?:Output\s+)?Policy\s*:.*$/i,
 
-  // Russian internal status banner observed in Cases 81/86
+  // Russian internal status banner observed in Cases 81/86/95–99.
   // `Состояние` (state) added per Case-86 manual acceptance feedback.
-  /^\s*(?:Система|Классификация|Режим|Состояние|Статус|Прогресс|Первый\s+шаг)\s*:.*$/iu,
+  // `Первый\s+(?:[\wа-яё]+\s+)?шаг` covers `Первый шаг` AND
+  // `Первый действительный шаг` / `Первый необходимый шаг` (Case-97).
+  /^\s*(?:Система|Классификация|Режим|Состояние|Статус|Прогресс)\s*:.*$/iu,
+  /^\s*Первый(?:\s+[\wа-яё]+){0,2}\s+шаг\s*:.*$/iu,
   /^\s*АКТИВНАЯ\s+ДИАГНОСТИЧЕСКАЯ\s+ПРОЦЕДУРА\s*:.*$/iu,
   /^\s*ТЕКУЩИЙ\s+ШАГ\s*:.*$/iu,
   /^\s*Задай\s+ТОЧНО\s*:.*$/iu,
   /^\s*ВСЕ\s+ШАГИ\s+ЗАВЕРШЕНЫ\.?\s*$/iu,
 
   // English equivalents (system prompt label leakage)
-  /^\s*(?:System|Classification|Mode|State|Status|Progress|First\s+step)\s*:\s+.{0,400}$/i,
+  /^\s*(?:System|Classification|Mode|State|Status|Progress)\s*:\s+.{0,400}$/i,
+  /^\s*First(?:\s+\S+){0,2}\s+step\s*:.*$/i,
   /^\s*ACTIVE\s+DIAGNOSTIC\s+PROCEDURE\s*:.*$/i,
   /^\s*CURRENT\s+STEP\s*:.*$/i,
   /^\s*Ask\s+EXACTLY\s*:.*$/i,
   /^\s*ALL\s+STEPS\s+COMPLETE\.?\s*$/i,
 
   // Spanish equivalents
-  /^\s*(?:Sistema|Clasificación|Modo|Estado|Progreso|Primer\s+paso)\s*:.*$/i,
+  /^\s*(?:Sistema|Clasificación|Modo|Estado|Progreso)\s*:.*$/i,
+  // Spanish places adjectives AFTER the noun, so we accept up to 2
+  // words AFTER `paso` (e.g. `Primer paso necesario:` / `Primero paso
+  // adecuado:`) in addition to the canonical `Primer paso:`.
+  /^\s*Primer(?:o)?\s+paso(?:\s+\S+){0,2}\s*:.*$/i,
   /^\s*PROCEDIMIENTO\s+DE\s+DIAGN[ÓO]STICO\s+ACTIVO\s*:.*$/i,
   /^\s*PASO\s+ACTUAL\s*:.*$/i,
   /^\s*Pregunta\s+EXACTAMENTE\s*:.*$/i,
@@ -114,6 +154,11 @@ const STRIP_PREFIX_PATTERNS: RegExp[] = [
 // whitespace OR sentence-terminator punctuation" so the inline strip
 // works for "Принято. Шаг wh_3:" as well as English/ES.
 const STRIP_INLINE_PATTERNS: RegExp[] = [
+  // Universal — defensive mid-line strip for the validator-retry marker.
+  // The token emit at the source is removed, but this catches any
+  // residual occurrences (e.g. an LLM echo).
+  /\[\s*System\s*\]\s*Repairing\s+(?:output|clarification|response)\s*\.?\s*\.?\s*\.?\s*/gi,
+  /\[\s*Система\s*\]\s*Восстановл\S*\s+(?:вывод\S*|ответ\S*|уточн\S*)\s*\.?\s*\.?\s*\.?\s*/giu,
   /(?<=^|[\s.,;:])Шаг\s+\S+\s*:\s*/giu,
   /(?<=^|[\s.,;:])Step\s+\S+\s*:\s*/gi,
   /(?<=^|[\s.,;:])Paso\s+\S+\s*:\s*/gi,
@@ -153,12 +198,30 @@ export function sanitizeLine(
     }
   }
   // Strip inline metadata fragments mid-line (Case 86 leakage).
+  let inlineWasStripped = false;
   for (const pat of STRIP_INLINE_PATTERNS) {
-    out = out.replace(pat, "");
+    const replaced = out.replace(pat, "");
+    if (replaced !== out) {
+      inlineWasStripped = true;
+      out = replaced;
+    }
   }
   // Collapse runs of whitespace introduced by the inline strips and
-  // trim any leading punctuation/whitespace left behind.
-  out = out.replace(/\s{2,}/g, " ").replace(/^[\s.,;:·•|/—–-]+/, "");
+  // trim any leading punctuation/whitespace left behind — but ONLY
+  // when a prefix or inline strip actually happened. Unconditional
+  // leading-punctuation stripping would mangle legitimate separators
+  // such as the bilingual final-report `--- TRANSLATION ---` line
+  // (Blocker 2 — final-report sanitization must not damage the
+  // translation separator that the report-validator requires).
+  if (prefixWasStripped || inlineWasStripped) {
+    out = out
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s.,;:·•|/—–-]+/, "");
+  } else {
+    // Still collapse internal whitespace runs caused by the LLM, but
+    // do NOT touch leading punctuation.
+    out = out.replace(/\s{2,}/g, " ");
+  }
 
   // Case-88 — Language-fidelity drop:
   // If a step-prefix was stripped (i.e. this line was originally
@@ -209,6 +272,37 @@ export type SanitizingEmitter = {
   /** Flush any buffered partial line. Call once at end-of-stream. */
   flush: () => void;
 };
+
+/**
+ * Sanitize a complete text string using the same line-buffered logic as
+ * `wrapEmitterWithDiagnosticSanitizer`. Used to clean text that bypasses
+ * the streaming SSE emitter — e.g., the persisted assistant message
+ * (`full`) saved via `appendAssistantChatMessage`. The streamed SSE
+ * tokens go through the wrapper, but the persisted snapshot does NOT,
+ * so reloading the case re-exposed banner leaks even when the live
+ * stream had been clean.
+ *
+ * Returns the sanitized text (empty string if everything was dropped).
+ * If the sanitizer feature flag is off, returns the input unchanged.
+ */
+export function sanitizeText(
+  text: string,
+  options?: { replyLanguage?: "RU" | "EN" | "ES" },
+): string {
+  if (!isDiagnosticOutputSanitizerEnabled()) return text;
+  if (!text) return text;
+  let out = "";
+  const wrapper = wrapEmitterWithDiagnosticSanitizer((chunk) => {
+    out += chunk;
+  }, options);
+  wrapper.emit(text);
+  wrapper.flush();
+  // Collapse any runs of >2 blank lines that the sanitizer's line drops
+  // may have left behind (the streaming wrapper already collapses
+  // adjacent newlines emitted by it, but back-to-back drops can still
+  // leave double blanks in the accumulated output).
+  return out.replace(/\n{3,}/g, "\n\n").trim();
+}
 
 /**
  * Wrap a downstream `emitToken(text)` callback with a stateful, line-buffered

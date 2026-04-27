@@ -94,6 +94,7 @@ import {
   normalizeRoutingInput,
   assessRepairSummaryIntent,
   assessTranscriptRepairStatus,
+  hasStructuredReportHeaders,
   type RepairSummaryIntentAssessment,
   // LLM Runtime Signals (advisory sidecar)
   tryAdjudicateRuntimeSignals,
@@ -110,10 +111,18 @@ import {
 
 import {
   isDiagnosticOutputSanitizerEnabled,
+  sanitizeText as sanitizeDiagnosticText,
   wrapEmitterWithDiagnosticSanitizer,
 } from "@/lib/chat/diagnostic-output-sanitizer";
 
-import { buildStepHintLine as _buildStepHintLine } from "@/lib/chat/report-gate-language";
+import { buildStepHintLine as _buildStepHintLine, filterServerAuthoredFragments } from "@/lib/chat/report-gate-language";
+
+import {
+  buildPostInvitationGateResponse,
+  isStartFinalReportInvariantViolated,
+  wasFinalReportInvitedRecently,
+  type GovernanceHistoryMessage,
+} from "@/lib/chat/response-governance-policy";
 
 // ── Strict Context Engine Mode ──────────────────────────────────────
 const STRICT_CONTEXT_ENGINE = true;
@@ -371,15 +380,24 @@ function buildSpecificReportGateResponse(args: {
   repairSummary: RepairSummaryIntentAssessment;
   activeProcedureLabel?: string | null;
   activeStepPrompt?: string | null;
+  history?: GovernanceHistoryMessage[] | null;
 }): string {
   const sidecarReadiness = args.sidecarSignals?.reportReadiness;
-  const sidecarMissing = sidecarReadiness?.accepted && sidecarReadiness.missingFields
+  const sidecarMissingRaw = sidecarReadiness?.accepted && sidecarReadiness.missingFields
     ? sidecarReadiness.missingFields.filter((s) => s.length > 0)
     : [];
 
   // Tier 1 — adjudicated sidecar `missingFields` win when available.
   // These are legal-field names the sidecar grounded in the transcript;
   // they are not a questionnaire authored from scratch.
+  //
+  // Language-fidelity invariant: when the reply language is RU/ES,
+  // sidecar-supplied field names that are dominantly the wrong script
+  // (e.g. raw English fragments leaked from a registry-only English
+  // procedure) MUST NOT be echoed verbatim. Filter them out before
+  // composing the response. If filtering eliminates ALL fragments,
+  // fall through to Tier 2/3/4.
+  const sidecarMissing = filterServerAuthoredFragments(sidecarMissingRaw, args.language);
   if (sidecarMissing.length > 0) {
     switch (args.language) {
       case "RU":
@@ -443,9 +461,49 @@ function buildSpecificReportGateResponse(args: {
     }
   }
 
+  // Tier 3.5 — active procedure exists but no specific active step
+  // (e.g. all steps complete + isolation not yet flipped, or
+  // intermediate state). Emit a procedure-aware acknowledgement
+  // instead of the generic wall. Cases 95–99 manual feedback: the
+  // technician must NOT see "Diagnostics not complete" when the
+  // procedure is mid-flight and the report request was acknowledged.
+  if (args.activeProcedureLabel) {
+    switch (args.language) {
+      case "RU":
+        return [
+          "Понял — отчёт нужен.",
+          "Чтобы оформить отчёт, мне не хватает только подтверждения изоляции неисправности по текущему случаю.",
+          "Поделитесь, пожалуйста, итоговым результатом проверки — и я подготовлю отчёт.",
+        ].join(" ");
+      case "ES":
+        return [
+          "Entendido — quieres el informe.",
+          "Para prepararlo solo me falta la confirmación final de aislamiento de la falla.",
+          "Comparte el resultado final y preparo el informe.",
+        ].join(" ");
+      default:
+        return [
+          "Understood — you want the report.",
+          "To prepare it I just need the final isolation confirmation for this case.",
+          "Share the final check result and I'll generate the report.",
+        ].join(" ");
+    }
+  }
+
+  // ── START-FINAL-REPORT INVARIANT ───────────────────────────────────
+  // If the assistant's prior turn explicitly invited the technician to
+  // send `START FINAL REPORT` AND we'd otherwise reach the legacy
+  // generic wall, emit a ChatGPT-style post-invitation acknowledgement
+  // instead. The technician SHOULD NOT see "Diagnostics not complete..."
+  // immediately after we just invited the action.
+  if (isStartFinalReportInvariantViolated(args.history ?? null, /* runtimeReportReady */ false)) {
+    return buildPostInvitationGateResponse(args.language);
+  }
+
   // Tier 4 — last-resort generic wall. Reached only when Context Engine
-  // has no active step to point at AND no sidecar signal is present.
-  // Behaviour preserved from prior PRs.
+  // has no active procedure / no active step to point at AND no
+  // sidecar signal is present AND no recent invitation. Behaviour
+  // preserved from prior PRs.
   return buildDiagnosticsNotReadyResponse(args.language);
 }
 
@@ -1338,6 +1396,65 @@ export async function POST(req: Request) {
         requestedSurface: requestedOutputSurface,
       });
       console.log("[Chat API v2] Mode transition: diagnostic → final_report (report request ready after context processing)");
+    } else if (
+      effectiveHasBoundedReportRequest &&
+      currentMode === "diagnostic" &&
+      !engineResult.context.activeProcedureId &&
+      hasStructuredReportHeaders(message)
+    ) {
+      // Cases 100/103 generalization — non-procedure dense report.
+      // The technician copy/pasted a structured shop-style narrative
+      // (Complaint / Inspection / Conclusion / Parts / Labor) AND
+      // explicitly asked for a report. There is no Context-Engine
+      // isolation to gate on (no procedure for this equipment), so
+      // we transition to `final_report` and let the LLM build a
+      // transcript-derived draft. Truth integrity is preserved by
+      // the existing `assessTranscriptRepairStatus` constraint —
+      // recommended-only / completed-mixed scenarios are handled.
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      const transcriptRepairStatusStructured = assessTranscriptRepairStatus(
+        history.filter((msg) => msg.role === "user").map((msg) => msg.content),
+      );
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusStructured),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      currentOutputSurface = resolveOutputSurface({
+        mode: currentMode,
+        requestedSurface: requestedOutputSurface,
+      });
+      console.log("[Chat API v2] Mode transition: diagnostic → final_report (structured report headers + explicit report intent, no active procedure)");
+    } else if (
+      effectiveHasBoundedReportRequest &&
+      currentMode === "diagnostic" &&
+      hasEmbeddedExplicitFinalReportCommand &&
+      wasFinalReportInvitedRecently(historyBeforeAppend)
+    ) {
+      // START-FINAL-REPORT INVARIANT (Cases 100/101 follow-up).
+      // The assistant's previous turn explicitly invited the technician
+      // to send `START FINAL REPORT`. The technician complied. The
+      // route MUST honour that invitation and produce report/draft —
+      // not a gate response. Truth integrity is still enforced by the
+      // existing `assessTranscriptRepairStatus` constraint.
+      currentMode = "final_report";
+      await storage.updateCase(ensuredCase.id, { mode: currentMode });
+      const transcriptRepairStatusInv = assessTranscriptRepairStatus(
+        history.filter((msg) => msg.role === "user").map((msg) => msg.content),
+      );
+      reportPromptConstraint = [
+        buildReportTypePromptConstraint(requestedReportKind),
+        buildTranscriptDerivedDraftConstraint(transcriptRepairStatusInv),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      currentOutputSurface = resolveOutputSurface({
+        mode: currentMode,
+        requestedSurface: requestedOutputSurface,
+      });
+      console.log("[Chat API v2] Mode transition: diagnostic → final_report (START FINAL REPORT honoured after assistant invitation)");
     } else if (effectiveHasBoundedReportRequest && currentMode === "diagnostic") {
       // Diagnostics are unresolved — do NOT fall to repair-summary questionnaire.
       // Stay in diagnostic mode but build a SPECIFIC gate response that names
@@ -1350,6 +1467,7 @@ export async function POST(req: Request) {
         repairSummary: repairSummaryIntent,
         activeProcedureLabel: engineResult.context.activeProcedureId ?? null,
         activeStepPrompt: activeStepMetadata?.question ?? null,
+        history: historyBeforeAppend,
       });
       console.log(`[Chat API v2] Report request blocked post-context — diagnostics unresolved (specific gate)`);
     }
@@ -1462,7 +1580,7 @@ export async function POST(req: Request) {
       // Feature-flagged via `DISABLE_DIAGNOSTIC_OUTPUT_SANITIZER` for
       // emergency rollback (default: enabled).
       const sanitizingEmitter =
-        currentMode === "diagnostic" && isDiagnosticOutputSanitizerEnabled()
+        isDiagnosticOutputSanitizerEnabled()
           ? wrapEmitterWithDiagnosticSanitizer(rawEmitToken, {
               replyLanguage: outputPolicy.effective,
             })
@@ -1470,6 +1588,28 @@ export async function POST(req: Request) {
       const emitToken = sanitizingEmitter ? sanitizingEmitter.emit : rawEmitToken;
       const flushSanitizer = (): void => {
         if (sanitizingEmitter) sanitizingEmitter.flush();
+      };
+
+      // ── Persisted-message sanitizer ────────────────────────────────
+      //
+      // `full` (the assistant snapshot saved via
+      // `appendAssistantChatMessage`) bypasses the streaming SSE
+      // emitter and was therefore re-exposing the banner leaks on
+      // case reload (Case-107 first-turn metadata leak — even though
+      // the live stream was clean, the persisted record still
+      // contained `Система:` / `Классификация:` / `Шаг wh_*:` / etc.).
+      //
+      // The sanitizer runs in BOTH diagnostic AND final-report mode
+      // because both paths can leak prompt-fragment banners (Blocker 2:
+      // `Active surface: shop_final_report` was leaking into warranty
+      // report bodies and their auto-translations). The line-drop /
+      // strip rules are conservative — they target only labels that
+      // are never legitimate user-facing text in any mode (banner
+      // metadata, validator status markers, system-prompt headers).
+      const sanitizeForPersistence = (text: string): string => {
+        return sanitizeDiagnosticText(text, {
+          replyLanguage: outputPolicy.effective,
+        });
       };
 
       const onAbort = () => {
@@ -1503,7 +1643,7 @@ export async function POST(req: Request) {
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              content: full,
+              content: sanitizeForPersistence(full),
               language: outputPolicy.effective,
               userId: user?.id,
             });
@@ -1550,7 +1690,7 @@ export async function POST(req: Request) {
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              content: full,
+              content: sanitizeForPersistence(full),
               language: outputPolicy.effective,
               userId: user?.id,
             });
@@ -1586,7 +1726,7 @@ export async function POST(req: Request) {
           if (!aborted && full.trim()) {
             await appendAssistantChatMessage({
               caseId: ensuredCase.id,
-              content: full,
+              content: sanitizeForPersistence(full),
               language: outputPolicy.effective,
               userId: user?.id,
             });
@@ -1723,7 +1863,7 @@ export async function POST(req: Request) {
         if (!aborted && full.trim()) {
           await appendAssistantChatMessage({
             caseId: ensuredCase.id,
-            content: full,
+            content: sanitizeForPersistence(full),
             language: outputPolicy.effective,
             userId: user?.id,
           });
@@ -1776,4 +1916,5 @@ export const __test__ = {
   applyDiagnosticModeValidationGuard,
   computeLaborOverrideRequest,
   buildTranscriptDerivedDraftConstraint,
+  buildSpecificReportGateResponse,
 };
