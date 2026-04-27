@@ -50,6 +50,38 @@ export function isDiagnosticOutputSanitizerEnabled(): boolean {
 const SEP = "[·•∙\u00B7\\-\\u2010\\u2011\\u2012\\u2013\\u2014\\u2015|/]";
 
 const DROP_LINE_PATTERNS: RegExp[] = [
+  // ── Universal — drop in ALL modes (diagnostic AND final_report) ────
+  //
+  // These patterns target prompt-leakage that is never legitimate
+  // user-facing text in any case mode:
+  //
+  //   - "Active surface: <value>" / localised translations — the
+  //     OUTPUT SURFACE (MANDATORY) header from prompt-composer.ts
+  //     was being copied verbatim into final-report bodies, then
+  //     auto-translated into the chat language ("Активная
+  //     поверхность: shop_final_report" leaked into RU translations).
+  //
+  //   - "OUTPUT SURFACE (MANDATORY):" preamble — the system-prompt
+  //     fragment header itself, also occasionally echoed.
+  //
+  //   - "[System] Repairing output..." / "[System] Repairing
+  //     clarification..." — validator-retry markers historically
+  //     emitted as visible tokens by openai-execution-service. The
+  //     emit calls are removed at the source; this rule is a
+  //     defense-in-depth catch.
+  //
+  // These patterns deliberately match in ANY mode and ANY language —
+  // there is no case in which a technician should ever see them.
+  /^\s*(?:Active|Output)\s+surface\s*:.*$/i,
+  /^\s*Активная\s+(?:поверхность|выходная\s+поверхность)\s*:.*$/iu,
+  /^\s*Superficie\s+(?:activa|de\s+salida)\s*:.*$/i,
+  /^\s*OUTPUT\s+SURFACE(?:\s*\([^)]*\))?\s*:?\s*$/i,
+  /^\s*ВЫХОДНАЯ\s+ПОВЕРХНОСТЬ(?:\s*\([^)]*\))?\s*:?\s*$/iu,
+  /^\s*SUPERFICIE\s+DE\s+SALIDA(?:\s*\([^)]*\))?\s*:?\s*$/i,
+  /^\s*\[System\]\s*Repairing\s+(?:output|clarification|response)[\s.]*$/i,
+  /^\s*\[Система\]\s*Восстановл\S*\s*(?:вывод|ответ|уточн)[\s.а-яё]*$/iu,
+
+  // ── Diagnostic / runtime banners ───────────────────────────────────
   // Language/control banners
   /^\s*Copy\s*$/i,
   /^\s*Reply\s+(?:RU|EN|ES)\s*$/i,
@@ -122,6 +154,11 @@ const STRIP_PREFIX_PATTERNS: RegExp[] = [
 // whitespace OR sentence-terminator punctuation" so the inline strip
 // works for "Принято. Шаг wh_3:" as well as English/ES.
 const STRIP_INLINE_PATTERNS: RegExp[] = [
+  // Universal — defensive mid-line strip for the validator-retry marker.
+  // The token emit at the source is removed, but this catches any
+  // residual occurrences (e.g. an LLM echo).
+  /\[\s*System\s*\]\s*Repairing\s+(?:output|clarification|response)\s*\.?\s*\.?\s*\.?\s*/gi,
+  /\[\s*Система\s*\]\s*Восстановл\S*\s+(?:вывод\S*|ответ\S*|уточн\S*)\s*\.?\s*\.?\s*\.?\s*/giu,
   /(?<=^|[\s.,;:])Шаг\s+\S+\s*:\s*/giu,
   /(?<=^|[\s.,;:])Step\s+\S+\s*:\s*/gi,
   /(?<=^|[\s.,;:])Paso\s+\S+\s*:\s*/gi,
@@ -161,12 +198,30 @@ export function sanitizeLine(
     }
   }
   // Strip inline metadata fragments mid-line (Case 86 leakage).
+  let inlineWasStripped = false;
   for (const pat of STRIP_INLINE_PATTERNS) {
-    out = out.replace(pat, "");
+    const replaced = out.replace(pat, "");
+    if (replaced !== out) {
+      inlineWasStripped = true;
+      out = replaced;
+    }
   }
   // Collapse runs of whitespace introduced by the inline strips and
-  // trim any leading punctuation/whitespace left behind.
-  out = out.replace(/\s{2,}/g, " ").replace(/^[\s.,;:·•|/—–-]+/, "");
+  // trim any leading punctuation/whitespace left behind — but ONLY
+  // when a prefix or inline strip actually happened. Unconditional
+  // leading-punctuation stripping would mangle legitimate separators
+  // such as the bilingual final-report `--- TRANSLATION ---` line
+  // (Blocker 2 — final-report sanitization must not damage the
+  // translation separator that the report-validator requires).
+  if (prefixWasStripped || inlineWasStripped) {
+    out = out
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s.,;:·•|/—–-]+/, "");
+  } else {
+    // Still collapse internal whitespace runs caused by the LLM, but
+    // do NOT touch leading punctuation.
+    out = out.replace(/\s{2,}/g, " ");
+  }
 
   // Case-88 — Language-fidelity drop:
   // If a step-prefix was stripped (i.e. this line was originally

@@ -74,7 +74,9 @@ describe("OpenAI Execution Service", () => {
     });
 
     expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
-    expect(emitted.some((token) => token.includes("Repairing output"))).toBe(true);
+    // Validator/retry status is server-side only (Blocker 1).
+    expect(emitted.some((token) => token.includes("Repairing output"))).toBe(false);
+    expect(emitted.some((token) => token.includes("[System]"))).toBe(false);
     expect(result.emittedValidationFallback).toBe(true);
     // Metadata leak ban (Cases 95–99): fallback no longer emits the
     // `Step <id>:` prefix or procedure-banner. It just reuses the
@@ -152,7 +154,9 @@ describe("OpenAI Execution Service", () => {
     });
 
     expect(openAiMocks.callOpenAI).toHaveBeenCalledTimes(2);
-    expect(emitted.some((token) => token.includes("Repairing clarification"))).toBe(true);
+    // Validator/retry status is server-side only (Blocker 1).
+    expect(emitted.some((token) => token.includes("Repairing clarification"))).toBe(false);
+    expect(emitted.some((token) => token.includes("[System]"))).toBe(false);
     expect(result.emittedValidationFallback).toBe(true);
     expect(result.response).toBe(fallbackResponse);
   });

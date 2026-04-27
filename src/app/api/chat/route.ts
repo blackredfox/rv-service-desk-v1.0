@@ -1599,13 +1599,14 @@ export async function POST(req: Request) {
       // the live stream was clean, the persisted record still
       // contained `Система:` / `Классификация:` / `Шаг wh_*:` / etc.).
       //
-      // In diagnostic mode we run the same line-drop / prefix-strip /
-      // inline-strip rules on `full` before persistence. Final-report
-      // mode skips this transform — final reports legitimately
-      // contain section headers that look superficially banner-like
-      // (e.g. "Estimated Labor:") and must not be dropped.
+      // The sanitizer runs in BOTH diagnostic AND final-report mode
+      // because both paths can leak prompt-fragment banners (Blocker 2:
+      // `Active surface: shop_final_report` was leaking into warranty
+      // report bodies and their auto-translations). The line-drop /
+      // strip rules are conservative — they target only labels that
+      // are never legitimate user-facing text in any mode (banner
+      // metadata, validator status markers, system-prompt headers).
       const sanitizeForPersistence = (text: string): string => {
-        if (currentMode !== "diagnostic") return text;
         return sanitizeDiagnosticText(text, {
           replyLanguage: outputPolicy.effective,
         });
