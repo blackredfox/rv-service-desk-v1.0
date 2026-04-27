@@ -337,35 +337,31 @@ export function AppHeader({
             )}
           </div>
 
-          {/* Language selector — secondary outlined control, lighter weight */}
+          {/* Language selector — secondary outlined control, subtle orange accent */}
           <div
             className="
-              flex h-10 items-center gap-1
-              rounded-xl border border-zinc-800 bg-zinc-900
-              pl-3 pr-1
-              hover:border-[#FF6B00]/40
-              focus-within:border-[#FF6B00]/60 focus-within:ring-2 focus-within:ring-[#FF6B00]/40
+              flex h-10 items-center
+              rounded-xl border border-[#FF6B00]/30 bg-zinc-900
+              hover:border-[#FF6B00]/60
+              focus-within:border-[#FF6B00]/80 focus-within:ring-2 focus-within:ring-[#FF6B00]/40
               transition-colors
             "
           >
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-              Lang
-            </span>
             <select
               data-testid="language-selector"
               value={languageMode}
               onChange={(e) => onLanguageChange(e.target.value as LanguageMode)}
               aria-label="Input language"
               className="
-                h-10 bg-transparent pr-7 pl-1
+                h-10 bg-transparent pl-3 pr-7
                 text-xs font-bold text-white
                 outline-none cursor-pointer
                 appearance-none
               "
               style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a1a1aa'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23FF6B00'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
                 backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 6px center",
+                backgroundPosition: "right 8px center",
                 backgroundSize: "14px",
               }}
             >
